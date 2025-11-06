@@ -16,6 +16,7 @@ export const useCanvas = (width: number, height: number) => {
       const newImage: ImageUpload = {
         file,
         url,
+        type: 'image',
         x: 50,
         y: 50,
         width: img.width,
