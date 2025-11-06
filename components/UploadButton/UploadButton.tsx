@@ -16,9 +16,24 @@ const SUPPORTED_IMAGE_TYPES = [
   'image/tif',
 ];
 
+// Supported video formats
+const SUPPORTED_VIDEO_TYPES = [
+  'video/*',
+  '.mp4',
+  '.webm',
+  '.ogg',
+  '.mov',
+  '.avi',
+  '.mkv',
+  '.flv',
+  '.wmv',
+  '.m4v',
+  '.3gp',
+];
+
 export const UploadButton: React.FC<UploadButtonProps> = ({
   onImageUpload,
-  accept = 'image/*,.tif,.tiff',
+  accept = 'image/*,video/*,.tif,.tiff',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,19 +48,21 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
     }
   };
 
-  // Check if file is an image (including TIF/TIFF)
+  // Check if file is an image or video
   const isImageFile = (file: File): boolean => {
     const fileName = file.name.toLowerCase();
     const fileType = file.type.toLowerCase();
     
     // Check by MIME type
-    if (fileType.startsWith('image/')) {
+    if (fileType.startsWith('image/') || fileType.startsWith('video/')) {
       return true;
     }
     
-    // Check by file extension (for TIF files that might not have proper MIME type)
+    // Check by file extension
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tif', '.tiff'];
-    return imageExtensions.some(ext => fileName.endsWith(ext));
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
+    return imageExtensions.some(ext => fileName.endsWith(ext)) || 
+           videoExtensions.some(ext => fileName.endsWith(ext));
   };
 
   const handleClick = () => {
@@ -77,7 +94,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
             clipRule="evenodd"
           />
         </svg>
-        Upload Image
+        Upload Media
       </button>
     </div>
   );

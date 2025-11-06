@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Circle } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Rect, Circle, Group, Path, Text, Line } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 
@@ -249,13 +249,15 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
       const fileType = file.type.toLowerCase();
       
       // Check by MIME type
-      if (fileType.startsWith('image/')) {
+      if (fileType.startsWith('image/') || fileType.startsWith('video/')) {
         return true;
       }
       
-      // Check by file extension (for TIF files that might not have proper MIME type)
+      // Check by file extension
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tif', '.tiff'];
-      return imageExtensions.some(ext => fileName.endsWith(ext));
+      const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
+      return imageExtensions.some(ext => fileName.endsWith(ext)) || 
+             videoExtensions.some(ext => fileName.endsWith(ext));
     });
 
     if (files.length > 0 && onImagesDrop) {
@@ -351,36 +353,163 @@ const ResizeHandle: React.FC<{
   );
 };
 
-// Separate component for image rendering with resize handles
+// Separate component for image/video rendering with resize handles
 const CanvasImage: React.FC<{ 
   imageData: ImageUpload;
   index: number;
   onUpdate?: (updates: Partial<ImageUpload>) => void;
 }> = ({ imageData, index, onUpdate }) => {
-  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [img, setImg] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
   const [isSelected, setIsSelected] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const imageRef = useRef<Konva.Image>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const animRef = useRef<number | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeUpdateRef = useRef<number | null>(null);
+  const wasPlayingBeforeDrag = useRef(false);
   const originalAspectRatio = useRef<number>(1);
+  const isVideo = imageData.type === 'video';
 
   useEffect(() => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.src = imageData.url;
-    image.onload = () => {
-      setImg(image);
-      originalAspectRatio.current = image.width / image.height;
-    };
+    if (isVideo) {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.src = imageData.url;
+      video.muted = false;
+      video.loop = false;
+      video.playsInline = true;
+      
+      video.onloadedmetadata = () => {
+        setImg(video);
+        originalAspectRatio.current = video.videoWidth / video.videoHeight;
+        setDuration(video.duration || 0);
+        videoRef.current = video;
+      };
+      
+      video.onplay = () => setIsPlaying(true);
+      video.onpause = () => setIsPlaying(false);
+      video.onended = () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      };
+      video.ontimeupdate = () => {
+        if (!isDragging && videoRef.current) {
+          // Throttle time updates to prevent excessive re-renders
+          if (timeUpdateRef.current) {
+            cancelAnimationFrame(timeUpdateRef.current);
+          }
+          timeUpdateRef.current = requestAnimationFrame(() => {
+            if (videoRef.current && !isDragging) {
+              setCurrentTime(videoRef.current.currentTime);
+            }
+          });
+        }
+      };
+      
+      return () => {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.src = '';
+        }
+        if (timeUpdateRef.current) {
+          cancelAnimationFrame(timeUpdateRef.current);
+        }
+        URL.revokeObjectURL(imageData.url);
+      };
+    } else {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.src = imageData.url;
+      image.onload = () => {
+        setImg(image);
+        originalAspectRatio.current = image.width / image.height;
+      };
+      return () => {
+        URL.revokeObjectURL(imageData.url);
+      };
+    }
+  }, [imageData.url, isVideo]);
+
+  // Animation loop for video - updates both video frame and progress bar
+  useEffect(() => {
+    if (isVideo && videoRef.current && imageRef.current) {
+      const video = videoRef.current;
+      const layer = imageRef.current.getLayer();
+      const anim = () => {
+        if (video && !video.paused && !video.ended) {
+          layer?.batchDraw();
+          animRef.current = requestAnimationFrame(anim);
+        }
+      };
+      
+      if (isPlaying) {
+        anim();
+      }
+      
+      return () => {
+        if (animRef.current) {
+          cancelAnimationFrame(animRef.current);
+        }
+      };
+    }
+  }, [isVideo, isPlaying]);
+
+  // Smooth hover state management to prevent flickering
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    if (isVideo) {
+      setIsHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Small delay to prevent flickering when moving between controls
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 100);
+  };
+
+  useEffect(() => {
     return () => {
-      URL.revokeObjectURL(imageData.url);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
     };
-  }, [imageData.url]);
+  }, []);
+
+  // Format time helper
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   if (!img) return null;
 
   const x = imageData.x || 50;
   const y = imageData.y || 50;
-  const width = imageData.width || img.width;
-  const height = imageData.height || img.height;
+  const getDefaultWidth = () => {
+    if (isVideo && img instanceof HTMLVideoElement) {
+      return img.videoWidth || 640;
+    }
+    return (img as HTMLImageElement).width || 640;
+  };
+  const getDefaultHeight = () => {
+    if (isVideo && img instanceof HTMLVideoElement) {
+      return img.videoHeight || 360;
+    }
+    return (img as HTMLImageElement).height || 360;
+  };
+  const width = imageData.width || getDefaultWidth();
+  const height = imageData.height || getDefaultHeight();
 
   // Calculate corner positions
   const corners = {
@@ -441,24 +570,256 @@ const CanvasImage: React.FC<{
     });
   };
 
+  const handlePlayPause = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    if (isVideo && videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const handleProgressClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!isVideo || !videoRef.current || !duration) return;
+    e.cancelBubble = true;
+    
+    const stage = e.target.getStage();
+    if (!stage) return;
+    
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) return;
+    
+    // Get the absolute position of the progress bar
+    const progressBarStartX = x + 40; // Left edge of progress bar (accounting for play button)
+    const progressBarWidth = width - 100; // Width of progress bar
+    const progressBarEndX = progressBarStartX + progressBarWidth;
+    
+    // Calculate progress based on click position
+    const clickX = pointerPos.x;
+    const relativeX = clickX - progressBarStartX;
+    const progress = Math.max(0, Math.min(1, relativeX / progressBarWidth));
+    
+    if (videoRef.current) {
+      videoRef.current.currentTime = progress * duration;
+      setCurrentTime(progress * duration);
+    }
+  };
+
+  const handleProgressDrag = (e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!isVideo || !videoRef.current || !duration) return;
+    
+    const node = e.target;
+    const progressBarWidth = width - 100;
+    
+    // Get the handle's x position relative to the progress bar group
+    const handleX = node.x();
+    const progress = Math.max(0, Math.min(1, handleX / progressBarWidth));
+    const newTime = progress * duration;
+    
+    if (videoRef.current) {
+      // Update video position smoothly during drag
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+      // Force layer update for smooth visual feedback
+      imageRef.current?.getLayer()?.batchDraw();
+    }
+  };
+
+  const handleProgressDragStart = () => {
+    setIsDragging(true);
+    if (videoRef.current) {
+      // Remember if video was playing before drag
+      wasPlayingBeforeDrag.current = !videoRef.current.paused;
+      // Pause video during drag for smoother seeking
+      if (wasPlayingBeforeDrag.current) {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const handleProgressDragEnd = () => {
+    setIsDragging(false);
+    // Resume playback if it was playing before drag
+    if (videoRef.current && wasPlayingBeforeDrag.current) {
+      videoRef.current.play();
+    }
+  };
+
   return (
     <>
-      <KonvaImage
-        ref={imageRef}
-        image={img}
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        draggable
-        onDragEnd={handleImageDragEnd}
-        onClick={(e) => {
-          e.cancelBubble = true;
-          setIsSelected(true);
-        }}
-        stroke={isSelected ? '#3b82f6' : undefined}
-        strokeWidth={isSelected ? 2 : 0}
-      />
+      <Group
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <KonvaImage
+          ref={imageRef}
+          image={img}
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          draggable
+          onDragEnd={handleImageDragEnd}
+          onClick={(e) => {
+            e.cancelBubble = true;
+            setIsSelected(true);
+            if (isVideo && !isHovered) {
+              handlePlayPause(e);
+            }
+          }}
+          stroke={isSelected ? '#3b82f6' : undefined}
+          strokeWidth={isSelected ? 2 : 0}
+        />
+      </Group>
+      {/* Video controls overlay - appears on hover */}
+      {isVideo && isHovered && (
+        <Group 
+          x={x} 
+          y={y}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Controls background */}
+          <Rect
+            x={0}
+            y={height - 50}
+            width={width}
+            height={50}
+            fill="rgba(0, 0, 0, 0.75)"
+            cornerRadius={[0, 0, 0, 0]}
+            listening={false}
+          />
+          
+          {/* Play/Pause button */}
+          <Group
+            x={15}
+            y={height - 35}
+            onClick={handlePlayPause}
+            onTap={handlePlayPause}
+          >
+            <Circle
+              radius={12}
+              fill="rgba(255, 255, 255, 0.9)"
+            />
+            {isPlaying ? (
+              // Pause icon
+              <>
+                <Rect x={-5} y={-6} width={3} height={12} fill="rgba(0, 0, 0, 0.9)" cornerRadius={1} />
+                <Rect x={2} y={-6} width={3} height={12} fill="rgba(0, 0, 0, 0.9)" cornerRadius={1} />
+              </>
+            ) : (
+              // Play icon
+              <Path
+                data="M -4 -6 L -4 6 L 6 0 Z"
+                fill="rgba(0, 0, 0, 0.9)"
+              />
+            )}
+          </Group>
+
+          {/* Progress bar container */}
+          <Group x={40} y={height - 30}>
+            {/* Progress bar background - clickable area */}
+            <Rect
+              x={0}
+              y={-8}
+              width={width - 100}
+              height={20}
+              fill="transparent"
+              onClick={handleProgressClick}
+            />
+            
+            {/* Progress bar background track */}
+            <Rect
+              x={0}
+              y={0}
+              width={width - 100}
+              height={4}
+              fill="rgba(255, 255, 255, 0.3)"
+              cornerRadius={2}
+              listening={false}
+            />
+            
+            {/* Progress bar filled */}
+            <Rect
+              x={0}
+              y={0}
+              width={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
+              height={4}
+              fill="#3b82f6"
+              cornerRadius={2}
+              listening={false}
+            />
+            
+            {/* Progress bar handle */}
+            <Circle
+              x={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
+              y={2}
+              radius={6}
+              fill="#ffffff"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              draggable
+              dragBoundFunc={(pos) => {
+                return {
+                  x: Math.max(0, Math.min(width - 100, pos.x)),
+                  y: 2,
+                };
+              }}
+              onDragMove={handleProgressDrag}
+              onDragEnd={handleProgressDragEnd}
+              onDragStart={handleProgressDragStart}
+              onClick={(e) => {
+                e.cancelBubble = true;
+              }}
+            />
+          </Group>
+
+          {/* Time display */}
+          <Text
+            x={width - 55}
+            y={height - 35}
+            text={`${formatTime(currentTime)} / ${formatTime(duration)}`}
+            fontSize={12}
+            fontFamily="Arial"
+            fill="rgba(255, 255, 255, 0.9)"
+            align="right"
+            listening={false}
+          />
+        </Group>
+      )}
+      
+      {/* Center play button when not hovered */}
+      {isVideo && !isHovered && (
+        <Group
+          x={x + width / 2}
+          y={y + height / 2}
+          onClick={handlePlayPause}
+          onTap={handlePlayPause}
+          opacity={0.7}
+        >
+          <Circle
+            radius={25}
+            fill="rgba(0, 0, 0, 0.7)"
+            shadowBlur={10}
+            shadowOpacity={0.5}
+          />
+          {isPlaying ? (
+            // Pause icon
+            <>
+              <Rect x={-10} y={-8} width={5} height={16} fill="white" cornerRadius={1} />
+              <Rect x={5} y={-8} width={5} height={16} fill="white" cornerRadius={1} />
+            </>
+          ) : (
+            // Play icon
+            <Path
+              data="M -8 -10 L -8 10 L 12 0 Z"
+              fill="white"
+            />
+          )}
+        </Group>
+      )}
       {isSelected && (
         <>
           <ResizeHandle

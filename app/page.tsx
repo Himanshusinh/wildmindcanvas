@@ -26,42 +26,77 @@ export default function Home() {
   };
 
   const handleImageUpload = (file: File) => {
-    processImageFile(file, images.length);
+    processMediaFile(file, images.length);
   };
 
-  const processImageFile = (file: File, offsetIndex: number = 0) => {
+  const processMediaFile = (file: File, offsetIndex: number = 0) => {
     const url = URL.createObjectURL(file);
-    const img = new Image();
+    const fileType = file.type.toLowerCase();
+    const isVideo = fileType.startsWith('video/') || 
+                    ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
+                      .some(ext => file.name.toLowerCase().endsWith(ext));
     
-    img.onload = () => {
-      // Get current viewport center
-      const center = viewportCenterRef.current;
+    if (isVideo) {
+      const video = document.createElement('video');
+      video.src = url;
+      video.preload = 'metadata';
       
-      // Place image at the center of current viewport with slight offset for multiple images
-      const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
-      const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
-      const imageX = center.x - img.width / 2 + offsetX;
-      const imageY = center.y - img.height / 2 + offsetY;
+      video.onloadedmetadata = () => {
+        // Get current viewport center
+        const center = viewportCenterRef.current;
+        
+        // Place video at the center of current viewport with slight offset for multiple files
+        const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
+        const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
+        const videoX = center.x - video.videoWidth / 2 + offsetX;
+        const videoY = center.y - video.videoHeight / 2 + offsetY;
 
-      const newImage: ImageUpload = {
-        file,
-        url,
-        x: imageX,
-        y: imageY,
-        width: img.width,
-        height: img.height,
+        const newImage: ImageUpload = {
+          file,
+          url,
+          type: 'video',
+          x: videoX,
+          y: videoY,
+          width: video.videoWidth,
+          height: video.videoHeight,
+        };
+
+        setImages((prev) => [...prev, newImage]);
+      };
+    } else {
+      const img = new Image();
+      
+      img.onload = () => {
+        // Get current viewport center
+        const center = viewportCenterRef.current;
+        
+        // Place image at the center of current viewport with slight offset for multiple images
+        const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
+        const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
+        const imageX = center.x - img.width / 2 + offsetX;
+        const imageY = center.y - img.height / 2 + offsetY;
+
+        const newImage: ImageUpload = {
+          file,
+          url,
+          type: 'image',
+          x: imageX,
+          y: imageY,
+          width: img.width,
+          height: img.height,
+        };
+
+        setImages((prev) => [...prev, newImage]);
       };
 
-      setImages((prev) => [...prev, newImage]);
-    };
-
-    img.src = url;
+      img.src = url;
+    }
   };
 
   const handleImagesDrop = (files: File[]) => {
     // Process multiple files with slight offsets
     files.forEach((file, index) => {
-      processImageFile(file, images.length + index);
+      processMediaFile(file, images.length + index);
     });
   };
 
