@@ -4,12 +4,39 @@ import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Image as KonvaImage, Rect, Circle, Group, Path, Text, Line } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
+import { Model3DOverlay } from './Model3DOverlay';
+import { TextInput } from '@/components/TextInput';
+import { ImageUploadModal } from '@/components/ImageUploadModal';
+import { VideoUploadModal } from '@/components/VideoUploadModal';
+import { MusicUploadModal } from '@/components/MusicUploadModal';
+import { ContextMenu } from '@/components/ContextMenu';
 
 interface CanvasProps {
   images?: ImageUpload[];
   onViewportChange?: (center: { x: number; y: number }, scale: number) => void;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
+  onImageDelete?: (index: number) => void;
+  onImageDownload?: (index: number) => void;
+  onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
+  selectedTool?: 'cursor' | 'text' | 'image' | 'video' | 'music';
+  onTextCreate?: (text: string, x: number, y: number) => void;
+  toolClickCounter?: number;
+  isImageModalOpen?: boolean;
+  onImageModalClose?: () => void;
+  onImageSelect?: (file: File) => void;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  generatedImageUrl?: string | null;
+  isVideoModalOpen?: boolean;
+  onVideoModalClose?: () => void;
+  onVideoSelect?: (file: File) => void;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  generatedVideoUrl?: string | null;
+  isMusicModalOpen?: boolean;
+  onMusicModalClose?: () => void;
+  onMusicSelect?: (file: File) => void;
+  onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  generatedMusicUrl?: string | null;
 }
 
 // Truly infinite canvas - fixed massive size to support 100+ 8K images
@@ -24,7 +51,33 @@ const DOT_SPACING = 20; // Distance between dots in pixels
 const DOT_SIZE = 2; // Size of each dot in pixels
 const DOT_OPACITY = 0.90; // Dot darkness (0.0 = invisible, 1.0 = fully black) - adjust this value to make dots darker/lighter
 
-export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, onImageUpdate, onImagesDrop }) => {
+export const Canvas: React.FC<CanvasProps> = ({ 
+  images = [], 
+  onViewportChange, 
+  onImageUpdate,
+  onImageDelete,
+  onImageDownload,
+  onImageDuplicate,
+  onImagesDrop,
+  selectedTool,
+  onTextCreate,
+  toolClickCounter = 0,
+  isImageModalOpen = false,
+  onImageModalClose,
+  onImageSelect,
+  onImageGenerate,
+  generatedImageUrl,
+  isVideoModalOpen = false,
+  onVideoModalClose,
+  onVideoSelect,
+  onVideoGenerate,
+  generatedVideoUrl,
+  isMusicModalOpen = false,
+  onMusicModalClose,
+  onMusicSelect,
+  onMusicGenerate,
+  generatedMusicUrl,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const layerRef = useRef<Konva.Layer>(null);
@@ -37,8 +90,123 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
     x: 0, 
     y: 0 
   });
+  const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
+  const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>>([]);
+  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>>([]);
+  const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
+  const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
+  const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
+  const [selectedMusicModalId, setSelectedMusicModalId] = useState<string | null>(null);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
+  const [contextMenuModalId, setContextMenuModalId] = useState<string | null>(null);
+  const [contextMenuModalType, setContextMenuModalType] = useState<'image' | 'video' | 'music' | null>(null);
+  const prevSelectedToolRef = useRef<'cursor' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
   // Truly infinite canvas - fixed massive size
   const canvasSize = { width: INFINITE_CANVAS_SIZE, height: INFINITE_CANVAS_SIZE };
+
+  // Automatically create text input at center when text tool is selected
+  useEffect(() => {
+    if (selectedTool === 'text') {
+      // Always create a new text input at center when text tool is selected
+      // Calculate center of viewport in canvas coordinates
+      const centerX = (viewportSize.width / 2 - position.x) / scale;
+      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const newId = `text-${Date.now()}-${Math.random()}`;
+      setTextInputStates(prev => [...prev, { id: newId, x: centerX, y: centerY }]);
+    }
+    prevSelectedToolRef.current = selectedTool;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTool, toolClickCounter]);
+
+  // Automatically create image modal at center when image tool is selected
+  useEffect(() => {
+    if (selectedTool === 'image' && isImageModalOpen) {
+      // Calculate center of viewport in canvas coordinates
+      const centerX = (viewportSize.width / 2 - position.x) / scale;
+      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const newId = `image-${Date.now()}-${Math.random()}`;
+      setImageModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedImageUrl: null }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTool, isImageModalOpen, toolClickCounter]);
+
+  // Automatically create video modal at center when video tool is selected
+  useEffect(() => {
+    if (selectedTool === 'video' && isVideoModalOpen) {
+      // Calculate center of viewport in canvas coordinates
+      const centerX = (viewportSize.width / 2 - position.x) / scale;
+      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const newId = `video-${Date.now()}-${Math.random()}`;
+      setVideoModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedVideoUrl: null }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTool, isVideoModalOpen, toolClickCounter]);
+
+  // Automatically create music modal at center when music tool is selected
+  useEffect(() => {
+    if (selectedTool === 'music' && isMusicModalOpen) {
+      // Calculate center of viewport in canvas coordinates
+      const centerX = (viewportSize.width / 2 - position.x) / scale;
+      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const newId = `music-${Date.now()}-${Math.random()}`;
+      setMusicModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedMusicUrl: null }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTool, isMusicModalOpen, toolClickCounter]);
+
+  // Sync generatedImageUrl prop to the most recently created image modal
+  useEffect(() => {
+    if (generatedImageUrl && imageModalStates.length > 0) {
+      // Update the last image modal with the generated URL
+      setImageModalStates(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            generatedImageUrl,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [generatedImageUrl, imageModalStates.length]);
+
+  // Sync generatedVideoUrl prop to the most recently created video modal
+  useEffect(() => {
+    if (generatedVideoUrl && videoModalStates.length > 0) {
+      // Update the last video modal with the generated URL
+      setVideoModalStates(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            generatedVideoUrl,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [generatedVideoUrl, videoModalStates.length]);
+
+  // Sync generatedMusicUrl prop to the most recently created music modal
+  useEffect(() => {
+    if (generatedMusicUrl && musicModalStates.length > 0) {
+      // Update the last music modal with the generated URL
+      setMusicModalStates(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            generatedMusicUrl,
+          };
+        }
+        return updated;
+      });
+    }
+  }, [generatedMusicUrl, musicModalStates.length]);
 
   // Update viewport size on window resize and center initial view
   useEffect(() => {
@@ -147,19 +315,150 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
     }
   }, [scale, position]);
 
-  // Handle drag to pan - only when clicking on stage background
+  // Track if space key is pressed for panning
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
+
+  // Listen for space key for panning and Delete/Backspace for deletion
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        setIsSpacePressed(true);
+        const stage = stageRef.current;
+        if (stage) {
+          stage.container().style.cursor = 'grab';
+        }
+      }
+      
+      // Handle Delete/Backspace key for deletion (works on both Windows and Mac)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.repeat) {
+        // Prevent default browser behavior (like going back in history)
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          // Don't delete if user is typing in an input field
+          return;
+        }
+        
+        e.preventDefault();
+        
+        // Delete selected image/video/text element
+        if (selectedImageIndex !== null && onImageDelete) {
+          onImageDelete(selectedImageIndex);
+          setSelectedImageIndex(null);
+        }
+        
+        // Delete selected text input overlay
+        if (selectedTextInputId !== null) {
+          setTextInputStates(prev => prev.filter(t => t.id !== selectedTextInputId));
+          setSelectedTextInputId(null);
+        }
+        
+        // Delete selected image modal
+        if (selectedImageModalId !== null) {
+          setImageModalStates(prev => prev.filter(m => m.id !== selectedImageModalId));
+          setSelectedImageModalId(null);
+        }
+        
+        // Delete selected video modal
+        if (selectedVideoModalId !== null) {
+          setVideoModalStates(prev => prev.filter(m => m.id !== selectedVideoModalId));
+          setSelectedVideoModalId(null);
+        }
+        
+        // Delete selected music modal
+        if (selectedMusicModalId !== null) {
+          setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
+          setSelectedMusicModalId(null);
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+        const stage = stageRef.current;
+        if (stage && !isPanning) {
+          stage.container().style.cursor = selectedTool === 'text' ? 'text' : 'grab';
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedTool, isPanning, selectedImageIndex, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete]);
+
+  // Handle drag to pan - enhanced for better navigation
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const clickedOnEmpty = e.target === e.target.getStage();
-    const isPanKey = e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey;
+    const target = e.target;
+    const stage = target.getStage();
+    const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.getClassName() === 'Rect';
+    const isPanKey = e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    const isCursorTool = selectedTool === 'cursor';
+    const clickedOnElement = !clickedOnEmpty;
     
-    if (clickedOnEmpty || isPanKey) {
+    // Check if clicking on a resize handle - if so, don't clear selection
+    // Resize handles have a name attribute "resize-handle"
+    const isResizeHandle = target.name() === 'resize-handle';
+    
+    // Clear selections when clicking on empty space (but not on resize handles or the background pattern)
+    // Also exclude the background Rect pattern (which is the canvas pattern - very large Rect)
+    const targetClassName = target.getClassName();
+    const isBackgroundPattern = targetClassName === 'Rect' && 
+      (target as Konva.Rect).width() > 100000; // Background pattern is the full canvas size
+    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern) {
+      setSelectedImageIndex(null);
+      setSelectedTextInputId(null);
+      setSelectedImageModalId(null);
+      setSelectedVideoModalId(null);
+      setSelectedMusicModalId(null);
+      setContextMenuOpen(false);
+      setContextMenuImageIndex(null);
+      setContextMenuModalId(null);
+      setContextMenuModalType(null);
+    }
+    
+    // Store mouse down position to detect drag vs click
+    const pointerPos = e.target.getStage()?.getPointerPosition();
+    if (pointerPos) {
+      setMouseDownPos({ x: pointerPos.x, y: pointerPos.y });
+    }
+    
+    // If text tool is selected and clicking on empty space, create text input
+    if (selectedTool === 'text' && clickedOnEmpty && !isPanKey) {
       const stage = e.target.getStage();
       if (stage) {
+        if (pointerPos) {
+          // Convert screen coordinates to canvas coordinates
+          const canvasX = (pointerPos.x - position.x) / scale;
+          const canvasY = (pointerPos.y - position.y) / scale;
+          const newId = `text-${Date.now()}-${Math.random()}`;
+          setTextInputStates(prev => [...prev, { id: newId, x: canvasX, y: canvasY }]);
+        }
+      }
+      return;
+    }
+    
+    // Enable panning if:
+    // 1. Clicking on empty space (always allows panning without modifier keys), OR
+    // 2. Using pan keys (middle mouse button, Ctrl/Cmd, or Space key) - works anywhere
+    const shouldPan = clickedOnEmpty || isPanKey;
+    
+    if (shouldPan) {
+      const stage = e.target.getStage();
+      if (stage) {
+        setIsPanning(true);
         stage.draggable(true);
         stage.container().style.cursor = 'grabbing';
       }
-    } else {
-      // If clicking on an image, disable stage dragging
+    } else if (clickedOnElement) {
+      // If clicking on an image/video element, prepare for potential drag-to-pan
+      setIsDraggingFromElement(true);
       const stage = e.target.getStage();
       if (stage) {
         stage.draggable(false);
@@ -167,10 +466,58 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
     }
   };
 
+  // Track mouse movement to detect drag vs click on elements
+  useEffect(() => {
+    if (!isDraggingFromElement || !mouseDownPos) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const moveThreshold = 5; // pixels
+      const distance = Math.sqrt(
+        Math.pow(e.clientX - mouseDownPos.x, 2) + 
+        Math.pow(e.clientY - mouseDownPos.y, 2)
+      );
+
+      // If mouse moved significantly, enable panning
+      if (distance > moveThreshold) {
+        const stage = stageRef.current;
+        if (stage) {
+          setIsPanning(true);
+          stage.draggable(true);
+          stage.container().style.cursor = 'grabbing';
+          // Disable element dragging when panning
+          const allNodes = stage.find('Image');
+          allNodes.forEach((node) => {
+            node.draggable(false);
+          });
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingFromElement(false);
+      setMouseDownPos(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingFromElement, mouseDownPos]);
+
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (stage) {
-      stage.container().style.cursor = 'grab';
+      setIsPanning(false);
+      setIsDraggingFromElement(false);
+      setMouseDownPos(null);
+      if (isSpacePressed) {
+        stage.container().style.cursor = 'grab';
+      } else {
+        stage.container().style.cursor = selectedTool === 'text' ? 'text' : 'grab';
+      }
     }
   };
 
@@ -256,8 +603,10 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
       // Check by file extension
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tif', '.tiff'];
       const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
+      const modelExtensions = ['.obj', '.gltf', '.glb'];
       return imageExtensions.some(ext => fileName.endsWith(ext)) || 
-             videoExtensions.some(ext => fileName.endsWith(ext));
+             videoExtensions.some(ext => fileName.endsWith(ext)) ||
+             modelExtensions.some(ext => fileName.endsWith(ext));
     });
 
     if (files.length > 0 && onImagesDrop) {
@@ -286,7 +635,7 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
         onMouseUp={handleStageMouseUp}
         onDragMove={handleStageDragMove}
         onDragEnd={handleStageDragEnd}
-        style={{ cursor: 'grab' }}
+        style={{ cursor: selectedTool === 'text' ? 'text' : 'grab' }}
       >
         <Layer ref={layerRef}>
           {/* Infinite canvas pattern background */}
@@ -300,17 +649,370 @@ export const Canvas: React.FC<CanvasProps> = ({ images = [], onViewportChange, o
               fillPatternRepeat="repeat"
             />
           )}
-          {/* Images */}
-          {images.map((imageData, index) => (
-            <CanvasImage 
-              key={`${imageData.url}-${index}`} 
-              imageData={imageData}
-              index={index}
-              onUpdate={(updates) => onImageUpdate?.(index, updates)}
-            />
-          ))}
+          {/* Images and Videos */}
+          {images
+            .filter((img) => img.type !== 'model3d' && img.type !== 'text')
+            .map((imageData, index) => {
+              const actualIndex = images.findIndex(img => img === imageData);
+              return (
+              <CanvasImage 
+                key={`${imageData.url}-${index}`} 
+                imageData={imageData}
+                index={actualIndex}
+                onUpdate={(updates) => onImageUpdate?.(actualIndex, updates)}
+                onSelect={() => setSelectedImageIndex(actualIndex)}
+                isSelected={selectedImageIndex === actualIndex}
+                onDelete={() => {
+                  if (onImageDelete) {
+                    onImageDelete(actualIndex);
+                  }
+                  setSelectedImageIndex(null);
+                }}
+                onContextMenu={() => {
+                  setContextMenuImageIndex(actualIndex);
+                  setContextMenuOpen(true);
+                  setSelectedImageIndex(actualIndex);
+                }}
+              />
+              );
+            })}
+          {/* Text Elements */}
+          {images
+            .filter((img) => img.type === 'text')
+            .map((textData, index) => {
+              const actualIndex = images.findIndex(img => img === textData);
+              const isSelected = selectedImageIndex === actualIndex;
+              const textX = textData.x || 0;
+              const textY = textData.y || 0;
+              const fontSize = textData.fontSize || 24;
+              // Estimate text width (approximate)
+              const textWidth = (textData.text || '').length * fontSize * 0.6;
+              const textHeight = fontSize * 1.2;
+              return (
+                <Group key={`text-${actualIndex}`}>
+                  <Text
+                    x={textX}
+                    y={textY}
+                    text={textData.text || ''}
+                    fontSize={fontSize}
+                    fontFamily={textData.fontFamily || 'Arial'}
+                    fill={textData.fill || '#000000'}
+                    draggable
+                    onDragEnd={(e) => {
+                      const node = e.target;
+                      onImageUpdate?.(actualIndex, {
+                        x: node.x(),
+                        y: node.y(),
+                      });
+                    }}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      setSelectedImageIndex(actualIndex);
+                      // Show context menu when text is clicked
+                      setContextMenuImageIndex(actualIndex);
+                      setContextMenuOpen(true);
+                    }}
+                    stroke={isSelected ? '#3b82f6' : undefined}
+                    strokeWidth={isSelected ? 2 : 0}
+                  />
+                  {/* Delete button removed - now handled by context menu in header */}
+                </Group>
+              );
+            })}
         </Layer>
       </Stage>
+      {/* 3D Models - rendered outside Konva as overlay */}
+      <Model3DOverlay
+        images={images.filter((img) => img.type === 'model3d')}
+        allImages={images}
+        stageRef={stageRef}
+        onImageUpdate={onImageUpdate}
+      />
+      {/* Text Input Overlays */}
+      {textInputStates.map((textState) => (
+        <TextInput
+          key={textState.id}
+          x={textState.x}
+          y={textState.y}
+          onConfirm={(text) => {
+            if (onTextCreate) {
+              onTextCreate(text, textState.x, textState.y);
+            }
+            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
+            setSelectedTextInputId(null);
+          }}
+          onCancel={() => {
+            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
+            setSelectedTextInputId(null);
+          }}
+          onPositionChange={(newX, newY) => {
+            setTextInputStates(prev => prev.map(t => 
+              t.id === textState.id ? { ...t, x: newX, y: newY } : t
+            ));
+          }}
+          onSelect={() => setSelectedTextInputId(textState.id)}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+        />
+      ))}
+      {/* Image Upload Modal Overlays */}
+      {imageModalStates.map((modalState) => (
+        <ImageUploadModal
+          key={modalState.id}
+          isOpen={true}
+          onClose={() => {
+            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedImageModalId(null);
+          }}
+          onImageSelect={onImageSelect}
+          onGenerate={(prompt, model, frame, aspectRatio) => {
+            if (onImageGenerate) {
+              onImageGenerate(prompt, model, frame, aspectRatio);
+              // Store generated image URL when generation completes
+              // This will be updated via a callback or prop update
+            }
+          }}
+          generatedImageUrl={modalState.generatedImageUrl}
+          onSelect={() => {
+            setSelectedImageModalId(modalState.id);
+            // Show context menu when modal is clicked
+            setContextMenuModalId(modalState.id);
+            setContextMenuModalType('image');
+            setContextMenuOpen(true);
+          }}
+          onDelete={() => {
+            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedImageModalId(null);
+          }}
+          isSelected={selectedImageModalId === modalState.id}
+          x={modalState.x}
+          y={modalState.y}
+          onPositionChange={(newX, newY) => {
+            setImageModalStates(prev => prev.map(m => 
+              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
+            ));
+          }}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+        />
+      ))}
+      {/* Video Upload Modal Overlays */}
+      {videoModalStates.map((modalState) => (
+        <VideoUploadModal
+          key={modalState.id}
+          isOpen={true}
+          onClose={() => {
+            setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedVideoModalId(null);
+          }}
+          onVideoSelect={onVideoSelect}
+          onGenerate={(prompt, model, frame, aspectRatio) => {
+            if (onVideoGenerate) {
+              onVideoGenerate(prompt, model, frame, aspectRatio);
+              // Store generated video URL when generation completes
+              // This will be updated via a callback or prop update
+            }
+          }}
+          generatedVideoUrl={modalState.generatedVideoUrl || generatedVideoUrl}
+          onSelect={() => {
+            setSelectedVideoModalId(modalState.id);
+            // Show context menu when modal is clicked
+            setContextMenuModalId(modalState.id);
+            setContextMenuModalType('video');
+            setContextMenuOpen(true);
+          }}
+          onDelete={() => {
+            setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedVideoModalId(null);
+          }}
+          isSelected={selectedVideoModalId === modalState.id}
+          x={modalState.x}
+          y={modalState.y}
+          onPositionChange={(newX, newY) => {
+            setVideoModalStates(prev => prev.map(m => 
+              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
+            ));
+          }}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+        />
+      ))}
+      {/* Music Upload Modal Overlays */}
+      {musicModalStates.map((modalState) => (
+        <MusicUploadModal
+          key={modalState.id}
+          isOpen={true}
+          onClose={() => {
+            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedMusicModalId(null);
+          }}
+          onMusicSelect={onMusicSelect}
+          onGenerate={(prompt, model, frame, aspectRatio) => {
+            if (onMusicGenerate) {
+              onMusicGenerate(prompt, model, frame, aspectRatio);
+              // Store generated music URL when generation completes
+              // This will be updated via a callback or prop update
+            }
+          }}
+          generatedMusicUrl={modalState.generatedMusicUrl || generatedMusicUrl}
+          onSelect={() => {
+            setSelectedMusicModalId(modalState.id);
+            // Show context menu when modal is clicked
+            setContextMenuModalId(modalState.id);
+            setContextMenuModalType('music');
+            setContextMenuOpen(true);
+          }}
+          onDelete={() => {
+            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedMusicModalId(null);
+          }}
+          isSelected={selectedMusicModalId === modalState.id}
+          x={modalState.x}
+          y={modalState.y}
+          onPositionChange={(newX, newY) => {
+            setMusicModalStates(prev => prev.map(m => 
+              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
+            ));
+          }}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+        />
+      ))}
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenuOpen && (contextMenuImageIndex !== null || contextMenuModalId !== null)}
+        onClose={() => {
+          setContextMenuOpen(false);
+          setContextMenuImageIndex(null);
+          setContextMenuModalId(null);
+          setContextMenuModalType(null);
+        }}
+        onDelete={() => {
+          // Handle deletion for images/videos
+          if (contextMenuImageIndex !== null && onImageDelete) {
+            onImageDelete(contextMenuImageIndex);
+            setSelectedImageIndex(null);
+            setContextMenuOpen(false);
+            setContextMenuImageIndex(null);
+          }
+          // Handle deletion for modals
+          else if (contextMenuModalId !== null && contextMenuModalType) {
+            if (contextMenuModalType === 'image') {
+              setImageModalStates(prev => prev.filter(m => m.id !== contextMenuModalId));
+              setSelectedImageModalId(null);
+            } else if (contextMenuModalType === 'video') {
+              setVideoModalStates(prev => prev.filter(m => m.id !== contextMenuModalId));
+              setSelectedVideoModalId(null);
+            } else if (contextMenuModalType === 'music') {
+              setMusicModalStates(prev => prev.filter(m => m.id !== contextMenuModalId));
+              setSelectedMusicModalId(null);
+            }
+            setContextMenuOpen(false);
+            setContextMenuModalId(null);
+            setContextMenuModalType(null);
+          }
+        }}
+        onDownload={() => {
+          // Handle download for actual images/videos
+          if (contextMenuImageIndex !== null && onImageDownload) {
+            onImageDownload(contextMenuImageIndex);
+          }
+          // Handle download for modals
+          else if (contextMenuModalId !== null && contextMenuModalType) {
+            let urlToDownload: string | null = null;
+            if (contextMenuModalType === 'image') {
+              const modal = imageModalStates.find(m => m.id === contextMenuModalId);
+              urlToDownload = modal?.generatedImageUrl || null;
+            } else if (contextMenuModalType === 'video') {
+              const modal = videoModalStates.find(m => m.id === contextMenuModalId);
+              urlToDownload = modal?.generatedVideoUrl || null;
+            } else if (contextMenuModalType === 'music') {
+              const modal = musicModalStates.find(m => m.id === contextMenuModalId);
+              urlToDownload = modal?.generatedMusicUrl || null;
+            }
+            
+            if (urlToDownload) {
+              // Download the file
+              const link = document.createElement('a');
+              link.href = urlToDownload;
+              link.download = contextMenuModalType === 'image' 
+                ? `image-${Date.now()}.png` 
+                : contextMenuModalType === 'video'
+                ? `video-${Date.now()}.mp4`
+                : `music-${Date.now()}.mp3`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          }
+        }}
+        onDuplicate={() => {
+          // Handle duplicate for actual images/videos
+          if (contextMenuImageIndex !== null && onImageDuplicate) {
+            onImageDuplicate(contextMenuImageIndex);
+          }
+          // Handle duplicate for modals
+          else if (contextMenuModalId !== null && contextMenuModalType) {
+            if (contextMenuModalType === 'image') {
+              const modal = imageModalStates.find(m => m.id === contextMenuModalId);
+              if (modal) {
+                // Create a duplicate modal with offset position
+                const newId = `image-${Date.now()}-${Math.random()}`;
+                const centerX = (viewportSize.width / 2 - position.x) / scale;
+                const centerY = (viewportSize.height / 2 - position.y) / scale;
+                setImageModalStates(prev => [...prev, {
+                  id: newId,
+                  x: modal.x + 50,
+                  y: modal.y + 50,
+                  generatedImageUrl: modal.generatedImageUrl,
+                }]);
+              }
+            } else if (contextMenuModalType === 'video') {
+              const modal = videoModalStates.find(m => m.id === contextMenuModalId);
+              if (modal) {
+                // Create a duplicate modal with offset position
+                const newId = `video-${Date.now()}-${Math.random()}`;
+                const centerX = (viewportSize.width / 2 - position.x) / scale;
+                const centerY = (viewportSize.height / 2 - position.y) / scale;
+                setVideoModalStates(prev => [...prev, {
+                  id: newId,
+                  x: modal.x + 50,
+                  y: modal.y + 50,
+                  generatedVideoUrl: modal.generatedVideoUrl,
+                }]);
+              }
+            } else if (contextMenuModalType === 'music') {
+              const modal = musicModalStates.find(m => m.id === contextMenuModalId);
+              if (modal) {
+                // Create a duplicate modal with offset position
+                const newId = `music-${Date.now()}-${Math.random()}`;
+                const centerX = (viewportSize.width / 2 - position.x) / scale;
+                const centerY = (viewportSize.height / 2 - position.y) / scale;
+                setMusicModalStates(prev => [...prev, {
+                  id: newId,
+                  x: modal.x + 50,
+                  y: modal.y + 50,
+                  generatedMusicUrl: modal.generatedMusicUrl,
+                }]);
+              }
+            }
+          }
+        }}
+        showDownload={!!(contextMenuImageIndex !== null && images[contextMenuImageIndex]?.type !== 'text' && images[contextMenuImageIndex]?.url) || !!(contextMenuModalId !== null && (
+          (contextMenuModalType === 'image' && imageModalStates.find(m => m.id === contextMenuModalId)?.generatedImageUrl) ||
+          (contextMenuModalType === 'video' && videoModalStates.find(m => m.id === contextMenuModalId)?.generatedVideoUrl) ||
+          (contextMenuModalType === 'music' && musicModalStates.find(m => m.id === contextMenuModalId)?.generatedMusicUrl)
+        ))}
+        showDuplicate={!!(contextMenuImageIndex !== null && images[contextMenuImageIndex]?.type !== 'text' && images[contextMenuImageIndex]?.url) || !!(contextMenuModalId !== null && (
+          (contextMenuModalType === 'image' && imageModalStates.find(m => m.id === contextMenuModalId)?.generatedImageUrl) ||
+          (contextMenuModalType === 'video' && videoModalStates.find(m => m.id === contextMenuModalId)?.generatedVideoUrl) ||
+          (contextMenuModalType === 'music' && musicModalStates.find(m => m.id === contextMenuModalId)?.generatedMusicUrl)
+        ))}
+      />
     </div>
   );
 };
@@ -333,9 +1035,18 @@ const ResizeHandle: React.FC<{
       stroke="#1e40af"
       strokeWidth={2}
       draggable
+      name="resize-handle"
       onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
         const node = e.target;
         onDragEnd(node.x(), node.y());
+      }}
+      onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
+        // Stop event propagation to prevent clearing selection
+        e.cancelBubble = true;
+      }}
+      onMouseDown={(e: Konva.KonvaEventObject<MouseEvent>) => {
+        // Stop event propagation to prevent clearing selection
+        e.cancelBubble = true;
       }}
       onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
         const stage = e.target.getStage();
@@ -358,9 +1069,14 @@ const CanvasImage: React.FC<{
   imageData: ImageUpload;
   index: number;
   onUpdate?: (updates: Partial<ImageUpload>) => void;
-}> = ({ imageData, index, onUpdate }) => {
+  onSelect?: () => void;
+  isSelected?: boolean;
+  onDelete?: () => void;
+  onContextMenu?: () => void;
+}> = ({ imageData, index, onUpdate, onSelect, isSelected: externalIsSelected, onDelete, onContextMenu }) => {
   const [img, setImg] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
   const [isSelected, setIsSelected] = useState(false);
+  const isSelectedState = externalIsSelected !== undefined ? externalIsSelected : isSelected;
   const [isPlaying, setIsPlaying] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -375,20 +1091,57 @@ const CanvasImage: React.FC<{
   const originalAspectRatio = useRef<number>(1);
   const isVideo = imageData.type === 'video';
 
+  // Don't render if no URL (text elements don't have URLs)
+  if (!imageData.url) return null;
+
+  const url = imageData.url; // Type narrowing
+
   useEffect(() => {
+    
     if (isVideo) {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
-      video.src = imageData.url;
+      video.src = url;
       video.muted = false;
       video.loop = false;
       video.playsInline = true;
+      video.preload = 'metadata';
       
       video.onloadedmetadata = () => {
+        // Ensure video is paused and at first frame
+        video.pause();
+        video.currentTime = 0;
         setImg(video);
         originalAspectRatio.current = video.videoWidth / video.videoHeight;
         setDuration(video.duration || 0);
         videoRef.current = video;
+        
+        // Force initial frame display after a small delay to ensure video is ready
+        setTimeout(() => {
+          if (videoRef.current && imageRef.current) {
+            videoRef.current.currentTime = 0;
+            imageRef.current.getLayer()?.batchDraw();
+          }
+        }, 100);
+      };
+      
+      // Ensure first frame is loaded and displayed
+      video.onloadeddata = () => {
+        if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+          video.currentTime = 0;
+          // Force a frame update
+          if (imageRef.current) {
+            imageRef.current.getLayer()?.batchDraw();
+          }
+        }
+      };
+      
+      // When video seeks to first frame, update the display
+      video.onseeked = () => {
+        if (video.currentTime === 0 && imageRef.current) {
+          // Force update to show first frame
+          imageRef.current.getLayer()?.batchDraw();
+        }
       };
       
       video.onplay = () => setIsPlaying(true);
@@ -419,21 +1172,21 @@ const CanvasImage: React.FC<{
         if (timeUpdateRef.current) {
           cancelAnimationFrame(timeUpdateRef.current);
         }
-        URL.revokeObjectURL(imageData.url);
+        URL.revokeObjectURL(url);
       };
     } else {
       const image = new Image();
       image.crossOrigin = 'anonymous';
-      image.src = imageData.url;
+      image.src = url;
       image.onload = () => {
         setImg(image);
         originalAspectRatio.current = image.width / image.height;
       };
       return () => {
-        URL.revokeObjectURL(imageData.url);
+        URL.revokeObjectURL(url);
       };
     }
-  }, [imageData.url, isVideo]);
+  }, [url, isVideo]);
 
   // Animation loop for video - updates both video frame and progress bar
   useEffect(() => {
@@ -460,19 +1213,21 @@ const CanvasImage: React.FC<{
   }, [isVideo, isPlaying]);
 
   // Smooth hover state management to prevent flickering
+  const [isMediaHovered, setIsMediaHovered] = useState(false);
+  
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
-    if (isVideo) {
-      setIsHovered(true);
-    }
+    setIsHovered(true);
+    setIsMediaHovered(true);
   };
 
   const handleMouseLeave = () => {
     // Small delay to prevent flickering when moving between controls
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(false);
+      setIsMediaHovered(false);
     }, 100);
   };
 
@@ -614,6 +1369,7 @@ const CanvasImage: React.FC<{
     const progressBarWidth = width - 100;
     
     // Get the handle's x position relative to the progress bar group
+    // Since the handle is now a Group, get its x position
     const handleX = node.x();
     const progress = Math.max(0, Math.min(1, handleX / progressBarWidth));
     const newTime = progress * duration;
@@ -647,55 +1403,155 @@ const CanvasImage: React.FC<{
     }
   };
 
+  // Frame styling constants (matching ImageUploadModal)
+  const frameBorderRadius = 16;
+  const frameBorderWidth = 2;
+  const framePadding = 0; // No padding, image fills the frame
+  const frameBackgroundColor = 'rgba(255, 255, 255, 0.95)';
+  const frameBorderColor = 'rgba(0, 0, 0, 0.1)';
+  const frameShadowBlur = 32;
+  const frameShadowOpacity = 0.15;
+
   return (
     <>
       <Group
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        draggable
+        x={x}
+        y={y}
+        onDragEnd={(e) => {
+          const node = e.target;
+          onUpdate?.({
+            x: node.x(),
+            y: node.y(),
+          });
+        }}
+        onClick={(e) => {
+          e.cancelBubble = true;
+          setIsSelected(true);
+          if (onSelect) {
+            onSelect();
+          }
+          // Show context menu on click
+          if (onContextMenu) {
+            onContextMenu();
+          }
+          // Don't play/pause when showing context menu
+          // Video play/pause is handled by the center button on hover
+        }}
       >
-        <KonvaImage
-          ref={imageRef}
-          image={img}
-          x={x}
-          y={y}
+        {/* Tooltip - Attached to Top, Full Width (for uploaded media) */}
+        {isMediaHovered && (
+          <Group x={0} y={-28} listening={false}>
+            <Rect
+              x={0}
+              y={0}
+              width={width}
+              height={28}
+              fill="#f0f2f5"
+              cornerRadius={[frameBorderRadius, frameBorderRadius, 0, 0]}
+              stroke={frameBorderColor}
+              strokeWidth={frameBorderWidth}
+              strokeBottom={false}
+            />
+            <Text
+              x={12}
+              y={8}
+              text="Media"
+              fontSize={12}
+              fontFamily="Arial"
+              fill="#1f2937"
+              fontWeight="600"
+              listening={false}
+            />
+            {/* Resolution display - right aligned */}
+            {imageData.originalWidth && imageData.originalHeight && (
+              <Text
+                x={width -80}
+                y={8}
+                text={`${imageData.originalWidth} x ${imageData.originalHeight}`}
+                fontSize={12}
+                fontFamily="Arial"
+                fill="#1f2937"
+                fontWeight="600"
+                align="right"
+                listening={false}
+              />
+            )}
+          </Group>
+        )}
+        {/* Frame Background */}
+        <Rect
+          x={0}
+          y={0}
           width={width}
           height={height}
-          draggable
-          onDragEnd={handleImageDragEnd}
-          onClick={(e) => {
-            e.cancelBubble = true;
-            setIsSelected(true);
-            if (isVideo && !isHovered) {
-              handlePlayPause(e);
-            }
-          }}
-          stroke={isSelected ? '#3b82f6' : undefined}
-          strokeWidth={isSelected ? 2 : 0}
+          fill={frameBackgroundColor}
+          cornerRadius={isMediaHovered ? 0 : frameBorderRadius}
+          stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
+          strokeWidth={isSelectedState ? 2 : frameBorderWidth}
+          shadowBlur={frameShadowBlur}
+          shadowOpacity={frameShadowOpacity}
+          shadowColor="rgba(0, 0, 0, 1)"
+          shadowOffsetY={8}
         />
+        
+        {/* Image/Video clipped to frame with rounded corners - fills entire frame */}
+        <Group
+          clipFunc={(ctx) => {
+            ctx.beginPath();
+            // Create rounded rectangle path matching the frame exactly
+            const x = 0;
+            const y = 0;
+            const w = width;
+            const h = height;
+            const r = isMediaHovered ? 0 : frameBorderRadius;
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+          }}
+        >
+          <KonvaImage
+            ref={imageRef}
+            image={img}
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+          />
+        </Group>
       </Group>
       {/* Video controls overlay - appears on hover */}
       {isVideo && isHovered && (
         <Group 
           x={x} 
-          y={y}
+          y={y + height - 50}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {/* Controls background */}
           <Rect
             x={0}
-            y={height - 50}
+            y={0}
             width={width}
             height={50}
             fill="rgba(0, 0, 0, 0.75)"
-            cornerRadius={[0, 0, 0, 0]}
+            cornerRadius={[0, 0, frameBorderRadius, frameBorderRadius]}
             listening={false}
           />
           
           {/* Play/Pause button */}
           <Group
             x={15}
-            y={height - 35}
+            y={15}
             onClick={handlePlayPause}
             onTap={handlePlayPause}
           >
@@ -719,47 +1575,43 @@ const CanvasImage: React.FC<{
           </Group>
 
           {/* Progress bar container */}
-          <Group x={40} y={height - 30}>
-            {/* Progress bar background - clickable area */}
+          <Group x={40} y={18}>
+            {/* Progress bar background - larger clickable area for easier interaction */}
             <Rect
               x={0}
-              y={-8}
+              y={-12}
               width={width - 100}
-              height={20}
+              height={24}
               fill="transparent"
               onClick={handleProgressClick}
             />
             
-            {/* Progress bar background track */}
+            {/* Progress bar background track - larger and more visible */}
             <Rect
               x={0}
-              y={0}
+              y={-2}
               width={width - 100}
-              height={4}
-              fill="rgba(255, 255, 255, 0.3)"
-              cornerRadius={2}
+              height={8}
+              fill="rgba(255, 255, 255, 0.25)"
+              cornerRadius={4}
               listening={false}
             />
             
-            {/* Progress bar filled */}
+            {/* Progress bar filled - shows progress */}
             <Rect
               x={0}
-              y={0}
+              y={-2}
               width={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
-              height={4}
+              height={8}
               fill="#3b82f6"
-              cornerRadius={2}
+              cornerRadius={4}
               listening={false}
             />
             
-            {/* Progress bar handle */}
-            <Circle
+            {/* Progress bar handle - larger and more visible */}
+            <Group
               x={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
               y={2}
-              radius={6}
-              fill="#ffffff"
-              stroke="#3b82f6"
-              strokeWidth={2}
               draggable
               dragBoundFunc={(pos) => {
                 return {
@@ -773,13 +1625,30 @@ const CanvasImage: React.FC<{
               onClick={(e) => {
                 e.cancelBubble = true;
               }}
-            />
+            >
+              {/* Outer circle with shadow for better visibility */}
+              <Circle
+                radius={10}
+                fill="#ffffff"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                shadowBlur={8}
+                shadowColor="rgba(0, 0, 0, 0.5)"
+                shadowOffsetX={0}
+                shadowOffsetY={2}
+              />
+              {/* Inner circle for depth */}
+              <Circle
+                radius={6}
+                fill="#3b82f6"
+              />
+            </Group>
           </Group>
 
           {/* Time display */}
           <Text
             x={width - 55}
-            y={height - 35}
+            y={15}
             text={`${formatTime(currentTime)} / ${formatTime(duration)}`}
             fontSize={12}
             fontFamily="Arial"
@@ -790,17 +1659,18 @@ const CanvasImage: React.FC<{
         </Group>
       )}
       
-      {/* Center play button when not hovered */}
-      {isVideo && !isHovered && (
+      {/* Center play/pause button - only show on hover */}
+      {isVideo && isHovered && (
         <Group
           x={x + width / 2}
           y={y + height / 2}
           onClick={handlePlayPause}
           onTap={handlePlayPause}
-          opacity={0.7}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <Circle
-            radius={25}
+            radius={30}
             fill="rgba(0, 0, 0, 0.7)"
             shadowBlur={10}
             shadowOpacity={0.5}
@@ -808,20 +1678,21 @@ const CanvasImage: React.FC<{
           {isPlaying ? (
             // Pause icon
             <>
-              <Rect x={-10} y={-8} width={5} height={16} fill="white" cornerRadius={1} />
-              <Rect x={5} y={-8} width={5} height={16} fill="white" cornerRadius={1} />
+              <Rect x={-10} y={-10} width={5} height={20} fill="white" cornerRadius={1} />
+              <Rect x={5} y={-10} width={5} height={20} fill="white" cornerRadius={1} />
             </>
           ) : (
             // Play icon
             <Path
-              data="M -8 -10 L -8 10 L 12 0 Z"
+              data="M -8 -12 L -8 12 L 14 0 Z"
               fill="white"
             />
           )}
         </Group>
       )}
-      {isSelected && (
+      {isSelectedState && (
         <>
+          {/* Resize handles only - delete button removed, now in header navbar */}
           <ResizeHandle
             x={corners.topLeft.x}
             y={corners.topLeft.y}

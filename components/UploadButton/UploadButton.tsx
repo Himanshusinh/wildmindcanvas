@@ -4,6 +4,7 @@ import { useRef, ChangeEvent } from 'react';
 
 interface UploadButtonProps {
   onImageUpload: (file: File) => void;
+  onMultipleFilesUpload?: (files: File[]) => void;
   accept?: string;
 }
 
@@ -33,15 +34,31 @@ const SUPPORTED_VIDEO_TYPES = [
 
 export const UploadButton: React.FC<UploadButtonProps> = ({
   onImageUpload,
-  accept = 'image/*,video/*,.tif,.tiff',
+  onMultipleFilesUpload,
+  accept = 'image/*,video/*,.tif,.tiff,.obj,.gltf,.glb,.fbx,.mb,.ma,.bin',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && isImageFile(file)) {
-      onImageUpload(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    // Check if any file is a GLTF file (which might need dependencies)
+    const hasGLTF = files.some(f => 
+      f.name.toLowerCase().endsWith('.gltf')
+    );
+    
+    if (hasGLTF && files.length > 1 && onMultipleFilesUpload) {
+      // If GLTF with multiple files, use multiple file handler
+      onMultipleFilesUpload(files);
+    } else {
+      // Single file or non-GLTF, use single file handler
+      const file = files[0];
+      if (file && (isImageFile(file) || isModelFile(file))) {
+        onImageUpload(file);
+      }
     }
+    
     // Reset input so same file can be selected again
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -64,6 +81,12 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
     return imageExtensions.some(ext => fileName.endsWith(ext)) || 
            videoExtensions.some(ext => fileName.endsWith(ext));
   };
+  
+  // Check if file is a 3D model
+  const isModelFile = (file: File): boolean => {
+    const fileName = file.name.toLowerCase();
+    return ['.obj', '.gltf', '.glb', '.fbx', '.mb', '.ma', '.bin'].some(ext => fileName.endsWith(ext));
+  };
 
   const handleClick = () => {
     fileInputRef.current?.click();
@@ -76,6 +99,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({
         type="file"
         accept={accept}
         onChange={handleFileChange}
+        multiple
         className="hidden"
       />
       <button

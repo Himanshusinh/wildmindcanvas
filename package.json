@@ -15,6 +15,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-konva": "^19.2.0",
+    "three": "^0.169.0",
     "utif": "^3.1.0"
   },
   "devDependencies": {
@@ -22,6 +23,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.169.0",
     "@types/utif": "^3.0.6",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",

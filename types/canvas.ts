@@ -4,15 +4,29 @@ export interface CanvasConfig {
   scale?: number;
 }
 
-export type MediaType = 'image' | 'video';
+export type MediaType = 'image' | 'video' | 'model3d' | 'text';
 
 export interface ImageUpload {
-  file: File;
-  url: string;
+  file?: File;
+  url?: string;
   type: MediaType;
   x?: number;
   y?: number;
   width?: number;
   height?: number;
+  // Original resolution for display in tooltip
+  originalWidth?: number;
+  originalHeight?: number;
+  // For 3D models
+  rotationX?: number;
+  rotationY?: number;
+  zoom?: number;
+  // For GLTF files with dependencies
+  relatedFiles?: Map<string, { file: File; url: string }>;
+  // For text elements
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  fill?: string;
 }
 

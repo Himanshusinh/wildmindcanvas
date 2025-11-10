@@ -1,0 +1,151 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+
+interface HeaderProps {
+  projectName?: string;
+  onProjectNameChange?: (name: string) => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ 
+  projectName: initialProjectName = 'Untitled',
+  onProjectNameChange 
+}) => {
+  const [projectName, setProjectName] = useState(initialProjectName);
+  const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleNameClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProjectName(e.target.value);
+  };
+
+  const handleNameBlur = () => {
+    setIsEditing(false);
+    if (onProjectNameChange) {
+      onProjectNameChange(projectName);
+    }
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setProjectName(initialProjectName);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: '16px',
+        left: '16px',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+      }}
+    >
+      {/* Library Icon - Part 1 */}
+      <div
+        style={{
+          width: '28px',
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '8px',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+          color: '#4b5563',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+        </svg>
+      </div>
+
+      {/* Project Name - Part 2 */}
+      <div
+        style={{
+          padding: '6px 10px',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+        }}
+      >
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={projectName}
+            onChange={handleNameChange}
+            onBlur={handleNameBlur}
+            onKeyDown={handleNameKeyDown}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(59, 130, 246, 0.5)',
+              borderRadius: '4px',
+              padding: '2px 6px',
+              color: '#1f2937',
+              fontSize: '14px',
+              fontWeight: '500',
+              outline: 'none',
+              minWidth: '120px',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            }}
+          />
+        ) : (
+          <div
+            onClick={handleNameClick}
+            style={{
+              padding: '2px 6px',
+              color: '#1f2937',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'text',
+              borderRadius: '4px',
+              transition: 'background-color 0.2s',
+              minWidth: '120px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            {projectName || 'Untitled'}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
