@@ -10,6 +10,7 @@ import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { VideoUploadModal } from '@/components/VideoUploadModal';
 import { MusicUploadModal } from '@/components/MusicUploadModal';
 import { ContextMenu } from '@/components/ContextMenu';
+import { GroupNameModal } from '@/components/GroupNameModal';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -19,7 +20,7 @@ interface CanvasProps {
   onImageDownload?: (index: number) => void;
   onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
-  selectedTool?: 'cursor' | 'text' | 'image' | 'video' | 'music';
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music';
   onTextCreate?: (text: string, x: number, y: number) => void;
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
@@ -95,6 +96,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
   const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
@@ -103,7 +105,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
   const [contextMenuModalId, setContextMenuModalId] = useState<string | null>(null);
   const [contextMenuModalType, setContextMenuModalType] = useState<'image' | 'video' | 'music' | null>(null);
-  const prevSelectedToolRef = useRef<'cursor' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
+  const [groups, setGroups] = useState<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>(new Map());
+  const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
+  const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
   // Truly infinite canvas - fixed massive size
   const canvasSize = { width: INFINITE_CANVAS_SIZE, height: INFINITE_CANVAS_SIZE };
 
@@ -317,11 +322,15 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Track if space key is pressed for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
+  // Selection box state
+  const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
-  // Listen for space key for panning and Delete/Backspace for deletion
+  // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
@@ -330,6 +339,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (stage) {
           stage.container().style.cursor = 'grab';
         }
+      }
+      
+      if (e.shiftKey) {
+        setIsShiftPressed(true);
+        const stage = stageRef.current;
+        if (stage && selectedTool === 'move') {
+          stage.container().style.cursor = 'grab';
+        }
+        // Cursor tool with Shift should still show default cursor (no panning)
       }
       
       // Handle Delete/Backspace key for deletion (works on both Windows and Mac)
@@ -372,6 +390,24 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedMusicModalId(null);
         }
       }
+      
+      // Handle Ctrl+G / Cmd+G for creating groups
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g' && !e.repeat) {
+        e.preventDefault();
+        // Check if we have enough items to group (at least 2)
+        // For now, we'll focus on images - can be extended later for other types
+        if (selectedImageIndices.length > 1) {
+          // Store pending group items and show naming modal
+          setPendingGroupItems({
+            imageIndices: [...selectedImageIndices],
+            textIds: [],
+            imageModalIds: [],
+            videoModalIds: [],
+            musicModalIds: [],
+          });
+          setIsGroupNameModalOpen(true);
+        }
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -379,7 +415,27 @@ export const Canvas: React.FC<CanvasProps> = ({
         setIsSpacePressed(false);
         const stage = stageRef.current;
         if (stage && !isPanning) {
-          stage.container().style.cursor = selectedTool === 'text' ? 'text' : 'grab';
+          if (selectedTool === 'text') {
+            stage.container().style.cursor = 'text';
+          } else if (selectedTool === 'cursor') {
+            stage.container().style.cursor = 'default';
+          } else if (selectedTool === 'move') {
+            stage.container().style.cursor = 'grab';
+          } else {
+            stage.container().style.cursor = 'grab';
+          }
+        }
+      }
+      
+      if (!e.shiftKey) {
+        setIsShiftPressed(false);
+        const stage = stageRef.current;
+        if (stage && !isPanning) {
+          if (selectedTool === 'cursor') {
+            stage.container().style.cursor = 'default';
+          } else if (selectedTool === 'move') {
+            stage.container().style.cursor = 'grab';
+          }
         }
       }
     };
@@ -391,15 +447,188 @@ export const Canvas: React.FC<CanvasProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedTool, isPanning, selectedImageIndex, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete]);
+  }, [selectedTool, isPanning, selectedImageIndex, selectedImageIndices, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete, onImageUpdate]);
+  
+  // Handle selection box mouse move
+  useEffect(() => {
+    if (!isSelecting || !selectionBox) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      // Prevent text selection during drag
+      e.preventDefault();
+
+      // Ensure stage is not draggable during selection
+      stage.draggable(false);
+
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos) {
+        setSelectionBox(prev => prev ? {
+          ...prev,
+          currentX: pointerPos.x,
+          currentY: pointerPos.y,
+        } : null);
+      }
+    };
+
+    const handleMouseUp = () => {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      // Ensure stage is not draggable
+      stage.draggable(false);
+      
+      // Reset cursor to default for cursor tool
+      if (selectedTool === 'cursor') {
+        stage.container().style.cursor = 'default';
+      }
+
+      if (selectionBox) {
+        // Calculate selection box bounds in canvas coordinates
+        // getPointerPosition() returns coordinates relative to stage container
+        // We need to convert to canvas coordinates
+        const startCanvasX = (selectionBox.startX - position.x) / scale;
+        const startCanvasY = (selectionBox.startY - position.y) / scale;
+        const endCanvasX = (selectionBox.currentX - position.x) / scale;
+        const endCanvasY = (selectionBox.currentY - position.y) / scale;
+        
+        const minX = Math.min(startCanvasX, endCanvasX);
+        const maxX = Math.max(startCanvasX, endCanvasX);
+        const minY = Math.min(startCanvasY, endCanvasY);
+        const maxY = Math.max(startCanvasY, endCanvasY);
+        
+        // Find all items that intersect with the selection box
+        const selectedIndices: number[] = [];
+        const selectedTextIds: string[] = [];
+        const selectedImageModalIds: string[] = [];
+        const selectedVideoModalIds: string[] = [];
+        const selectedMusicModalIds: string[] = [];
+        
+        // Check images and videos (skip 3D models)
+        images.forEach((img, index) => {
+          if (img.type === 'model3d') return;
+          
+          const imgX = img.x || 0;
+          const imgY = img.y || 0;
+          const imgWidth = img.width || 0;
+          const imgHeight = img.height || 0;
+          
+          // For text, estimate dimensions
+          let width = imgWidth;
+          let height = imgHeight;
+          if (img.type === 'text') {
+            const fontSize = img.fontSize || 24;
+            width = (img.text || '').length * fontSize * 0.6;
+            height = fontSize * 1.2;
+          }
+          
+          // Check if item intersects with selection box
+          if (imgX < maxX && imgX + width > minX && imgY < maxY && imgY + height > minY) {
+            // For text in images array, we'll use the index
+            // But we need to track text separately
+            selectedIndices.push(index);
+          }
+        });
+        
+        // Check text input overlays
+        textInputStates.forEach((textState) => {
+          const textX = textState.x;
+          const textY = textState.y;
+          // Estimate text dimensions (will be updated when text is confirmed)
+          const textWidth = 200; // Approximate width for input
+          const textHeight = 30; // Approximate height for input
+          
+          if (textX < maxX && textX + textWidth > minX && textY < maxY && textY + textHeight > minY) {
+            selectedTextIds.push(textState.id);
+          }
+        });
+        
+        // Check image modals
+        imageModalStates.forEach((modalState) => {
+          const modalX = modalState.x;
+          const modalY = modalState.y;
+          const modalWidth = 400; // Approximate modal width
+          const modalHeight = 300; // Approximate modal height
+          
+          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
+            selectedImageModalIds.push(modalState.id);
+          }
+        });
+        
+        // Check video modals
+        videoModalStates.forEach((modalState) => {
+          const modalX = modalState.x;
+          const modalY = modalState.y;
+          const modalWidth = 400; // Approximate modal width
+          const modalHeight = 300; // Approximate modal height
+          
+          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
+            selectedVideoModalIds.push(modalState.id);
+          }
+        });
+        
+        // Check music modals
+        musicModalStates.forEach((modalState) => {
+          const modalX = modalState.x;
+          const modalY = modalState.y;
+          const modalWidth = 400; // Approximate modal width
+          const modalHeight = 300; // Approximate modal height
+          
+          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
+            selectedMusicModalIds.push(modalState.id);
+          }
+        });
+        
+        // Select all items that intersect with the selection box
+        const totalSelected = selectedIndices.length + selectedTextIds.length + selectedImageModalIds.length + selectedVideoModalIds.length + selectedMusicModalIds.length;
+        if (totalSelected > 0) {
+          setSelectedImageIndices(selectedIndices);
+          if (selectedIndices.length > 0) {
+            setSelectedImageIndex(selectedIndices[0]); // Keep for backward compatibility
+          }
+          // Store selected text and modal IDs in a way we can use them
+          // We'll use a ref or state to track these
+        } else {
+          // Only clear selection if selection box was actually dragged (not just clicked)
+          const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
+          const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
+          if (boxWidth > 5 || boxHeight > 5) {
+            // Selection box was dragged, clear selection
+            setSelectedImageIndices([]);
+            setSelectedImageIndex(null);
+          }
+        }
+      }
+      
+      setIsSelecting(false);
+      // Keep selection box visible after mouse up to show the selected region
+      // Clear it after a short delay
+      setTimeout(() => {
+        setSelectionBox(null);
+      }, 200);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isSelecting, selectionBox, position, scale, images, selectedTool]);
 
   // Handle drag to pan - enhanced for better navigation
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const target = e.target;
     const stage = target.getStage();
     const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.getClassName() === 'Rect';
-    const isPanKey = e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool)
+    const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
+    // Cursor tool should NEVER pan - only selection
+    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
     const clickedOnElement = !clickedOnEmpty;
     
     // Check if clicking on a resize handle - if so, don't clear selection
@@ -408,11 +637,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     
     // Clear selections when clicking on empty space (but not on resize handles or the background pattern)
     // Also exclude the background Rect pattern (which is the canvas pattern - very large Rect)
+    // Don't clear if we're starting a selection box with cursor tool
     const targetClassName = target.getClassName();
     const isBackgroundPattern = targetClassName === 'Rect' && 
       (target as Konva.Rect).width() > 100000; // Background pattern is the full canvas size
-    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern) {
+    const isStartingSelection = isCursorTool && !isPanKey && e.evt.button === 0;
+    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern && !isStartingSelection) {
       setSelectedImageIndex(null);
+      setSelectedImageIndices([]);
       setSelectedTextInputId(null);
       setSelectedImageModalId(null);
       setSelectedVideoModalId(null);
@@ -444,10 +676,41 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // Enable panning if:
-    // 1. Clicking on empty space (always allows panning without modifier keys), OR
-    // 2. Using pan keys (middle mouse button, Ctrl/Cmd, or Space key) - works anywhere
-    const shouldPan = clickedOnEmpty || isPanKey;
+    // If move tool is selected, always enable panning
+    if (isMoveTool && clickedOnEmpty && e.evt.button === 0) {
+      const stage = e.target.getStage();
+      if (stage) {
+        setIsPanning(true);
+        stage.draggable(true);
+        stage.container().style.cursor = 'grabbing';
+      }
+      return;
+    }
+    
+    // If cursor tool is selected, always start selection box on left click (NEVER pan)
+    if (isCursorTool && e.evt.button === 0) {
+      if (pointerPos) {
+        const stage = e.target.getStage();
+        if (stage) {
+          // Explicitly disable stage dragging during selection
+          stage.draggable(false);
+          // Set cursor to crosshair during selection
+          stage.container().style.cursor = 'crosshair';
+        }
+        setIsSelecting(true);
+        setSelectionBox({
+          startX: pointerPos.x,
+          startY: pointerPos.y,
+          currentX: pointerPos.x,
+          currentY: pointerPos.y,
+        });
+      }
+      return;
+    }
+    
+    // Enable panning only with move tool or pan keys (middle mouse, Ctrl/Cmd, or Space key)
+    // Cursor tool should NEVER pan
+    const shouldPan = isPanKey && !isCursorTool;
     
     if (shouldPan) {
       const stage = e.target.getStage();
@@ -456,8 +719,16 @@ export const Canvas: React.FC<CanvasProps> = ({
         stage.draggable(true);
         stage.container().style.cursor = 'grabbing';
       }
+    } else if (clickedOnElement && isMoveTool) {
+      // If move tool is selected, allow panning even when clicking on elements
+      const stage = e.target.getStage();
+      if (stage) {
+        setIsPanning(true);
+        stage.draggable(true);
+        stage.container().style.cursor = 'grabbing';
+      }
     } else if (clickedOnElement) {
-      // If clicking on an image/video element, prepare for potential drag-to-pan
+      // For other tools, prepare for potential drag-to-pan
       setIsDraggingFromElement(true);
       const stage = e.target.getStage();
       if (stage) {
@@ -468,7 +739,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Track mouse movement to detect drag vs click on elements
   useEffect(() => {
-    if (!isDraggingFromElement || !mouseDownPos) return;
+    if (!isDraggingFromElement || !mouseDownPos || selectedTool === 'cursor' || selectedTool === 'move') return;
 
     const handleMouseMove = (e: MouseEvent) => {
       const moveThreshold = 5; // pixels
@@ -505,7 +776,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingFromElement, mouseDownPos]);
+  }, [isDraggingFromElement, mouseDownPos, selectedTool]);
 
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
@@ -513,10 +784,14 @@ export const Canvas: React.FC<CanvasProps> = ({
       setIsPanning(false);
       setIsDraggingFromElement(false);
       setMouseDownPos(null);
-      if (isSpacePressed) {
+      if (selectedTool === 'text') {
+        stage.container().style.cursor = 'text';
+      } else if (selectedTool === 'move') {
         stage.container().style.cursor = 'grab';
+      } else if (selectedTool === 'cursor') {
+        stage.container().style.cursor = 'default'; // Cursor tool always shows default cursor
       } else {
-        stage.container().style.cursor = selectedTool === 'text' ? 'text' : 'grab';
+        stage.container().style.cursor = 'grab';
       }
     }
   };
@@ -565,6 +840,101 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Canvas is truly infinite - no need to expand, it's already massive
   // Fixed at 1,000,000 x 1,000,000 pixels - can handle 100+ 8K images easily
+
+  // Wrapper for onImageUpdate that handles group movement
+  const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
+    const image = images[index];
+    if (!image) return;
+
+    // Check if this image is in a group
+    if (image.groupId) {
+      const group = groups.get(image.groupId);
+      if (group) {
+        // Calculate delta if position changed
+        const oldX = image.x || 0;
+        const oldY = image.y || 0;
+        const newX = updates.x !== undefined ? updates.x : oldX;
+        const newY = updates.y !== undefined ? updates.y : oldY;
+        const deltaX = newX - oldX;
+        const deltaY = newY - oldY;
+
+        // Move all items in the group by the same delta
+        if (deltaX !== 0 || deltaY !== 0) {
+          // Move all images in the group
+          group.itemIndices.forEach((groupIndex) => {
+            if (groupIndex !== index && images[groupIndex]) {
+              const groupImage = images[groupIndex];
+              const currentX = groupImage.x || 0;
+              const currentY = groupImage.y || 0;
+              if (onImageUpdate) {
+                onImageUpdate(groupIndex, {
+                  x: currentX + deltaX,
+                  y: currentY + deltaY,
+                });
+              }
+            }
+          });
+
+          // Move text elements in the group
+          if (group.textIds) {
+            group.textIds.forEach((textId) => {
+              setTextInputStates((prev) =>
+                prev.map((textState) =>
+                  textState.id === textId
+                    ? { ...textState, x: textState.x + deltaX, y: textState.y + deltaY }
+                    : textState
+                )
+              );
+            });
+          }
+
+          // Move image modals in the group
+          if (group.imageModalIds) {
+            group.imageModalIds.forEach((modalId) => {
+              setImageModalStates((prev) =>
+                prev.map((modalState) =>
+                  modalState.id === modalId
+                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
+                    : modalState
+                )
+              );
+            });
+          }
+
+          // Move video modals in the group
+          if (group.videoModalIds) {
+            group.videoModalIds.forEach((modalId) => {
+              setVideoModalStates((prev) =>
+                prev.map((modalState) =>
+                  modalState.id === modalId
+                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
+                    : modalState
+                )
+              );
+            });
+          }
+
+          // Move music modals in the group
+          if (group.musicModalIds) {
+            group.musicModalIds.forEach((modalId) => {
+              setMusicModalStates((prev) =>
+                prev.map((modalState) =>
+                  modalState.id === modalId
+                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
+                    : modalState
+                )
+              );
+            });
+          }
+        }
+      }
+    }
+
+    // Always update the dragged item
+    if (onImageUpdate) {
+      onImageUpdate(index, updates);
+    }
+  };
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -635,7 +1005,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         onMouseUp={handleStageMouseUp}
         onDragMove={handleStageDragMove}
         onDragEnd={handleStageDragEnd}
-        style={{ cursor: selectedTool === 'text' ? 'text' : 'grab' }}
+        style={{ 
+          cursor: selectedTool === 'text' 
+            ? 'text' 
+            : selectedTool === 'move'
+              ? (isPanning ? 'grabbing' : 'grab')
+              : selectedTool === 'cursor' 
+                ? (isSelecting ? 'crosshair' : 'crosshair')
+                : 'grab' 
+        }}
       >
         <Layer ref={layerRef}>
           {/* Infinite canvas pattern background */}
@@ -659,14 +1037,35 @@ export const Canvas: React.FC<CanvasProps> = ({
                 key={`${imageData.url}-${index}`} 
                 imageData={imageData}
                 index={actualIndex}
-                onUpdate={(updates) => onImageUpdate?.(actualIndex, updates)}
-                onSelect={() => setSelectedImageIndex(actualIndex)}
-                isSelected={selectedImageIndex === actualIndex}
+                onUpdate={(updates) => handleImageUpdateWithGroup(actualIndex, updates)}
+                onSelect={(e?: { ctrlKey?: boolean; metaKey?: boolean }) => {
+                  const isMultiSelect = e?.ctrlKey || e?.metaKey;
+                  if (isMultiSelect) {
+                    // Add to selection if not already selected, remove if selected
+                    setSelectedImageIndices(prev => {
+                      if (prev.includes(actualIndex)) {
+                        const newIndices = prev.filter(i => i !== actualIndex);
+                        setSelectedImageIndex(newIndices.length > 0 ? newIndices[0] : null);
+                        return newIndices;
+                      } else {
+                        const newIndices = [...prev, actualIndex];
+                        setSelectedImageIndex(actualIndex);
+                        return newIndices;
+                      }
+                    });
+                  } else {
+                    // Single select
+                    setSelectedImageIndices([actualIndex]);
+                    setSelectedImageIndex(actualIndex);
+                  }
+                }}
+                isSelected={selectedImageIndices.includes(actualIndex)}
                 onDelete={() => {
                   if (onImageDelete) {
                     onImageDelete(actualIndex);
                   }
                   setSelectedImageIndex(null);
+                  setSelectedImageIndices([]);
                 }}
                 onContextMenu={() => {
                   setContextMenuImageIndex(actualIndex);
@@ -700,7 +1099,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     draggable
                     onDragEnd={(e) => {
                       const node = e.target;
-                      onImageUpdate?.(actualIndex, {
+                      handleImageUpdateWithGroup(actualIndex, {
                         x: node.x(),
                         y: node.y(),
                       });
@@ -719,6 +1118,21 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </Group>
               );
             })}
+          {/* Selection Box - Region Selection - rendered in stage coordinates */}
+          {selectionBox && (
+            <Rect
+              x={Math.min(selectionBox.startX, selectionBox.currentX)}
+              y={Math.min(selectionBox.startY, selectionBox.currentY)}
+              width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
+              height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
+              fill="rgba(0, 0, 0, 0.3)"
+              stroke="#000000"
+              strokeWidth={2}
+              listening={false}
+              globalCompositeOperation="source-over"
+              cornerRadius={0}
+            />
+          )}
         </Layer>
       </Stage>
       {/* 3D Models - rendered outside Konva as overlay */}
@@ -1013,6 +1427,41 @@ export const Canvas: React.FC<CanvasProps> = ({
           (contextMenuModalType === 'music' && musicModalStates.find(m => m.id === contextMenuModalId)?.generatedMusicUrl)
         ))}
       />
+      {/* Group Name Modal */}
+      <GroupNameModal
+        isOpen={isGroupNameModalOpen}
+        onClose={() => {
+          setIsGroupNameModalOpen(false);
+          setPendingGroupItems(null);
+        }}
+        onConfirm={(name) => {
+          if (pendingGroupItems) {
+            const groupId = `group-${Date.now()}-${Math.random()}`;
+            setGroups(prev => {
+              const newGroups = new Map(prev);
+              newGroups.set(groupId, {
+                id: groupId,
+                name,
+                itemIndices: pendingGroupItems.imageIndices,
+                textIds: pendingGroupItems.textIds,
+                imageModalIds: pendingGroupItems.imageModalIds,
+                videoModalIds: pendingGroupItems.videoModalIds,
+                musicModalIds: pendingGroupItems.musicModalIds,
+              });
+              return newGroups;
+            });
+            // Update images to have groupId
+            pendingGroupItems.imageIndices.forEach(index => {
+              if (onImageUpdate) {
+                onImageUpdate(index, { groupId });
+              }
+            });
+            setIsGroupNameModalOpen(false);
+            setPendingGroupItems(null);
+          }
+        }}
+        defaultName={`Group ${groups.size + 1}`}
+      />
     </div>
   );
 };
@@ -1069,7 +1518,7 @@ const CanvasImage: React.FC<{
   imageData: ImageUpload;
   index: number;
   onUpdate?: (updates: Partial<ImageUpload>) => void;
-  onSelect?: () => void;
+  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
   isSelected?: boolean;
   onDelete?: () => void;
   onContextMenu?: () => void;
@@ -1431,10 +1880,14 @@ const CanvasImage: React.FC<{
           e.cancelBubble = true;
           setIsSelected(true);
           if (onSelect) {
-            onSelect();
+            // Pass event info for multi-select support
+            onSelect({
+              ctrlKey: e.evt.ctrlKey,
+              metaKey: e.evt.metaKey,
+            });
           }
-          // Show context menu on click
-          if (onContextMenu) {
+          // Show context menu on click (only if not Ctrl/Cmd+click for multi-select)
+          if (onContextMenu && !e.evt.ctrlKey && !e.evt.metaKey) {
             onContextMenu();
           }
           // Don't play/pause when showing context menu

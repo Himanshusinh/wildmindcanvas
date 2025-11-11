@@ -317,7 +317,7 @@ export default function Home() {
     });
   };
 
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'text' | 'image' | 'video' | 'music'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
@@ -326,7 +326,7 @@ export default function Home() {
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
 
-  const handleToolSelect = (tool: 'cursor' | 'text' | 'image' | 'video' | 'music') => {
+  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => {
     // Always update to trigger effect, even if tool is the same
     // Use counter to force re-render when clicking same tool again
     if (tool === selectedTool) {

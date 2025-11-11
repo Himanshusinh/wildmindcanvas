@@ -1,0 +1,2 @@
+export { GroupNameModal } from './GroupNameModal';
+

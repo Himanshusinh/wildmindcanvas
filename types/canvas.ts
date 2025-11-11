@@ -28,5 +28,17 @@ export interface ImageUpload {
   fontSize?: number;
   fontFamily?: string;
   fill?: string;
+  // For grouping
+  groupId?: string;
+}
+
+export interface Group {
+  id: string;
+  name?: string;
+  itemIndices: number[];
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
 }
 

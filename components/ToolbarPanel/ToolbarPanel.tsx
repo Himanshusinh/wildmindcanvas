@@ -3,15 +3,15 @@
 import { useState, useRef } from 'react';
 
 interface ToolbarPanelProps {
-  onToolSelect?: (tool: 'cursor' | 'text' | 'image' | 'video' | 'music') => void;
+  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => void;
   onUpload?: (files: File[]) => void;
 }
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload }) => {
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'text' | 'image' | 'video' | 'music'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleToolClick = (tool: 'cursor' | 'text' | 'image' | 'video' | 'music') => {
+  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => {
     // Always update state and call callback, even if tool is already selected
     // This allows clicking the same tool again to trigger actions (like creating new text input)
     setSelectedTool(tool);
@@ -45,7 +45,21 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
         </svg>
       ),
-      label: 'Cursor',
+      label: 'Select',
+    },
+    {
+      id: 'move' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="5 9 2 12 5 15" />
+          <polyline points="9 5 12 2 15 5" />
+          <polyline points="15 19 12 22 9 19" />
+          <polyline points="19 9 22 12 19 15" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <line x1="12" y1="2" x2="12" y2="22" />
+        </svg>
+      ),
+      label: 'Move',
     },
     {
       id: 'text' as const,
