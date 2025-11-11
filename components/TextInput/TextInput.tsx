@@ -148,7 +148,6 @@ export const TextInput: React.FC<TextInputProps> = ({
         minWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
-        transition: 'border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1), border 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'visible',
       }}
     >
@@ -176,22 +175,8 @@ export const TextInput: React.FC<TextInputProps> = ({
             boxShadow: 'none',
             transform: 'translateY(0)',
             opacity: 1,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            animation: 'slideInFromTop 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          <style>{`
-            @keyframes slideInFromTop {
-              from {
-                transform: translateY(-${8 * scale}px);
-                opacity: 0;
-              }
-              to {
-                transform: translateY(0);
-                opacity: 1;
-              }
-            }
-          `}</style>
           AI Companion
         </div>
       )}
@@ -262,16 +247,13 @@ export const TextInput: React.FC<TextInputProps> = ({
             borderRadius: `${8 * scale}px`,
             color: '#ef4444',
             cursor: 'pointer',
-            transition: 'all 0.2s',
             padding: 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-            e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -297,17 +279,14 @@ export const TextInput: React.FC<TextInputProps> = ({
             borderRadius: `${8 * scale}px`,
             color: '#3b82f6',
             cursor: 'pointer',
-            transition: 'all 0.2s',
             boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.3)`,
             padding: 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)';
-            e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
-            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -335,7 +314,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
           opacity: isHovered ? 1 : 0,
           maxHeight: isHovered ? '200px' : '0px',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
@@ -366,7 +344,6 @@ export const TextInput: React.FC<TextInputProps> = ({
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
               backgroundRepeat: 'no-repeat',
               backgroundPosition: `right ${12 * scale}px center`,
-              transition: 'all 0.2s',
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = '#3b82f6';

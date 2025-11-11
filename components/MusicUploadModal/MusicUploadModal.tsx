@@ -274,22 +274,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
             boxShadow: 'none',
             transform: 'translateY(0)',
             opacity: 1,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            animation: 'slideInFromTop 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
-          <style>{`
-            @keyframes slideInFromTop {
-              from {
-                transform: translateY(-${8 * scale}px);
-                opacity: 0;
-              }
-              to {
-                transform: translateY(0);
-                opacity: 1;
-              }
-            }
-          `}</style>
           Music Generator
         </div>
       )}
@@ -316,7 +302,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1), border 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           cursor: isDraggingContainer ? 'grabbing' : 'grab',
           overflow: 'visible',
           position: 'relative',
@@ -376,18 +361,15 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: generatedMusicUrl ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
-              transition: 'all 0.2s',
               flexShrink: 0,
             }}
             onMouseEnter={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.transform = 'scale(1.05)';
                 e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.transform = 'scale(1)';
                 e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
               }
             }}
@@ -483,7 +465,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
           opacity: isHovered ? 1 : 0,
           maxHeight: isHovered ? '500px' : '0px',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
@@ -517,7 +498,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               fontSize: `${13 * scale}px`,
               color: '#1f2937',
               outline: 'none',
-              transition: 'all 0.2s',
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = '#3b82f6';
@@ -543,19 +523,16 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               borderRadius: `${10 * scale}px`,
               cursor: prompt.trim() ? 'pointer' : 'not-allowed',
               color: 'white',
-              transition: 'all 0.2s',
               boxShadow: prompt.trim() ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
               padding: 0,
             }}
             onMouseEnter={(e) => {
               if (prompt.trim()) {
-                e.currentTarget.style.transform = 'scale(1.05)';
                 e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (prompt.trim()) {
-                e.currentTarget.style.transform = 'scale(1)';
                 e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
               }
             }}
@@ -587,11 +564,10 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 cursor: 'pointer',
                 appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `right ${12 * scale}px center`,
-                transition: 'all 0.2s',
-              }}
-              onFocus={(e) => {
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: `right ${12 * scale}px center`,
+                }}
+                onFocus={(e) => {
                 e.currentTarget.style.borderColor = '#3b82f6';
                 e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
               }}
@@ -627,12 +603,11 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 cursor: 'pointer',
                 appearance: 'none',
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `right ${10 * scale}px center`,
-                transition: 'all 0.2s',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: `right ${10 * scale}px center`,
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#3b82f6';
                 e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
               }}
               onBlur={(e) => {
