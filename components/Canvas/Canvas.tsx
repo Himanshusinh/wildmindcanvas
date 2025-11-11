@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Circle, Group, Path, Text, Line } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Rect, Circle, Group, Path, Text, Line, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 import { Model3DOverlay } from './Model3DOverlay';
@@ -106,6 +106,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [contextMenuModalId, setContextMenuModalId] = useState<string | null>(null);
   const [contextMenuModalType, setContextMenuModalType] = useState<'image' | 'video' | 'music' | null>(null);
   const [groups, setGroups] = useState<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>(new Map());
+  // Tight selection rect calculated from selected items (canvas coords)
+  const [selectionTightRect, setSelectionTightRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Track last rect top-left for drag delta computation
+  const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
   const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
@@ -326,9 +330,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
-  // Selection box state
+  // Selection box state (marquee)
   const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStartPoint, setSelectionStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
+  const selectedNodesRef = useRef<Konva.Node[]>([]);
+  const rafRef = useRef<number | null>(null);
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
@@ -359,6 +367,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
         
         e.preventDefault();
+        
+        // Clear selection box and tight rect when Delete is pressed
+        setSelectionBox(null);
+        setSelectionTightRect(null);
         
         // Delete selected image/video/text element
         if (selectedImageIndex !== null && onImageDelete) {
@@ -449,6 +461,91 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedTool, isPanning, selectedImageIndex, selectedImageIndices, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete, onImageUpdate]);
   
+  // Handle clicks outside modal components to clear selections
+  useEffect(() => {
+    let mouseDownTarget: HTMLElement | null = null;
+    let mouseDownTime = 0;
+    let mouseDownPos: { x: number; y: number } | null = null;
+    
+    const handleMouseDown = (e: MouseEvent) => {
+      mouseDownTarget = e.target as HTMLElement;
+      mouseDownTime = Date.now();
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+    };
+    
+    const handleMouseUp = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const timeDiff = Date.now() - mouseDownTime;
+      const mouseUpPos = { x: e.clientX, y: e.clientY };
+      
+      // Calculate if it was a drag (moved more than 5 pixels)
+      const wasDrag = mouseDownPos && (
+        Math.abs(mouseUpPos.x - mouseDownPos.x) > 5 ||
+        Math.abs(mouseUpPos.y - mouseDownPos.y) > 5
+      );
+      
+      // Only clear if it was a click (not a drag) - check if target is same and time is short and no movement
+      const wasClick = mouseDownTarget === target && timeDiff < 200 && !wasDrag;
+      
+      // Don't clear if we're in the middle of a selection drag or if it was a drag
+      if (isSelecting || wasDrag) {
+        mouseDownTarget = null;
+        mouseDownPos = null;
+        return;
+      }
+      
+      // Check if click is inside any modal component
+      const isInsideModal = 
+        target.closest('[data-modal-component]') !== null ||
+        target.closest('.controls-overlay') !== null ||
+        target.closest('.text-input-header') !== null ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'BUTTON' ||
+        target.closest('button') !== null;
+      
+      // Check if click is on Konva canvas (canvas element) - let Konva handle it completely
+      const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
+      
+      // If click is outside all modals and NOT on Konva canvas, clear selections
+      // Note: Konva stage clicks are handled by handleStageMouseDown - we should not interfere
+      if (wasClick && !isInsideModal && !isOnKonvaCanvas && containerRef.current) {
+        const container = containerRef.current;
+        const rect = container.getBoundingClientRect();
+        const clickX = e.clientX;
+        const clickY = e.clientY;
+        
+        // Check if click is inside the container
+        if (
+          clickX >= rect.left &&
+          clickX <= rect.right &&
+          clickY >= rect.top &&
+          clickY <= rect.bottom
+        ) {
+          // Click is inside container but outside modals and not on canvas - clear selections
+          setSelectedImageIndex(null);
+          setSelectedImageIndices([]);
+          setSelectedTextInputId(null);
+          setSelectedImageModalId(null);
+          setSelectedVideoModalId(null);
+          setSelectedMusicModalId(null);
+          // Don't clear selectionBox here - let the Konva handler manage it
+        }
+      }
+      
+      mouseDownTarget = null;
+      mouseDownPos = null;
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isSelecting]);
+  
   // Handle selection box mouse move
   useEffect(() => {
     if (!isSelecting || !selectionBox) return;
@@ -465,10 +562,13 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       const pointerPos = stage.getPointerPosition();
       if (pointerPos) {
+        // Store selection box in canvas coordinates so it stays consistent across zoom/pan
+        const canvasX = (pointerPos.x - position.x) / scale;
+        const canvasY = (pointerPos.y - position.y) / scale;
         setSelectionBox(prev => prev ? {
           ...prev,
-          currentX: pointerPos.x,
-          currentY: pointerPos.y,
+          currentX: canvasX,
+          currentY: canvasY,
         } : null);
       }
     };
@@ -486,128 +586,131 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
 
       if (selectionBox) {
-        // Calculate selection box bounds in canvas coordinates
-        // getPointerPosition() returns coordinates relative to stage container
-        // We need to convert to canvas coordinates
-        const startCanvasX = (selectionBox.startX - position.x) / scale;
-        const startCanvasY = (selectionBox.startY - position.y) / scale;
-        const endCanvasX = (selectionBox.currentX - position.x) / scale;
-        const endCanvasY = (selectionBox.currentY - position.y) / scale;
+        // Selection box is already in canvas coordinates
+        const marqueeRect = {
+          x: Math.min(selectionBox.startX, selectionBox.currentX),
+          y: Math.min(selectionBox.startY, selectionBox.currentY),
+          width: Math.abs(selectionBox.currentX - selectionBox.startX),
+          height: Math.abs(selectionBox.currentY - selectionBox.startY),
+        };
         
-        const minX = Math.min(startCanvasX, endCanvasX);
-        const maxX = Math.max(startCanvasX, endCanvasX);
-        const minY = Math.min(startCanvasY, endCanvasY);
-        const maxY = Math.max(startCanvasY, endCanvasY);
+        // Check if selection box was actually dragged (not just clicked)
+        const boxWidth = marqueeRect.width;
+        const boxHeight = marqueeRect.height;
+        const wasDragged = boxWidth > 5 || boxHeight > 5;
         
-        // Find all items that intersect with the selection box
-        const selectedIndices: number[] = [];
-        const selectedTextIds: string[] = [];
-        const selectedImageModalIds: string[] = [];
-        const selectedVideoModalIds: string[] = [];
-        const selectedMusicModalIds: string[] = [];
-        
-        // Check images and videos (skip 3D models)
-        images.forEach((img, index) => {
-          if (img.type === 'model3d') return;
+        if (wasDragged) {
+          // Find all items that intersect with the marquee using Konva's intersection utility
+          const selectedIndices: number[] = [];
           
-          const imgX = img.x || 0;
-          const imgY = img.y || 0;
-          const imgWidth = img.width || 0;
-          const imgHeight = img.height || 0;
+          // Check images and videos (skip 3D models)
+          images.forEach((img, index) => {
+            if (img.type === 'model3d') return;
+            
+            const imgX = img.x || 0;
+            const imgY = img.y || 0;
+            const imgWidth = img.width || 0;
+            const imgHeight = img.height || 0;
+            
+            // For text, estimate dimensions
+            let width = imgWidth;
+            let height = imgHeight;
+            if (img.type === 'text') {
+              const fontSize = img.fontSize || 24;
+              width = (img.text || '').length * fontSize * 0.6;
+              height = fontSize * 1.2;
+            }
+            
+            // Create bounding box for the item
+            const itemRect = {
+              x: imgX,
+              y: imgY,
+              width: width,
+              height: height,
+            };
+            
+            // Use Konva's intersection check
+            if (Konva.Util.haveIntersection(marqueeRect, itemRect)) {
+              selectedIndices.push(index);
+            }
+          });
           
-          // For text, estimate dimensions
-          let width = imgWidth;
-          let height = imgHeight;
-          if (img.type === 'text') {
-            const fontSize = img.fontSize || 24;
-            width = (img.text || '').length * fontSize * 0.6;
-            height = fontSize * 1.2;
+          // Handle selection with modifier keys (Shift/Ctrl/Cmd)
+          const isModifierPressed = (window.event as MouseEvent)?.shiftKey || 
+                                    (window.event as MouseEvent)?.ctrlKey || 
+                                    (window.event as MouseEvent)?.metaKey;
+          
+          if (isModifierPressed) {
+            // Union: add to existing selection
+            setSelectedImageIndices(prev => {
+              const combined = [...new Set([...prev, ...selectedIndices])];
+              return combined;
+            });
+          } else {
+            // Replace selection
+            setSelectedImageIndices(selectedIndices);
+            if (selectedIndices.length > 0) {
+              setSelectedImageIndex(selectedIndices[0]);
+            } else {
+              setSelectedImageIndex(null);
+            }
           }
           
-          // Check if item intersects with selection box
-          if (imgX < maxX && imgX + width > minX && imgY < maxY && imgY + height > minY) {
-            // For text in images array, we'll use the index
-            // But we need to track text separately
-            selectedIndices.push(index);
-          }
-        });
-        
-        // Check text input overlays
-        textInputStates.forEach((textState) => {
-          const textX = textState.x;
-          const textY = textState.y;
-          // Estimate text dimensions (will be updated when text is confirmed)
-          const textWidth = 200; // Approximate width for input
-          const textHeight = 30; // Approximate height for input
-          
-          if (textX < maxX && textX + textWidth > minX && textY < maxY && textY + textHeight > minY) {
-            selectedTextIds.push(textState.id);
-          }
-        });
-        
-        // Check image modals
-        imageModalStates.forEach((modalState) => {
-          const modalX = modalState.x;
-          const modalY = modalState.y;
-          const modalWidth = 400; // Approximate modal width
-          const modalHeight = 300; // Approximate modal height
-          
-          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
-            selectedImageModalIds.push(modalState.id);
-          }
-        });
-        
-        // Check video modals
-        videoModalStates.forEach((modalState) => {
-          const modalX = modalState.x;
-          const modalY = modalState.y;
-          const modalWidth = 400; // Approximate modal width
-          const modalHeight = 300; // Approximate modal height
-          
-          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
-            selectedVideoModalIds.push(modalState.id);
-          }
-        });
-        
-        // Check music modals
-        musicModalStates.forEach((modalState) => {
-          const modalX = modalState.x;
-          const modalY = modalState.y;
-          const modalWidth = 400; // Approximate modal width
-          const modalHeight = 300; // Approximate modal height
-          
-          if (modalX < maxX && modalX + modalWidth > minX && modalY < maxY && modalY + modalHeight > minY) {
-            selectedMusicModalIds.push(modalState.id);
-          }
-        });
-        
-        // Select all items that intersect with the selection box
-        const totalSelected = selectedIndices.length + selectedTextIds.length + selectedImageModalIds.length + selectedVideoModalIds.length + selectedMusicModalIds.length;
-        if (totalSelected > 0) {
-          setSelectedImageIndices(selectedIndices);
+          // Compute tight bounding rect around selected items (remove extra area)
           if (selectedIndices.length > 0) {
-            setSelectedImageIndex(selectedIndices[0]); // Keep for backward compatibility
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            selectedIndices.forEach((idx) => {
+              const it = images[idx];
+              if (!it) return;
+              const ix = it.x || 0;
+              const iy = it.y || 0;
+              let iw = it.width || 0;
+              let ih = it.height || 0;
+              if (it.type === 'text') {
+                const fontSize = it.fontSize || 24;
+                iw = (it.text || '').length * fontSize * 0.6;
+                ih = fontSize * 1.2;
+              }
+              minX = Math.min(minX, ix);
+              minY = Math.min(minY, iy);
+              maxX = Math.max(maxX, ix + iw);
+              maxY = Math.max(maxY, iy + ih);
+            });
+            if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+              setSelectionTightRect({
+                x: minX,
+                y: minY,
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY),
+              });
+              selectionDragOriginRef.current = { x: minX, y: minY };
+            } else {
+              setSelectionTightRect(null);
+              selectionDragOriginRef.current = null;
+            }
+          } else {
+            setSelectionTightRect(null);
+            selectionDragOriginRef.current = null;
           }
-          // Store selected text and modal IDs in a way we can use them
-          // We'll use a ref or state to track these
         } else {
-          // Only clear selection if selection box was actually dragged (not just clicked)
-          const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
-          const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
-          if (boxWidth > 5 || boxHeight > 5) {
-            // Selection box was dragged, clear selection
+          // Just a click, clear selection if not clicking on an element and no modifier
+          const isModifierPressed = (window.event as MouseEvent)?.shiftKey || 
+                                    (window.event as MouseEvent)?.ctrlKey || 
+                                    (window.event as MouseEvent)?.metaKey;
+          if (!isModifierPressed) {
             setSelectedImageIndices([]);
             setSelectedImageIndex(null);
+            setSelectionTightRect(null);
+            selectionDragOriginRef.current = null;
           }
         }
       }
       
       setIsSelecting(false);
-      // Keep selection box visible after mouse up to show the selected region
-      // Clear it after a short delay
-      setTimeout(() => {
-        setSelectionBox(null);
-      }, 200);
+      // Keep selection box visible after mouse up - it will be cleared when Delete is pressed or when starting a new selection
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -616,8 +719,56 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
     };
   }, [isSelecting, selectionBox, position, scale, images, selectedTool]);
+
+  // Attach Transformer to selected nodes
+  useEffect(() => {
+    if (transformerRef.current && selectedImageIndices.length > 0) {
+      const stage = stageRef.current;
+      if (!stage) return;
+      
+      const layer = layerRef.current;
+      if (!layer) return;
+      
+      // Find all selected nodes by matching image indices
+      const nodes: Konva.Node[] = [];
+      selectedImageIndices.forEach((index) => {
+        const imageData = images[index];
+        if (!imageData || imageData.type === 'model3d') return;
+        
+        // Find the node by looking for Groups that match the image position
+        const allNodes = layer.getChildren();
+        allNodes.forEach((node: Konva.Node) => {
+          if (node instanceof Konva.Group) {
+            const nodeX = node.x();
+            const nodeY = node.y();
+            const imgX = imageData.x || 0;
+            const imgY = imageData.y || 0;
+            
+            // Match by position (with small tolerance)
+            if (Math.abs(nodeX - imgX) < 1 && Math.abs(nodeY - imgY) < 1) {
+              if (!nodes.includes(node)) {
+                nodes.push(node);
+              }
+            }
+          }
+        });
+      });
+      
+      if (nodes.length > 0) {
+        transformerRef.current.nodes(nodes);
+        transformerRef.current.getLayer()?.batchDraw();
+        selectedNodesRef.current = nodes;
+      }
+    } else if (transformerRef.current && selectedImageIndices.length === 0) {
+      transformerRef.current.nodes([]);
+      selectedNodesRef.current = [];
+    }
+  }, [selectedImageIndices, images]);
 
   // Handle drag to pan - enhanced for better navigation
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -638,6 +789,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Clear selections when clicking on empty space (but not on resize handles or the background pattern)
     // Also exclude the background Rect pattern (which is the canvas pattern - very large Rect)
     // Don't clear if we're starting a selection box with cursor tool
+    // NOTE: Selection box is NOT cleared here - it only clears on Delete key or when starting a new selection
     const targetClassName = target.getClassName();
     const isBackgroundPattern = targetClassName === 'Rect' && 
       (target as Konva.Rect).width() > 100000; // Background pattern is the full canvas size
@@ -653,6 +805,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       setContextMenuImageIndex(null);
       setContextMenuModalId(null);
       setContextMenuModalType(null);
+      // Clear selection rectangle and tight rect when clicking on empty space
+      setSelectionBox(null);
+      setSelectionTightRect(null);
     }
     
     // Store mouse down position to detect drag vs click
@@ -687,7 +842,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // If cursor tool is selected, always start selection box on left click (NEVER pan)
+    // If cursor tool is selected, start marquee selection on left click (NEVER pan)
     if (isCursorTool && e.evt.button === 0) {
       if (pointerPos) {
         const stage = e.target.getStage();
@@ -697,13 +852,20 @@ export const Canvas: React.FC<CanvasProps> = ({
           // Set cursor to crosshair during selection
           stage.container().style.cursor = 'crosshair';
         }
+        // Clear previous selection box and tight rect when starting a new one
+        setSelectionBox(null);
+        setSelectionTightRect(null);
         setIsSelecting(true);
+        // Start new selection box in canvas coordinates
+        const canvasX = (pointerPos.x - position.x) / scale;
+        const canvasY = (pointerPos.y - position.y) / scale;
         setSelectionBox({
-          startX: pointerPos.x,
-          startY: pointerPos.y,
-          currentX: pointerPos.x,
-          currentY: pointerPos.y,
+          startX: canvasX,
+          startY: canvasY,
+          currentX: canvasX,
+          currentY: canvasY,
         });
+        setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
       }
       return;
     }
@@ -1054,9 +1216,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                       }
                     });
                   } else {
-                    // Single select
+                    // Single select - clear all modal selections
                     setSelectedImageIndices([actualIndex]);
                     setSelectedImageIndex(actualIndex);
+                    setSelectedImageModalId(null);
+                    setSelectedVideoModalId(null);
+                    setSelectedMusicModalId(null);
+                    setSelectedTextInputId(null);
                   }
                 }}
                 isSelected={selectedImageIndices.includes(actualIndex)}
@@ -1107,6 +1273,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                     onClick={(e) => {
                       e.cancelBubble = true;
                       setSelectedImageIndex(actualIndex);
+                      setSelectedImageIndices([actualIndex]);
+                      // Clear all modal selections
+                      setSelectedImageModalId(null);
+                      setSelectedVideoModalId(null);
+                      setSelectedMusicModalId(null);
+                      setSelectedTextInputId(null);
                       // Show context menu when text is clicked
                       setContextMenuImageIndex(actualIndex);
                       setContextMenuOpen(true);
@@ -1118,19 +1290,284 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </Group>
               );
             })}
-          {/* Selection Box - Region Selection - rendered in stage coordinates */}
-          {selectionBox && (
+          {/* Group labels overlay */}
+          {Array.from(groups.values()).map((grp) => {
+            // Compute group bounding box from image indices
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            grp.itemIndices.forEach(idx => {
+              const it = images[idx];
+              if (!it) return;
+              const ix = it.x || 0;
+              const iy = it.y || 0;
+              const iw = it.width || 0;
+              const ih = it.height || 0;
+              minX = Math.min(minX, ix);
+              minY = Math.min(minY, iy);
+              maxX = Math.max(maxX, ix + iw);
+              maxY = Math.max(maxY, iy + ih);
+            });
+            if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+              return null;
+            }
+            const labelX = minX - 6;
+            const labelY = Math.min(minY - 28, minY - 6);
+            const name = grp.name || 'Group';
+            const labelWidth = Math.max(60, name.length * 8 + 20);
+            return (
+              <Group
+                key={grp.id}
+                x={labelX}
+                y={labelY}
+                draggable
+                onDragEnd={(e) => {
+                  const node = e.target as Konva.Group;
+                  const newX = node.x();
+                  const newY = node.y();
+                  const deltaX = newX - labelX;
+                  const deltaY = newY - labelY;
+                  // Move all items in the group
+                  grp.itemIndices.forEach(idx => {
+                    const it = images[idx];
+                    if (!it) return;
+                    const ox = it.x || 0;
+                    const oy = it.y || 0;
+                    handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
+                  });
+                  // Reset visual position back (items have moved)
+                  node.position({ x: labelX, y: labelY });
+                }}
+              >
+                <Rect
+                  x={0}
+                  y={0}
+                  width={labelWidth}
+                  height={22}
+                  fill="#111827"
+                  stroke="#374151"
+                  strokeWidth={1}
+                  cornerRadius={6}
+                />
+                <Text
+                  x={10}
+                  y={4}
+                  text={name}
+                  fontSize={12}
+                  fontFamily="Arial"
+                  fill="#ffffff"
+                />
+              </Group>
+            );
+          })}
+          {/* Selection Rect & Toolbar */}
+          {(isSelecting && selectionBox) ? (
+            // While dragging, show live marquee box
             <Rect
               x={Math.min(selectionBox.startX, selectionBox.currentX)}
               y={Math.min(selectionBox.startY, selectionBox.currentY)}
               width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
               height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-              fill="rgba(0, 0, 0, 0.3)"
-              stroke="#000000"
+              fill="rgba(147, 197, 253, 0.3)"
+              stroke="#3b82f6"
               strokeWidth={2}
+              dash={[5, 5]}
               listening={false}
               globalCompositeOperation="source-over"
               cornerRadius={0}
+            />
+          ) : selectionTightRect && selectedImageIndices.length > 0 ? (
+            // After selection completes, show tight rect with toolbar and allow dragging to move all
+            <Group
+              x={selectionTightRect.x}
+              y={selectionTightRect.y}
+              draggable
+              onDragStart={(e) => {
+                selectionDragOriginRef.current = { x: selectionTightRect.x, y: selectionTightRect.y };
+              }}
+              onDragEnd={(e) => {
+                const origin = selectionDragOriginRef.current;
+                const node = e.target as Konva.Group;
+                if (!origin || !node) return;
+                const newX = node.x();
+                const newY = node.y();
+                const deltaX = newX - origin.x;
+                const deltaY = newY - origin.y;
+                // Move all selected images by delta
+                selectedImageIndices.forEach(idx => {
+                  const it = images[idx];
+                  if (!it) return;
+                  const ox = it.x || 0;
+                  const oy = it.y || 0;
+                  handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
+                });
+                // Update tight rect to new position and reset node back to (0,0) under new rect
+                setSelectionTightRect(prev => prev ? { ...prev, x: prev.x + deltaX, y: prev.y + deltaY } : prev);
+                node.position({ x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY });
+                selectionDragOriginRef.current = { x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY };
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={selectionTightRect.width}
+                height={selectionTightRect.height}
+                fill="rgba(147, 197, 253, 0.18)"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dash={[5, 5]}
+                listening={true}
+                cornerRadius={0}
+              />
+              {/* Toolbar buttons at top border */}
+              <Group
+                x={8}
+                y={-36}
+              >
+                {/* Group button */}
+                <Group
+                  onClick={() => {
+                    // Collect items inside tight rect for grouping
+                    const rect = selectionTightRect;
+                    if (!rect) return;
+                    const insideImageIndices: number[] = [];
+                    images.forEach((img, index) => {
+                      if (img.type === 'model3d') return;
+                      const ix = img.x || 0;
+                      const iy = img.y || 0;
+                      let iw = img.width || 0;
+                      let ih = img.height || 0;
+                      if (img.type === 'text') {
+                        const fontSize = img.fontSize || 24;
+                        iw = (img.text || '').length * fontSize * 0.6;
+                        ih = fontSize * 1.2;
+                      }
+                      const itemRect = { x: ix, y: iy, width: iw, height: ih };
+                      if (itemRect.x >= rect.x && itemRect.y >= rect.y &&
+                          (itemRect.x + itemRect.width) <= (rect.x + rect.width) &&
+                          (itemRect.y + itemRect.height) <= (rect.y + rect.height)) {
+                        insideImageIndices.push(index);
+                      }
+                    });
+                    setPendingGroupItems({
+                      imageIndices: insideImageIndices,
+                      textIds: [], // Text inputs are separate overlays; skipping for now
+                      imageModalIds: [],
+                      videoModalIds: [],
+                      musicModalIds: [],
+                    });
+                    setIsGroupNameModalOpen(true);
+                  }}
+                >
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={80}
+                    height={28}
+                    fill="#111827"
+                    stroke="#374151"
+                    strokeWidth={1}
+                    cornerRadius={6}
+                  />
+                  <Text
+                    x={10}
+                    y={7}
+                    text="Group"
+                    fontSize={14}
+                    fontFamily="Arial"
+                    fill="#ffffff"
+                  />
+                </Group>
+                {/* Arrange button */}
+                <Group
+                  x={92}
+                  onClick={() => {
+                    const rect = selectionTightRect;
+                    if (!rect) return;
+                    const sel = [...selectedImageIndices];
+                    if (sel.length === 0) return;
+                    // Simple grid layout inside rect preserving item sizes; top-left flow
+                    const padding = 12;
+                    const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
+                    let col = 0;
+                    let row = 0;
+                    let currentY = rect.y + padding;
+                    let maxRowHeight = 0;
+                    let currentX = rect.x + padding;
+                    sel.forEach((idx, i) => {
+                      const it = images[idx];
+                      if (!it) return;
+                      const iw = it.width || 100;
+                      const ih = it.height || 100;
+                      if (col >= cols || (currentX + iw + padding) > (rect.x + rect.width)) {
+                        // next row
+                        row += 1;
+                        col = 0;
+                        currentX = rect.x + padding;
+                        currentY += maxRowHeight + padding;
+                        maxRowHeight = 0;
+                      }
+                      handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
+                      currentX += iw + padding;
+                      maxRowHeight = Math.max(maxRowHeight, ih);
+                      col += 1;
+                    });
+                    // Update tight rect after arrange
+                    // Recompute bounds of selected items
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    sel.forEach(idx => {
+                      const it = images[idx];
+                      if (!it) return;
+                      const ix = it.x || 0;
+                      const iy = it.y || 0;
+                      const iw = it.width || 0;
+                      const ih = it.height || 0;
+                      minX = Math.min(minX, ix);
+                      minY = Math.min(minY, iy);
+                      maxX = Math.max(maxX, ix + iw);
+                      maxY = Math.max(maxY, iy + ih);
+                    });
+                    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+                      setSelectionTightRect({
+                        x: minX,
+                        y: minY,
+                        width: Math.max(1, maxX - minX),
+                        height: Math.max(1, maxY - minY),
+                      });
+                    }
+                  }}
+                >
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={90}
+                    height={28}
+                    fill="#111827"
+                    stroke="#374151"
+                    strokeWidth={1}
+                    cornerRadius={6}
+                  />
+                  <Text
+                    x={10}
+                    y={7}
+                    text="Arrange"
+                    fontSize={14}
+                    fontFamily="Arial"
+                    fill="#ffffff"
+                  />
+                </Group>
+              </Group>
+            </Group>
+          ) : null}
+          {/* Transformer for selected nodes */}
+          {selectedImageIndices.length > 0 && (
+            <Transformer
+              ref={transformerRef}
+              boundBoxFunc={(oldBox, newBox) => {
+                // Limit resize to prevent negative dimensions
+                if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
+                  return oldBox;
+                }
+                return newBox;
+              }}
             />
           )}
         </Layer>
@@ -1148,6 +1585,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           key={textState.id}
           x={textState.x}
           y={textState.y}
+          isSelected={selectedTextInputId === textState.id}
           onConfirm={(text) => {
             if (onTextCreate) {
               onTextCreate(text, textState.x, textState.y);
@@ -1164,7 +1602,15 @@ export const Canvas: React.FC<CanvasProps> = ({
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
           }}
-          onSelect={() => setSelectedTextInputId(textState.id)}
+          onSelect={() => {
+            setSelectedTextInputId(textState.id);
+            // Clear other selections so only this shows blue border
+            setSelectedImageIndex(null);
+            setSelectedImageIndices([]);
+            setSelectedImageModalId(null);
+            setSelectedVideoModalId(null);
+            setSelectedMusicModalId(null);
+          }}
           stageRef={stageRef}
           scale={scale}
           position={position}
@@ -1190,6 +1636,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedImageUrl={modalState.generatedImageUrl}
           onSelect={() => {
             setSelectedImageModalId(modalState.id);
+            // Clear other selections
+            setSelectedVideoModalId(null);
+            setSelectedMusicModalId(null);
+            setSelectedTextInputId(null);
+            setSelectedImageIndex(null);
+            setSelectedImageIndices([]);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('image');
@@ -1232,6 +1684,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedVideoUrl={modalState.generatedVideoUrl || generatedVideoUrl}
           onSelect={() => {
             setSelectedVideoModalId(modalState.id);
+            // Clear other selections
+            setSelectedImageModalId(null);
+            setSelectedMusicModalId(null);
+            setSelectedTextInputId(null);
+            setSelectedImageIndex(null);
+            setSelectedImageIndices([]);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('video');
@@ -1274,6 +1732,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedMusicUrl={modalState.generatedMusicUrl || generatedMusicUrl}
           onSelect={() => {
             setSelectedMusicModalId(modalState.id);
+            // Clear other selections
+            setSelectedImageModalId(null);
+            setSelectedVideoModalId(null);
+            setSelectedTextInputId(null);
+            setSelectedImageIndex(null);
+            setSelectedImageIndices([]);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('music');
@@ -1904,8 +2368,8 @@ const CanvasImage: React.FC<{
               height={28}
               fill="#f0f2f5"
               cornerRadius={[frameBorderRadius, frameBorderRadius, 0, 0]}
-              stroke={frameBorderColor}
-              strokeWidth={frameBorderWidth}
+              stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
+              strokeWidth={isSelectedState ? 2 : frameBorderWidth}
               strokeBottom={false}
             />
             <Text
@@ -1998,6 +2462,8 @@ const CanvasImage: React.FC<{
             height={50}
             fill="rgba(0, 0, 0, 0.75)"
             cornerRadius={[0, 0, frameBorderRadius, frameBorderRadius]}
+            stroke={isSelectedState ? '#3b82f6' : 'transparent'}
+            strokeWidth={isSelectedState ? 2 : 0}
             listening={false}
           />
           

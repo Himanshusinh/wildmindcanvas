@@ -127,6 +127,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   return (
     <div
       ref={containerRef}
+      data-modal-component="video"
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -134,7 +135,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: 2000,
+        zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
       }}
     >
@@ -155,7 +156,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
-            border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -171,6 +172,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       {/* Video Frame */}
       <div
         ref={imageAreaRef}
+        onClick={(e) => {
+          // Ensure selection works when clicking on frame
+          if (onSelect && !e.defaultPrevented) {
+            onSelect();
+          }
+        }}
         style={{
           width: `${600 * scale}px`,
           maxWidth: '90vw',
@@ -180,8 +187,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: isHovered ? '0' : `${16 * scale}px`,
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
-          borderTop: isHovered ? 'none' : `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+          borderTop: isHovered ? 'none' : `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTopLeftRadius: isHovered ? '0' : `${16 * scale}px`,
           borderTopRightRadius: isHovered ? '0' : `${16 * scale}px`,
           borderBottomLeftRadius: isHovered ? '0' : `${16 * scale}px`,
@@ -205,7 +212,20 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               height: '100%',
               objectFit: 'cover',
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              // Allow selection when clicking on video (not on controls)
+              const target = e.target as HTMLElement;
+              if (target.tagName === 'VIDEO' && onSelect) {
+                onSelect();
+              }
+            }}
+            onMouseDown={(e) => {
+              // Only stop propagation for control clicks
+              const target = e.target as HTMLElement;
+              if (target.tagName !== 'VIDEO') {
+                e.stopPropagation();
+              }
+            }}
           />
         ) : (
           <div style={{ textAlign: 'center', color: '#9ca3af' }}>
@@ -241,7 +261,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTop: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',

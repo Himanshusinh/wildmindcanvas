@@ -126,6 +126,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   return (
     <div
       ref={containerRef}
+      data-modal-component="image"
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -133,7 +134,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: 2000,
+        zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
       }}
     >
@@ -154,7 +155,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
-            border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -170,6 +171,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       {/* Image Frame */}
       <div
         ref={imageAreaRef}
+        onClick={(e) => {
+          // Ensure selection works when clicking on frame
+          if (onSelect && !e.defaultPrevented) {
+            onSelect();
+          }
+        }}
         style={{
           width: `${600 * scale}px`,
           maxWidth: '90vw',
@@ -179,8 +186,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: isHovered ? '0' : `${16 * scale}px`,
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
-          borderTop: isHovered ? 'none' : `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+          borderTop: isHovered ? 'none' : `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTopLeftRadius: isHovered ? '0' : `${16 * scale}px`,
           borderTopRightRadius: isHovered ? '0' : `${16 * scale}px`,
           borderBottomLeftRadius: isHovered ? '0' : `${16 * scale}px`,
@@ -203,8 +210,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              pointerEvents: 'none',
             }}
-            onMouseDown={(e) => e.stopPropagation()}
             draggable={false}
           />
         ) : (
@@ -242,7 +249,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTop: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',

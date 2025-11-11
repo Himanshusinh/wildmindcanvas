@@ -237,6 +237,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   return (
     <div
       ref={containerRef}
+      data-modal-component="music"
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -244,7 +245,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: 2000,
+        zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
       }}
     >
@@ -266,7 +267,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
-            border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -282,6 +283,12 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       {/* Music Frame */}
       <div
         ref={musicAreaRef}
+        onClick={(e) => {
+          // Ensure selection works when clicking on frame
+          if (onSelect && !e.defaultPrevented) {
+            onSelect();
+          }
+        }}
         style={{
           width: `${600 * scale}px`,
           maxWidth: '90vw',
@@ -292,8 +299,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: isHovered ? '0' : `${16 * scale}px`,
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
-          borderTop: isHovered ? 'none' : `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+          borderTop: isHovered ? 'none' : `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTopLeftRadius: isHovered ? '0' : `${16 * scale}px`,
           borderTopRightRadius: isHovered ? '0' : `${16 * scale}px`,
           borderBottomLeftRadius: isHovered ? '0' : `${16 * scale}px`,
@@ -458,7 +465,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTop: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',

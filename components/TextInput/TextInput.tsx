@@ -12,6 +12,7 @@ interface TextInputProps {
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
+  isSelected?: boolean;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -24,6 +25,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   stageRef,
   scale,
   position,
+  isSelected,
 }) => {
   const [text, setText] = useState('');
   const [selectedModel, setSelectedModel] = useState('GPT-4');
@@ -122,6 +124,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   return (
     <div
       ref={containerRef}
+      data-modal-component="text"
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -129,7 +132,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: 2000,
+        zIndex: isHovered || isSelected ? 2001 : 2000,
         display: 'flex',
         flexDirection: 'column',
         gap: `${1 * scale}px`,
@@ -138,8 +141,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: isHovered ? '0' : `${12 * scale}px`,
-        border: isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`,
-        borderBottom: isHovered ? 'none' : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`,
+        border: isSelected ? `${2 * scale}px solid #3b82f6` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`),
+        borderBottom: isHovered && !isSelected ? 'none' : (isSelected ? `${2 * scale}px solid #3b82f6` : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`),
         borderTopLeftRadius: isHovered ? '0' : `${12 * scale}px`,
         borderTopRightRadius: isHovered ? '0' : `${12 * scale}px`,
         borderBottomLeftRadius: isHovered ? '0' : `${12 * scale}px`,
@@ -167,7 +170,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${12 * scale}px ${12 * scale}px 0 0`,
-            border: `${1 * scale}px solid rgba(255, 255, 255, 0.2)`,
+            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)'}`,
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -307,7 +310,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
           borderTop: 'none',
           borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
           boxShadow: 'none',
