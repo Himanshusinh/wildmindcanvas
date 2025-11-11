@@ -94,6 +94,14 @@ export const Model3D: React.FC<Model3DProps> = ({
         setIsLoading(true);
         setError(null);
 
+        if (!modelData.file) {
+          throw new Error('No file provided');
+        }
+
+        if (!modelData.url) {
+          throw new Error('No URL provided');
+        }
+
         const fileExtension = modelData.file.name.toLowerCase().split('.').pop();
         let model: THREE.Group | null = null;
 
