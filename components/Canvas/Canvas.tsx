@@ -98,9 +98,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
+  const [selectedTextInputIds, setSelectedTextInputIds] = useState<string[]>([]); // Multiple text input selection
   const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
+  const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
+  const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
   const [selectedMusicModalId, setSelectedMusicModalId] = useState<string | null>(null);
+  const [selectedMusicModalIds, setSelectedMusicModalIds] = useState<string[]>([]); // Multiple music modal selection
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
   const [contextMenuModalId, setContextMenuModalId] = useState<string | null>(null);
@@ -108,6 +112,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [groups, setGroups] = useState<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>(new Map());
   // Tight selection rect calculated from selected items (canvas coords)
   const [selectionTightRect, setSelectionTightRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  // Track if selection came from drag (marquee selection) - only show icons for drag selections
+  const [isDragSelection, setIsDragSelection] = useState(false);
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
@@ -371,6 +377,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Clear selection box and tight rect when Delete is pressed
         setSelectionBox(null);
         setSelectionTightRect(null);
+        setIsDragSelection(false);
         
         // Delete selected image/video/text element
         if (selectedImageIndex !== null && onImageDelete) {
@@ -527,9 +534,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedImageIndex(null);
           setSelectedImageIndices([]);
           setSelectedTextInputId(null);
+          setSelectedTextInputIds([]);
           setSelectedImageModalId(null);
+          setSelectedImageModalIds([]);
           setSelectedVideoModalId(null);
+          setSelectedVideoModalIds([]);
           setSelectedMusicModalId(null);
+          setSelectedMusicModalIds([]);
           // Don't clear selectionBox here - let the Konva handler manage it
         }
       }
@@ -602,6 +613,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (wasDragged) {
           // Find all items that intersect with the marquee using Konva's intersection utility
           const selectedIndices: number[] = [];
+          const selectedImageModalIdsList: string[] = [];
+          const selectedVideoModalIdsList: string[] = [];
+          const selectedMusicModalIdsList: string[] = [];
+          const selectedTextInputIdsList: string[] = [];
           
           // Check images and videos (skip 3D models)
           images.forEach((img, index) => {
@@ -635,6 +650,74 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
           
+          // Check image modals (600px wide, aspect ratio height, typically 400px+ min height)
+          imageModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = 600; // Fixed width
+            const modalHeight = 400; // Minimum height (aspect ratio can make it taller)
+            const modalRect = {
+              x: modalX,
+              y: modalY,
+              width: modalWidth,
+              height: modalHeight,
+            };
+            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+              selectedImageModalIdsList.push(modal.id);
+            }
+          });
+          
+          // Check video modals (600px wide, aspect ratio height, typically 400px+ min height)
+          videoModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = 600; // Fixed width
+            const modalHeight = 400; // Minimum height (aspect ratio can make it taller)
+            const modalRect = {
+              x: modalX,
+              y: modalY,
+              width: modalWidth,
+              height: modalHeight,
+            };
+            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+              selectedVideoModalIdsList.push(modal.id);
+            }
+          });
+          
+          // Check music modals (600px wide, 300px high)
+          musicModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = 600; // Fixed width
+            const modalHeight = 300; // Fixed height
+            const modalRect = {
+              x: modalX,
+              y: modalY,
+              width: modalWidth,
+              height: modalHeight,
+            };
+            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+              selectedMusicModalIdsList.push(modal.id);
+            }
+          });
+          
+          // Check text input modals (400px+ wide, variable height, typically 200px+ with controls)
+          textInputStates.forEach((textState) => {
+            const textX = textState.x;
+            const textY = textState.y;
+            const textWidth = 400; // Minimum width
+            const textHeight = 200; // Approximate height with controls
+            const textRect = {
+              x: textX,
+              y: textY,
+              width: textWidth,
+              height: textHeight,
+            };
+            if (Konva.Util.haveIntersection(marqueeRect, textRect)) {
+              selectedTextInputIdsList.push(textState.id);
+            }
+          });
+          
           // Handle selection with modifier keys (Shift/Ctrl/Cmd)
           const isModifierPressed = (window.event as MouseEvent)?.shiftKey || 
                                     (window.event as MouseEvent)?.ctrlKey || 
@@ -646,22 +729,58 @@ export const Canvas: React.FC<CanvasProps> = ({
               const combined = [...new Set([...prev, ...selectedIndices])];
               return combined;
             });
+            setSelectedImageModalIds(prev => [...new Set([...prev, ...selectedImageModalIdsList])]);
+            setSelectedVideoModalIds(prev => [...new Set([...prev, ...selectedVideoModalIdsList])]);
+            setSelectedMusicModalIds(prev => [...new Set([...prev, ...selectedMusicModalIdsList])]);
+            setSelectedTextInputIds(prev => [...new Set([...prev, ...selectedTextInputIdsList])]);
           } else {
             // Replace selection
             setSelectedImageIndices(selectedIndices);
+            setSelectedImageModalIds(selectedImageModalIdsList);
+            setSelectedVideoModalIds(selectedVideoModalIdsList);
+            setSelectedMusicModalIds(selectedMusicModalIdsList);
+            setSelectedTextInputIds(selectedTextInputIdsList);
             if (selectedIndices.length > 0) {
               setSelectedImageIndex(selectedIndices[0]);
             } else {
               setSelectedImageIndex(null);
             }
+            // Set single selection IDs for backward compatibility
+            if (selectedImageModalIdsList.length > 0) {
+              setSelectedImageModalId(selectedImageModalIdsList[0]);
+            } else {
+              setSelectedImageModalId(null);
+            }
+            if (selectedVideoModalIdsList.length > 0) {
+              setSelectedVideoModalId(selectedVideoModalIdsList[0]);
+            } else {
+              setSelectedVideoModalId(null);
+            }
+            if (selectedMusicModalIdsList.length > 0) {
+              setSelectedMusicModalId(selectedMusicModalIdsList[0]);
+            } else {
+              setSelectedMusicModalId(null);
+            }
+            if (selectedTextInputIdsList.length > 0) {
+              setSelectedTextInputId(selectedTextInputIdsList[0]);
+            } else {
+              setSelectedTextInputId(null);
+            }
           }
           
           // Compute tight bounding rect around selected items (remove extra area)
-          if (selectedIndices.length > 0) {
+          // Include both canvas images and modals
+          const totalSelected = selectedIndices.length + selectedImageModalIdsList.length + 
+                               selectedVideoModalIdsList.length + selectedMusicModalIdsList.length + 
+                               selectedTextInputIdsList.length;
+          
+          if (totalSelected > 0) {
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
             let maxY = -Infinity;
+            
+            // Include canvas images
             selectedIndices.forEach((idx) => {
               const it = images[idx];
               if (!it) return;
@@ -679,21 +798,99 @@ export const Canvas: React.FC<CanvasProps> = ({
               maxX = Math.max(maxX, ix + iw);
               maxY = Math.max(maxY, iy + ih);
             });
+            
+            // Include image modals
+            // Image modals: 600px wide, height varies by aspect ratio (min 400px)
+            // The actual height is: max(400, 600 / aspectRatio)
+            // Default aspect ratio is typically 1:1, so height would be 600px
+            // But to get a tighter fit, we'll use the minimum height (400px) for calculation
+            // This will create a tighter selection box
+            selectedImageModalIdsList.forEach((id) => {
+              const modal = imageModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600;
+                // Use minimum height for tighter fit - the actual modal may be taller
+                // but this ensures the selection box fits tightly around the minimum size
+                const modalHeight = 400;
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                maxY = Math.max(maxY, modal.y + modalHeight);
+              }
+            });
+            
+            // Include video modals
+            // Video modals: 600px wide, height varies by aspect ratio (min 400px)
+            // Similar to image modals, use minimum height for tighter fit
+            selectedVideoModalIdsList.forEach((id) => {
+              const modal = videoModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600;
+                const modalHeight = 400; // Minimum height for tighter fit
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                maxY = Math.max(maxY, modal.y + modalHeight);
+              }
+            });
+            
+            // Include music modals
+            // Music modals: 600px wide, 300px high (fixed)
+            selectedMusicModalIdsList.forEach((id) => {
+              const modal = musicModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600;
+                const modalHeight = 300;
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                maxY = Math.max(maxY, modal.y + modalHeight);
+              }
+            });
+            
+            // Include text input modals
+            // Text inputs: variable width (min 400px), variable height based on content
+            // Use approximate dimensions
+            selectedTextInputIdsList.forEach((id) => {
+              const textState = textInputStates.find(t => t.id === id);
+              if (textState) {
+                // Text inputs have minWidth of 400px and variable height
+                // Approximate height: ~150-200px for typical content
+                const textWidth = 400;
+                const textHeight = 180; // More accurate estimate
+                minX = Math.min(minX, textState.x);
+                minY = Math.min(minY, textState.y);
+                maxX = Math.max(maxX, textState.x + textWidth);
+                maxY = Math.max(maxY, textState.y + textHeight);
+              }
+            });
+            
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+              // Calculate tight rect - ensure we're using the actual bounds
+              // The calculation should already be tight, but we ensure no extra padding
+              const calculatedWidth = Math.max(1, maxX - minX);
+              const calculatedHeight = Math.max(1, maxY - minY);
+              
               setSelectionTightRect({
                 x: minX,
                 y: minY,
-                width: Math.max(1, maxX - minX),
-                height: Math.max(1, maxY - minY),
+                width: calculatedWidth,
+                height: calculatedHeight,
               });
               selectionDragOriginRef.current = { x: minX, y: minY };
+              // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+              setSelectionBox(null);
+              // Mark this as a drag selection so icons will show
+              setIsDragSelection(true);
             } else {
               setSelectionTightRect(null);
               selectionDragOriginRef.current = null;
+              setIsDragSelection(false);
             }
           } else {
             setSelectionTightRect(null);
             selectionDragOriginRef.current = null;
+            setIsDragSelection(false);
           }
         } else {
           // Just a click, clear selection if not clicking on an element and no modifier
@@ -703,8 +900,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           if (!isModifierPressed) {
             setSelectedImageIndices([]);
             setSelectedImageIndex(null);
+            setSelectedImageModalIds([]);
+            setSelectedVideoModalIds([]);
+            setSelectedMusicModalIds([]);
+            setSelectedTextInputIds([]);
             setSelectionTightRect(null);
             selectionDragOriginRef.current = null;
+            setIsDragSelection(false);
           }
         }
       }
@@ -723,7 +925,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [isSelecting, selectionBox, position, scale, images, selectedTool]);
+  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates]);
 
   // Attach Transformer to selected nodes
   useEffect(() => {
@@ -794,21 +996,71 @@ export const Canvas: React.FC<CanvasProps> = ({
     const isBackgroundPattern = targetClassName === 'Rect' && 
       (target as Konva.Rect).width() > 100000; // Background pattern is the full canvas size
     const isStartingSelection = isCursorTool && !isPanKey && e.evt.button === 0;
-    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern && !isStartingSelection) {
+    
+    // Check if click is inside the selection area (selectionTightRect or selectionBox)
+    let isInsideSelection = false;
+    if (stage) {
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos) {
+        // Convert screen coordinates to canvas coordinates
+        const canvasPos = {
+          x: (pointerPos.x - position.x) / scale,
+          y: (pointerPos.y - position.y) / scale,
+        };
+        
+        // Check if click is inside selectionTightRect
+        if (selectionTightRect) {
+          const rect = selectionTightRect;
+          if (
+            canvasPos.x >= rect.x &&
+            canvasPos.x <= rect.x + rect.width &&
+            canvasPos.y >= rect.y &&
+            canvasPos.y <= rect.y + rect.height
+          ) {
+            isInsideSelection = true;
+          }
+        }
+        
+        // Check if click is inside selectionBox (if no tightRect yet)
+        if (!isInsideSelection && selectionBox) {
+          const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
+          const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
+          const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
+          const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
+          if (
+            canvasPos.x >= boxX &&
+            canvasPos.x <= boxX + boxWidth &&
+            canvasPos.y >= boxY &&
+            canvasPos.y <= boxY + boxHeight
+          ) {
+            isInsideSelection = true;
+          }
+        }
+      }
+    }
+    
+    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern && !isStartingSelection && !isInsideSelection) {
+      // Click is outside selection area - clear everything
       setSelectedImageIndex(null);
       setSelectedImageIndices([]);
       setSelectedTextInputId(null);
+      setSelectedTextInputIds([]);
       setSelectedImageModalId(null);
+      setSelectedImageModalIds([]);
       setSelectedVideoModalId(null);
+      setSelectedVideoModalIds([]);
       setSelectedMusicModalId(null);
+      setSelectedMusicModalIds([]);
       setContextMenuOpen(false);
       setContextMenuImageIndex(null);
       setContextMenuModalId(null);
       setContextMenuModalType(null);
-      // Clear selection rectangle and tight rect when clicking on empty space
+      // Clear selection rectangle and tight rect when clicking outside selection area
       setSelectionBox(null);
       setSelectionTightRect(null);
+      setIsDragSelection(false);
     }
+    // If click is inside selection area, do nothing - keep selections
     
     // Store mouse down position to detect drag vs click
     const pointerPos = e.target.getStage()?.getPointerPosition();
@@ -855,6 +1107,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Clear previous selection box and tight rect when starting a new one
         setSelectionBox(null);
         setSelectionTightRect(null);
+        setIsDragSelection(false);
         setIsSelecting(true);
         // Start new selection box in canvas coordinates
         const canvasX = (pointerPos.x - position.x) / scale;
@@ -1220,9 +1473,16 @@ export const Canvas: React.FC<CanvasProps> = ({
                     setSelectedImageIndices([actualIndex]);
                     setSelectedImageIndex(actualIndex);
                     setSelectedImageModalId(null);
+                    setSelectedImageModalIds([]);
                     setSelectedVideoModalId(null);
+                    setSelectedVideoModalIds([]);
                     setSelectedMusicModalId(null);
+                    setSelectedMusicModalIds([]);
                     setSelectedTextInputId(null);
+                    setSelectedTextInputIds([]);
+                    // Clear drag selection flag - this is a single click, not a drag
+                    setIsDragSelection(false);
+                    setSelectionTightRect(null);
                   }
                 }}
                 isSelected={selectedImageIndices.includes(actualIndex)}
@@ -1276,9 +1536,16 @@ export const Canvas: React.FC<CanvasProps> = ({
                       setSelectedImageIndices([actualIndex]);
                       // Clear all modal selections
                       setSelectedImageModalId(null);
+                      setSelectedImageModalIds([]);
                       setSelectedVideoModalId(null);
+                      setSelectedVideoModalIds([]);
                       setSelectedMusicModalId(null);
+                      setSelectedMusicModalIds([]);
                       setSelectedTextInputId(null);
+                      setSelectedTextInputIds([]);
+                      // Clear drag selection flag - this is a single click, not a drag
+                      setIsDragSelection(false);
+                      setSelectionTightRect(null);
                       // Show context menu when text is clicked
                       setContextMenuImageIndex(actualIndex);
                       setContextMenuOpen(true);
@@ -1359,22 +1626,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             );
           })}
           {/* Selection Rect & Toolbar */}
-          {(isSelecting && selectionBox) ? (
-            // While dragging, show live marquee box
-            <Rect
-              x={Math.min(selectionBox.startX, selectionBox.currentX)}
-              y={Math.min(selectionBox.startY, selectionBox.currentY)}
-              width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-              height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-              fill="rgba(147, 197, 253, 0.3)"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dash={[5, 5]}
-              listening={false}
-              globalCompositeOperation="source-over"
-              cornerRadius={0}
-            />
-          ) : selectionTightRect && selectedImageIndices.length > 0 ? (
+          {selectionTightRect && isDragSelection && (selectedImageIndices.length > 0 || selectedImageModalIds.length > 0 || selectedVideoModalIds.length > 0 || selectedMusicModalIds.length > 0 || selectedTextInputIds.length > 0) ? (
             // After selection completes, show tight rect with toolbar and allow dragging to move all
             <Group
               x={selectionTightRect.x}
@@ -1417,69 +1669,63 @@ export const Canvas: React.FC<CanvasProps> = ({
                 listening={true}
                 cornerRadius={0}
               />
-              {/* Toolbar buttons at top border */}
+              {/* Toolbar buttons at top center, outside selection area */}
               <Group
-                x={8}
-                y={-36}
+                x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
+                y={-40}
               >
                 {/* Group button */}
                 <Group
-                  onClick={() => {
-                    // Collect items inside tight rect for grouping
-                    const rect = selectionTightRect;
-                    if (!rect) return;
-                    const insideImageIndices: number[] = [];
-                    images.forEach((img, index) => {
-                      if (img.type === 'model3d') return;
-                      const ix = img.x || 0;
-                      const iy = img.y || 0;
-                      let iw = img.width || 0;
-                      let ih = img.height || 0;
-                      if (img.type === 'text') {
-                        const fontSize = img.fontSize || 24;
-                        iw = (img.text || '').length * fontSize * 0.6;
-                        ih = fontSize * 1.2;
-                      }
-                      const itemRect = { x: ix, y: iy, width: iw, height: ih };
-                      if (itemRect.x >= rect.x && itemRect.y >= rect.y &&
-                          (itemRect.x + itemRect.width) <= (rect.x + rect.width) &&
-                          (itemRect.y + itemRect.height) <= (rect.y + rect.height)) {
-                        insideImageIndices.push(index);
-                      }
-                    });
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    // Use the selected items from selection arrays
                     setPendingGroupItems({
-                      imageIndices: insideImageIndices,
-                      textIds: [], // Text inputs are separate overlays; skipping for now
-                      imageModalIds: [],
-                      videoModalIds: [],
-                      musicModalIds: [],
+                      imageIndices: [...selectedImageIndices],
+                      textIds: [...selectedTextInputIds],
+                      imageModalIds: [...selectedImageModalIds],
+                      videoModalIds: [...selectedVideoModalIds],
+                      musicModalIds: [...selectedMusicModalIds],
                     });
                     setIsGroupNameModalOpen(true);
+                  }}
+                  onMouseEnter={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'pointer';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'default';
+                    }
                   }}
                 >
                   <Rect
                     x={0}
                     y={0}
-                    width={80}
-                    height={28}
+                    width={36}
+                    height={36}
                     fill="#111827"
                     stroke="#374151"
                     strokeWidth={1}
-                    cornerRadius={6}
+                    cornerRadius={8}
+                    shadowColor="rgba(0, 0, 0, 0.3)"
+                    shadowBlur={4}
+                    shadowOffset={{ x: 0, y: 2 }}
                   />
-                  <Text
-                    x={10}
-                    y={7}
-                    text="Group"
-                    fontSize={14}
-                    fontFamily="Arial"
-                    fill="#ffffff"
-                  />
+                  {/* Group icon - layers/stack icon */}
+                  <Group x={8} y={8}>
+                    <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                  </Group>
                 </Group>
                 {/* Arrange button */}
                 <Group
-                  x={92}
-                  onClick={() => {
+                  x={48}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
                     const rect = selectionTightRect;
                     if (!rect) return;
                     const sel = [...selectedImageIndices];
@@ -1534,25 +1780,192 @@ export const Canvas: React.FC<CanvasProps> = ({
                       });
                     }
                   }}
+                  onMouseEnter={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'pointer';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'default';
+                    }
+                  }}
                 >
                   <Rect
                     x={0}
                     y={0}
-                    width={90}
-                    height={28}
+                    width={36}
+                    height={36}
                     fill="#111827"
                     stroke="#374151"
                     strokeWidth={1}
-                    cornerRadius={6}
+                    cornerRadius={8}
+                    shadowColor="rgba(0, 0, 0, 0.3)"
+                    shadowBlur={4}
+                    shadowOffset={{ x: 0, y: 2 }}
                   />
-                  <Text
-                    x={10}
-                    y={7}
-                    text="Arrange"
-                    fontSize={14}
-                    fontFamily="Arial"
-                    fill="#ffffff"
+                  {/* Arrange icon - grid/layout icon */}
+                  <Group x={8} y={8}>
+                    <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                  </Group>
+                </Group>
+              </Group>
+            </Group>
+          ) : (isSelecting && selectionBox) ? (
+            // While dragging, show live marquee box
+            <Rect
+              x={Math.min(selectionBox.startX, selectionBox.currentX)}
+              y={Math.min(selectionBox.startY, selectionBox.currentY)}
+              width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
+              height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
+              fill="rgba(147, 197, 253, 0.3)"
+              stroke="#3b82f6"
+              strokeWidth={2}
+              dash={[5, 5]}
+              listening={false}
+              globalCompositeOperation="source-over"
+              cornerRadius={0}
+            />
+          ) : (selectionBox && !isSelecting) ? (
+            // After drag completes but before tight rect is calculated, show the selection box with buttons
+            <Group
+              x={Math.min(selectionBox.startX, selectionBox.currentX)}
+              y={Math.min(selectionBox.startY, selectionBox.currentY)}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
+                height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
+                fill="rgba(147, 197, 253, 0.3)"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dash={[5, 5]}
+                listening={false}
+                globalCompositeOperation="source-over"
+                cornerRadius={0}
+              />
+              {/* Toolbar buttons at top center, outside selection area */}
+              <Group
+                x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 42}
+                y={-40}
+              >
+                {/* Group button */}
+                <Group
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    setPendingGroupItems({
+                      imageIndices: [...selectedImageIndices],
+                      textIds: [...selectedTextInputIds],
+                      imageModalIds: [...selectedImageModalIds],
+                      videoModalIds: [...selectedVideoModalIds],
+                      musicModalIds: [...selectedMusicModalIds],
+                    });
+                    setIsGroupNameModalOpen(true);
+                  }}
+                  onMouseEnter={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'pointer';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'default';
+                    }
+                  }}
+                >
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={36}
+                    height={36}
+                    fill="#111827"
+                    stroke="#374151"
+                    strokeWidth={1}
+                    cornerRadius={8}
+                    shadowColor="rgba(0, 0, 0, 0.3)"
+                    shadowBlur={4}
+                    shadowOffset={{ x: 0, y: 2 }}
                   />
+                  <Group x={8} y={8}>
+                    <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
+                  </Group>
+                </Group>
+                {/* Arrange button */}
+                <Group
+                  x={48}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    const sel = [...selectedImageIndices];
+                    if (sel.length === 0) return;
+                    const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
+                    const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
+                    const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
+                    const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
+                    const padding = 12;
+                    const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
+                    let col = 0;
+                    let currentY = boxY + padding;
+                    let maxRowHeight = 0;
+                    let currentX = boxX + padding;
+                    sel.forEach((idx) => {
+                      const it = images[idx];
+                      if (!it) return;
+                      const iw = it.width || 100;
+                      const ih = it.height || 100;
+                      if (col >= cols || (currentX + iw + padding) > (boxX + boxWidth)) {
+                        col = 0;
+                        currentX = boxX + padding;
+                        currentY += maxRowHeight + padding;
+                        maxRowHeight = 0;
+                      }
+                      handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
+                      currentX += iw + padding;
+                      maxRowHeight = Math.max(maxRowHeight, ih);
+                      col += 1;
+                    });
+                  }}
+                  onMouseEnter={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'pointer';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const stage = e.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor = 'default';
+                    }
+                  }}
+                >
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={36}
+                    height={36}
+                    fill="#111827"
+                    stroke="#374151"
+                    strokeWidth={1}
+                    cornerRadius={8}
+                    shadowColor="rgba(0, 0, 0, 0.3)"
+                    shadowBlur={4}
+                    shadowOffset={{ x: 0, y: 2 }}
+                  />
+                  <Group x={8} y={8}>
+                    <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                    <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                  </Group>
                 </Group>
               </Group>
             </Group>
@@ -1585,7 +1998,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           key={textState.id}
           x={textState.x}
           y={textState.y}
-          isSelected={selectedTextInputId === textState.id}
+          isSelected={selectedTextInputId === textState.id || selectedTextInputIds.includes(textState.id)}
           onConfirm={(text) => {
             if (onTextCreate) {
               onTextCreate(text, textState.x, textState.y);
@@ -1604,12 +2017,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           }}
           onSelect={() => {
             setSelectedTextInputId(textState.id);
+            setSelectedTextInputIds([textState.id]);
             // Clear other selections so only this shows blue border
             setSelectedImageIndex(null);
             setSelectedImageIndices([]);
             setSelectedImageModalId(null);
+            setSelectedImageModalIds([]);
             setSelectedVideoModalId(null);
+            setSelectedVideoModalIds([]);
             setSelectedMusicModalId(null);
+            setSelectedMusicModalIds([]);
+            // Clear drag selection flag - this is a single click, not a drag
+            setIsDragSelection(false);
+            setSelectionTightRect(null);
           }}
           stageRef={stageRef}
           scale={scale}
@@ -1636,12 +2056,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedImageUrl={modalState.generatedImageUrl}
           onSelect={() => {
             setSelectedImageModalId(modalState.id);
+            setSelectedImageModalIds([modalState.id]);
             // Clear other selections
             setSelectedVideoModalId(null);
+            setSelectedVideoModalIds([]);
             setSelectedMusicModalId(null);
+            setSelectedMusicModalIds([]);
             setSelectedTextInputId(null);
+            setSelectedTextInputIds([]);
             setSelectedImageIndex(null);
             setSelectedImageIndices([]);
+            // Clear drag selection flag - this is a single click, not a drag
+            setIsDragSelection(false);
+            setSelectionTightRect(null);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('image');
@@ -1651,7 +2078,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedImageModalId(null);
           }}
-          isSelected={selectedImageModalId === modalState.id}
+          isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
@@ -1684,12 +2111,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedVideoUrl={modalState.generatedVideoUrl || generatedVideoUrl}
           onSelect={() => {
             setSelectedVideoModalId(modalState.id);
+            setSelectedVideoModalIds([modalState.id]);
             // Clear other selections
             setSelectedImageModalId(null);
+            setSelectedImageModalIds([]);
             setSelectedMusicModalId(null);
+            setSelectedMusicModalIds([]);
             setSelectedTextInputId(null);
+            setSelectedTextInputIds([]);
             setSelectedImageIndex(null);
             setSelectedImageIndices([]);
+            // Clear drag selection flag - this is a single click, not a drag
+            setIsDragSelection(false);
+            setSelectionTightRect(null);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('video');
@@ -1699,7 +2133,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedVideoModalId(null);
           }}
-          isSelected={selectedVideoModalId === modalState.id}
+          isSelected={selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
@@ -1732,12 +2166,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           generatedMusicUrl={modalState.generatedMusicUrl || generatedMusicUrl}
           onSelect={() => {
             setSelectedMusicModalId(modalState.id);
+            setSelectedMusicModalIds([modalState.id]);
             // Clear other selections
             setSelectedImageModalId(null);
+            setSelectedImageModalIds([]);
             setSelectedVideoModalId(null);
+            setSelectedVideoModalIds([]);
             setSelectedTextInputId(null);
+            setSelectedTextInputIds([]);
             setSelectedImageIndex(null);
             setSelectedImageIndices([]);
+            // Clear drag selection flag - this is a single click, not a drag
+            setIsDragSelection(false);
+            setSelectionTightRect(null);
             // Show context menu when modal is clicked
             setContextMenuModalId(modalState.id);
             setContextMenuModalType('music');
@@ -1747,7 +2188,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedMusicModalId(null);
           }}
-          isSelected={selectedMusicModalId === modalState.id}
+          isSelected={selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
