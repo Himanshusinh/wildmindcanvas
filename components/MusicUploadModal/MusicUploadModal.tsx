@@ -271,7 +271,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
-            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+            border: 'none',
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -285,14 +285,15 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         </div>
       )}
 
-      {/* Action Icons - Top Right Corner, Outside Frame (Only when selected) */}
+      {/* Action Icons - Right Side Top, Outside Frame (Only when selected) */}
       {isSelected && (
         <div
           style={{
             position: 'absolute',
-            top: `${-40 * scale}px`,
-            right: 0,
+            top: 0,
+            right: `${-40 * scale}px`,
             display: 'flex',
+            flexDirection: 'column',
             gap: `${6 * scale}px`,
             zIndex: 3001,
             pointerEvents: 'auto',
@@ -449,13 +450,9 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: isHovered ? '0' : `${16 * scale}px`,
-          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
-          borderTop: isHovered ? 'none' : `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
-          borderTopLeftRadius: isHovered ? '0' : `${16 * scale}px`,
-          borderTopRightRadius: isHovered ? '0' : `${16 * scale}px`,
-          borderBottomLeftRadius: isHovered ? '0' : `${16 * scale}px`,
-          borderBottomRightRadius: isHovered ? '0' : `${16 * scale}px`,
+          borderRadius: `${16 * scale}px`,
+          border: isSelected ? `${4 * scale}px solid #60A5FA` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : 'none'),
+          transition: 'border 0.3s ease, box-shadow 0.3s ease',
           boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
           display: 'flex',
           alignItems: 'center',
@@ -616,7 +613,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+          border: 'none',
           borderTop: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',

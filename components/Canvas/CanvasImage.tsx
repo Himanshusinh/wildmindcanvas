@@ -341,8 +341,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               height={28}
               fill="#f0f2f5"
               cornerRadius={[frameBorderRadius, frameBorderRadius, 0, 0]}
-              stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
-              strokeWidth={isSelectedState ? 2 : frameBorderWidth}
+              stroke={isSelectedState ? '#60A5FA' : frameBorderColor}
+              strokeWidth={isSelectedState ? 4 : frameBorderWidth}
               strokeBottom={false}
             />
             <Text
@@ -379,8 +379,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           height={height}
           fill={frameBackgroundColor}
           cornerRadius={isMediaHovered ? 0 : frameBorderRadius}
-          stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
-          strokeWidth={isSelectedState ? 2 : frameBorderWidth}
+          stroke={isSelectedState ? '#60A5FA' : frameBorderColor}
+          strokeWidth={isSelectedState ? 4 : frameBorderWidth}
           shadowBlur={frameShadowBlur}
           shadowOpacity={frameShadowOpacity}
           shadowColor="rgba(0, 0, 0, 1)"
@@ -435,8 +435,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             height={50}
             fill="rgba(0, 0, 0, 0.75)"
             cornerRadius={[0, 0, frameBorderRadius, frameBorderRadius]}
-            stroke={isSelectedState ? '#3b82f6' : 'transparent'}
-            strokeWidth={isSelectedState ? 2 : 0}
+            stroke={isSelectedState ? '#60A5FA' : 'transparent'}
+            strokeWidth={isSelectedState ? 4 : 0}
             listening={false}
           />
           

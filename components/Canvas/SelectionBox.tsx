@@ -80,7 +80,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
           });
           // Update tight rect to new position and reset node back to (0,0) under new rect
-          setSelectionTightRect(prev => prev ? { ...prev, x: prev.x + deltaX, y: prev.y + deltaY } : prev);
+          if (selectionTightRect) {
+            setSelectionTightRect({ ...selectionTightRect, x: selectionTightRect.x + deltaX, y: selectionTightRect.y + deltaY });
+          }
           node.position({ x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY });
           selectionDragOriginRef.current = { x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY };
         }}
@@ -91,8 +93,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           width={selectionTightRect.width}
           height={selectionTightRect.height}
           fill="rgba(147, 197, 253, 0.18)"
-          stroke="#3b82f6"
-          strokeWidth={2}
+          stroke="#60A5FA"
+          strokeWidth={4}
           dash={[5, 5]}
           listening={true}
           cornerRadius={0}
@@ -256,8 +258,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
         fill="rgba(147, 197, 253, 0.3)"
-        stroke="#3b82f6"
-        strokeWidth={2}
+        stroke="#60A5FA"
+        strokeWidth={4}
         dash={[5, 5]}
         listening={false}
         globalCompositeOperation="source-over"
@@ -279,8 +281,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
           height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
           fill="rgba(147, 197, 253, 0.3)"
-          stroke="#3b82f6"
-          strokeWidth={2}
+          stroke="#60A5FA"
+          strokeWidth={4}
           dash={[5, 5]}
           listening={false}
           globalCompositeOperation="source-over"
