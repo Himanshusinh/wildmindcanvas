@@ -80,7 +80,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
           });
           // Update tight rect to new position and reset node back to (0,0) under new rect
-          setSelectionTightRect(prev => prev ? { ...prev, x: prev.x + deltaX, y: prev.y + deltaY } : prev);
+          if (selectionTightRect) {
+            setSelectionTightRect({ ...selectionTightRect, x: selectionTightRect.x + deltaX, y: selectionTightRect.y + deltaY });
+          }
           node.position({ x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY });
           selectionDragOriginRef.current = { x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY };
         }}
