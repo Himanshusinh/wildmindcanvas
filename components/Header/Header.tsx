@@ -11,9 +11,17 @@ export const Header: React.FC<HeaderProps> = ({
   projectName: initialProjectName = 'Untitled',
   onProjectNameChange 
 }) => {
-  const [projectName, setProjectName] = useState(initialProjectName);
+  // Use prop directly to avoid hydration mismatches - only use state when editing
+  const [editingValue, setEditingValue] = useState(initialProjectName);
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync editing value with prop changes
+  useEffect(() => {
+    if (initialProjectName !== undefined && !isEditing) {
+      setEditingValue(initialProjectName);
+    }
+  }, [initialProjectName, isEditing]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -27,13 +35,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProjectName(e.target.value);
+    setEditingValue(e.target.value);
   };
 
   const handleNameBlur = () => {
     setIsEditing(false);
     if (onProjectNameChange) {
-      onProjectNameChange(projectName);
+      onProjectNameChange(editingValue);
     }
   };
 
@@ -41,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
     if (e.key === 'Enter') {
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
-      setProjectName(initialProjectName);
+      setEditingValue(initialProjectName);
       setIsEditing(false);
     }
   };
@@ -104,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
           <input
             ref={inputRef}
             type="text"
-            value={projectName}
+            value={editingValue}
             onChange={handleNameChange}
             onBlur={handleNameBlur}
             onKeyDown={handleNameKeyDown}
@@ -141,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {projectName || 'Untitled'}
+            {initialProjectName || 'Untitled'}
           </div>
         )}
       </div>
