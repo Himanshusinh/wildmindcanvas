@@ -144,13 +144,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: isHovered ? '0' : `${12 * scale}px`,
-        border: isSelected ? `${2 * scale}px solid #3b82f6` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`),
-        borderBottom: isHovered && !isSelected ? 'none' : (isSelected ? `${2 * scale}px solid #3b82f6` : `${1 * scale}px solid rgba(255, 255, 255, 0.2)`),
-        borderTopLeftRadius: isHovered ? '0' : `${12 * scale}px`,
-        borderTopRightRadius: isHovered ? '0' : `${12 * scale}px`,
-        borderBottomLeftRadius: isHovered ? '0' : `${12 * scale}px`,
-        borderBottomRightRadius: isHovered ? '0' : `${12 * scale}px`,
+        borderRadius: `${12 * scale}px`,
+        border: isSelected ? `${4 * scale}px solid #60A5FA` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : 'none'),
+        transition: 'border 0.3s ease, box-shadow 0.3s ease',
         boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(31, 38, 135, 0.37)`,
         minWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : 'grab',
@@ -174,7 +170,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
             borderRadius: `${12 * scale}px ${12 * scale}px 0 0`,
-            border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)'}`,
+            border: 'none',
             borderBottom: 'none',
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
@@ -188,14 +184,15 @@ export const TextInput: React.FC<TextInputProps> = ({
         </div>
       )}
 
-      {/* Action Icons - Top Right Corner, Outside Frame (Only when selected) */}
+      {/* Action Icons - Right Side Top, Outside Frame (Only when selected) */}
       {isSelected && (
         <div
           style={{
             position: 'absolute',
-            top: `${-40 * scale}px`,
-            right: 0,
+            top: 0,
+            right: `${-40 * scale}px`,
             display: 'flex',
+            flexDirection: 'column',
             gap: `${6 * scale}px`,
             zIndex: 3001,
             pointerEvents: 'auto',
@@ -417,7 +414,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0, 0, 0, 0.1)'}`,
+          border: 'none',
           borderTop: 'none',
           borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
           boxShadow: 'none',

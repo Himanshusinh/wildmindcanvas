@@ -65,8 +65,8 @@ export const TextElements: React.FC<TextElementsProps> = ({
                   setContextMenuImageIndex(actualIndex);
                   setContextMenuOpen(true);
                 }}
-                stroke={isSelected ? '#3b82f6' : undefined}
-                strokeWidth={isSelected ? 2 : 0}
+                stroke={isSelected ? '#60A5FA' : undefined}
+                strokeWidth={isSelected ? 4 : 0}
               />
               {/* Delete button removed - now handled by context menu in header */}
             </Group>

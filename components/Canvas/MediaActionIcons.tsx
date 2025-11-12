@@ -36,12 +36,13 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
       style={{
         position: 'absolute',
         left: `${screenX + screenWidth}px`,
-        top: `${screenY - 40 * scale}px`,
+        top: `${screenY}px`,
         display: 'flex',
+        flexDirection: 'column',
         gap: `${6 * scale}px`,
         zIndex: 3001,
         pointerEvents: 'auto',
-        transform: 'translateX(-100%)',
+        marginLeft: `${6 * scale}px`,
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >

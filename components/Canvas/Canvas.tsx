@@ -569,10 +569,10 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (e.shiftKey) {
         setIsShiftPressed(true);
         const stage = stageRef.current;
-        if (stage && selectedTool === 'move') {
+        if (stage) {
+          // Show grab cursor when Shift is pressed (enables panning with Shift + Left Click)
           stage.container().style.cursor = 'grab';
         }
-        // Cursor tool with Shift should still show default cursor (no panning)
       }
       
       // Handle Delete/Backspace key for deletion (works on both Windows and Mac)
@@ -665,6 +665,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             stage.container().style.cursor = 'default';
           } else if (selectedTool === 'move') {
             stage.container().style.cursor = 'grab';
+          } else if (selectedTool === 'text') {
+            stage.container().style.cursor = 'text';
+          } else {
+            stage.container().style.cursor = 'default';
           }
         }
       }
@@ -1182,11 +1186,11 @@ export const Canvas: React.FC<CanvasProps> = ({
       target.getClassName() === 'Stage' || 
       target.getClassName() === 'Layer' || 
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
-    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool)
+    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, Space key, or Shift + Left Click (NOT with cursor tool)
     const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
     // Cursor tool should NEVER pan - only selection
-    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed || (e.evt.shiftKey && e.evt.button === 0);
     const clickedOnElement = !clickedOnEmpty;
     
     // Check if clicking on a resize handle - if so, don't clear selection
@@ -1272,8 +1276,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // If move tool is selected, always enable panning
-    if (isMoveTool && clickedOnEmpty && e.evt.button === 0) {
+    // If move tool is selected, or Shift + Left Click, always enable panning
+    if ((isMoveTool || (e.evt.shiftKey && e.evt.button === 0)) && clickedOnEmpty && e.evt.button === 0) {
       const stage = e.target.getStage();
       if (stage) {
         setIsPanning(true);
@@ -1312,7 +1316,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // Enable panning only with move tool or pan keys (middle mouse, Ctrl/Cmd, or Space key)
+    // Enable panning only with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key, or Shift + Left Click)
     // Cursor tool should NEVER pan
     const shouldPan = isPanKey && !isCursorTool;
     
@@ -1323,8 +1327,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         stage.draggable(true);
         stage.container().style.cursor = 'grabbing';
       }
-    } else if (clickedOnElement && isMoveTool) {
-      // If move tool is selected, allow panning even when clicking on elements
+    } else if (clickedOnElement && (isMoveTool || (e.evt.shiftKey && e.evt.button === 0))) {
+      // If move tool is selected, or Shift + Left Click, allow panning even when clicking on elements
       const stage = e.target.getStage();
       if (stage) {
         setIsPanning(true);
@@ -1895,42 +1899,36 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (contextMenuModalType === 'image') {
               const modal = imageModalStates.find(m => m.id === contextMenuModalId);
               if (modal) {
-                // Create a duplicate modal with offset position
+                // Create a duplicate modal to the right
                 const newId = `image-${Date.now()}-${Math.random()}`;
-                const centerX = (viewportSize.width / 2 - position.x) / scale;
-                const centerY = (viewportSize.height / 2 - position.y) / scale;
                 setImageModalStates(prev => [...prev, {
                   id: newId,
-                  x: modal.x + 50,
-                  y: modal.y + 50,
+                  x: modal.x + 600 + 50, // 600px width + 50px spacing
+                  y: modal.y, // Same Y position
                   generatedImageUrl: modal.generatedImageUrl,
                 }]);
               }
             } else if (contextMenuModalType === 'video') {
               const modal = videoModalStates.find(m => m.id === contextMenuModalId);
               if (modal) {
-                // Create a duplicate modal with offset position
+                // Create a duplicate modal to the right
                 const newId = `video-${Date.now()}-${Math.random()}`;
-                const centerX = (viewportSize.width / 2 - position.x) / scale;
-                const centerY = (viewportSize.height / 2 - position.y) / scale;
                 setVideoModalStates(prev => [...prev, {
                   id: newId,
-                  x: modal.x + 50,
-                  y: modal.y + 50,
+                  x: modal.x + 600 + 50, // 600px width + 50px spacing
+                  y: modal.y, // Same Y position
                   generatedVideoUrl: modal.generatedVideoUrl,
                 }]);
               }
             } else if (contextMenuModalType === 'music') {
               const modal = musicModalStates.find(m => m.id === contextMenuModalId);
               if (modal) {
-                // Create a duplicate modal with offset position
+                // Create a duplicate modal to the right
                 const newId = `music-${Date.now()}-${Math.random()}`;
-                const centerX = (viewportSize.width / 2 - position.x) / scale;
-                const centerY = (viewportSize.height / 2 - position.y) / scale;
                 setMusicModalStates(prev => [...prev, {
                   id: newId,
-                  x: modal.x + 50,
-                  y: modal.y + 50,
+                  x: modal.x + 600 + 50, // 600px width + 50px spacing
+                  y: modal.y, // Same Y position
                   generatedMusicUrl: modal.generatedMusicUrl,
                 }]);
               }

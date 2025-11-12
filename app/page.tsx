@@ -87,11 +87,12 @@ export default function Home() {
     const imageData = images[index];
     if (!imageData) return;
 
-    // Create a duplicate with offset
+    // Create a duplicate to the right
+    const imageWidth = imageData.width || 400;
     const duplicated: ImageUpload = {
       ...imageData,
-      x: (imageData.x || 0) + 50,
-      y: (imageData.y || 0) + 50,
+      x: (imageData.x || 0) + imageWidth + 50, // Image width + 50px spacing
+      y: imageData.y || 0, // Same Y position
     };
 
     // If it's a blob URL, we need to create a new blob URL

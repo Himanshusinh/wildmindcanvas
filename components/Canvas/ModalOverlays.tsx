@@ -122,11 +122,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             setSelectedTextInputId(null);
           }}
           onDuplicate={() => {
-            // Create a duplicate of the text input with offset
+            // Create a duplicate of the text input to the right
             const duplicated = {
               id: `text-${Date.now()}-${Math.random()}`,
-              x: textState.x + 50,
-              y: textState.y + 50,
+              x: textState.x + 300 + 50, // 300px width + 50px spacing
+              y: textState.y, // Same Y position
             };
             setTextInputStates(prev => [...prev, duplicated]);
           }}
@@ -202,11 +202,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             }
           }}
           onDuplicate={() => {
-            // Create a duplicate of the image modal with offset
+            // Create a duplicate of the image modal to the right
             const duplicated = {
               id: `image-modal-${Date.now()}`,
-              x: modalState.x + 50,
-              y: modalState.y + 50,
+              x: modalState.x + 600 + 50, // 600px width + 50px spacing
+              y: modalState.y, // Same Y position
               generatedImageUrl: modalState.generatedImageUrl,
             };
             setImageModalStates(prev => [...prev, duplicated]);
@@ -283,11 +283,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             }
           }}
           onDuplicate={() => {
-            // Create a duplicate of the video modal with offset
+            // Create a duplicate of the video modal to the right
             const duplicated = {
               id: `video-modal-${Date.now()}`,
-              x: modalState.x + 50,
-              y: modalState.y + 50,
+              x: modalState.x + 600 + 50, // 600px width + 50px spacing
+              y: modalState.y, // Same Y position
               generatedVideoUrl: modalState.generatedVideoUrl,
             };
             setVideoModalStates(prev => [...prev, duplicated]);
@@ -364,11 +364,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             }
           }}
           onDuplicate={() => {
-            // Create a duplicate of the music modal with offset
+            // Create a duplicate of the music modal to the right
             const duplicated = {
               id: `music-modal-${Date.now()}`,
-              x: modalState.x + 50,
-              y: modalState.y + 50,
+              x: modalState.x + 600 + 50, // 600px width + 50px spacing
+              y: modalState.y, // Same Y position
               generatedMusicUrl: modalState.generatedMusicUrl,
             };
             setMusicModalStates(prev => [...prev, duplicated]);
