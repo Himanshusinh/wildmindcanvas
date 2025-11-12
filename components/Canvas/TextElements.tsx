@@ -1,0 +1,78 @@
+'use client';
+
+import { Group, Text } from 'react-konva';
+import { ImageUpload } from '@/types/canvas';
+
+interface TextElementsProps {
+  images: ImageUpload[];
+  selectedImageIndex: number | null;
+  clearAllSelections: () => void;
+  setSelectedImageIndex: (index: number | null) => void;
+  setSelectedImageIndices: (indices: number[]) => void;
+  setContextMenuImageIndex: (index: number | null) => void;
+  setContextMenuOpen: (open: boolean) => void;
+  handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
+}
+
+export const TextElements: React.FC<TextElementsProps> = ({
+  images,
+  selectedImageIndex,
+  clearAllSelections,
+  setSelectedImageIndex,
+  setSelectedImageIndices,
+  setContextMenuImageIndex,
+  setContextMenuOpen,
+  handleImageUpdateWithGroup,
+}) => {
+  return (
+    <>
+      {images
+        .filter((img) => img.type === 'text')
+        .map((textData, index) => {
+          const actualIndex = images.findIndex(img => img === textData);
+          const isSelected = selectedImageIndex === actualIndex;
+          const textX = textData.x || 0;
+          const textY = textData.y || 0;
+          const fontSize = textData.fontSize || 24;
+          // Estimate text width (approximate)
+          const textWidth = (textData.text || '').length * fontSize * 0.6;
+          const textHeight = fontSize * 1.2;
+          return (
+            <Group key={`text-${actualIndex}`}>
+              <Text
+                x={textX}
+                y={textY}
+                text={textData.text || ''}
+                fontSize={fontSize}
+                fontFamily={textData.fontFamily || 'Arial'}
+                fill={textData.fill || '#000000'}
+                draggable
+                onDragEnd={(e) => {
+                  const node = e.target;
+                  handleImageUpdateWithGroup(actualIndex, {
+                    x: node.x(),
+                    y: node.y(),
+                  });
+                }}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  // Clear all other selections first
+                  clearAllSelections();
+                  // Then set this text as selected
+                  setSelectedImageIndex(actualIndex);
+                  setSelectedImageIndices([actualIndex]);
+                  // Show context menu when text is clicked
+                  setContextMenuImageIndex(actualIndex);
+                  setContextMenuOpen(true);
+                }}
+                stroke={isSelected ? '#3b82f6' : undefined}
+                strokeWidth={isSelected ? 2 : 0}
+              />
+              {/* Delete button removed - now handled by context menu in header */}
+            </Group>
+          );
+        })}
+    </>
+  );
+};
+

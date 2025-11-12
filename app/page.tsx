@@ -5,6 +5,8 @@ import { Canvas } from '@/components/Canvas';
 import { ToolbarPanel } from '@/components/ToolbarPanel';
 import { Header } from '@/components/Header';
 import { ImageUpload } from '@/types/canvas';
+import { generateImage } from '@/lib/api';
+import { getAuthToken } from '@/lib/auth';
 
 export default function Home() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -390,11 +392,38 @@ export default function Home() {
     processMediaFile(file, images.length);
   };
 
-  const handleImageGenerate = (prompt: string, model: string, frame: string, aspectRatio: string) => {
-    console.log('Generate image:', { prompt, model, frame, aspectRatio });
-    // TODO: Implement image generation API call here
-    // For now, just close the modal
-    setIsImageModalOpen(false);
+  const handleImageGenerate = async (
+    prompt: string, 
+    model: string, 
+    frame: string, 
+    aspectRatio: string,
+    modalId?: string
+  ): Promise<string | null> => {
+    try {
+      console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId });
+      
+      // Get auth token from cookies or localStorage
+      const token = getAuthToken();
+      
+      // If no token found, show user-friendly error with instructions
+      if (!token) {
+        const errorMsg = 'Authentication required. Please log in to generate images.\n\nFor development: You can set a test token in the browser console:\nlocalStorage.setItem("auth_token", "your-token-here")';
+        console.error(errorMsg);
+        console.warn('To set a test token, run in browser console:');
+        console.warn('localStorage.setItem("auth_token", "your-token-here")');
+        alert('Authentication required. Please log in to generate images.');
+        throw new Error('Authentication required');
+      }
+
+      // Call the API to generate image
+      const imageUrl = await generateImage(prompt, model, aspectRatio, token);
+      
+      console.log('Image generated successfully:', imageUrl);
+      return imageUrl;
+    } catch (error) {
+      console.error('Error generating image:', error);
+      throw error; // Re-throw to let the modal handle the error display
+    }
   };
 
   const handleVideoSelect = (file: File) => {

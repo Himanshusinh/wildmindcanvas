@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
         position: 'fixed',
         top: '16px',
         left: '16px',
-        zIndex: 1000,
+        zIndex: 10001,
         display: 'flex',
         alignItems: 'center',
         gap: '8px',

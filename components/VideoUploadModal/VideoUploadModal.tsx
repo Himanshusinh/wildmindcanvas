@@ -16,6 +16,8 @@ interface VideoUploadModalProps {
   onPositionChange?: (x: number, y: number) => void;
   onSelect?: () => void;
   onDelete?: () => void;
+  onDownload?: () => void;
+  onDuplicate?: () => void;
   isSelected?: boolean;
 }
 
@@ -33,6 +35,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   onPositionChange,
   onSelect,
   onDelete,
+  onDownload,
+  onDuplicate,
   isSelected,
 }) => {
   const [prompt, setPrompt] = useState('');
@@ -167,6 +171,153 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           }}
         >
           Video Generator
+        </div>
+      )}
+
+      {/* Action Icons - Top Right Corner, Outside Frame (Only when selected) */}
+      {isSelected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `${-40 * scale}px`,
+            right: 0,
+            display: 'flex',
+            gap: `${6 * scale}px`,
+            zIndex: 3001,
+            pointerEvents: 'auto',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Delete Icon */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete) onDelete();
+              }}
+              title="Delete"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+            </button>
+          )}
+
+          {/* Download Icon */}
+          {onDownload && generatedVideoUrl && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDownload) onDownload();
+              }}
+              title="Download"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                e.currentTarget.style.color = '#3b82f6';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
+
+          {/* Duplicate Icon */}
+          {onDuplicate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDuplicate) onDuplicate();
+              }}
+              title="Duplicate"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
+                e.currentTarget.style.color = '#22c55e';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
       {/* Video Frame */}

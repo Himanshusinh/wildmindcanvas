@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Circle, Group, Path, Text, Line, Transformer } from 'react-konva';
+import { Stage, Layer, Rect, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 import { Model3DOverlay } from './Model3DOverlay';
-import { TextInput } from '@/components/TextInput';
-import { ImageUploadModal } from '@/components/ImageUploadModal';
-import { VideoUploadModal } from '@/components/VideoUploadModal';
-import { MusicUploadModal } from '@/components/MusicUploadModal';
 import { ContextMenu } from '@/components/ContextMenu';
 import { GroupNameModal } from '@/components/GroupNameModal';
+import { CanvasImage } from './CanvasImage';
+import { TextElements } from './TextElements';
+import { ModalOverlays } from './ModalOverlays';
+import { SelectionBox } from './SelectionBox';
+import { MediaActionIcons } from './MediaActionIcons';
+import { GroupLabel } from './GroupLabel';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -26,7 +28,7 @@ interface CanvasProps {
   isImageModalOpen?: boolean;
   onImageModalClose?: () => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string) => Promise<string | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
@@ -119,18 +121,227 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
   const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
+
+  // Helper function to clear all selections
+  // clearSelectionBoxes: if true, also clears selection boxes (for empty canvas clicks)
+  // if false, keeps selection boxes (for component switching)
+  const clearAllSelections = (clearSelectionBoxes: boolean = false) => {
+    setSelectedImageIndex(null);
+    setSelectedImageIndices([]);
+    setSelectedTextInputId(null);
+    setSelectedTextInputIds([]);
+    setSelectedImageModalId(null);
+    setSelectedImageModalIds([]);
+    setSelectedVideoModalId(null);
+    setSelectedVideoModalIds([]);
+    setSelectedMusicModalId(null);
+    setSelectedMusicModalIds([]);
+    setContextMenuOpen(false);
+    setContextMenuImageIndex(null);
+    setContextMenuModalId(null);
+    setContextMenuModalType(null);
+    if (clearSelectionBoxes) {
+      setSelectionBox(null);
+      setSelectionTightRect(null);
+      setIsDragSelection(false);
+    }
+  };
   // Truly infinite canvas - fixed massive size
   const canvasSize = { width: INFINITE_CANVAS_SIZE, height: INFINITE_CANVAS_SIZE };
+
+  // Helper function to check if a position overlaps with existing components
+  const checkOverlap = (x: number, y: number, width: number = 600, height: number = 400, padding: number = 100): boolean => {
+    // Expand check rect with padding
+    const checkRect = { 
+      x: x - padding, 
+      y: y - padding, 
+      width: width + padding * 2, 
+      height: height + padding * 2 
+    };
+    
+    // Check against uploaded images/videos
+    for (const img of images) {
+      if (img.type === 'text' || img.type === 'model3d') continue;
+      const imgWidth = img.width || 400;
+      const imgHeight = img.height || 400;
+      const imgRect = {
+        x: (img.x || 0) - padding,
+        y: (img.y || 0) - padding,
+        width: imgWidth + padding * 2,
+        height: imgHeight + padding * 2,
+      };
+      if (
+        checkRect.x < imgRect.x + imgRect.width &&
+        checkRect.x + checkRect.width > imgRect.x &&
+        checkRect.y < imgRect.y + imgRect.height &&
+        checkRect.y + checkRect.height > imgRect.y
+      ) {
+        return true;
+      }
+    }
+    
+    // Check against text inputs (estimated size: 300x100)
+    for (const textState of textInputStates) {
+      const textRect = { 
+        x: textState.x - padding, 
+        y: textState.y - padding, 
+        width: 300 + padding * 2, 
+        height: 100 + padding * 2 
+      };
+      if (
+        checkRect.x < textRect.x + textRect.width &&
+        checkRect.x + checkRect.width > textRect.x &&
+        checkRect.y < textRect.y + textRect.height &&
+        checkRect.y + checkRect.height > textRect.y
+      ) {
+        return true;
+      }
+    }
+    
+    // Check against image modals (600px wide, ~400px tall for 1:1 aspect ratio)
+    for (const modalState of imageModalStates) {
+      const modalRect = { 
+        x: modalState.x - padding, 
+        y: modalState.y - padding, 
+        width: 600 + padding * 2, 
+        height: 400 + padding * 2 
+      };
+      if (
+        checkRect.x < modalRect.x + modalRect.width &&
+        checkRect.x + checkRect.width > modalRect.x &&
+        checkRect.y < modalRect.y + modalRect.height &&
+        checkRect.y + checkRect.height > modalRect.y
+      ) {
+        return true;
+      }
+    }
+    
+    // Check against video modals (600px wide, ~400px tall for 16:9 aspect ratio)
+    for (const modalState of videoModalStates) {
+      const modalRect = { 
+        x: modalState.x - padding, 
+        y: modalState.y - padding, 
+        width: 600 + padding * 2, 
+        height: 400 + padding * 2 
+      };
+      if (
+        checkRect.x < modalRect.x + modalRect.width &&
+        checkRect.x + checkRect.width > modalRect.x &&
+        checkRect.y < modalRect.y + modalRect.height &&
+        checkRect.y + checkRect.height > modalRect.y
+      ) {
+        return true;
+      }
+    }
+    
+    // Check against music modals (600px wide, ~300px tall)
+    for (const modalState of musicModalStates) {
+      const modalRect = { 
+        x: modalState.x - padding, 
+        y: modalState.y - padding, 
+        width: 600 + padding * 2, 
+        height: 300 + padding * 2 
+      };
+      if (
+        checkRect.x < modalRect.x + modalRect.width &&
+        checkRect.x + checkRect.width > modalRect.x &&
+        checkRect.y < modalRect.y + modalRect.height &&
+        checkRect.y + checkRect.height > modalRect.y
+      ) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // Helper function to find blank space for new component
+  const findBlankSpace = (componentWidth: number = 600, componentHeight: number = 400): { x: number; y: number } => {
+    // Check if canvas is empty
+    const isEmpty = images.length === 0 && 
+                    textInputStates.length === 0 && 
+                    imageModalStates.length === 0 && 
+                    videoModalStates.length === 0 && 
+                    musicModalStates.length === 0;
+    
+    if (isEmpty) {
+      // Center on screen when canvas is empty
+      const centerX = (viewportSize.width / 2 - position.x) / scale;
+      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      return { x: centerX - componentWidth / 2, y: centerY - componentHeight / 2 };
+    }
+    
+    // Find blank space starting from viewport center
+    const centerX = (viewportSize.width / 2 - position.x) / scale;
+    const centerY = (viewportSize.height / 2 - position.y) / scale;
+    
+    // Try positions in a spiral pattern from center with larger spacing
+    const spacing = Math.max(componentWidth, componentHeight) + 200; // Space between attempts (component size + padding)
+    const maxAttempts = 100; // Search further
+    
+    // First try center position
+    if (!checkOverlap(centerX - componentWidth / 2, centerY - componentHeight / 2, componentWidth, componentHeight)) {
+      return { x: centerX - componentWidth / 2, y: centerY - componentHeight / 2 };
+    }
+    
+    // Spiral search pattern
+    for (let radius = 1; radius < maxAttempts; radius++) {
+      // Try 8 directions at each radius
+      for (let angle = 0; angle < 360; angle += 45) {
+        const rad = (angle * Math.PI) / 180;
+        const x = centerX - componentWidth / 2 + Math.cos(rad) * radius * spacing;
+        const y = centerY - componentHeight / 2 + Math.sin(rad) * radius * spacing;
+        
+        if (!checkOverlap(x, y, componentWidth, componentHeight)) {
+          return { x, y };
+        }
+      }
+    }
+    
+    // Fallback: try positions further away in a grid pattern
+    const gridSpacing = spacing;
+    for (let row = -10; row <= 10; row++) {
+      for (let col = -10; col <= 10; col++) {
+        if (row === 0 && col === 0) continue; // Skip center (already checked)
+        const x = centerX - componentWidth / 2 + col * gridSpacing;
+        const y = centerY - componentHeight / 2 + row * gridSpacing;
+        
+        if (!checkOverlap(x, y, componentWidth, componentHeight)) {
+          return { x, y };
+        }
+      }
+    }
+    
+    // Last resort: return a position far to the right
+    return { x: centerX + 1000, y: centerY - componentHeight / 2 };
+  };
+
+  // Helper function to pan viewport to focus on a component
+  const focusOnComponent = (canvasX: number, canvasY: number, componentWidth: number = 600, componentHeight: number = 400) => {
+    // Calculate the position to center the component on screen
+    const targetScreenX = viewportSize.width / 2;
+    const targetScreenY = viewportSize.height / 2;
+    
+    // Convert canvas coordinates to screen coordinates
+    const componentCenterX = canvasX + componentWidth / 2;
+    const componentCenterY = canvasY + componentHeight / 2;
+    
+    // Calculate new position to center the component
+    const newPosX = targetScreenX - componentCenterX * scale;
+    const newPosY = targetScreenY - componentCenterY * scale;
+    
+    setPosition({ x: newPosX, y: newPosY });
+    setTimeout(() => updateViewportCenter({ x: newPosX, y: newPosY }, scale), 0);
+  };
 
   // Automatically create text input at center when text tool is selected
   useEffect(() => {
     if (selectedTool === 'text') {
-      // Always create a new text input at center when text tool is selected
-      // Calculate center of viewport in canvas coordinates
-      const centerX = (viewportSize.width / 2 - position.x) / scale;
-      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const blankPos = findBlankSpace(300, 100);
       const newId = `text-${Date.now()}-${Math.random()}`;
-      setTextInputStates(prev => [...prev, { id: newId, x: centerX, y: centerY }]);
+      setTextInputStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y }]);
+      // Auto-focus on new component
+      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 300, 100), 100);
     }
     prevSelectedToolRef.current = selectedTool;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,11 +350,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Automatically create image modal at center when image tool is selected
   useEffect(() => {
     if (selectedTool === 'image' && isImageModalOpen) {
-      // Calculate center of viewport in canvas coordinates
-      const centerX = (viewportSize.width / 2 - position.x) / scale;
-      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const blankPos = findBlankSpace(600, 400);
       const newId = `image-${Date.now()}-${Math.random()}`;
-      setImageModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedImageUrl: null }]);
+      setImageModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedImageUrl: null }]);
+      // Auto-focus on new component
+      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isImageModalOpen, toolClickCounter]);
@@ -151,11 +362,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Automatically create video modal at center when video tool is selected
   useEffect(() => {
     if (selectedTool === 'video' && isVideoModalOpen) {
-      // Calculate center of viewport in canvas coordinates
-      const centerX = (viewportSize.width / 2 - position.x) / scale;
-      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const blankPos = findBlankSpace(600, 400);
       const newId = `video-${Date.now()}-${Math.random()}`;
-      setVideoModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedVideoUrl: null }]);
+      setVideoModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedVideoUrl: null }]);
+      // Auto-focus on new component
+      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isVideoModalOpen, toolClickCounter]);
@@ -163,11 +374,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Automatically create music modal at center when music tool is selected
   useEffect(() => {
     if (selectedTool === 'music' && isMusicModalOpen) {
-      // Calculate center of viewport in canvas coordinates
-      const centerX = (viewportSize.width / 2 - position.x) / scale;
-      const centerY = (viewportSize.height / 2 - position.y) / scale;
+      const blankPos = findBlankSpace(600, 300);
       const newId = `music-${Date.now()}-${Math.random()}`;
-      setMusicModalStates(prev => [...prev, { id: newId, x: centerX, y: centerY, generatedMusicUrl: null }]);
+      setMusicModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedMusicUrl: null }]);
+      // Auto-focus on new component
+      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 300), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isMusicModalOpen, toolClickCounter]);
@@ -530,18 +741,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           clickY >= rect.top &&
           clickY <= rect.bottom
         ) {
-          // Click is inside container but outside modals and not on canvas - clear selections
-          setSelectedImageIndex(null);
-          setSelectedImageIndices([]);
-          setSelectedTextInputId(null);
-          setSelectedTextInputIds([]);
-          setSelectedImageModalId(null);
-          setSelectedImageModalIds([]);
-          setSelectedVideoModalId(null);
-          setSelectedVideoModalIds([]);
-          setSelectedMusicModalId(null);
-          setSelectedMusicModalIds([]);
-          // Don't clear selectionBox here - let the Konva handler manage it
+          // Click is inside container but outside modals and not on canvas - clear selections including boxes
+          clearAllSelections(true);
         }
       }
       
@@ -976,7 +1177,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const target = e.target;
     const stage = target.getStage();
-    const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.getClassName() === 'Rect';
+    // More comprehensive check for empty clicks - includes Stage, Layer, and background Rect
+    const clickedOnEmpty = target === stage || 
+      target.getClassName() === 'Stage' || 
+      target.getClassName() === 'Layer' || 
+      (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
     // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool)
     const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
@@ -988,13 +1193,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Resize handles have a name attribute "resize-handle"
     const isResizeHandle = target.name() === 'resize-handle';
     
-    // Clear selections when clicking on empty space (but not on resize handles or the background pattern)
-    // Also exclude the background Rect pattern (which is the canvas pattern - very large Rect)
+    // Clear selections when clicking on empty space (but not on resize handles)
     // Don't clear if we're starting a selection box with cursor tool
     // NOTE: Selection box is NOT cleared here - it only clears on Delete key or when starting a new selection
-    const targetClassName = target.getClassName();
-    const isBackgroundPattern = targetClassName === 'Rect' && 
-      (target as Konva.Rect).width() > 100000; // Background pattern is the full canvas size
     const isStartingSelection = isCursorTool && !isPanKey && e.evt.button === 0;
     
     // Check if click is inside the selection area (selectionTightRect or selectionBox)
@@ -1039,26 +1240,14 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     }
     
-    if (clickedOnEmpty && !isResizeHandle && !isBackgroundPattern && !isStartingSelection && !isInsideSelection) {
-      // Click is outside selection area - clear everything
-      setSelectedImageIndex(null);
-      setSelectedImageIndices([]);
-      setSelectedTextInputId(null);
-      setSelectedTextInputIds([]);
-      setSelectedImageModalId(null);
-      setSelectedImageModalIds([]);
-      setSelectedVideoModalId(null);
-      setSelectedVideoModalIds([]);
-      setSelectedMusicModalId(null);
-      setSelectedMusicModalIds([]);
-      setContextMenuOpen(false);
-      setContextMenuImageIndex(null);
-      setContextMenuModalId(null);
-      setContextMenuModalType(null);
-      // Clear selection rectangle and tight rect when clicking outside selection area
-      setSelectionBox(null);
-      setSelectionTightRect(null);
-      setIsDragSelection(false);
+    // Clear selections when clicking on empty canvas space
+    // Only skip clearing if:
+    // 1. We're clicking on a resize handle
+    // 2. We're starting a selection box (cursor tool drag)
+    // 3. We're clicking inside an existing selection area
+    if (clickedOnEmpty && !isResizeHandle && !isStartingSelection && !isInsideSelection) {
+      // Click is on empty canvas - clear everything including selection boxes
+      clearAllSelections(true);
     }
     // If click is inside selection area, do nothing - keep selections
     
@@ -1195,6 +1384,34 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
+    const target = e.target;
+    
+    // Check if this was a click on empty canvas (not a drag)
+    const clickedOnEmpty = target === stage || 
+      target.getClassName() === 'Stage' || 
+      target.getClassName() === 'Layer' || 
+      (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
+    
+    // If it was a click (not a drag) on empty space and no selection box was created, clear selections
+    // This handles the case where user clicks on empty canvas to deselect
+    if (clickedOnEmpty && !isSelecting && !selectionBox) {
+      // Only clear if we have selections and this was just a click (not part of a drag operation)
+      const hasSelections = selectedImageIndex !== null || 
+        selectedImageModalId !== null || 
+        selectedVideoModalId !== null || 
+        selectedMusicModalId !== null || 
+        selectedTextInputId !== null ||
+        selectedImageIndices.length > 0 ||
+        selectedImageModalIds.length > 0 ||
+        selectedVideoModalIds.length > 0 ||
+        selectedMusicModalIds.length > 0 ||
+        selectedTextInputIds.length > 0;
+      
+      if (hasSelections) {
+        clearAllSelections(true);
+      }
+    }
+    
     if (stage) {
       setIsPanning(false);
       setIsDraggingFromElement(false);
@@ -1469,20 +1686,11 @@ export const Canvas: React.FC<CanvasProps> = ({
                       }
                     });
                   } else {
-                    // Single select - clear all modal selections
+                    // Single select - clear all other selections first
+                    clearAllSelections();
+                    // Then set this image as selected
                     setSelectedImageIndices([actualIndex]);
                     setSelectedImageIndex(actualIndex);
-                    setSelectedImageModalId(null);
-                    setSelectedImageModalIds([]);
-                    setSelectedVideoModalId(null);
-                    setSelectedVideoModalIds([]);
-                    setSelectedMusicModalId(null);
-                    setSelectedMusicModalIds([]);
-                    setSelectedTextInputId(null);
-                    setSelectedTextInputIds([]);
-                    // Clear drag selection flag - this is a single click, not a drag
-                    setIsDragSelection(false);
-                    setSelectionTightRect(null);
                   }
                 }}
                 isSelected={selectedImageIndices.includes(actualIndex)}
@@ -1493,501 +1701,47 @@ export const Canvas: React.FC<CanvasProps> = ({
                   setSelectedImageIndex(null);
                   setSelectedImageIndices([]);
                 }}
-                onContextMenu={() => {
-                  setContextMenuImageIndex(actualIndex);
-                  setContextMenuOpen(true);
-                  setSelectedImageIndex(actualIndex);
-                }}
               />
               );
             })}
           {/* Text Elements */}
-          {images
-            .filter((img) => img.type === 'text')
-            .map((textData, index) => {
-              const actualIndex = images.findIndex(img => img === textData);
-              const isSelected = selectedImageIndex === actualIndex;
-              const textX = textData.x || 0;
-              const textY = textData.y || 0;
-              const fontSize = textData.fontSize || 24;
-              // Estimate text width (approximate)
-              const textWidth = (textData.text || '').length * fontSize * 0.6;
-              const textHeight = fontSize * 1.2;
-              return (
-                <Group key={`text-${actualIndex}`}>
-                  <Text
-                    x={textX}
-                    y={textY}
-                    text={textData.text || ''}
-                    fontSize={fontSize}
-                    fontFamily={textData.fontFamily || 'Arial'}
-                    fill={textData.fill || '#000000'}
-                    draggable
-                    onDragEnd={(e) => {
-                      const node = e.target;
-                      handleImageUpdateWithGroup(actualIndex, {
-                        x: node.x(),
-                        y: node.y(),
-                      });
-                    }}
-                    onClick={(e) => {
-                      e.cancelBubble = true;
-                      setSelectedImageIndex(actualIndex);
-                      setSelectedImageIndices([actualIndex]);
-                      // Clear all modal selections
-                      setSelectedImageModalId(null);
-                      setSelectedImageModalIds([]);
-                      setSelectedVideoModalId(null);
-                      setSelectedVideoModalIds([]);
-                      setSelectedMusicModalId(null);
-                      setSelectedMusicModalIds([]);
-                      setSelectedTextInputId(null);
-                      setSelectedTextInputIds([]);
-                      // Clear drag selection flag - this is a single click, not a drag
-                      setIsDragSelection(false);
-                      setSelectionTightRect(null);
-                      // Show context menu when text is clicked
-                      setContextMenuImageIndex(actualIndex);
-                      setContextMenuOpen(true);
-                    }}
-                    stroke={isSelected ? '#3b82f6' : undefined}
-                    strokeWidth={isSelected ? 2 : 0}
-                  />
-                  {/* Delete button removed - now handled by context menu in header */}
-                </Group>
-              );
-            })}
+          <TextElements
+            images={images}
+            selectedImageIndex={selectedImageIndex}
+            clearAllSelections={clearAllSelections}
+            setSelectedImageIndex={setSelectedImageIndex}
+            setSelectedImageIndices={setSelectedImageIndices}
+            setContextMenuImageIndex={setContextMenuImageIndex}
+            setContextMenuOpen={setContextMenuOpen}
+            handleImageUpdateWithGroup={handleImageUpdateWithGroup}
+          />
           {/* Group labels overlay */}
-          {Array.from(groups.values()).map((grp) => {
-            // Compute group bounding box from image indices
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            grp.itemIndices.forEach(idx => {
-              const it = images[idx];
-              if (!it) return;
-              const ix = it.x || 0;
-              const iy = it.y || 0;
-              const iw = it.width || 0;
-              const ih = it.height || 0;
-              minX = Math.min(minX, ix);
-              minY = Math.min(minY, iy);
-              maxX = Math.max(maxX, ix + iw);
-              maxY = Math.max(maxY, iy + ih);
-            });
-            if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-              return null;
-            }
-            const labelX = minX - 6;
-            const labelY = Math.min(minY - 28, minY - 6);
-            const name = grp.name || 'Group';
-            const labelWidth = Math.max(60, name.length * 8 + 20);
-            return (
-              <Group
-                key={grp.id}
-                x={labelX}
-                y={labelY}
-                draggable
-                onDragEnd={(e) => {
-                  const node = e.target as Konva.Group;
-                  const newX = node.x();
-                  const newY = node.y();
-                  const deltaX = newX - labelX;
-                  const deltaY = newY - labelY;
-                  // Move all items in the group
-                  grp.itemIndices.forEach(idx => {
-                    const it = images[idx];
-                    if (!it) return;
-                    const ox = it.x || 0;
-                    const oy = it.y || 0;
-                    handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
-                  });
-                  // Reset visual position back (items have moved)
-                  node.position({ x: labelX, y: labelY });
-                }}
-              >
-                <Rect
-                  x={0}
-                  y={0}
-                  width={labelWidth}
-                  height={22}
-                  fill="#111827"
-                  stroke="#374151"
-                  strokeWidth={1}
-                  cornerRadius={6}
-                />
-                <Text
-                  x={10}
-                  y={4}
-                  text={name}
-                  fontSize={12}
-                  fontFamily="Arial"
-                  fill="#ffffff"
-                />
-              </Group>
-            );
-          })}
-          {/* Selection Rect & Toolbar */}
-          {(() => {
-            // Calculate total number of selected items
-            const totalSelected = selectedImageIndices.length + 
-                                 selectedImageModalIds.length + 
-                                 selectedVideoModalIds.length + 
-                                 selectedMusicModalIds.length + 
-                                 selectedTextInputIds.length;
-            // Only show icons if there are 2 or more components selected
-            return selectionTightRect && isDragSelection && totalSelected >= 2;
-          })() && selectionTightRect ? (
-            // After selection completes, show tight rect with toolbar and allow dragging to move all
-            <Group
-              x={selectionTightRect.x}
-              y={selectionTightRect.y}
-              draggable
-              onDragStart={(e) => {
-                selectionDragOriginRef.current = { x: selectionTightRect.x, y: selectionTightRect.y };
-              }}
-              onDragEnd={(e) => {
-                const origin = selectionDragOriginRef.current;
-                const node = e.target as Konva.Group;
-                if (!origin || !node) return;
-                const newX = node.x();
-                const newY = node.y();
-                const deltaX = newX - origin.x;
-                const deltaY = newY - origin.y;
-                // Move all selected images by delta
-                selectedImageIndices.forEach(idx => {
-                  const it = images[idx];
-                  if (!it) return;
-                  const ox = it.x || 0;
-                  const oy = it.y || 0;
-                  handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
-                });
-                // Update tight rect to new position and reset node back to (0,0) under new rect
-                setSelectionTightRect(prev => prev ? { ...prev, x: prev.x + deltaX, y: prev.y + deltaY } : prev);
-                node.position({ x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY });
-                selectionDragOriginRef.current = { x: (selectionTightRect?.x || 0) + deltaX, y: (selectionTightRect?.y || 0) + deltaY };
-              }}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={selectionTightRect.width}
-                height={selectionTightRect.height}
-                fill="rgba(147, 197, 253, 0.18)"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dash={[5, 5]}
-                listening={true}
-                cornerRadius={0}
-              />
-              {/* Toolbar buttons at top center, outside selection area */}
-              <Group
-                x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
-                y={-40}
-              >
-                {/* Group button */}
-                <Group
-                  onClick={(e) => {
-                    e.cancelBubble = true;
-                    // Use the selected items from selection arrays
-                    setPendingGroupItems({
-                      imageIndices: [...selectedImageIndices],
-                      textIds: [...selectedTextInputIds],
-                      imageModalIds: [...selectedImageModalIds],
-                      videoModalIds: [...selectedVideoModalIds],
-                      musicModalIds: [...selectedMusicModalIds],
-                    });
-                    setIsGroupNameModalOpen(true);
-                  }}
-                  onMouseEnter={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'pointer';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'default';
-                    }
-                  }}
-                >
-                  <Rect
-                    x={0}
-                    y={0}
-                    width={36}
-                    height={36}
-                    fill="#111827"
-                    stroke="#374151"
-                    strokeWidth={1}
-                    cornerRadius={8}
-                    shadowColor="rgba(0, 0, 0, 0.3)"
-                    shadowBlur={4}
-                    shadowOffset={{ x: 0, y: 2 }}
-                  />
-                  {/* Group icon - layers/stack icon */}
-                  <Group x={8} y={8}>
-                    <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                  </Group>
-                </Group>
-                {/* Arrange button */}
-                <Group
-                  x={48}
-                  onClick={(e) => {
-                    e.cancelBubble = true;
-                    const rect = selectionTightRect;
-                    if (!rect) return;
-                    const sel = [...selectedImageIndices];
-                    if (sel.length === 0) return;
-                    // Simple grid layout inside rect preserving item sizes; top-left flow
-                    const padding = 12;
-                    const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
-                    let col = 0;
-                    let row = 0;
-                    let currentY = rect.y + padding;
-                    let maxRowHeight = 0;
-                    let currentX = rect.x + padding;
-                    sel.forEach((idx, i) => {
-                      const it = images[idx];
-                      if (!it) return;
-                      const iw = it.width || 100;
-                      const ih = it.height || 100;
-                      if (col >= cols || (currentX + iw + padding) > (rect.x + rect.width)) {
-                        // next row
-                        row += 1;
-                        col = 0;
-                        currentX = rect.x + padding;
-                        currentY += maxRowHeight + padding;
-                        maxRowHeight = 0;
-                      }
-                      handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
-                      currentX += iw + padding;
-                      maxRowHeight = Math.max(maxRowHeight, ih);
-                      col += 1;
-                    });
-                    // Update tight rect after arrange
-                    // Recompute bounds of selected items
-                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                    sel.forEach(idx => {
-                      const it = images[idx];
-                      if (!it) return;
-                      const ix = it.x || 0;
-                      const iy = it.y || 0;
-                      const iw = it.width || 0;
-                      const ih = it.height || 0;
-                      minX = Math.min(minX, ix);
-                      minY = Math.min(minY, iy);
-                      maxX = Math.max(maxX, ix + iw);
-                      maxY = Math.max(maxY, iy + ih);
-                    });
-                    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-                      setSelectionTightRect({
-                        x: minX,
-                        y: minY,
-                        width: Math.max(1, maxX - minX),
-                        height: Math.max(1, maxY - minY),
-                      });
-                    }
-                  }}
-                  onMouseEnter={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'pointer';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'default';
-                    }
-                  }}
-                >
-                  <Rect
-                    x={0}
-                    y={0}
-                    width={36}
-                    height={36}
-                    fill="#111827"
-                    stroke="#374151"
-                    strokeWidth={1}
-                    cornerRadius={8}
-                    shadowColor="rgba(0, 0, 0, 0.3)"
-                    shadowBlur={4}
-                    shadowOffset={{ x: 0, y: 2 }}
-                  />
-                  {/* Arrange icon - grid/layout icon */}
-                  <Group x={8} y={8}>
-                    <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                  </Group>
-                </Group>
-              </Group>
-            </Group>
-          ) : (isSelecting && selectionBox) ? (
-            // While dragging, show live marquee box
-            <Rect
-              x={Math.min(selectionBox.startX, selectionBox.currentX)}
-              y={Math.min(selectionBox.startY, selectionBox.currentY)}
-              width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-              height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-              fill="rgba(147, 197, 253, 0.3)"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              dash={[5, 5]}
-              listening={false}
-              globalCompositeOperation="source-over"
-              cornerRadius={0}
+          {Array.from(groups.values()).map((grp) => (
+            <GroupLabel
+              key={grp.id}
+              group={grp}
+              images={images}
+              handleImageUpdateWithGroup={handleImageUpdateWithGroup}
             />
-          ) : (selectionBox && !isSelecting) ? (
-            // After drag completes but before tight rect is calculated, show the selection box with buttons
-            <Group
-              x={Math.min(selectionBox.startX, selectionBox.currentX)}
-              y={Math.min(selectionBox.startY, selectionBox.currentY)}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-                height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-                fill="rgba(147, 197, 253, 0.3)"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dash={[5, 5]}
-                listening={false}
-                globalCompositeOperation="source-over"
-                cornerRadius={0}
-              />
-              {/* Toolbar buttons at top center, outside selection area - only show if 2+ items selected */}
-              {(() => {
-                const totalSelected = selectedImageIndices.length + 
-                                     selectedImageModalIds.length + 
-                                     selectedVideoModalIds.length + 
-                                     selectedMusicModalIds.length + 
-                                     selectedTextInputIds.length;
-                return totalSelected >= 2;
-              })() && (
-              <Group
-                x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 42}
-                y={-40}
-              >
-                {/* Group button */}
-                <Group
-                  onClick={(e) => {
-                    e.cancelBubble = true;
-                    setPendingGroupItems({
-                      imageIndices: [...selectedImageIndices],
-                      textIds: [...selectedTextInputIds],
-                      imageModalIds: [...selectedImageModalIds],
-                      videoModalIds: [...selectedVideoModalIds],
-                      musicModalIds: [...selectedMusicModalIds],
-                    });
-                    setIsGroupNameModalOpen(true);
-                  }}
-                  onMouseEnter={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'pointer';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'default';
-                    }
-                  }}
-                >
-                  <Rect
-                    x={0}
-                    y={0}
-                    width={36}
-                    height={36}
-                    fill="#111827"
-                    stroke="#374151"
-                    strokeWidth={1}
-                    cornerRadius={8}
-                    shadowColor="rgba(0, 0, 0, 0.3)"
-                    shadowBlur={4}
-                    shadowOffset={{ x: 0, y: 2 }}
-                  />
-                  <Group x={8} y={8}>
-                    <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                  </Group>
-                </Group>
-                {/* Arrange button */}
-                <Group
-                  x={48}
-                  onClick={(e) => {
-                    e.cancelBubble = true;
-                    const sel = [...selectedImageIndices];
-                    if (sel.length === 0) return;
-                    const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
-                    const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
-                    const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
-                    const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
-                    const padding = 12;
-                    const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
-                    let col = 0;
-                    let currentY = boxY + padding;
-                    let maxRowHeight = 0;
-                    let currentX = boxX + padding;
-                    sel.forEach((idx) => {
-                      const it = images[idx];
-                      if (!it) return;
-                      const iw = it.width || 100;
-                      const ih = it.height || 100;
-                      if (col >= cols || (currentX + iw + padding) > (boxX + boxWidth)) {
-                        col = 0;
-                        currentX = boxX + padding;
-                        currentY += maxRowHeight + padding;
-                        maxRowHeight = 0;
-                      }
-                      handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
-                      currentX += iw + padding;
-                      maxRowHeight = Math.max(maxRowHeight, ih);
-                      col += 1;
-                    });
-                  }}
-                  onMouseEnter={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'pointer';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const stage = e.target.getStage();
-                    if (stage) {
-                      stage.container().style.cursor = 'default';
-                    }
-                  }}
-                >
-                  <Rect
-                    x={0}
-                    y={0}
-                    width={36}
-                    height={36}
-                    fill="#111827"
-                    stroke="#374151"
-                    strokeWidth={1}
-                    cornerRadius={8}
-                    shadowColor="rgba(0, 0, 0, 0.3)"
-                    shadowBlur={4}
-                    shadowOffset={{ x: 0, y: 2 }}
-                  />
-                  <Group x={8} y={8}>
-                    <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                    <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                  </Group>
-                </Group>
-              </Group>
-              )}
-            </Group>
-          ) : null}
+          ))}
+          {/* Selection Rect & Toolbar */}
+          <SelectionBox
+            selectionBox={selectionBox}
+            selectionTightRect={selectionTightRect}
+            isSelecting={isSelecting}
+            isDragSelection={isDragSelection}
+            selectedImageIndices={selectedImageIndices}
+            selectedImageModalIds={selectedImageModalIds}
+            selectedVideoModalIds={selectedVideoModalIds}
+            selectedMusicModalIds={selectedMusicModalIds}
+            selectedTextInputIds={selectedTextInputIds}
+            images={images}
+            selectionDragOriginRef={selectionDragOriginRef}
+            setPendingGroupItems={setPendingGroupItems}
+            setIsGroupNameModalOpen={setIsGroupNameModalOpen}
+            setSelectionTightRect={setSelectionTightRect}
+            handleImageUpdateWithGroup={handleImageUpdateWithGroup}
+          />
           {/* Transformer for selected nodes */}
           {selectedImageIndices.length > 0 && (
             <Transformer
@@ -2010,218 +1764,62 @@ export const Canvas: React.FC<CanvasProps> = ({
         stageRef={stageRef}
         onImageUpdate={onImageUpdate}
       />
-      {/* Text Input Overlays */}
-      {textInputStates.map((textState) => (
-        <TextInput
-          key={textState.id}
-          x={textState.x}
-          y={textState.y}
-          isSelected={selectedTextInputId === textState.id || selectedTextInputIds.includes(textState.id)}
-          onConfirm={(text) => {
-            if (onTextCreate) {
-              onTextCreate(text, textState.x, textState.y);
-            }
-            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
-            setSelectedTextInputId(null);
-          }}
-          onCancel={() => {
-            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
-            setSelectedTextInputId(null);
-          }}
-          onPositionChange={(newX, newY) => {
-            setTextInputStates(prev => prev.map(t => 
-              t.id === textState.id ? { ...t, x: newX, y: newY } : t
-            ));
-          }}
-          onSelect={() => {
-            setSelectedTextInputId(textState.id);
-            setSelectedTextInputIds([textState.id]);
-            // Clear other selections so only this shows blue border
-            setSelectedImageIndex(null);
-            setSelectedImageIndices([]);
-            setSelectedImageModalId(null);
-            setSelectedImageModalIds([]);
-            setSelectedVideoModalId(null);
-            setSelectedVideoModalIds([]);
-            setSelectedMusicModalId(null);
-            setSelectedMusicModalIds([]);
-            // Clear drag selection flag - this is a single click, not a drag
-            setIsDragSelection(false);
-            setSelectionTightRect(null);
-          }}
-          stageRef={stageRef}
-          scale={scale}
-          position={position}
-        />
-      ))}
-      {/* Image Upload Modal Overlays */}
-      {imageModalStates.map((modalState) => (
-        <ImageUploadModal
-          key={modalState.id}
-          isOpen={true}
-          onClose={() => {
-            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedImageModalId(null);
-          }}
+      {/* Modal Overlays */}
+      <ModalOverlays
+        textInputStates={textInputStates}
+        imageModalStates={imageModalStates}
+        videoModalStates={videoModalStates}
+        musicModalStates={musicModalStates}
+        selectedTextInputId={selectedTextInputId}
+        selectedTextInputIds={selectedTextInputIds}
+        selectedImageModalId={selectedImageModalId}
+        selectedImageModalIds={selectedImageModalIds}
+        selectedVideoModalId={selectedVideoModalId}
+        selectedVideoModalIds={selectedVideoModalIds}
+        selectedMusicModalId={selectedMusicModalId}
+        selectedMusicModalIds={selectedMusicModalIds}
+        clearAllSelections={clearAllSelections}
+        setTextInputStates={setTextInputStates}
+        setSelectedTextInputId={setSelectedTextInputId}
+        setSelectedTextInputIds={setSelectedTextInputIds}
+        setImageModalStates={setImageModalStates}
+        setSelectedImageModalId={setSelectedImageModalId}
+        setSelectedImageModalIds={setSelectedImageModalIds}
+        setVideoModalStates={setVideoModalStates}
+        setSelectedVideoModalId={setSelectedVideoModalId}
+        setSelectedVideoModalIds={setSelectedVideoModalIds}
+        setMusicModalStates={setMusicModalStates}
+        setSelectedMusicModalId={setSelectedMusicModalId}
+        setSelectedMusicModalIds={setSelectedMusicModalIds}
+        onTextCreate={onTextCreate}
           onImageSelect={onImageSelect}
-          onGenerate={(prompt, model, frame, aspectRatio) => {
-            if (onImageGenerate) {
-              onImageGenerate(prompt, model, frame, aspectRatio);
-              // Store generated image URL when generation completes
-              // This will be updated via a callback or prop update
-            }
-          }}
-          generatedImageUrl={modalState.generatedImageUrl}
-          onSelect={() => {
-            setSelectedImageModalId(modalState.id);
-            setSelectedImageModalIds([modalState.id]);
-            // Clear other selections
-            setSelectedVideoModalId(null);
-            setSelectedVideoModalIds([]);
-            setSelectedMusicModalId(null);
-            setSelectedMusicModalIds([]);
-            setSelectedTextInputId(null);
-            setSelectedTextInputIds([]);
-            setSelectedImageIndex(null);
-            setSelectedImageIndices([]);
-            // Clear drag selection flag - this is a single click, not a drag
-            setIsDragSelection(false);
-            setSelectionTightRect(null);
-            // Show context menu when modal is clicked
-            setContextMenuModalId(modalState.id);
-            setContextMenuModalType('image');
-            setContextMenuOpen(true);
-          }}
-          onDelete={() => {
-            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedImageModalId(null);
-          }}
-          isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
-          x={modalState.x}
-          y={modalState.y}
-          onPositionChange={(newX, newY) => {
-            setImageModalStates(prev => prev.map(m => 
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
-          }}
-          stageRef={stageRef}
-          scale={scale}
-          position={position}
-        />
-      ))}
-      {/* Video Upload Modal Overlays */}
-      {videoModalStates.map((modalState) => (
-        <VideoUploadModal
-          key={modalState.id}
-          isOpen={true}
-          onClose={() => {
-            setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedVideoModalId(null);
-          }}
+        onImageGenerate={onImageGenerate}
           onVideoSelect={onVideoSelect}
-          onGenerate={(prompt, model, frame, aspectRatio) => {
-            if (onVideoGenerate) {
-              onVideoGenerate(prompt, model, frame, aspectRatio);
-              // Store generated video URL when generation completes
-              // This will be updated via a callback or prop update
-            }
-          }}
-          generatedVideoUrl={modalState.generatedVideoUrl || generatedVideoUrl}
-          onSelect={() => {
-            setSelectedVideoModalId(modalState.id);
-            setSelectedVideoModalIds([modalState.id]);
-            // Clear other selections
-            setSelectedImageModalId(null);
-            setSelectedImageModalIds([]);
-            setSelectedMusicModalId(null);
-            setSelectedMusicModalIds([]);
-            setSelectedTextInputId(null);
-            setSelectedTextInputIds([]);
-            setSelectedImageIndex(null);
-            setSelectedImageIndices([]);
-            // Clear drag selection flag - this is a single click, not a drag
-            setIsDragSelection(false);
-            setSelectionTightRect(null);
-            // Show context menu when modal is clicked
-            setContextMenuModalId(modalState.id);
-            setContextMenuModalType('video');
-            setContextMenuOpen(true);
-          }}
-          onDelete={() => {
-            setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedVideoModalId(null);
-          }}
-          isSelected={selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id)}
-          x={modalState.x}
-          y={modalState.y}
-          onPositionChange={(newX, newY) => {
-            setVideoModalStates(prev => prev.map(m => 
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
-          }}
+        onVideoGenerate={onVideoGenerate}
+        onMusicSelect={onMusicSelect}
+        onMusicGenerate={onMusicGenerate}
+        generatedVideoUrl={generatedVideoUrl}
+        generatedMusicUrl={generatedMusicUrl}
           stageRef={stageRef}
           scale={scale}
           position={position}
         />
-      ))}
-      {/* Music Upload Modal Overlays */}
-      {musicModalStates.map((modalState) => (
-        <MusicUploadModal
-          key={modalState.id}
-          isOpen={true}
-          onClose={() => {
-            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedMusicModalId(null);
-          }}
-          onMusicSelect={onMusicSelect}
-          onGenerate={(prompt, model, frame, aspectRatio) => {
-            if (onMusicGenerate) {
-              onMusicGenerate(prompt, model, frame, aspectRatio);
-              // Store generated music URL when generation completes
-              // This will be updated via a callback or prop update
-            }
-          }}
-          generatedMusicUrl={modalState.generatedMusicUrl || generatedMusicUrl}
-          onSelect={() => {
-            setSelectedMusicModalId(modalState.id);
-            setSelectedMusicModalIds([modalState.id]);
-            // Clear other selections
-            setSelectedImageModalId(null);
-            setSelectedImageModalIds([]);
-            setSelectedVideoModalId(null);
-            setSelectedVideoModalIds([]);
-            setSelectedTextInputId(null);
-            setSelectedTextInputIds([]);
-            setSelectedImageIndex(null);
-            setSelectedImageIndices([]);
-            // Clear drag selection flag - this is a single click, not a drag
-            setIsDragSelection(false);
-            setSelectionTightRect(null);
-            // Show context menu when modal is clicked
-            setContextMenuModalId(modalState.id);
-            setContextMenuModalType('music');
-            setContextMenuOpen(true);
-          }}
-          onDelete={() => {
-            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedMusicModalId(null);
-          }}
-          isSelected={selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id)}
-          x={modalState.x}
-          y={modalState.y}
-          onPositionChange={(newX, newY) => {
-            setMusicModalStates(prev => prev.map(m => 
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
-          }}
-          stageRef={stageRef}
+      {/* Action Icons for Uploaded Media */}
+      {selectedImageIndex !== null && images[selectedImageIndex] && (
+        <MediaActionIcons
+          selectedImage={images[selectedImageIndex]}
+          selectedImageIndex={selectedImageIndex}
           scale={scale}
           position={position}
+          onImageDelete={onImageDelete}
+          onImageDuplicate={onImageDuplicate}
+          setSelectedImageIndex={setSelectedImageIndex}
+          setSelectedImageIndices={setSelectedImageIndices}
         />
-      ))}
-      {/* Context Menu */}
+      )}
+      {/* Context Menu - Only for text elements, not for uploaded images/videos */}
       <ContextMenu
-        isOpen={contextMenuOpen && (contextMenuImageIndex !== null || contextMenuModalId !== null)}
+        isOpen={contextMenuOpen && contextMenuImageIndex !== null && images[contextMenuImageIndex]?.type === 'text'}
         onClose={() => {
           setContextMenuOpen(false);
           setContextMenuImageIndex(null);
@@ -2388,712 +1986,3 @@ export const Canvas: React.FC<CanvasProps> = ({
     </div>
   );
 };
-
-// Resize handle component
-const ResizeHandle: React.FC<{
-  x: number;
-  y: number;
-  onDragEnd: (newX: number, newY: number) => void;
-}> = ({ x, y, onDragEnd }) => {
-  const handleRef = useRef<Konva.Circle>(null);
-
-  return (
-    <Circle
-      ref={handleRef}
-      x={x}
-      y={y}
-      radius={10}
-      fill="#3b82f6"
-      stroke="#1e40af"
-      strokeWidth={2}
-      draggable
-      name="resize-handle"
-      onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
-        const node = e.target;
-        onDragEnd(node.x(), node.y());
-      }}
-      onClick={(e: Konva.KonvaEventObject<MouseEvent>) => {
-        // Stop event propagation to prevent clearing selection
-        e.cancelBubble = true;
-      }}
-      onMouseDown={(e: Konva.KonvaEventObject<MouseEvent>) => {
-        // Stop event propagation to prevent clearing selection
-        e.cancelBubble = true;
-      }}
-      onMouseEnter={(e: Konva.KonvaEventObject<MouseEvent>) => {
-        const stage = e.target.getStage();
-        if (stage) {
-          stage.container().style.cursor = 'nwse-resize';
-        }
-      }}
-      onMouseLeave={(e: Konva.KonvaEventObject<MouseEvent>) => {
-        const stage = e.target.getStage();
-        if (stage) {
-          stage.container().style.cursor = 'default';
-        }
-      }}
-    />
-  );
-};
-
-// Separate component for image/video rendering with resize handles
-const CanvasImage: React.FC<{ 
-  imageData: ImageUpload;
-  index: number;
-  onUpdate?: (updates: Partial<ImageUpload>) => void;
-  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
-  isSelected?: boolean;
-  onDelete?: () => void;
-  onContextMenu?: () => void;
-}> = ({ imageData, index, onUpdate, onSelect, isSelected: externalIsSelected, onDelete, onContextMenu }) => {
-  const [img, setImg] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
-  const [isSelected, setIsSelected] = useState(false);
-  const isSelectedState = externalIsSelected !== undefined ? externalIsSelected : isSelected;
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const imageRef = useRef<Konva.Image>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const animRef = useRef<number | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const timeUpdateRef = useRef<number | null>(null);
-  const wasPlayingBeforeDrag = useRef(false);
-  const originalAspectRatio = useRef<number>(1);
-  const isVideo = imageData.type === 'video';
-
-  // Don't render if no URL (text elements don't have URLs)
-  if (!imageData.url) return null;
-
-  const url = imageData.url; // Type narrowing
-
-  useEffect(() => {
-    
-    if (isVideo) {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.src = url;
-      video.muted = false;
-      video.loop = false;
-      video.playsInline = true;
-      video.preload = 'metadata';
-      
-      video.onloadedmetadata = () => {
-        // Ensure video is paused and at first frame
-        video.pause();
-        video.currentTime = 0;
-        setImg(video);
-        originalAspectRatio.current = video.videoWidth / video.videoHeight;
-        setDuration(video.duration || 0);
-        videoRef.current = video;
-        
-        // Force initial frame display after a small delay to ensure video is ready
-        setTimeout(() => {
-          if (videoRef.current && imageRef.current) {
-            videoRef.current.currentTime = 0;
-            imageRef.current.getLayer()?.batchDraw();
-          }
-        }, 100);
-      };
-      
-      // Ensure first frame is loaded and displayed
-      video.onloadeddata = () => {
-        if (video.readyState >= 2) { // HAVE_CURRENT_DATA
-          video.currentTime = 0;
-          // Force a frame update
-          if (imageRef.current) {
-            imageRef.current.getLayer()?.batchDraw();
-          }
-        }
-      };
-      
-      // When video seeks to first frame, update the display
-      video.onseeked = () => {
-        if (video.currentTime === 0 && imageRef.current) {
-          // Force update to show first frame
-          imageRef.current.getLayer()?.batchDraw();
-        }
-      };
-      
-      video.onplay = () => setIsPlaying(true);
-      video.onpause = () => setIsPlaying(false);
-      video.onended = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-      };
-      video.ontimeupdate = () => {
-        if (!isDragging && videoRef.current) {
-          // Throttle time updates to prevent excessive re-renders
-          if (timeUpdateRef.current) {
-            cancelAnimationFrame(timeUpdateRef.current);
-          }
-          timeUpdateRef.current = requestAnimationFrame(() => {
-            if (videoRef.current && !isDragging) {
-              setCurrentTime(videoRef.current.currentTime);
-            }
-          });
-        }
-      };
-      
-      return () => {
-        if (videoRef.current) {
-          videoRef.current.pause();
-          videoRef.current.src = '';
-        }
-        if (timeUpdateRef.current) {
-          cancelAnimationFrame(timeUpdateRef.current);
-        }
-        URL.revokeObjectURL(url);
-      };
-    } else {
-      const image = new Image();
-      image.crossOrigin = 'anonymous';
-      image.src = url;
-      image.onload = () => {
-        setImg(image);
-        originalAspectRatio.current = image.width / image.height;
-      };
-      return () => {
-        URL.revokeObjectURL(url);
-      };
-    }
-  }, [url, isVideo]);
-
-  // Animation loop for video - updates both video frame and progress bar
-  useEffect(() => {
-    if (isVideo && videoRef.current && imageRef.current) {
-      const video = videoRef.current;
-      const layer = imageRef.current.getLayer();
-      const anim = () => {
-        if (video && !video.paused && !video.ended) {
-          layer?.batchDraw();
-          animRef.current = requestAnimationFrame(anim);
-        }
-      };
-      
-      if (isPlaying) {
-        anim();
-      }
-      
-      return () => {
-        if (animRef.current) {
-          cancelAnimationFrame(animRef.current);
-        }
-      };
-    }
-  }, [isVideo, isPlaying]);
-
-  // Smooth hover state management to prevent flickering
-  const [isMediaHovered, setIsMediaHovered] = useState(false);
-  
-  const handleMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    setIsHovered(true);
-    setIsMediaHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    // Small delay to prevent flickering when moving between controls
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false);
-      setIsMediaHovered(false);
-    }, 100);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Format time helper
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  if (!img) return null;
-
-  const x = imageData.x || 50;
-  const y = imageData.y || 50;
-  const getDefaultWidth = () => {
-    if (isVideo && img instanceof HTMLVideoElement) {
-      return img.videoWidth || 640;
-    }
-    return (img as HTMLImageElement).width || 640;
-  };
-  const getDefaultHeight = () => {
-    if (isVideo && img instanceof HTMLVideoElement) {
-      return img.videoHeight || 360;
-    }
-    return (img as HTMLImageElement).height || 360;
-  };
-  const width = imageData.width || getDefaultWidth();
-  const height = imageData.height || getDefaultHeight();
-
-  // Calculate corner positions
-  const corners = {
-    topLeft: { x, y },
-    topRight: { x: x + width, y },
-    bottomLeft: { x, y: y + height },
-    bottomRight: { x: x + width, y: y + height },
-  };
-
-  const handleCornerDrag = (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight', newX: number, newY: number) => {
-    if (!onUpdate) return;
-
-    let newXPos = x;
-    let newYPos = y;
-    let newWidth = width;
-    let newHeight = height;
-
-    switch (corner) {
-      case 'topLeft':
-        newXPos = newX;
-        newYPos = newY;
-        newWidth = width + (x - newX);
-        newHeight = height + (y - newY);
-        break;
-      case 'topRight':
-        newYPos = newY;
-        newWidth = newX - x;
-        newHeight = height + (y - newY);
-        break;
-      case 'bottomLeft':
-        newXPos = newX;
-        newWidth = width + (x - newX);
-        newHeight = newY - y;
-        break;
-      case 'bottomRight':
-        newWidth = newX - x;
-        newHeight = newY - y;
-        break;
-    }
-
-    // Maintain minimum size
-    if (newWidth < 20) newWidth = 20;
-    if (newHeight < 20) newHeight = 20;
-
-    onUpdate({
-      x: newXPos,
-      y: newYPos,
-      width: newWidth,
-      height: newHeight,
-    });
-  };
-
-  const handleImageDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-    const node = e.target;
-    onUpdate?.({
-      x: node.x(),
-      y: node.y(),
-    });
-  };
-
-  const handlePlayPause = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    e.cancelBubble = true;
-    if (isVideo && videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  };
-
-  const handleProgressClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isVideo || !videoRef.current || !duration) return;
-    e.cancelBubble = true;
-    
-    const stage = e.target.getStage();
-    if (!stage) return;
-    
-    const pointerPos = stage.getPointerPosition();
-    if (!pointerPos) return;
-    
-    // Get the absolute position of the progress bar
-    const progressBarStartX = x + 40; // Left edge of progress bar (accounting for play button)
-    const progressBarWidth = width - 100; // Width of progress bar
-    const progressBarEndX = progressBarStartX + progressBarWidth;
-    
-    // Calculate progress based on click position
-    const clickX = pointerPos.x;
-    const relativeX = clickX - progressBarStartX;
-    const progress = Math.max(0, Math.min(1, relativeX / progressBarWidth));
-    
-    if (videoRef.current) {
-      videoRef.current.currentTime = progress * duration;
-      setCurrentTime(progress * duration);
-    }
-  };
-
-  const handleProgressDrag = (e: Konva.KonvaEventObject<DragEvent>) => {
-    if (!isVideo || !videoRef.current || !duration) return;
-    
-    const node = e.target;
-    const progressBarWidth = width - 100;
-    
-    // Get the handle's x position relative to the progress bar group
-    // Since the handle is now a Group, get its x position
-    const handleX = node.x();
-    const progress = Math.max(0, Math.min(1, handleX / progressBarWidth));
-    const newTime = progress * duration;
-    
-    if (videoRef.current) {
-      // Update video position smoothly during drag
-      videoRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
-      // Force layer update for smooth visual feedback
-      imageRef.current?.getLayer()?.batchDraw();
-    }
-  };
-
-  const handleProgressDragStart = () => {
-    setIsDragging(true);
-    if (videoRef.current) {
-      // Remember if video was playing before drag
-      wasPlayingBeforeDrag.current = !videoRef.current.paused;
-      // Pause video during drag for smoother seeking
-      if (wasPlayingBeforeDrag.current) {
-        videoRef.current.pause();
-      }
-    }
-  };
-
-  const handleProgressDragEnd = () => {
-    setIsDragging(false);
-    // Resume playback if it was playing before drag
-    if (videoRef.current && wasPlayingBeforeDrag.current) {
-      videoRef.current.play();
-    }
-  };
-
-  // Frame styling constants (matching ImageUploadModal)
-  const frameBorderRadius = 16;
-  const frameBorderWidth = 2;
-  const framePadding = 0; // No padding, image fills the frame
-  const frameBackgroundColor = 'rgba(255, 255, 255, 0.95)';
-  const frameBorderColor = 'rgba(0, 0, 0, 0.1)';
-  const frameShadowBlur = 32;
-  const frameShadowOpacity = 0.15;
-
-  return (
-    <>
-      <Group
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        draggable
-        x={x}
-        y={y}
-        onDragEnd={(e) => {
-          const node = e.target;
-          onUpdate?.({
-            x: node.x(),
-            y: node.y(),
-          });
-        }}
-        onClick={(e) => {
-          e.cancelBubble = true;
-          setIsSelected(true);
-          if (onSelect) {
-            // Pass event info for multi-select support
-            onSelect({
-              ctrlKey: e.evt.ctrlKey,
-              metaKey: e.evt.metaKey,
-            });
-          }
-          // Show context menu on click (only if not Ctrl/Cmd+click for multi-select)
-          if (onContextMenu && !e.evt.ctrlKey && !e.evt.metaKey) {
-            onContextMenu();
-          }
-          // Don't play/pause when showing context menu
-          // Video play/pause is handled by the center button on hover
-        }}
-      >
-        {/* Tooltip - Attached to Top, Full Width (for uploaded media) */}
-        {isMediaHovered && (
-          <Group x={0} y={-28} listening={false}>
-            <Rect
-              x={0}
-              y={0}
-              width={width}
-              height={28}
-              fill="#f0f2f5"
-              cornerRadius={[frameBorderRadius, frameBorderRadius, 0, 0]}
-              stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
-              strokeWidth={isSelectedState ? 2 : frameBorderWidth}
-              strokeBottom={false}
-            />
-            <Text
-              x={12}
-              y={8}
-              text="Media"
-              fontSize={12}
-              fontFamily="Arial"
-              fill="#1f2937"
-              fontWeight="600"
-              listening={false}
-            />
-            {/* Resolution display - right aligned */}
-            {imageData.originalWidth && imageData.originalHeight && (
-              <Text
-                x={width -80}
-                y={8}
-                text={`${imageData.originalWidth} x ${imageData.originalHeight}`}
-                fontSize={12}
-                fontFamily="Arial"
-                fill="#1f2937"
-                fontWeight="600"
-                align="right"
-                listening={false}
-              />
-            )}
-          </Group>
-        )}
-        {/* Frame Background */}
-        <Rect
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          fill={frameBackgroundColor}
-          cornerRadius={isMediaHovered ? 0 : frameBorderRadius}
-          stroke={isSelectedState ? '#3b82f6' : frameBorderColor}
-          strokeWidth={isSelectedState ? 2 : frameBorderWidth}
-          shadowBlur={frameShadowBlur}
-          shadowOpacity={frameShadowOpacity}
-          shadowColor="rgba(0, 0, 0, 1)"
-          shadowOffsetY={8}
-        />
-        
-        {/* Image/Video clipped to frame with rounded corners - fills entire frame */}
-        <Group
-          clipFunc={(ctx) => {
-            ctx.beginPath();
-            // Create rounded rectangle path matching the frame exactly
-            const x = 0;
-            const y = 0;
-            const w = width;
-            const h = height;
-            const r = isMediaHovered ? 0 : frameBorderRadius;
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + w - r, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-            ctx.lineTo(x + w, y + h - r);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-            ctx.lineTo(x + r, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-            ctx.lineTo(x, y + r);
-            ctx.quadraticCurveTo(x, y, x + r, y);
-            ctx.closePath();
-          }}
-        >
-          <KonvaImage
-            ref={imageRef}
-            image={img}
-            x={0}
-            y={0}
-            width={width}
-            height={height}
-          />
-        </Group>
-      </Group>
-      {/* Video controls overlay - appears on hover */}
-      {isVideo && isHovered && (
-        <Group 
-          x={x} 
-          y={y + height - 50}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Controls background */}
-          <Rect
-            x={0}
-            y={0}
-            width={width}
-            height={50}
-            fill="rgba(0, 0, 0, 0.75)"
-            cornerRadius={[0, 0, frameBorderRadius, frameBorderRadius]}
-            stroke={isSelectedState ? '#3b82f6' : 'transparent'}
-            strokeWidth={isSelectedState ? 2 : 0}
-            listening={false}
-          />
-          
-          {/* Play/Pause button */}
-          <Group
-            x={15}
-            y={15}
-            onClick={handlePlayPause}
-            onTap={handlePlayPause}
-          >
-            <Circle
-              radius={12}
-              fill="rgba(255, 255, 255, 0.9)"
-            />
-            {isPlaying ? (
-              // Pause icon
-              <>
-                <Rect x={-5} y={-6} width={3} height={12} fill="rgba(0, 0, 0, 0.9)" cornerRadius={1} />
-                <Rect x={2} y={-6} width={3} height={12} fill="rgba(0, 0, 0, 0.9)" cornerRadius={1} />
-              </>
-            ) : (
-              // Play icon
-              <Path
-                data="M -4 -6 L -4 6 L 6 0 Z"
-                fill="rgba(0, 0, 0, 0.9)"
-              />
-            )}
-          </Group>
-
-          {/* Progress bar container */}
-          <Group x={40} y={18}>
-            {/* Progress bar background - larger clickable area for easier interaction */}
-            <Rect
-              x={0}
-              y={-12}
-              width={width - 100}
-              height={24}
-              fill="transparent"
-              onClick={handleProgressClick}
-            />
-            
-            {/* Progress bar background track - larger and more visible */}
-            <Rect
-              x={0}
-              y={-2}
-              width={width - 100}
-              height={8}
-              fill="rgba(255, 255, 255, 0.25)"
-              cornerRadius={4}
-              listening={false}
-            />
-            
-            {/* Progress bar filled - shows progress */}
-            <Rect
-              x={0}
-              y={-2}
-              width={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
-              height={8}
-              fill="#3b82f6"
-              cornerRadius={4}
-              listening={false}
-            />
-            
-            {/* Progress bar handle - larger and more visible */}
-            <Group
-              x={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
-              y={2}
-              draggable
-              dragBoundFunc={(pos) => {
-                return {
-                  x: Math.max(0, Math.min(width - 100, pos.x)),
-                  y: 2,
-                };
-              }}
-              onDragMove={handleProgressDrag}
-              onDragEnd={handleProgressDragEnd}
-              onDragStart={handleProgressDragStart}
-              onClick={(e) => {
-                e.cancelBubble = true;
-              }}
-            >
-              {/* Outer circle with shadow for better visibility */}
-              <Circle
-                radius={10}
-                fill="#ffffff"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                shadowBlur={8}
-                shadowColor="rgba(0, 0, 0, 0.5)"
-                shadowOffsetX={0}
-                shadowOffsetY={2}
-              />
-              {/* Inner circle for depth */}
-              <Circle
-                radius={6}
-                fill="#3b82f6"
-              />
-            </Group>
-          </Group>
-
-          {/* Time display */}
-          <Text
-            x={width - 55}
-            y={15}
-            text={`${formatTime(currentTime)} / ${formatTime(duration)}`}
-            fontSize={12}
-            fontFamily="Arial"
-            fill="rgba(255, 255, 255, 0.9)"
-            align="right"
-            listening={false}
-          />
-        </Group>
-      )}
-      
-      {/* Center play/pause button - only show on hover */}
-      {isVideo && isHovered && (
-        <Group
-          x={x + width / 2}
-          y={y + height / 2}
-          onClick={handlePlayPause}
-          onTap={handlePlayPause}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <Circle
-            radius={30}
-            fill="rgba(0, 0, 0, 0.7)"
-            shadowBlur={10}
-            shadowOpacity={0.5}
-          />
-          {isPlaying ? (
-            // Pause icon
-            <>
-              <Rect x={-10} y={-10} width={5} height={20} fill="white" cornerRadius={1} />
-              <Rect x={5} y={-10} width={5} height={20} fill="white" cornerRadius={1} />
-            </>
-          ) : (
-            // Play icon
-            <Path
-              data="M -8 -12 L -8 12 L 14 0 Z"
-              fill="white"
-            />
-          )}
-        </Group>
-      )}
-      {isSelectedState && (
-        <>
-          {/* Resize handles only - delete button removed, now in header navbar */}
-          <ResizeHandle
-            x={corners.topLeft.x}
-            y={corners.topLeft.y}
-            onDragEnd={(newX, newY) => handleCornerDrag('topLeft', newX, newY)}
-          />
-          <ResizeHandle
-            x={corners.topRight.x}
-            y={corners.topRight.y}
-            onDragEnd={(newX, newY) => handleCornerDrag('topRight', newX, newY)}
-          />
-          <ResizeHandle
-            x={corners.bottomLeft.x}
-            y={corners.bottomLeft.y}
-            onDragEnd={(newX, newY) => handleCornerDrag('bottomLeft', newX, newY)}
-          />
-          <ResizeHandle
-            x={corners.bottomRight.x}
-            y={corners.bottomRight.y}
-            onDragEnd={(newX, newY) => handleCornerDrag('bottomRight', newX, newY)}
-          />
-        </>
-      )}
-    </>
-  );
-};
-

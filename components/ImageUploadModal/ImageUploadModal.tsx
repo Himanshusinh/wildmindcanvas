@@ -16,6 +16,8 @@ interface ImageUploadModalProps {
   onPositionChange?: (x: number, y: number) => void;
   onSelect?: () => void;
   onDelete?: () => void;
+  onDownload?: () => void;
+  onDuplicate?: () => void;
   isSelected?: boolean;
 }
 
@@ -33,12 +35,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onPositionChange,
   onSelect,
   onDelete,
+  onDownload,
+  onDuplicate,
   isSelected,
 }) => {
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('Seedream 4K');
+  const [selectedModel, setSelectedModel] = useState('Google Nano Banana');
   const [selectedFrame, setSelectedFrame] = useState('Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -55,10 +60,52 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
 
-  const handleGenerate = () => {
-    if (onGenerate && prompt.trim()) {
-      onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio);
-      // The generated image will be set by the parent component via props or callback
+  const handleGenerate = async () => {
+    if (onGenerate && prompt.trim() && !isGenerating) {
+      setIsGenerating(true);
+      try {
+        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio);
+      } catch (error) {
+        console.error('Error generating image:', error);
+        alert('Failed to generate image. Please try again.');
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+  };
+
+  // Get available aspect ratios based on selected model
+  const getAvailableAspectRatios = () => {
+    const modelLower = selectedModel.toLowerCase();
+    if (modelLower.includes('flux')) {
+      // Flux models support: 1:1, 3:4, 4:3, 16:9, 9:16, 3:2, 2:3, 21:9, 9:21, 16:10, 10:16
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '16:9', label: '16:9' },
+        { value: '9:16', label: '9:16' },
+        { value: '4:3', label: '4:3' },
+        { value: '3:4', label: '3:4' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+        { value: '21:9', label: '21:9' },
+        { value: '9:21', label: '9:21' },
+        { value: '16:10', label: '16:10' },
+        { value: '10:16', label: '10:16' },
+      ];
+    } else {
+      // FAL models (Google Nano Banana, Seedream v4) support: 21:9, 1:1, 4:3, 3:2, 2:3, 5:4, 4:5, 3:4, 16:9, 9:16
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '16:9', label: '16:9' },
+        { value: '9:16', label: '9:16' },
+        { value: '4:3', label: '4:3' },
+        { value: '3:4', label: '3:4' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+        { value: '21:9', label: '21:9' },
+        { value: '5:4', label: '5:4' },
+        { value: '4:5', label: '4:5' },
+      ];
     }
   };
 
@@ -166,6 +213,153 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           }}
         >
           Image Generator
+        </div>
+      )}
+
+      {/* Action Icons - Top Right Corner, Outside Frame (Only when selected) */}
+      {isSelected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `${-40 * scale}px`,
+            right: 0,
+            display: 'flex',
+            gap: `${6 * scale}px`,
+            zIndex: 3001,
+            pointerEvents: 'auto',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Delete Icon */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDelete) onDelete();
+              }}
+              title="Delete"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+            </button>
+          )}
+
+          {/* Download Icon */}
+          {onDownload && generatedImageUrl && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDownload) onDownload();
+              }}
+              title="Download"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                e.currentTarget.style.color = '#3b82f6';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
+
+          {/* Duplicate Icon */}
+          {onDuplicate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onDuplicate) onDuplicate();
+              }}
+              title="Duplicate"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${28 * scale}px`,
+                height: `${28 * scale}px`,
+                padding: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: `1px solid rgba(0, 0, 0, 0.1)`,
+                borderRadius: `${8 * scale}px`,
+                color: '#4b5563',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
+                e.currentTarget.style.color = '#22c55e';
+                e.currentTarget.style.transform = 'scale(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
       {/* Image Frame */}
@@ -302,20 +496,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             />
             <button
               onClick={handleGenerate}
-              disabled={!prompt.trim()}
+              disabled={!prompt.trim() || isGenerating}
               style={{
                 width: `${40 * scale}px`,
                 height: `${40 * scale}px`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: prompt.trim() ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
+                backgroundColor: (prompt.trim() && !isGenerating) ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
                 border: 'none',
                 borderRadius: `${10 * scale}px`,
-                cursor: prompt.trim() ? 'pointer' : 'not-allowed',
+                cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
                 color: 'white',
-                boxShadow: prompt.trim() ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
+                boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
                 padding: 0,
+                opacity: isGenerating ? 0.6 : 1,
               }}
               onMouseEnter={(e) => {
                 if (prompt.trim()) {
@@ -329,9 +524,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
+              {isGenerating ? (
+                <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeDasharray="31.416" strokeDashoffset="31.416">
+                    <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite" />
+                    <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite" />
+                  </path>
+                </svg>
+              ) : (
+                <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              )}
             </button>
           </div>
 
@@ -341,7 +546,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             <div style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px` }}>
               <select
                 value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
                 style={{
                   width: '100%',
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
@@ -367,12 +571,49 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  const newModel = e.target.value;
+                  setSelectedModel(newModel);
+                  // Reset to default aspect ratio when model changes if current ratio is not supported
+                  const modelLower = newModel.toLowerCase();
+                  let availableRatios: Array<{ value: string; label: string }>;
+                  if (modelLower.includes('flux')) {
+                    availableRatios = [
+                      { value: '1:1', label: '1:1' },
+                      { value: '16:9', label: '16:9' },
+                      { value: '9:16', label: '9:16' },
+                      { value: '4:3', label: '4:3' },
+                      { value: '3:4', label: '3:4' },
+                      { value: '3:2', label: '3:2' },
+                      { value: '2:3', label: '2:3' },
+                      { value: '21:9', label: '21:9' },
+                      { value: '9:21', label: '9:21' },
+                      { value: '16:10', label: '16:10' },
+                      { value: '10:16', label: '10:16' },
+                    ];
+                  } else {
+                    availableRatios = [
+                      { value: '1:1', label: '1:1' },
+                      { value: '16:9', label: '16:9' },
+                      { value: '9:16', label: '9:16' },
+                      { value: '4:3', label: '4:3' },
+                      { value: '3:4', label: '3:4' },
+                      { value: '3:2', label: '3:2' },
+                      { value: '2:3', label: '2:3' },
+                      { value: '21:9', label: '21:9' },
+                      { value: '5:4', label: '5:4' },
+                      { value: '4:5', label: '4:5' },
+                    ];
+                  }
+                  if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
+                    setSelectedAspectRatio(availableRatios[0].value);
+                  }
+                }}
               >
-                <option value="Seedream 4K">Seedream 4K</option>
-                <option value="Google nano banana">Google nano banana</option>
-                <option value="OpenAI DALL-E">OpenAI DALL-E</option>
-                <option value="Midjourney">Midjourney</option>
-                <option value="Stable Diffusion">Stable Diffusion</option>
+                <option value="Google Nano Banana">Google Nano Banana</option>
+                <option value="Flux Kontext Max">Flux Kontext Max</option>
+                <option value="Flux Kontext Pro">Flux Kontext Pro</option>
+                <option value="Seedream v4 4K">Seedream v4 4K</option>
               </select>
             </div>
 
@@ -407,12 +648,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <option value="1:1">1:1</option>
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="4:3">4:3</option>
-                <option value="3:4">3:4</option>
-                <option value="21:9">21:9</option>
+                {getAvailableAspectRatios().map((ratio) => (
+                  <option key={ratio.value} value={ratio.value}>
+                    {ratio.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

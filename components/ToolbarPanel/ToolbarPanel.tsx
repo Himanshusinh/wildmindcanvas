@@ -122,7 +122,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           left: '20px',
           top: '50%',
           transform: 'translateY(-50%)',
-          zIndex: 1000,
+          zIndex: 10001,
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
