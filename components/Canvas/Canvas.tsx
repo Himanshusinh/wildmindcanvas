@@ -914,6 +914,28 @@ export const Canvas: React.FC<CanvasProps> = ({
   useEffect(() => {
     if (!isSelecting || !selectionBox) return;
 
+    // Use requestAnimationFrame to throttle updates for smooth performance
+    let rafId: number | null = null;
+    let pendingUpdate: { currentX: number; currentY: number } | null = null;
+    // Use a ref to store the latest coordinates for immediate access on mouse up
+    const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
+
+    const updateSelectionBox = () => {
+      // Store pending update in a local variable to avoid race conditions
+      const update = pendingUpdate;
+      if (update) {
+        latestCoordsRef.currentX = update.currentX;
+        latestCoordsRef.currentY = update.currentY;
+        setSelectionBox(prev => prev ? {
+          ...prev,
+          currentX: update.currentX,
+          currentY: update.currentY,
+        } : null);
+        pendingUpdate = null;
+      }
+      rafId = null;
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
       const stage = stageRef.current;
       if (!stage) return;
@@ -929,17 +951,40 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Store selection box in canvas coordinates so it stays consistent across zoom/pan
         const canvasX = (pointerPos.x - position.x) / scale;
         const canvasY = (pointerPos.y - position.y) / scale;
-        setSelectionBox(prev => prev ? {
-          ...prev,
-          currentX: canvasX,
-          currentY: canvasY,
-        } : null);
+        
+        // Update ref immediately for mouse up handler
+        latestCoordsRef.currentX = canvasX;
+        latestCoordsRef.currentY = canvasY;
+        
+        // Store pending update
+        pendingUpdate = { currentX: canvasX, currentY: canvasY };
+        
+        // Schedule update using requestAnimationFrame for smooth performance
+        if (rafId === null) {
+          rafId = requestAnimationFrame(updateSelectionBox);
+        }
       }
     };
 
     const handleMouseUp = () => {
       const stage = stageRef.current;
       if (!stage) return;
+
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+
+      // Apply final pending update if any (use latest from ref)
+      if (pendingUpdate) {
+        setSelectionBox(prev => prev ? {
+          ...prev,
+          currentX: latestCoordsRef.currentX,
+          currentY: latestCoordsRef.currentY,
+        } : null);
+        pendingUpdate = null;
+      }
 
       // Ensure stage is not draggable
       stage.draggable(false);
@@ -958,13 +1003,20 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       }
 
-      if (selectionBox) {
+      // Use latest coordinates from ref for immediate processing
+      const currentBox = selectionBox ? {
+        ...selectionBox,
+        currentX: latestCoordsRef.currentX,
+        currentY: latestCoordsRef.currentY,
+      } : null;
+
+      if (currentBox) {
         // Selection box is already in canvas coordinates
         const marqueeRect = {
-          x: Math.min(selectionBox.startX, selectionBox.currentX),
-          y: Math.min(selectionBox.startY, selectionBox.currentY),
-          width: Math.abs(selectionBox.currentX - selectionBox.startX),
-          height: Math.abs(selectionBox.currentY - selectionBox.startY),
+          x: Math.min(currentBox.startX, currentBox.currentX),
+          y: Math.min(currentBox.startY, currentBox.currentY),
+          width: Math.abs(currentBox.currentX - currentBox.startX),
+          height: Math.abs(currentBox.currentY - currentBox.startY),
         };
         
         // Check if selection box was actually dragged (not just clicked)
@@ -1228,53 +1280,58 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include image modals
-            // Image modals: 600px wide
-            // Frame: min 400px height (varies by aspect ratio)
-            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
-            // Total height: frame (400px+) + controls (500px) = 900px minimum
+            // Image modals: 600px wide, height = max(400px, 600px / aspectRatio)
+            // The frame has minHeight: 400px, but actual height varies by aspect ratio
+            // For tight bounding box, we need to use the actual visible frame height
+            // Since we can't know the exact aspect ratio, use a conservative estimate
+            // Most common: 1:1 = 600px, 16:9 = 400px (clamped), 9:16 = 1066px
+            // To ensure tight fit and avoid extra space, use a value that works for common cases
+            // Using 400px ensures we don't overestimate for 16:9, but may underestimate for 1:1
             selectedImageModalIdsList.forEach((id) => {
               const modal = imageModalStates.find(m => m.id === id);
               if (modal) {
-                const modalWidth = 600;
-                // Include frame height (min 400px) + controls area (500px max)
-                // This ensures the selection box covers the entire modal including controls
-                const modalHeight = 400 + 500; // 900px total
+                const modalWidth = 600; // Fixed width
+                // Use minimum frame height to ensure tight bounding box
+                // This matches the CSS minHeight and works for most aspect ratios
+                // Use a slightly smaller estimate to ensure tight fit at bottom
+                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
+                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
+                // Calculate bottom edge: modal.y + modalHeight
+                // This gives us the actual bottom border of this component
                 maxY = Math.max(maxY, modal.y + modalHeight);
               }
             });
             
             // Include video modals
-            // Video modals: 600px wide
-            // Frame: min 400px height (varies by aspect ratio)
-            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
-            // Total height: frame (400px+) + controls (500px) = 900px minimum
+            // Video modals: 600px wide, height = max(400px, 600px / aspectRatio)
+            // Default aspect ratio is 16:9, so height = max(400px, 600/(16/9)) = max(400px, 337.5px) = 400px
+            // Use the minimum frame height to ensure tight bounding box
             selectedVideoModalIdsList.forEach((id) => {
               const modal = videoModalStates.find(m => m.id === id);
               if (modal) {
-                const modalWidth = 600;
-                // Include frame height (min 400px) + controls area (500px max)
-                const modalHeight = 400 + 500; // 900px total
+                const modalWidth = 600; // Fixed width
+                // Use a slightly smaller estimate to ensure tight fit at bottom
+                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
+                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
+                // Calculate bottom edge: modal.y + modalHeight
+                // This gives us the actual bottom border of this component
                 maxY = Math.max(maxY, modal.y + modalHeight);
               }
             });
             
             // Include music modals
-            // Music modals: 600px wide
-            // Frame: 300px height (fixed)
-            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
-            // Total height: frame (300px) + controls (500px) = 800px
+            // Music modals: 600px wide, 300px height (fixed) - this is the frame height
             selectedMusicModalIdsList.forEach((id) => {
               const modal = musicModalStates.find(m => m.id === id);
               if (modal) {
-                const modalWidth = 600;
-                // Include frame height (300px) + controls area (500px max)
-                const modalHeight = 300 + 500; // 800px total
+                const modalWidth = 600; // Fixed width
+                const modalHeight = 300; // Fixed frame height
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
@@ -1283,13 +1340,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include text input modals
-            // Text inputs: variable width (min 400px), includes header + input area + controls
-            // Total height: header (~40px) + input area (~150px) + controls (~100px) = ~300-400px
+            // Text inputs: min 400px width, height is variable based on content
+            // Structure: drag handle (~4px) + padding top (~12px) + textarea (min 80px) + padding bottom (~12px) + buttons (~32px)
+            // Total: ~140px minimum, but can grow with content
+            // Use minimum height for tight bounding box
             selectedTextInputIdsList.forEach((id) => {
               const textState = textInputStates.find(t => t.id === id);
               if (textState) {
-                const textWidth = 400;
-                const textHeight = 400; // Total height including all sections
+                const textWidth = 400; // Minimum width
+                // Use minimum height: handle (4px) + top padding (12px) + textarea min (80px) + bottom padding (12px) + buttons (32px) = 140px
+                // But to be more accurate, let's use a slightly smaller estimate to ensure tight fit
+                // Use a tighter estimate to ensure no extra space at bottom
+                // Actual height is ~140px minimum, but we use 110px to ensure tight fit
+                const textHeight = 110; // Tighter estimate to remove extra bottom space
                 minX = Math.min(minX, textState.x);
                 minY = Math.min(minY, textState.y);
                 maxX = Math.max(maxX, textState.x + textWidth);
@@ -1353,8 +1416,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
+      // Clean up any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
     };
   }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates]);
