@@ -1626,7 +1626,16 @@ export const Canvas: React.FC<CanvasProps> = ({
             );
           })}
           {/* Selection Rect & Toolbar */}
-          {selectionTightRect && isDragSelection && (selectedImageIndices.length > 0 || selectedImageModalIds.length > 0 || selectedVideoModalIds.length > 0 || selectedMusicModalIds.length > 0 || selectedTextInputIds.length > 0) ? (
+          {(() => {
+            // Calculate total number of selected items
+            const totalSelected = selectedImageIndices.length + 
+                                 selectedImageModalIds.length + 
+                                 selectedVideoModalIds.length + 
+                                 selectedMusicModalIds.length + 
+                                 selectedTextInputIds.length;
+            // Only show icons if there are 2 or more components selected
+            return selectionTightRect && isDragSelection && totalSelected >= 2;
+          })() && selectionTightRect ? (
             // After selection completes, show tight rect with toolbar and allow dragging to move all
             <Group
               x={selectionTightRect.x}
@@ -1850,7 +1859,15 @@ export const Canvas: React.FC<CanvasProps> = ({
                 globalCompositeOperation="source-over"
                 cornerRadius={0}
               />
-              {/* Toolbar buttons at top center, outside selection area */}
+              {/* Toolbar buttons at top center, outside selection area - only show if 2+ items selected */}
+              {(() => {
+                const totalSelected = selectedImageIndices.length + 
+                                     selectedImageModalIds.length + 
+                                     selectedVideoModalIds.length + 
+                                     selectedMusicModalIds.length + 
+                                     selectedTextInputIds.length;
+                return totalSelected >= 2;
+              })() && (
               <Group
                 x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 42}
                 y={-40}
@@ -1968,6 +1985,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                   </Group>
                 </Group>
               </Group>
+              )}
             </Group>
           ) : null}
           {/* Transformer for selected nodes */}
