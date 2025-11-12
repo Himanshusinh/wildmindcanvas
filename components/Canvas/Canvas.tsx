@@ -122,10 +122,59 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
 
+  // Helper function to check if current selection is a group
+  const isCurrentSelectionAGroup = (): boolean => {
+    if (selectedImageIndices.length === 0 && selectedTextInputIds.length === 0 && 
+        selectedImageModalIds.length === 0 && selectedVideoModalIds.length === 0 && 
+        selectedMusicModalIds.length === 0) {
+      return false;
+    }
+    
+    // Check all groups to see if any group matches the current selection
+    for (const group of groups.values()) {
+      const selectedImagesSet = new Set(selectedImageIndices);
+      const groupImagesSet = new Set(group.itemIndices || []);
+      const imagesMatch = selectedImagesSet.size === groupImagesSet.size &&
+                         Array.from(selectedImagesSet).every(idx => groupImagesSet.has(idx));
+      
+      const selectedTextsSet = new Set(selectedTextInputIds);
+      const groupTextsSet = new Set(group.textIds || []);
+      const textsMatch = selectedTextsSet.size === groupTextsSet.size &&
+                        Array.from(selectedTextsSet).every(id => groupTextsSet.has(id));
+      
+      const selectedImageModalsSet = new Set(selectedImageModalIds);
+      const groupImageModalsSet = new Set(group.imageModalIds || []);
+      const imageModalsMatch = selectedImageModalsSet.size === groupImageModalsSet.size &&
+                              Array.from(selectedImageModalsSet).every(id => groupImageModalsSet.has(id));
+      
+      const selectedVideoModalsSet = new Set(selectedVideoModalIds);
+      const groupVideoModalsSet = new Set(group.videoModalIds || []);
+      const videoModalsMatch = selectedVideoModalsSet.size === groupVideoModalsSet.size &&
+                              Array.from(selectedVideoModalsSet).every(id => groupVideoModalsSet.has(id));
+      
+      const selectedMusicModalsSet = new Set(selectedMusicModalIds);
+      const groupMusicModalsSet = new Set(group.musicModalIds || []);
+      const musicModalsMatch = selectedMusicModalsSet.size === groupMusicModalsSet.size &&
+                              Array.from(selectedMusicModalsSet).every(id => groupMusicModalsSet.has(id));
+      
+      if (imagesMatch && textsMatch && imageModalsMatch && videoModalsMatch && musicModalsMatch &&
+          (selectedImagesSet.size > 0 || selectedTextsSet.size > 0 || selectedImageModalsSet.size > 0 || 
+           selectedVideoModalsSet.size > 0 || selectedMusicModalsSet.size > 0)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Helper function to clear all selections
   // clearSelectionBoxes: if true, also clears selection boxes (for empty canvas clicks)
   // if false, keeps selection boxes (for component switching)
   const clearAllSelections = (clearSelectionBoxes: boolean = false) => {
+    // Don't clear if current selection is a group - groups persist when clicking outside
+    if (isCurrentSelectionAGroup()) {
+      return;
+    }
+    
     setSelectedImageIndex(null);
     setSelectedImageIndices([]);
     setSelectedTextInputId(null);
@@ -570,8 +619,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         setIsShiftPressed(true);
         const stage = stageRef.current;
         if (stage) {
-          // Show grab cursor when Shift is pressed (enables panning with Shift + Left Click)
-          stage.container().style.cursor = 'grab';
+          // Show crosshair cursor when Shift is pressed (enables selection with Shift + Left Click)
+          stage.container().style.cursor = 'crosshair';
         }
       }
       
@@ -585,40 +634,139 @@ export const Canvas: React.FC<CanvasProps> = ({
         
         e.preventDefault();
         
+        // Check if there's a selected region (multiple components)
+        const hasMultipleSelections = selectedImageIndices.length > 0 || 
+                                     selectedTextInputIds.length > 0 || 
+                                     selectedImageModalIds.length > 0 || 
+                                     selectedVideoModalIds.length > 0 || 
+                                     selectedMusicModalIds.length > 0;
+        
+        if (hasMultipleSelections) {
+          // Delete all selected components in the region
+          
+          // Check if the selected items form a group and delete the group
+          let groupToDelete: string | null = null;
+          for (const group of groups.values()) {
+            const selectedImagesSet = new Set(selectedImageIndices);
+            const groupImagesSet = new Set(group.itemIndices || []);
+            const imagesMatch = selectedImagesSet.size === groupImagesSet.size &&
+                             Array.from(selectedImagesSet).every(idx => groupImagesSet.has(idx));
+            
+            const selectedTextsSet = new Set(selectedTextInputIds);
+            const groupTextsSet = new Set(group.textIds || []);
+            const textsMatch = selectedTextsSet.size === groupTextsSet.size &&
+                            Array.from(selectedTextsSet).every(id => groupTextsSet.has(id));
+            
+            const selectedImageModalsSet = new Set(selectedImageModalIds);
+            const groupImageModalsSet = new Set(group.imageModalIds || []);
+            const imageModalsMatch = selectedImageModalsSet.size === groupImageModalsSet.size &&
+                                   Array.from(selectedImageModalsSet).every(id => groupImageModalsSet.has(id));
+            
+            const selectedVideoModalsSet = new Set(selectedVideoModalIds);
+            const groupVideoModalsSet = new Set(group.videoModalIds || []);
+            const videoModalsMatch = selectedVideoModalsSet.size === groupVideoModalsSet.size &&
+                                   Array.from(selectedVideoModalsSet).every(id => groupVideoModalsSet.has(id));
+            
+            const selectedMusicModalsSet = new Set(selectedMusicModalIds);
+            const groupMusicModalsSet = new Set(group.musicModalIds || []);
+            const musicModalsMatch = selectedMusicModalsSet.size === groupMusicModalsSet.size &&
+                                   Array.from(selectedMusicModalsSet).every(id => groupMusicModalsSet.has(id));
+            
+            if (imagesMatch && textsMatch && imageModalsMatch && videoModalsMatch && musicModalsMatch &&
+                (selectedImagesSet.size > 0 || selectedTextsSet.size > 0 || selectedImageModalsSet.size > 0 || 
+                 selectedVideoModalsSet.size > 0 || selectedMusicModalsSet.size > 0)) {
+              groupToDelete = group.id;
+              break;
+            }
+          }
+          
+          // Delete the group if it exists
+          if (groupToDelete) {
+            setGroups(prev => {
+              const newGroups = new Map(prev);
+              newGroups.delete(groupToDelete!);
+              return newGroups;
+            });
+          }
+          
+          // Delete all selected images
+          if (selectedImageIndices.length > 0 && onImageDelete) {
+            // Delete in reverse order to maintain correct indices
+            const sortedIndices = [...selectedImageIndices].sort((a, b) => b - a);
+            sortedIndices.forEach(index => {
+              onImageDelete(index);
+            });
+          }
+          
+          // Delete all selected text inputs
+          if (selectedTextInputIds.length > 0) {
+            setTextInputStates(prev => prev.filter(t => !selectedTextInputIds.includes(t.id)));
+          }
+          
+          // Delete all selected image modals
+          if (selectedImageModalIds.length > 0) {
+            setImageModalStates(prev => prev.filter(m => !selectedImageModalIds.includes(m.id)));
+          }
+          
+          // Delete all selected video modals
+          if (selectedVideoModalIds.length > 0) {
+            setVideoModalStates(prev => prev.filter(m => !selectedVideoModalIds.includes(m.id)));
+          }
+          
+          // Delete all selected music modals
+          if (selectedMusicModalIds.length > 0) {
+            setMusicModalStates(prev => prev.filter(m => !selectedMusicModalIds.includes(m.id)));
+          }
+          
+          // Clear all selections
+          setSelectedImageIndices([]);
+          setSelectedImageIndex(null);
+          setSelectedTextInputIds([]);
+          setSelectedTextInputId(null);
+          setSelectedImageModalIds([]);
+          setSelectedImageModalId(null);
+          setSelectedVideoModalIds([]);
+          setSelectedVideoModalId(null);
+          setSelectedMusicModalIds([]);
+          setSelectedMusicModalId(null);
+        } else {
+          // Single selection deletion (backward compatibility)
+          
+          // Delete selected image/video/text element
+          if (selectedImageIndex !== null && onImageDelete) {
+            onImageDelete(selectedImageIndex);
+            setSelectedImageIndex(null);
+          }
+          
+          // Delete selected text input overlay
+          if (selectedTextInputId !== null) {
+            setTextInputStates(prev => prev.filter(t => t.id !== selectedTextInputId));
+            setSelectedTextInputId(null);
+          }
+          
+          // Delete selected image modal
+          if (selectedImageModalId !== null) {
+            setImageModalStates(prev => prev.filter(m => m.id !== selectedImageModalId));
+            setSelectedImageModalId(null);
+          }
+          
+          // Delete selected video modal
+          if (selectedVideoModalId !== null) {
+            setVideoModalStates(prev => prev.filter(m => m.id !== selectedVideoModalId));
+            setSelectedVideoModalId(null);
+          }
+          
+          // Delete selected music modal
+          if (selectedMusicModalId !== null) {
+            setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
+            setSelectedMusicModalId(null);
+          }
+        }
+        
         // Clear selection box and tight rect when Delete is pressed
         setSelectionBox(null);
         setSelectionTightRect(null);
         setIsDragSelection(false);
-        
-        // Delete selected image/video/text element
-        if (selectedImageIndex !== null && onImageDelete) {
-          onImageDelete(selectedImageIndex);
-          setSelectedImageIndex(null);
-        }
-        
-        // Delete selected text input overlay
-        if (selectedTextInputId !== null) {
-          setTextInputStates(prev => prev.filter(t => t.id !== selectedTextInputId));
-          setSelectedTextInputId(null);
-        }
-        
-        // Delete selected image modal
-        if (selectedImageModalId !== null) {
-          setImageModalStates(prev => prev.filter(m => m.id !== selectedImageModalId));
-          setSelectedImageModalId(null);
-        }
-        
-        // Delete selected video modal
-        if (selectedVideoModalId !== null) {
-          setVideoModalStates(prev => prev.filter(m => m.id !== selectedVideoModalId));
-          setSelectedVideoModalId(null);
-        }
-        
-        // Delete selected music modal
-        if (selectedMusicModalId !== null) {
-          setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
-          setSelectedMusicModalId(null);
-        }
       }
       
       // Handle Ctrl+G / Cmd+G for creating groups
@@ -796,9 +944,18 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Ensure stage is not draggable
       stage.draggable(false);
       
-      // Reset cursor to default for cursor tool
+      // Reset cursor to default for cursor tool or after Shift selection
       if (selectedTool === 'cursor') {
         stage.container().style.cursor = 'default';
+      } else if (!isShiftPressed) {
+        // Reset cursor when Shift is released
+        if (selectedTool === 'move') {
+          stage.container().style.cursor = 'grab';
+        } else if (selectedTool === 'text') {
+          stage.container().style.cursor = 'text';
+        } else {
+          stage.container().style.cursor = 'default';
+        }
       }
 
       if (selectionBox) {
@@ -849,8 +1006,22 @@ export const Canvas: React.FC<CanvasProps> = ({
               height: height,
             };
             
-            // Use Konva's intersection check
-            if (Konva.Util.haveIntersection(marqueeRect, itemRect)) {
+            // Check if component overlaps with selection box (even partially)
+            // Select if ANY part of the component is inside the selection box
+            const componentRight = itemRect.x + itemRect.width;
+            const componentBottom = itemRect.y + itemRect.height;
+            const marqueeRight = marqueeRect.x + marqueeRect.width;
+            const marqueeBottom = marqueeRect.y + marqueeRect.height;
+            
+            // Check if rectangles overlap (any intersection)
+            const overlaps = !(
+              componentRight < marqueeRect.x ||
+              itemRect.x > marqueeRight ||
+              componentBottom < marqueeRect.y ||
+              itemRect.y > marqueeBottom
+            );
+            
+            if (overlaps) {
               selectedIndices.push(index);
             }
           });
@@ -867,7 +1038,20 @@ export const Canvas: React.FC<CanvasProps> = ({
               width: modalWidth,
               height: modalHeight,
             };
-            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+            // Check if modal overlaps with selection box (even partially)
+            const modalRight = modalRect.x + modalRect.width;
+            const modalBottom = modalRect.y + modalRect.height;
+            const marqueeRight = marqueeRect.x + marqueeRect.width;
+            const marqueeBottom = marqueeRect.y + marqueeRect.height;
+            
+            const overlaps = !(
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
+            );
+            
+            if (overlaps) {
               selectedImageModalIdsList.push(modal.id);
             }
           });
@@ -884,7 +1068,20 @@ export const Canvas: React.FC<CanvasProps> = ({
               width: modalWidth,
               height: modalHeight,
             };
-            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+            // Check if modal overlaps with selection box (even partially)
+            const modalRight = modalRect.x + modalRect.width;
+            const modalBottom = modalRect.y + modalRect.height;
+            const marqueeRight = marqueeRect.x + marqueeRect.width;
+            const marqueeBottom = marqueeRect.y + marqueeRect.height;
+            
+            const overlaps = !(
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
+            );
+            
+            if (overlaps) {
               selectedVideoModalIdsList.push(modal.id);
             }
           });
@@ -901,7 +1098,20 @@ export const Canvas: React.FC<CanvasProps> = ({
               width: modalWidth,
               height: modalHeight,
             };
-            if (Konva.Util.haveIntersection(marqueeRect, modalRect)) {
+            // Check if modal overlaps with selection box (even partially)
+            const modalRight = modalRect.x + modalRect.width;
+            const modalBottom = modalRect.y + modalRect.height;
+            const marqueeRight = marqueeRect.x + marqueeRect.width;
+            const marqueeBottom = marqueeRect.y + marqueeRect.height;
+            
+            const overlaps = !(
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
+            );
+            
+            if (overlaps) {
               selectedMusicModalIdsList.push(modal.id);
             }
           });
@@ -918,7 +1128,20 @@ export const Canvas: React.FC<CanvasProps> = ({
               width: textWidth,
               height: textHeight,
             };
-            if (Konva.Util.haveIntersection(marqueeRect, textRect)) {
+            // Check if text input overlaps with selection box (even partially)
+            const textRight = textRect.x + textRect.width;
+            const textBottom = textRect.y + textRect.height;
+            const marqueeRight = marqueeRect.x + marqueeRect.width;
+            const marqueeBottom = marqueeRect.y + marqueeRect.height;
+            
+            const overlaps = !(
+              textRight < marqueeRect.x ||
+              textRect.x > marqueeRight ||
+              textBottom < marqueeRect.y ||
+              textRect.y > marqueeBottom
+            );
+            
+            if (overlaps) {
               selectedTextInputIdsList.push(textState.id);
             }
           });
@@ -1005,18 +1228,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include image modals
-            // Image modals: 600px wide, height varies by aspect ratio (min 400px)
-            // The actual height is: max(400, 600 / aspectRatio)
-            // Default aspect ratio is typically 1:1, so height would be 600px
-            // But to get a tighter fit, we'll use the minimum height (400px) for calculation
-            // This will create a tighter selection box
+            // Image modals: 600px wide
+            // Frame: min 400px height (varies by aspect ratio)
+            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
+            // Total height: frame (400px+) + controls (500px) = 900px minimum
             selectedImageModalIdsList.forEach((id) => {
               const modal = imageModalStates.find(m => m.id === id);
               if (modal) {
                 const modalWidth = 600;
-                // Use minimum height for tighter fit - the actual modal may be taller
-                // but this ensures the selection box fits tightly around the minimum size
-                const modalHeight = 400;
+                // Include frame height (min 400px) + controls area (500px max)
+                // This ensures the selection box covers the entire modal including controls
+                const modalHeight = 400 + 500; // 900px total
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
@@ -1025,13 +1247,16 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include video modals
-            // Video modals: 600px wide, height varies by aspect ratio (min 400px)
-            // Similar to image modals, use minimum height for tighter fit
+            // Video modals: 600px wide
+            // Frame: min 400px height (varies by aspect ratio)
+            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
+            // Total height: frame (400px+) + controls (500px) = 900px minimum
             selectedVideoModalIdsList.forEach((id) => {
               const modal = videoModalStates.find(m => m.id === id);
               if (modal) {
                 const modalWidth = 600;
-                const modalHeight = 400; // Minimum height for tighter fit
+                // Include frame height (min 400px) + controls area (500px max)
+                const modalHeight = 400 + 500; // 900px total
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
@@ -1040,12 +1265,16 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include music modals
-            // Music modals: 600px wide, 300px high (fixed)
+            // Music modals: 600px wide
+            // Frame: 300px height (fixed)
+            // Controls overlay: up to 500px when visible (positioned below frame at top: 100%)
+            // Total height: frame (300px) + controls (500px) = 800px
             selectedMusicModalIdsList.forEach((id) => {
               const modal = musicModalStates.find(m => m.id === id);
               if (modal) {
                 const modalWidth = 600;
-                const modalHeight = 300;
+                // Include frame height (300px) + controls area (500px max)
+                const modalHeight = 300 + 500; // 800px total
                 minX = Math.min(minX, modal.x);
                 minY = Math.min(minY, modal.y);
                 maxX = Math.max(maxX, modal.x + modalWidth);
@@ -1054,15 +1283,13 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             
             // Include text input modals
-            // Text inputs: variable width (min 400px), variable height based on content
-            // Use approximate dimensions
+            // Text inputs: variable width (min 400px), includes header + input area + controls
+            // Total height: header (~40px) + input area (~150px) + controls (~100px) = ~300-400px
             selectedTextInputIdsList.forEach((id) => {
               const textState = textInputStates.find(t => t.id === id);
               if (textState) {
-                // Text inputs have minWidth of 400px and variable height
-                // Approximate height: ~150-200px for typical content
                 const textWidth = 400;
-                const textHeight = 180; // More accurate estimate
+                const textHeight = 400; // Total height including all sections
                 minX = Math.min(minX, textState.x);
                 minY = Math.min(minY, textState.y);
                 maxX = Math.max(maxX, textState.x + textWidth);
@@ -1186,11 +1413,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       target.getClassName() === 'Stage' || 
       target.getClassName() === 'Layer' || 
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
-    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, Space key, or Shift + Left Click (NOT with cursor tool)
+    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool or Shift)
     const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
-    // Cursor tool should NEVER pan - only selection
-    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed || (e.evt.shiftKey && e.evt.button === 0);
+    // Cursor tool and Shift + Left Click should NEVER pan - only selection
+    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    // Shift + Left Click is for selection, not panning
+    const isShiftSelection = e.evt.shiftKey && e.evt.button === 0;
     const clickedOnElement = !clickedOnEmpty;
     
     // Check if clicking on a resize handle - if so, don't clear selection
@@ -1198,9 +1427,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     const isResizeHandle = target.name() === 'resize-handle';
     
     // Clear selections when clicking on empty space (but not on resize handles)
-    // Don't clear if we're starting a selection box with cursor tool
+    // Don't clear if we're starting a selection box with cursor tool or Shift + Left Click
     // NOTE: Selection box is NOT cleared here - it only clears on Delete key or when starting a new selection
-    const isStartingSelection = isCursorTool && !isPanKey && e.evt.button === 0;
+    const isStartingSelection = (isCursorTool || isShiftSelection) && !isPanKey && e.evt.button === 0;
     
     // Check if click is inside the selection area (selectionTightRect or selectionBox)
     let isInsideSelection = false;
@@ -1276,19 +1505,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // If move tool is selected, or Shift + Left Click, always enable panning
-    if ((isMoveTool || (e.evt.shiftKey && e.evt.button === 0)) && clickedOnEmpty && e.evt.button === 0) {
-      const stage = e.target.getStage();
-      if (stage) {
-        setIsPanning(true);
-        stage.draggable(true);
-        stage.container().style.cursor = 'grabbing';
-      }
-      return;
-    }
-    
-    // If cursor tool is selected, start marquee selection on left click (NEVER pan)
-    if (isCursorTool && e.evt.button === 0) {
+    // If Shift + Left Click, start marquee selection (NEVER pan)
+    if (isShiftSelection && clickedOnEmpty) {
       if (pointerPos) {
         const stage = e.target.getStage();
         if (stage) {
@@ -1316,9 +1534,74 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
-    // Enable panning only with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key, or Shift + Left Click)
-    // Cursor tool should NEVER pan
-    const shouldPan = isPanKey && !isCursorTool;
+    // If move tool is selected, always enable panning
+    if (isMoveTool && clickedOnEmpty && e.evt.button === 0) {
+      const stage = e.target.getStage();
+      if (stage) {
+        setIsPanning(true);
+        stage.draggable(true);
+        stage.container().style.cursor = 'grabbing';
+      }
+      return;
+    }
+    
+    // If cursor tool is selected with Shift + Left Click, start marquee selection
+    // If cursor tool is selected with normal Left Click, pan the canvas
+    if (isCursorTool && e.evt.button === 0) {
+      if (isShiftSelection && clickedOnEmpty) {
+        // Shift + Left Click = selection
+        if (pointerPos) {
+          const stage = e.target.getStage();
+          if (stage) {
+            // Explicitly disable stage dragging during selection
+            stage.draggable(false);
+            // Set cursor to crosshair during selection
+            stage.container().style.cursor = 'crosshair';
+          }
+          // Clear previous selection box and tight rect when starting a new one
+          setSelectionBox(null);
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
+          setIsSelecting(true);
+          // Start new selection box in canvas coordinates
+          const canvasX = (pointerPos.x - position.x) / scale;
+          const canvasY = (pointerPos.y - position.y) / scale;
+          setSelectionBox({
+            startX: canvasX,
+            startY: canvasY,
+            currentX: canvasX,
+            currentY: canvasY,
+          });
+          setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
+        }
+        return;
+      } else if (clickedOnEmpty) {
+        // Normal Left Click + Drag = pan canvas
+        const stage = e.target.getStage();
+        if (stage) {
+          setIsPanning(true);
+          stage.draggable(true);
+          stage.container().style.cursor = 'grabbing';
+        }
+        return;
+      }
+    }
+    
+    // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
+    // Shift should NEVER pan - only selection
+    const shouldPan = isPanKey && !isShiftSelection;
+    
+    // Default behavior: normal left click + drag on empty space should pan (unless it's Shift)
+    if (clickedOnEmpty && e.evt.button === 0 && !isShiftSelection && !isPanKey && !isCursorTool) {
+      // Normal left click + drag on empty space = pan (cursor tool is handled above)
+      const stage = e.target.getStage();
+      if (stage) {
+        setIsPanning(true);
+        stage.draggable(true);
+        stage.container().style.cursor = 'grabbing';
+      }
+      return;
+    }
     
     if (shouldPan) {
       const stage = e.target.getStage();
@@ -1327,8 +1610,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         stage.draggable(true);
         stage.container().style.cursor = 'grabbing';
       }
-    } else if (clickedOnElement && (isMoveTool || (e.evt.shiftKey && e.evt.button === 0))) {
-      // If move tool is selected, or Shift + Left Click, allow panning even when clicking on elements
+    } else if (clickedOnElement && isMoveTool) {
+      // If move tool is selected, allow panning even when clicking on elements
       const stage = e.target.getStage();
       if (stage) {
         setIsPanning(true);
@@ -1477,6 +1760,105 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Canvas is truly infinite - no need to expand, it's already massive
   // Fixed at 1,000,000 x 1,000,000 pixels - can handle 100+ 8K images easily
 
+  // Helper function to calculate group bounds
+  const calculateGroupBounds = (group: { itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }): { x: number; y: number; width: number; height: number } | null => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    // Check images
+    group.itemIndices.forEach(idx => {
+      const img = images[idx];
+      if (img) {
+        const imgX = img.x || 0;
+        const imgY = img.y || 0;
+        const imgWidth = img.width || 0;
+        const imgHeight = img.height || 0;
+        minX = Math.min(minX, imgX);
+        minY = Math.min(minY, imgY);
+        maxX = Math.max(maxX, imgX + imgWidth);
+        maxY = Math.max(maxY, imgY + imgHeight);
+      }
+    });
+    
+    // Check text inputs
+    if (group.textIds) {
+      group.textIds.forEach(textId => {
+        const textState = textInputStates.find(t => t.id === textId);
+        if (textState) {
+          minX = Math.min(minX, textState.x);
+          minY = Math.min(minY, textState.y);
+          maxX = Math.max(maxX, textState.x + 300); // Approximate width
+          maxY = Math.max(maxY, textState.y + 100); // Approximate height
+        }
+      });
+    }
+    
+    // Check image modals
+    if (group.imageModalIds) {
+      group.imageModalIds.forEach(modalId => {
+        const modalState = imageModalStates.find(m => m.id === modalId);
+        if (modalState) {
+          minX = Math.min(minX, modalState.x);
+          minY = Math.min(minY, modalState.y);
+          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
+          maxY = Math.max(maxY, modalState.y + 400); // Approximate height
+        }
+      });
+    }
+    
+    // Check video modals
+    if (group.videoModalIds) {
+      group.videoModalIds.forEach(modalId => {
+        const modalState = videoModalStates.find(m => m.id === modalId);
+        if (modalState) {
+          minX = Math.min(minX, modalState.x);
+          minY = Math.min(minY, modalState.y);
+          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
+          maxY = Math.max(maxY, modalState.y + 400); // Approximate height
+        }
+      });
+    }
+    
+    // Check music modals
+    if (group.musicModalIds) {
+      group.musicModalIds.forEach(modalId => {
+        const modalState = musicModalStates.find(m => m.id === modalId);
+        if (modalState) {
+          minX = Math.min(minX, modalState.x);
+          minY = Math.min(minY, modalState.y);
+          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
+          maxY = Math.max(maxY, modalState.y + 300); // Approximate height
+        }
+      });
+    }
+    
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      return null;
+    }
+    
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  };
+
+  // Helper function to check if a component is inside group bounds
+  const isComponentInsideGroupBounds = (x: number, y: number, width: number, height: number, groupBounds: { x: number; y: number; width: number; height: number }): boolean => {
+    const componentRight = x + width;
+    const componentBottom = y + height;
+    const boundsRight = groupBounds.x + groupBounds.width;
+    const boundsBottom = groupBounds.y + groupBounds.height;
+    
+    // Component is inside if it overlaps with the bounds (with some tolerance)
+    return (
+      x < boundsRight &&
+      componentRight > groupBounds.x &&
+      y < boundsBottom &&
+      componentBottom > groupBounds.y
+    );
+  };
+
   // Wrapper for onImageUpdate that handles group movement
   const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
     const image = images[index];
@@ -1494,8 +1876,47 @@ export const Canvas: React.FC<CanvasProps> = ({
         const deltaX = newX - oldX;
         const deltaY = newY - oldY;
 
-        // Move all items in the group by the same delta
+        // If position changed, check if component will be outside group bounds
         if (deltaX !== 0 || deltaY !== 0) {
+          // Calculate current group bounds BEFORE moving
+          const currentGroupBounds = calculateGroupBounds(group);
+          if (currentGroupBounds) {
+            const finalWidth = updates.width !== undefined ? updates.width : (image.width || 0);
+            const finalHeight = updates.height !== undefined ? updates.height : (image.height || 0);
+            
+            // Check if this component will be outside the group bounds after the move
+            const willBeOutside = !isComponentInsideGroupBounds(newX, newY, finalWidth, finalHeight, currentGroupBounds);
+            
+            if (willBeOutside) {
+              // Component is moving outside - don't move the group, just remove it from the group
+              setGroups(prev => {
+                const newGroups = new Map(prev);
+                const updatedGroup = newGroups.get(image.groupId!);
+                if (updatedGroup) {
+                  newGroups.set(image.groupId!, {
+                    ...updatedGroup,
+                    itemIndices: updatedGroup.itemIndices.filter(idx => idx !== index),
+                  });
+                }
+                return newGroups;
+              });
+              
+              // Remove groupId from the image and update position
+              if (onImageUpdate) {
+                onImageUpdate(index, { ...updates, groupId: undefined });
+              }
+              
+              // Remove from selection if it was selected
+              if (selectedImageIndices.includes(index)) {
+                setSelectedImageIndices(prev => prev.filter(idx => idx !== index));
+              }
+              
+              // Don't move the group, just return (component has already been updated above)
+              return;
+            }
+          }
+          
+          // Component is staying inside - move all items in the group by the same delta
           // Move all images in the group
           group.itemIndices.forEach((groupIndex) => {
             if (groupIndex !== index && images[groupIndex]) {
@@ -1745,6 +2166,21 @@ export const Canvas: React.FC<CanvasProps> = ({
             setIsGroupNameModalOpen={setIsGroupNameModalOpen}
             setSelectionTightRect={setSelectionTightRect}
             handleImageUpdateWithGroup={handleImageUpdateWithGroup}
+            setTextInputStates={setTextInputStates}
+            setImageModalStates={setImageModalStates}
+            setVideoModalStates={setVideoModalStates}
+            setMusicModalStates={setMusicModalStates}
+            textInputStates={textInputStates}
+            imageModalStates={imageModalStates}
+            videoModalStates={videoModalStates}
+            musicModalStates={musicModalStates}
+            groups={groups}
+            setGroups={setGroups}
+            setSelectedImageIndices={setSelectedImageIndices}
+            setSelectedTextInputIds={setSelectedTextInputIds}
+            setSelectedImageModalIds={setSelectedImageModalIds}
+            setSelectedVideoModalIds={setSelectedVideoModalIds}
+            setSelectedMusicModalIds={setSelectedMusicModalIds}
           />
           {/* Transformer for selected nodes */}
           {selectedImageIndices.length > 0 && (
@@ -1796,18 +2232,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
         onTextCreate={onTextCreate}
-          onImageSelect={onImageSelect}
+        onImageSelect={onImageSelect}
         onImageGenerate={onImageGenerate}
-          onVideoSelect={onVideoSelect}
+        onVideoSelect={onVideoSelect}
         onVideoGenerate={onVideoGenerate}
         onMusicSelect={onMusicSelect}
         onMusicGenerate={onMusicGenerate}
         generatedVideoUrl={generatedVideoUrl}
         generatedMusicUrl={generatedMusicUrl}
-          stageRef={stageRef}
-          scale={scale}
-          position={position}
-        />
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+        groups={groups}
+      />
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (
         <MediaActionIcons

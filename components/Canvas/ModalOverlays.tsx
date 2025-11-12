@@ -44,6 +44,7 @@ interface ModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  groups: Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>;
 }
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
@@ -84,7 +85,18 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  groups,
 }) => {
+  // Helper function to check if a component is in a group
+  const isInGroup = (textId?: string, imageModalId?: string, videoModalId?: string, musicModalId?: string): boolean => {
+    for (const group of groups.values()) {
+      if (textId && group.textIds?.includes(textId)) return true;
+      if (imageModalId && group.imageModalIds?.includes(imageModalId)) return true;
+      if (videoModalId && group.videoModalIds?.includes(videoModalId)) return true;
+      if (musicModalId && group.musicModalIds?.includes(musicModalId)) return true;
+    }
+    return false;
+  };
   return (
     <>
       {/* Text Input Overlays */}
@@ -105,7 +117,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
             setSelectedTextInputId(null);
           }}
-          onPositionChange={(newX, newY) => {
+          onPositionChange={isInGroup(textState.id) ? undefined : (newX, newY) => {
             setTextInputStates(prev => prev.map(t => 
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
@@ -214,7 +226,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={(newX, newY) => {
+          onPositionChange={isInGroup(undefined, modalState.id) ? undefined : (newX, newY) => {
             setImageModalStates(prev => prev.map(m => 
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));
@@ -295,7 +307,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={(newX, newY) => {
+          onPositionChange={isInGroup(undefined, undefined, modalState.id) ? undefined : (newX, newY) => {
             setVideoModalStates(prev => prev.map(m => 
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));
@@ -376,7 +388,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={(newX, newY) => {
+          onPositionChange={isInGroup(undefined, undefined, undefined, modalState.id) ? undefined : (newX, newY) => {
             setMusicModalStates(prev => prev.map(m => 
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));

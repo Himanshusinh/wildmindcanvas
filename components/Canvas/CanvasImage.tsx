@@ -306,7 +306,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       <Group
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        draggable
+        draggable={!imageData.groupId}
         x={x}
         y={y}
         onDragEnd={(e) => {
