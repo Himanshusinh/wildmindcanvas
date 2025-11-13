@@ -5,11 +5,13 @@ import { useState, useRef, useEffect } from 'react';
 interface HeaderProps {
   projectName?: string;
   onProjectNameChange?: (name: string) => void;
+  onSwitchProject?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
   projectName: initialProjectName = 'Untitled',
-  onProjectNameChange 
+  onProjectNameChange,
+  onSwitchProject
 }) => {
   // Use prop directly to avoid hydration mismatches - only use state when editing
   const [editingValue, setEditingValue] = useState(initialProjectName);
@@ -17,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync editing value with prop changes
-  useEffect(() => {
+  useEffect(() => { 
     if (initialProjectName !== undefined && !isEditing) {
       setEditingValue(initialProjectName);
     }
@@ -153,6 +155,40 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
       </div>
+
+      {/* Switch Project Button */}
+      {onSwitchProject && (
+        <div
+          onClick={onSwitchProject}
+          style={{
+            width: '28px',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+            color: '#4b5563',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
+          title="Switch Project"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3h18v18H3zM7 12h10M7 12l3-3M7 12l3 3" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 };

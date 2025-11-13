@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Group, Rect, Text, Image as KonvaImage, Circle, Path } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface CanvasImageProps {
   imageData: ImageUpload;
@@ -42,7 +43,21 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   // Don't render if no URL (text elements don't have URLs)
   if (!imageData.url) return null;
 
-  const url = imageData.url; // Type narrowing
+  // Use proxy URL for Zata URLs to avoid CORS issues
+  const getImageUrl = (originalUrl: string): string => {
+    // For blob URLs, use directly
+    if (originalUrl.startsWith('blob:')) {
+      return originalUrl;
+    }
+    // For Zata URLs, use proxy route
+    if (originalUrl.includes('zata.ai') || originalUrl.includes('zata')) {
+      return buildProxyResourceUrl(originalUrl);
+    }
+    // For other URLs, use directly
+    return originalUrl;
+  };
+
+  const url = getImageUrl(imageData.url); // Type narrowing
 
   useEffect(() => {
     

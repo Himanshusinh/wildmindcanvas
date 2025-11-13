@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+import { getCachedRequest, setCachedRequest } from './apiCache';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api-gateway-services-wildmind.onrender.com';
+const API_GATEWAY_URL = `${API_BASE_URL}/api`;
 
 export interface ImageGenerationRequest {
   prompt: string;
@@ -48,7 +51,7 @@ export async function generateImageFAL(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/fal/generate`, {
+  const response = await fetch(`${API_GATEWAY_URL}/fal/generate`, {
     method: 'POST',
     headers,
     credentials: 'include', // This will automatically send cookies if they exist
@@ -94,7 +97,7 @@ export async function generateImageBFL(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/bfl/generate`, {
+  const response = await fetch(`${API_GATEWAY_URL}/bfl/generate`, {
     method: 'POST',
     headers,
     credentials: 'include', // This will automatically send cookies if they exist
@@ -132,7 +135,7 @@ export async function generateImageReplicate(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/replicate/generate`, {
+  const response = await fetch(`${API_GATEWAY_URL}/replicate/generate`, {
     method: 'POST',
     headers,
     credentials: 'include', // This will automatically send cookies if they exist
@@ -191,5 +194,236 @@ export async function generateImage(
   }
 
   throw new Error('No image URL returned from API');
+}
+
+/**
+ * Generate image for Canvas using the Canvas-specific endpoint
+ * This endpoint automatically uploads to Zata and creates media records
+ */
+export async function generateImageForCanvas(
+  prompt: string,
+  model: string,
+  aspectRatio: string,
+  projectId: string,
+  width?: number,
+  height?: number
+): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string }> {
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/generate`, {
+      method: 'POST',
+      credentials: 'include', // Include cookies (app_session)
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        prompt,
+        model,
+        width,
+        height,
+        aspectRatio, // Pass aspectRatio for proper model mapping
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    // Handle empty response
+    if (!response || response.status === 0) {
+      throw new Error('Empty response from server. Please check if the API Gateway is running.');
+    }
+
+    // Try to parse response, handle empty body
+    let result;
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    
+    if (!text || text.trim() === '') {
+      throw new Error('Empty response body from server');
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        // If parsing fails, try to get more info
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      // Non-JSON response - include it in error
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate image');
+    }
+    
+    // Handle API Gateway response format
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate image');
+    }
+
+    // Return the data object directly (contains mediaId, url, storagePath, generationId)
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Image generation is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to generate image. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Generate video for Canvas using Seedance 1.0 Pro
+ * Returns taskId for polling the result
+ */
+export async function generateVideoForCanvas(
+  prompt: string,
+  model: string,
+  aspectRatio: string,
+  projectId: string,
+  duration?: number,
+  resolution?: string
+): Promise<{ mediaId?: string; url?: string; storagePath?: string; generationId?: string; taskId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-video`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        prompt,
+        model,
+        aspectRatio,
+        duration: duration || 5,
+        resolution: resolution || '1080p',
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response || response.status === 0) {
+      throw new Error('Empty response from server. Please check if the API Gateway is running.');
+    }
+
+    let result;
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    
+    if (!text || text.trim() === '') {
+      throw new Error('Empty response body from server');
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate video');
+    }
+    
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate video');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Video generation is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to generate video. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Get current user info from API (with request deduplication)
+ */
+export async function getCurrentUser(): Promise<{ uid: string; username: string; email: string; credits?: number } | null> {
+  const cacheKey = 'getCurrentUser';
+  
+  // Check cache first
+  const cached = getCachedRequest<{ uid: string; username: string; email: string; credits?: number } | null>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  // Create new request
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/auth/me`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies (app_session)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const result = await response.json();
+      if (result.responseStatus === 'success' && result.data?.user) {
+        return {
+          uid: result.data.user.uid,
+          username: result.data.user.username,
+          email: result.data.user.email,
+          credits: result.data.credits,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      return null;
+    }
+  })();
+
+  // Cache the request
+  return setCachedRequest(cacheKey, requestPromise);
 }
 

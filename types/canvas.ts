@@ -30,6 +30,8 @@ export interface ImageUpload {
   fill?: string;
   // For grouping
   groupId?: string;
+  // For op tracking and persistence
+  elementId?: string;
 }
 
 export interface Group {

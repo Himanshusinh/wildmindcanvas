@@ -40,7 +40,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   isSelected,
 }) => {
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('Seedream 4K');
+  const [selectedModel, setSelectedModel] = useState('Seedance 1.0 Pro');
   const [selectedFrame, setSelectedFrame] = useState('Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState('16:9');
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
@@ -528,11 +528,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <option value="Seedream 4K">Seedream 4K</option>
-              <option value="Runway Gen-3">Runway Gen-3</option>
-              <option value="Pika Labs">Pika Labs</option>
-              <option value="Stable Video">Stable Video</option>
-              <option value="Kling AI">Kling AI</option>
+              <option value="Seedance 1.0 Pro">Seedance 1.0 Pro</option>
             </select>
           </div>
 

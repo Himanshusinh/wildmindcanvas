@@ -77,8 +77,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Get available aspect ratios based on selected model
   const getAvailableAspectRatios = () => {
     const modelLower = selectedModel.toLowerCase();
+    
+    // BFL Flux models support: 1:1, 3:4, 4:3, 16:9, 9:16, 3:2, 2:3, 21:9, 9:21, 16:10, 10:16
     if (modelLower.includes('flux')) {
-      // Flux models support: 1:1, 3:4, 4:3, 16:9, 9:16, 3:2, 2:3, 21:9, 9:21, 16:10, 10:16
       return [
         { value: '1:1', label: '1:1' },
         { value: '16:9', label: '16:9' },
@@ -92,8 +93,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         { value: '16:10', label: '16:10' },
         { value: '10:16', label: '10:16' },
       ];
-    } else {
-      // FAL models (Google Nano Banana, Seedream v4) support: 21:9, 1:1, 4:3, 3:2, 2:3, 5:4, 4:5, 3:4, 16:9, 9:16
+    }
+    
+    // Replicate Seedream 4K supports: 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3, 21:9
+    if (modelLower.includes('seedream') && (modelLower.includes('4k') || modelLower.includes('4 k'))) {
       return [
         { value: '1:1', label: '1:1' },
         { value: '16:9', label: '16:9' },
@@ -103,10 +106,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         { value: '3:2', label: '3:2' },
         { value: '2:3', label: '2:3' },
         { value: '21:9', label: '21:9' },
-        { value: '5:4', label: '5:4' },
-        { value: '4:5', label: '4:5' },
       ];
     }
+    
+    // FAL models (Google Nano Banana, Seedream v4, Imagen) support: 1:1, 16:9, 9:16, 3:4, 4:3
+    return [
+      { value: '1:1', label: '1:1' },
+      { value: '16:9', label: '16:9' },
+      { value: '9:16', label: '9:16' },
+      { value: '4:3', label: '4:3' },
+      { value: '3:4', label: '3:4' },
+    ];
   };
 
   // Handle drag start
@@ -606,10 +616,29 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   }
                 }}
               >
-                <option value="Google Nano Banana">Google Nano Banana</option>
-                <option value="Flux Kontext Max">Flux Kontext Max</option>
-                <option value="Flux Kontext Pro">Flux Kontext Pro</option>
-                <option value="Seedream v4 4K">Seedream v4 4K</option>
+                {/* FAL Models */}
+                <optgroup label="FAL Models">
+                  <option value="Google Nano Banana">Google Nano Banana</option>
+                  <option value="Seedream v4">Seedream v4</option>
+                  <option value="Imagen 4 Ultra">Imagen 4 Ultra</option>
+                  <option value="Imagen 4">Imagen 4</option>
+                  <option value="Imagen 4 Fast">Imagen 4 Fast</option>
+                </optgroup>
+                
+                {/* BFL Flux Models */}
+                <optgroup label="Flux Models">
+                  <option value="Flux Kontext Max">Flux Kontext Max</option>
+                  <option value="Flux Kontext Pro">Flux Kontext Pro</option>
+                  <option value="Flux Pro 1.1 Ultra">Flux Pro 1.1 Ultra</option>
+                  <option value="Flux Pro 1.1">Flux Pro 1.1</option>
+                  <option value="Flux Pro">Flux Pro</option>
+                  <option value="Flux Dev">Flux Dev</option>
+                </optgroup>
+                
+                {/* Replicate Models */}
+                <optgroup label="Replicate Models">
+                  <option value="Seedream v4 4K">Seedream v4 4K</option>
+                </optgroup>
               </select>
             </div>
 
