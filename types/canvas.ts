@@ -14,6 +14,8 @@ export interface ImageUpload {
   y?: number;
   width?: number;
   height?: number;
+  // 2D rotation in degrees for images/videos/text
+  rotation?: number;
   // Original resolution for display in tooltip
   originalWidth?: number;
   originalHeight?: number;

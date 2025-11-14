@@ -8,7 +8,7 @@
  * - Conflict resolution
  */
 
-import { appendOp, getOps, getSnapshot, CanvasOp } from './canvasApi';
+import { appendOp as appendOpApi, getOps as getOpsApi, getSnapshot as getSnapshotApi, CanvasOp } from './canvasApi';
 
 export interface OpState {
   op: CanvasOp;
@@ -37,6 +37,7 @@ export class OpManager {
   private onOpApplied?: (op: CanvasOp, isOptimistic: boolean) => void;
   private onOpConfirmed?: (op: CanvasOp, opIndex: number) => void;
   private onOpRejected?: (op: CanvasOp, error: Error) => void;
+  private serverSync: boolean = true;
 
   constructor(
     projectId: string,
@@ -44,20 +45,27 @@ export class OpManager {
       onOpApplied?: (op: CanvasOp, isOptimistic: boolean) => void;
       onOpConfirmed?: (op: CanvasOp, opIndex: number) => void;
       onOpRejected?: (op: CanvasOp, error: Error) => void;
+      serverSync?: boolean;
     }
   ) {
     this.projectId = projectId;
     this.onOpApplied = callbacks?.onOpApplied;
     this.onOpConfirmed = callbacks?.onOpConfirmed;
     this.onOpRejected = callbacks?.onOpRejected;
+    this.serverSync = callbacks?.serverSync !== undefined ? !!callbacks.serverSync : true;
   }
 
   /**
    * Initialize OpManager by loading snapshot and replaying ops
    */
   async initialize(): Promise<void> {
+    if (!this.serverSync) {
+      // Local-only mode: no snapshot/ops from server
+      this.lastOpIndex = -1;
+      return;
+    }
     try {
-      const { snapshot, ops, fromOp } = await getSnapshot(this.projectId);
+      const { snapshot, ops, fromOp } = await getSnapshotApi(this.projectId);
       
       // Set last op index
       this.lastOpIndex = fromOp;
@@ -74,7 +82,7 @@ export class OpManager {
         this.isReplaying = true;
         for (const op of ops) {
           await this.applyOp(op, false);
-          if ((op as any).opIndex) {
+          if ((op as any).opIndex !== undefined) {
             this.lastOpIndex = Math.max(this.lastOpIndex, (op as any).opIndex);
           }
         }
@@ -116,9 +124,15 @@ export class OpManager {
       this.undoRedoState.currentIndex = this.undoRedoState.undoStack.length - 1;
     }
 
+    if (!this.serverSync) {
+      // Local-only: mark as confirmed immediately (optional)
+      opState.confirmed = true;
+      this.optimisticOps.delete(op.requestId);
+      return;
+    }
     // Send to server
     try {
-      const result = await appendOp(this.projectId, op);
+      const result = await appendOpApi(this.projectId, op);
       opState.confirmed = true;
       opState.opIndex = result.opIndex;
       this.lastOpIndex = Math.max(this.lastOpIndex, result.opIndex);
@@ -175,9 +189,9 @@ export class OpManager {
       this.undoRedoState.currentIndex--;
 
       // If op was confirmed, send inverse to server
-      if (opState.confirmed && opState.opIndex !== undefined) {
+      if (this.serverSync && opState.confirmed && opState.opIndex !== undefined && opState.op.inverse) {
         try {
-          await appendOp(this.projectId, opState.op.inverse);
+          await appendOpApi(this.projectId, opState.op.inverse);
         } catch (error) {
           console.error('Failed to send undo op to server:', error);
         }
@@ -207,9 +221,9 @@ export class OpManager {
     this.undoRedoState.currentIndex = this.undoRedoState.undoStack.length - 1;
 
     // If op was confirmed, send to server again
-    if (opState.confirmed && opState.opIndex !== undefined) {
+    if (this.serverSync && opState.confirmed && opState.opIndex !== undefined) {
       try {
-        await appendOp(this.projectId, opState.op);
+        await appendOpApi(this.projectId, opState.op);
       } catch (error) {
         console.error('Failed to send redo op to server:', error);
       }
@@ -222,8 +236,9 @@ export class OpManager {
    * Sync with server (fetch new ops)
    */
   async sync(): Promise<void> {
+    if (!this.serverSync) return;
     try {
-      const ops = await getOps(this.projectId, this.lastOpIndex + 1, 100);
+      const ops = await getOpsApi(this.projectId, this.lastOpIndex + 1, 100);
       
       if (ops.length > 0) {
         this.isReplaying = true;
@@ -231,7 +246,7 @@ export class OpManager {
           // Skip ops we already have optimistically
           if (!this.optimisticOps.has(op.requestId)) {
             await this.applyOp(op, false);
-            if ((op as any).opIndex) {
+            if ((op as any).opIndex !== undefined) {
               this.lastOpIndex = Math.max(this.lastOpIndex, (op as any).opIndex);
             }
           }

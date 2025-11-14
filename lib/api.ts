@@ -380,6 +380,32 @@ export async function generateVideoForCanvas(
 }
 
 /**
+ * Poll Replicate queue status (generic for Seedance/Kling/WAN/etc.)
+ */
+export async function getReplicateQueueStatus(requestId: string): Promise<any> {
+  const res = await fetch(`${API_GATEWAY_URL}/replicate/queue/status?requestId=${encodeURIComponent(requestId)}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || 'Failed to fetch status');
+  return json?.data || json;
+}
+
+/**
+ * Fetch Replicate queue result (final output, persists history on backend)
+ */
+export async function getReplicateQueueResult(requestId: string): Promise<any> {
+  const res = await fetch(`${API_GATEWAY_URL}/replicate/queue/result?requestId=${encodeURIComponent(requestId)}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || 'Failed to fetch result');
+  return json?.data || json;
+}
+
+/**
  * Get current user info from API (with request deduplication)
  */
 export async function getCurrentUser(): Promise<{ uid: string; username: string; email: string; credits?: number } | null> {

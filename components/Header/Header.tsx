@@ -6,12 +6,20 @@ interface HeaderProps {
   projectName?: string;
   onProjectNameChange?: (name: string) => void;
   onSwitchProject?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
   projectName: initialProjectName = 'Untitled',
   onProjectNameChange,
-  onSwitchProject
+  onSwitchProject,
+  onUndo,
+  onRedo,
+  canUndo = true,
+  canRedo = false,
 }) => {
   // Use prop directly to avoid hydration mismatches - only use state when editing
   const [editingValue, setEditingValue] = useState(initialProjectName);
@@ -68,6 +76,74 @@ export const Header: React.FC<HeaderProps> = ({
         gap: '8px',
       }}
     >
+      {/* Undo Button */}
+      <div
+        style={{
+          width: '28px',
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '8px',
+          backgroundColor: canUndo ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.05)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          color: canUndo ? '#111827' : '#9ca3af',
+          cursor: canUndo && onUndo ? 'pointer' : 'default',
+          transition: 'all 0.2s',
+          opacity: canUndo ? 1 : 0.6,
+        }}
+        onClick={() => { if (canUndo && onUndo) onUndo(); }}
+        onMouseEnter={(e) => {
+          if (canUndo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          if (canUndo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        }}
+        title="Undo (Ctrl/Cmd+Z)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 14l-4-4 4-4" />
+          <path d="M20 20a9 9 0 0 0-9-9H5" />
+        </svg>
+      </div>
+
+      {/* Redo Button */}
+      <div
+        style={{
+          width: '28px',
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '8px',
+          backgroundColor: canRedo ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.05)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          color: canRedo ? '#111827' : '#9ca3af',
+          cursor: canRedo && onRedo ? 'pointer' : 'default',
+          transition: 'all 0.2s',
+          opacity: canRedo ? 1 : 0.6,
+        }}
+        onClick={() => { if (canRedo && onRedo) onRedo(); }}
+        onMouseEnter={(e) => {
+          if (canRedo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        }}
+        onMouseLeave={(e) => {
+          if (canRedo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        }}
+        title="Redo (Ctrl+Y / Shift+Ctrl/Cmd+Z)"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 10l4 4-4 4" />
+          <path d="M4 4a9 9 0 0 1 9 9h5" />
+        </svg>
+      </div>
+
       {/* Library Icon - Part 1 */}
       <div
         style={{

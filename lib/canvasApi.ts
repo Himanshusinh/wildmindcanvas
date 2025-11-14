@@ -34,6 +34,40 @@ export interface CanvasOp {
   inverse?: CanvasOp;
 }
 
+// Ephemeral generator overlay type and API helpers
+export interface GeneratorOverlayDTO {
+  id: string;
+  type: 'image' | 'video' | 'music';
+  x: number;
+  y: number;
+  generatedImageUrl?: string | null;
+  generatedVideoUrl?: string | null;
+  generatedMusicUrl?: string | null;
+}
+
+export async function listGenerators(projectId: string): Promise<GeneratorOverlayDTO[]> {
+  const res = await fetch(`${CANVAS_API}/projects/${projectId}/generators`, { credentials: 'include' });
+  if (!res.ok) return [];
+  const json = await res.json().catch(() => ({ data: { overlays: [] } }));
+  return json?.data?.overlays || [];
+}
+
+export async function upsertGenerator(projectId: string, overlay: GeneratorOverlayDTO): Promise<void> {
+  await fetch(`${CANVAS_API}/projects/${projectId}/generators/${encodeURIComponent(overlay.id)}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(overlay),
+  });
+}
+
+export async function deleteGenerator(projectId: string, overlayId: string): Promise<void> {
+  await fetch(`${CANVAS_API}/projects/${projectId}/generators/${encodeURIComponent(overlayId)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+}
+
 /**
  * Create a new Canvas project
  */
@@ -191,5 +225,47 @@ export async function getSnapshot(
 
   const result = await response.json();
   return result.data;
+}
+
+/**
+ * Overwrite model: get the current snapshot (no ops)
+ */
+export async function getCurrentSnapshot(
+  projectId: string
+): Promise<{
+  snapshot: {
+    projectId: string;
+    snapshotOpIndex: number;
+    elements: Record<string, any>;
+    metadata?: Record<string, any>;
+  } | null;
+}> {
+  const url = `${CANVAS_API}/projects/${projectId}/snapshot/current`;
+  const response = await fetch(url, { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error('Failed to get current snapshot');
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Overwrite model: set the current snapshot (send full state)
+ */
+export async function setCurrentSnapshot(
+  projectId: string,
+  snapshot: { elements: Record<string, any>; metadata?: Record<string, any> }
+): Promise<void> {
+  const url = `${CANVAS_API}/projects/${projectId}/snapshot/current`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(snapshot),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ message: 'Failed to set snapshot' }));
+    throw new Error(err.message || 'Failed to set snapshot');
+  }
 }
 

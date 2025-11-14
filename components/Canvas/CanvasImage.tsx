@@ -38,6 +38,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const timeUpdateRef = useRef<number | null>(null);
   const wasPlayingBeforeDrag = useRef(false);
   const originalAspectRatio = useRef<number>(1);
+  const dragRafRef = useRef<number | null>(null);
+  const transformRafRef = useRef<number | null>(null);
   const isVideo = imageData.type === 'video';
 
   // Don't render if no URL (text elements don't have URLs)
@@ -228,6 +230,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   };
   const width = imageData.width || getDefaultWidth();
   const height = imageData.height || getDefaultHeight();
+  const rotation = imageData.rotation || 0;
 
   const handlePlayPause = (e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
@@ -324,12 +327,36 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         draggable={!imageData.groupId}
         x={x}
         y={y}
+        rotation={rotation}
+        onDragMove={(e) => {
+          // Let Konva handle visual movement; avoid React state churn for smoothness
+          const layer = (e.target as Konva.Node).getLayer();
+          layer?.batchDraw();
+        }}
         onDragEnd={(e) => {
           const node = e.target;
           onUpdate?.({
             x: node.x(),
             y: node.y(),
           });
+        }}
+        onTransform={(e) => {
+          // Only redraw for smooth feedback; commit sizes on end
+          const layer = (e.target as Konva.Node).getLayer();
+          layer?.batchDraw();
+        }}
+        onTransformEnd={(e) => {
+          const node = e.target as Konva.Group;
+          if (!node) return;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          const newWidth = Math.max(5, width * scaleX);
+          const newHeight = Math.max(5, height * scaleY);
+          const newRotation = node.rotation();
+          // Reset scales to keep width/height canonical
+          node.scaleX(1);
+          node.scaleY(1);
+          onUpdate?.({ width: newWidth, height: newHeight, rotation: newRotation });
         }}
         onClick={(e) => {
           e.cancelBubble = true;

@@ -43,7 +43,7 @@ export function useOpManager({ projectId, onOpApplied, enabled = true }: UseOpMa
 
     initializingRef.current = true;
 
-    const opManager = new OpManager(projectId, {
+    const opManager = new OpManager(projectId, { 
       onOpApplied: (op, isOptimistic) => {
         // Use ref to get latest callback without causing re-renders
         onOpAppliedRef.current?.(op, isOptimistic);
@@ -64,6 +64,8 @@ export function useOpManager({ projectId, onOpApplied, enabled = true }: UseOpMa
         console.error('Op rejected:', error);
         setPendingOps(opManager.getPendingOps());
       },
+      // Run in local-only mode: do not sync with server /ops
+      serverSync: false,
     });
 
     opManagerRef.current = opManager;
@@ -110,26 +112,35 @@ export function useOpManager({ projectId, onOpApplied, enabled = true }: UseOpMa
       throw new Error('OpManager not initialized');
     }
     // OpManager will add requestId and clientTs automatically
+    try {
+      const kind = (op as any)?.type;
+      const meta = (op as any)?.elementId || (op as any)?.elementIds?.length || '';
+      console.log('[Ops] append', kind, meta);
+    } catch {}
     await opManagerRef.current.appendOp(op as CanvasOp);
   };
 
   // Undo
   const undo = async () => {
     if (!opManagerRef.current) return false;
+    console.log('[Ops] undo requested');
     const result = await opManagerRef.current.undo();
     const state = opManagerRef.current.getUndoRedoState();
     setCanUndo(state.canUndo);
     setCanRedo(state.canRedo);
+    console.log('[Ops] undo result:', result, 'canUndo:', state.canUndo, 'canRedo:', state.canRedo);
     return result;
   };
 
   // Redo
   const redo = async () => {
     if (!opManagerRef.current) return false;
+    console.log('[Ops] redo requested');
     const result = await opManagerRef.current.redo();
     const state = opManagerRef.current.getUndoRedoState();
     setCanUndo(state.canUndo);
     setCanRedo(state.canRedo);
+    console.log('[Ops] redo result:', result, 'canUndo:', state.canUndo, 'canRedo:', state.canRedo);
     return result;
   };
 

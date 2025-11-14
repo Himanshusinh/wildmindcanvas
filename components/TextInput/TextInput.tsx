@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 interface TextInputProps {
+  id: string;
   x: number;
   y: number;
   onConfirm: (text: string, model?: string) => void;
@@ -11,13 +12,17 @@ interface TextInputProps {
   onSelect?: () => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
+  onValueChange?: (value: string) => void;
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
   isSelected?: boolean;
+
+  
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
+  id,
   x,
   y,
   onConfirm,
@@ -26,6 +31,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   onSelect,
   onDelete,
   onDuplicate,
+  onValueChange,
   stageRef,
   scale,
   position,
@@ -35,6 +41,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -43,6 +50,17 @@ export const TextInput: React.FC<TextInputProps> = ({
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  }, []);
+
+  // Listen for global node-drag active state so nodes stay visible during drag
+  useEffect(() => {
+    const handleActive = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { active } = ce.detail || {};
+      setGlobalDragActive(Boolean(active));
+    };
+    window.addEventListener('canvas-node-active', handleActive as any);
+    return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
 
   // Convert canvas coordinates to screen coordinates
@@ -129,6 +147,7 @@ export const TextInput: React.FC<TextInputProps> = ({
     <div
       ref={containerRef}
       data-modal-component="text"
+      data-overlay-id={id}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -145,7 +164,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `${12 * scale}px`,
-        border: isSelected ? `${4 * scale}px solid #60A5FA` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : 'none'),
+        border: isSelected ? `${4 * scale}px solid #22D3EE` : `${2 * scale}px solid #06B6D4`,
         transition: 'border 0.3s ease, box-shadow 0.3s ease',
         boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(31, 38, 135, 0.37)`,
         minWidth: `${400 * scale}px`,
@@ -200,91 +219,100 @@ export const TextInput: React.FC<TextInputProps> = ({
           onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Delete Icon */}
-          {onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDelete) onDelete();
-              }}
-              title="Delete"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: `${28 * scale}px`,
-                height: `${28 * scale}px`,
-                padding: 0,
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: `1px solid rgba(0, 0, 0, 0.1)`,
-                borderRadius: `${8 * scale}px`,
-                color: '#4b5563',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-                e.currentTarget.style.color = '#ef4444';
-                e.currentTarget.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-                e.currentTarget.style.color = '#4b5563';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h18" />
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              </svg>
-            </button>
-          )}
-
-          {/* Duplicate Icon */}
-          {onDuplicate && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onDuplicate) onDuplicate();
-              }}
-              title="Duplicate"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: `${28 * scale}px`,
-                height: `${28 * scale}px`,
-                padding: 0,
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: `1px solid rgba(0, 0, 0, 0.1)`,
-                borderRadius: `${8 * scale}px`,
-                color: '#4b5563',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
-                e.currentTarget.style.color = '#22c55e';
-                e.currentTarget.style.transform = 'scale(1.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-                e.currentTarget.style.color = '#4b5563';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-          )}
+          {/* Receive Node (Left) */}
+          <div
+            data-node-id={id}
+            data-node-side="receive"
+            onMouseUp={(e) => {
+              if (!id) return;
+              e.stopPropagation();
+              e.preventDefault();
+              window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id, side: 'receive' } }));
+            }}
+            style={{
+              position: 'absolute',
+              left: `${-12 * scale}px`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: `${18 * scale}px`,
+              height: `${18 * scale}px`,
+              borderRadius: '50%',
+              backgroundColor: isSelected ? '#C084FC' : '#8B5CF6',
+              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              cursor: 'pointer',
+              border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+              zIndex: 5000,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              transition: 'opacity 0.18s ease',
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Send Node (Right) */}
+          <div
+            data-node-id={id}
+            data-node-side="send"
+            onPointerDown={(e: React.PointerEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              try { el.setPointerCapture?.(e.pointerId); } catch (err) {}
+              if (!id) return;
+              e.stopPropagation();
+              e.preventDefault();
+              const color = isSelected ? '#C084FC' : '#8B5CF6';
+              window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
+            }}
+            style={{
+              position: 'absolute',
+              right: `${-12 * scale}px`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: `${18 * scale}px`,
+              height: `${18 * scale}px`,
+              borderRadius: '50%',
+              backgroundColor: isSelected ? '#C084FC' : '#8B5CF6',
+              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              cursor: 'grab',
+              border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+              zIndex: 5000,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              transition: 'opacity 0.18s ease, transform 0.12s ease',
+              pointerEvents: 'auto',
+            }}
+          />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onDelete) onDelete();
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="Delete"
+            style={{
+              padding: 0,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: `1px solid rgba(0, 0, 0, 0.1)`,
+              borderRadius: `${8 * scale}px`,
+              color: '#4b5563',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
+              (e.currentTarget as HTMLElement).style.color = '#22c55e';
+              (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+              (e.currentTarget as HTMLElement).style.color = '#4b5563';
+              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+            }}
+          >
+            <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          </button>
         </div>
       )}
       {/* Drag handle header */}
@@ -313,10 +341,75 @@ export const TextInput: React.FC<TextInputProps> = ({
           }}
         />
       </div>
+      {/* Connection Nodes - always rendered but subtle until hovered or during drag
+          NOTE: right-side is the send/start node and left-side is the receive node */}
+      <>
+        {/* Receive Node (Left) */}
+        <div
+          data-node-id={id}
+          data-node-side="receive"
+          onMouseUp={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id, side: 'receive' } }));
+          }}
+          style={{
+            position: 'absolute',
+            left: `${-12 * scale}px`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: `${18 * scale}px`,
+            height: `${18 * scale}px`,
+            borderRadius: '50%',
+            backgroundColor: isSelected ? '#22D3EE' : '#06B6D4',
+            boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+            cursor: 'pointer',
+            border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+            zIndex: 5000,
+            opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+            transition: 'opacity 0.18s ease, transform 0.12s ease',
+            pointerEvents: 'auto',
+          }}
+        />
+        {/* Send Node (Right) */}
+        <div
+          data-node-id={id}
+          data-node-side="send"
+          onPointerDown={(e: React.PointerEvent) => {
+            const el = e.currentTarget as HTMLElement;
+            try { el.setPointerCapture?.(e.pointerId); } catch (err) {}
+            e.stopPropagation();
+            e.preventDefault();
+            const color = isSelected ? '#22D3EE' : '#06B6D4';
+            window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
+          }}
+          style={{
+            position: 'absolute',
+            right: `${-12 * scale}px`,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: `${18 * scale}px`,
+            height: `${18 * scale}px`,
+            borderRadius: '50%',
+            backgroundColor: isSelected ? '#22D3EE' : '#06B6D4',
+            boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+            cursor: 'grab',
+            border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+            zIndex: 5000,
+            opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+            transition: 'opacity 0.18s ease, transform 0.12s ease',
+            pointerEvents: 'auto',
+          }}
+        />
+      </>
       <textarea
         ref={inputRef}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          const v = e.target.value;
+          setText(v);
+          if (onValueChange) onValueChange(v);
+        }}
         onKeyDown={handleKeyDown}
         placeholder="Enter text here..."
         onMouseDown={(e) => e.stopPropagation()}
@@ -336,38 +429,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         }}
       />
       <div style={{ display: 'flex', gap: `${8 * scale}px`, justifyContent: 'flex-end', alignItems: 'center' }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCancel();
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          title="Cancel"
-          style={{
-            width: `${32 * scale}px`,
-            height: `${32 * scale}px`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            border: `${1 * scale}px solid rgba(255, 255, 255, 0.2)`,
-            borderRadius: `${8 * scale}px`,
-            color: '#ef4444',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
-        >
-          <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        {/* Run Button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -376,28 +438,84 @@ export const TextInput: React.FC<TextInputProps> = ({
           onMouseDown={(e) => e.stopPropagation()}
           title="Run"
           style={{
-            width: `${32 * scale}px`,
-            height: `${32 * scale}px`,
+            width: `${40 * scale}px`,
+            height: `${40 * scale}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(59, 130, 246, 0.3)',
-            border: `${1 * scale}px solid rgba(59, 130, 246, 0.5)`,
-            borderRadius: `${8 * scale}px`,
-            color: '#3b82f6',
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.55) 100%)',
+            border: `${1 * scale}px solid rgba(59,130,246,0.6)`,
+            borderRadius: `${12 * scale}px`,
+            color: '#1d4ed8',
             cursor: 'pointer',
-            boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.3)`,
+            boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(59,130,246,0.35)`,
             padding: 0,
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            transition: 'all 0.25s ease',
           }}
+          disabled={!text.trim()}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)';
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+            e.currentTarget.style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(59,130,246,0.45)`;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59,130,246,0.35)`;
           }}
         >
-          <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+        {/* Enhance Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            // Simple client-side enhancement placeholder: trim + collapse spaces
+            const enhanced = text.replace(/\s+/g, ' ').trim();
+            if (enhanced) {
+              onConfirm(enhanced, selectedModel + ' (enhance)');
+            }
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Enhance"
+          style={{
+            width: `${40 * scale}px`,
+            height: `${40 * scale}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0.6) 100%)',
+            border: `${1 * scale}px solid rgba(168,85,247,0.65)`,
+            borderRadius: `${12 * scale}px`,
+            color: '#6d28d9',
+            cursor: 'pointer',
+            boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`,
+            padding: 0,
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            transition: 'all 0.25s ease',
+          }}
+          disabled={!text.trim()}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+            e.currentTarget.style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(168,85,247,0.45)`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`;
+          }}
+        >
+          <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3v4" />
+            <path d="M12 17v4" />
+            <path d="M3 12h4" />
+            <path d="M17 12h4" />
+            <path d="M5.6 5.6l2.8 2.8" />
+            <path d="M15.6 15.6l2.8 2.8" />
+            <path d="M18.4 5.6l-2.8 2.8" />
+            <path d="M8.4 15.6l-2.8 2.8" />
           </svg>
         </button>
       </div>

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import FrameSpinner from '../common/FrameSpinner';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
+  id?: string;
   onClose: () => void;
-  onImageSelect?: (file: File) => void;
   onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  onImageSelect?: (file: File) => void;
   generatedImageUrl?: string | null;
   stageRef: React.RefObject<any>;
   scale: number;
@@ -14,17 +16,24 @@ interface ImageUploadModalProps {
   x: number;
   y: number;
   onPositionChange?: (x: number, y: number) => void;
+  onPositionCommit?: (x: number, y: number) => void;
   onSelect?: () => void;
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
+  onAddToCanvas?: (url: string) => void;
   isSelected?: boolean;
+  initialModel?: string;
+  initialFrame?: string;
+  initialAspectRatio?: string;
+  initialPrompt?: string;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isOpen,
+  id,
   onClose,
-  onImageSelect,
   onGenerate,
   generatedImageUrl,
   stageRef,
@@ -33,22 +42,32 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   x,
   y,
   onPositionChange,
+  onPositionCommit,
   onSelect,
   onDelete,
   onDownload,
   onDuplicate,
+  onAddToCanvas,
+  onImageSelect,
   isSelected,
+  initialModel,
+  initialFrame,
+  initialAspectRatio,
+  initialPrompt,
+  onOptionsChange,
 }) => {
-  const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('Google Nano Banana');
-  const [selectedFrame, setSelectedFrame] = useState('Frame');
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState('1:1');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+  const [prompt, setPrompt] = useState(initialPrompt ?? '');
+  const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Google Nano Banana');
+  const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -73,6 +92,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }
     }
   };
+
+  // Sync internal state from initial props (hydration)
+  useEffect(() => {
+    if (typeof initialPrompt === 'string' && initialPrompt !== prompt) setPrompt(initialPrompt);
+  }, [initialPrompt]);
+
+  // Listen for global node-drag active state so nodes remain visible while dragging
+  useEffect(() => {
+    const handleActive = (e: Event) => {
+      const ce = e as CustomEvent;
+      setGlobalDragActive(Boolean(ce.detail?.active));
+    };
+    window.addEventListener('canvas-node-active', handleActive as any);
+    return () => window.removeEventListener('canvas-node-active', handleActive as any);
+  }, []);
+  useEffect(() => {
+    if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel);
+  }, [initialModel]);
+  useEffect(() => {
+    if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame);
+  }, [initialFrame]);
+  useEffect(() => {
+    if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio);
+  }, [initialAspectRatio]);
 
   // Get available aspect ratios based on selected model
   const getAvailableAspectRatios = () => {
@@ -163,10 +206,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       const newCanvasY = (newScreenY - position.y) / scale;
 
       onPositionChange(newCanvasX, newCanvasY);
+      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDraggingContainer(false);
+      if (onPositionCommit && lastCanvasPosRef.current) {
+        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -184,6 +231,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     <div
       ref={containerRef}
       data-modal-component="image"
+      data-overlay-id={id}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -376,6 +424,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       {/* Image Frame */}
       <div
         ref={imageAreaRef}
+        data-frame-id={id ? `${id}-frame` : undefined}
         onClick={(e) => {
           // Ensure selection works when clicking on frame
           if (onSelect && !e.defaultPrevented) {
@@ -391,13 +440,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: `${16 * scale}px`,
-          border: isSelected ? `${4 * scale}px solid #60A5FA` : (isHovered ? `${2 * scale}px solid rgba(0, 0, 0, 0.1)` : 'none'),
+          border: isSelected ? `${4 * scale}px solid #FF77A9` : `${2 * scale}px solid #FF4D8D`,
           boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: isDraggingContainer ? 'grabbing' : 'grab',
-          overflow: 'visible',
+          overflow: 'hidden',
           position: 'relative',
           zIndex: 1,
           transition: 'border 0.3s ease, box-shadow 0.3s ease',
@@ -412,6 +461,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               height: '100%',
               objectFit: 'cover',
               pointerEvents: 'none',
+              borderRadius: `${16 * scale}px`,
             }}
             draggable={false}
           />
@@ -434,6 +484,72 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             </svg>
           </div>
         )}
+        {isGenerating && (
+          <FrameSpinner scale={scale} label="Generating image…" />
+        )}
+        {/* Connection Nodes - always rendered but subtle until hovered or during drag
+            NOTE: right-side is the send/start node, left-side is the receive node */}
+        <>
+          {/* Receive Node (Left) */}
+          <div
+            data-node-id={id}
+            data-node-side="receive"
+            onMouseUp={(e) => {
+              if (!id) return;
+              e.stopPropagation();
+              e.preventDefault();
+              window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id, side: 'receive' } }));
+            }}
+            style={{
+              position: 'absolute',
+              left: `${-12 * scale}px`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: `${18 * scale}px`,
+              height: `${18 * scale}px`,
+              borderRadius: '50%',
+              backgroundColor: isSelected ? '#FF77A9' : '#FF4D8D',
+              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              cursor: 'pointer',
+              border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+              zIndex: 5000,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              transition: 'opacity 0.18s ease, transform 0.12s ease',
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Send Node (Right) */}
+          <div
+            data-node-id={id}
+            data-node-side="send"
+            onPointerDown={(e: React.PointerEvent) => {
+              const el = e.currentTarget as HTMLElement;
+              try { el.setPointerCapture?.(e.pointerId); } catch (err) {}
+              if (!id) return;
+              e.stopPropagation();
+              e.preventDefault();
+              const color = isSelected ? '#FF77A9' : '#FF4D8D';
+              window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
+            }}
+            style={{
+              position: 'absolute',
+              right: `${-12 * scale}px`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: `${18 * scale}px`,
+              height: `${18 * scale}px`,
+              borderRadius: '50%',
+              backgroundColor: isSelected ? '#FF77A9' : '#FF4D8D',
+              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              cursor: 'grab',
+              border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+              zIndex: 5000,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              transition: 'opacity 0.18s ease',
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
         {/* Delete button removed - now handled by context menu in header */}
       </div>
 
@@ -472,7 +588,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               className="prompt-input"
               type="text"
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPrompt(val);
+                if (onOptionsChange) {
+                  onOptionsChange({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame });
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -614,6 +736,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
                     setSelectedAspectRatio(availableRatios[0].value);
                   }
+                  if (onOptionsChange) {
+                    const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
+                    const frameWidth = 600;
+                    const ar = w && h ? (w / h) : 1;
+                    const rawHeight = Math.round(frameWidth / ar);
+                    const frameHeight = Math.max(400, rawHeight);
+                    onOptionsChange({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                  }
                 }}
               >
                 {/* FAL Models */}
@@ -646,7 +776,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             <div style={{ position: 'relative' }}>
               <select
                 value={selectedAspectRatio}
-                onChange={(e) => setSelectedAspectRatio(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedAspectRatio(val);
+                  if (onOptionsChange) {
+                    const [w, h] = val.split(':').map(Number);
+                    const frameWidth = 600;
+                    const ar = w && h ? (w / h) : 1;
+                    const rawHeight = Math.round(frameWidth / ar);
+                    const frameHeight = Math.max(400, rawHeight);
+                    onOptionsChange({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                  }
+                }}
                 style={{
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                   backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -681,6 +822,38 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               </select>
             </div>
           </div>
+          {/* Commit Row (shows after generation) */}
+          {generatedImageUrl && onAddToCanvas && (
+            <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', justifyContent: 'flex-end' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCanvas(generatedImageUrl);
+                  // Close/remove this modal after adding to canvas to avoid duplicate view
+                  if (onDelete) onDelete();
+                }}
+                style={{
+                  padding: `${10 * scale}px ${14 * scale}px`,
+                  backgroundColor: 'rgba(34,197,94,0.9)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: `${10 * scale}px`,
+                  fontSize: `${12 * scale}px`,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(34, 197, 94, 0.35)`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(34, 197, 94, 0.5)`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(34, 197, 94, 0.35)`;
+                }}
+              >
+                Add to Canvas
+              </button>
+            </div>
+          )}
         </div>
     </div>
   );

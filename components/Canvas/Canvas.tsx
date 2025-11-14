@@ -33,13 +33,32 @@ interface CanvasProps {
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
   generatedVideoUrl?: string | null;
   isMusicModalOpen?: boolean;
   onMusicModalClose?: () => void;
   onMusicSelect?: (file: File) => void;
-  onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
+  onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => Promise<string | null>;
   generatedMusicUrl?: string | null;
+  onAddImageToCanvas?: (url: string) => void;
+  projectId?: string | null;
+  externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalTextModals?: Array<{ id: string; x: number; y: number; value?: string }>;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistImageModalDelete?: (id: string) => void | Promise<void>;
+  onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistVideoModalDelete?: (id: string) => void | Promise<void>;
+  onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
+  // Text generator (input overlay) persistence callbacks
+  onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string }) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+  onPersistTextModalDelete?: (id: string) => void | Promise<void>;
 }
 
 // Truly infinite canvas - fixed massive size to support 100+ 8K images
@@ -80,6 +99,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   onMusicSelect,
   onMusicGenerate,
   generatedMusicUrl,
+  onAddImageToCanvas,
+  projectId,
+  externalImageModals,
+  externalVideoModals,
+  externalMusicModals,
+  externalTextModals,
+  onPersistImageModalCreate,
+  onPersistImageModalMove,
+  onPersistImageModalDelete,
+  onPersistVideoModalCreate,
+  onPersistVideoModalMove,
+  onPersistVideoModalDelete,
+  onPersistMusicModalCreate,
+  onPersistMusicModalMove,
+  onPersistMusicModalDelete,
+  onPersistTextModalCreate,
+  onPersistTextModalMove,
+  onPersistTextModalDelete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -93,10 +130,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     x: 0, 
     y: 0 
   });
-  const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
-  const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>>([]);
-  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>>([]);
-  const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>>([]);
+  const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
+  const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -388,7 +425,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (selectedTool === 'text') {
       const blankPos = findBlankSpace(300, 100);
       const newId = `text-${Date.now()}-${Math.random()}`;
-      setTextInputStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y }]);
+      const modal = { id: newId, x: blankPos.x, y: blankPos.y, value: '' as string };
+      setTextInputStates(prev => [...prev, modal]);
+      if (onPersistTextModalCreate) {
+        Promise.resolve(onPersistTextModalCreate(modal)).catch(console.error);
+      }
       // Auto-focus on new component
       setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 300, 100), 100);
     }
@@ -401,7 +442,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (selectedTool === 'image' && isImageModalOpen) {
       const blankPos = findBlankSpace(600, 400);
       const newId = `image-${Date.now()}-${Math.random()}`;
-      setImageModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedImageUrl: null }]);
+      const modal = { id: newId, x: blankPos.x, y: blankPos.y, generatedImageUrl: null as string | null };
+      setImageModalStates(prev => [...prev, modal]);
+      if (onPersistImageModalCreate) {
+        Promise.resolve(onPersistImageModalCreate(modal)).catch(console.error);
+      }
       // Auto-focus on new component
       setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
     }
@@ -414,6 +459,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       const blankPos = findBlankSpace(600, 400);
       const newId = `video-${Date.now()}-${Math.random()}`;
       setVideoModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedVideoUrl: null }]);
+      if (onPersistVideoModalCreate) {
+        Promise.resolve(onPersistVideoModalCreate({ id: newId, x: blankPos.x, y: blankPos.y, generatedVideoUrl: null })).catch(console.error);
+      }
       // Auto-focus on new component
       setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
     }
@@ -426,6 +474,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       const blankPos = findBlankSpace(600, 300);
       const newId = `music-${Date.now()}-${Math.random()}`;
       setMusicModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedMusicUrl: null }]);
+      if (onPersistMusicModalCreate) {
+        Promise.resolve(onPersistMusicModalCreate({ id: newId, x: blankPos.x, y: blankPos.y, generatedMusicUrl: null })).catch(console.error);
+      }
       // Auto-focus on new component
       setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 300), 100);
     }
@@ -448,6 +499,138 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [generatedImageUrl, imageModalStates.length]);
+
+  // Load persisted image modals from localStorage on mount (scoped by projectId)
+  useEffect(() => {
+    if (externalImageModals && externalImageModals.length > 0) {
+      // Hydrate from external (backend) first
+      setImageModalStates(externalImageModals);
+      return;
+    }
+    try {
+      const key = projectId ? `canvas:${projectId}:imageModals` : 'canvas:imageModals';
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setImageModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted image modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalImageModals || [])]);
+
+  // Persist image modals to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const key = projectId ? `canvas:${projectId}:imageModals` : 'canvas:imageModals';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(imageModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist image modals');
+    }
+  }, [imageModalStates, projectId]);
+
+  // Hydrate video modals from external or localStorage
+  useEffect(() => {
+    if (externalVideoModals && externalVideoModals.length > 0) {
+      setVideoModalStates(externalVideoModals);
+      return;
+    }
+    try {
+      const key = projectId ? `canvas:${projectId}:videoModals` : 'canvas:videoModals';
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setVideoModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted video modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalVideoModals || [])]);
+
+  // Sync external text modals from parent (for hydration/realtime)
+  useEffect(() => {
+    if (externalTextModals && externalTextModals.length > 0) {
+      setTextInputStates(externalTextModals as any);
+      return;
+    }
+    try {
+      const key = projectId ? `canvas:${projectId}:textModals` : 'canvas:textModals';
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; value?: string }>;
+        if (Array.isArray(parsed)) {
+          setTextInputStates(parsed as any);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted text modals');
+    }
+  }, [projectId, JSON.stringify(externalTextModals || [])]);
+
+  // Persist video modals
+  useEffect(() => {
+    try {
+      const key = projectId ? `canvas:${projectId}:videoModals` : 'canvas:videoModals';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(videoModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist video modals');
+    }
+  }, [videoModalStates, projectId]);
+
+  // Hydrate music modals from external or localStorage
+  useEffect(() => {
+    if (externalMusicModals && externalMusicModals.length > 0) {
+      setMusicModalStates(externalMusicModals);
+      return;
+    }
+    try {
+      const key = projectId ? `canvas:${projectId}:musicModals` : 'canvas:musicModals';
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setMusicModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted music modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalMusicModals || [])]);
+
+  // Persist music modals
+  useEffect(() => {
+    try {
+      const key = projectId ? `canvas:${projectId}:musicModals` : 'canvas:musicModals';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(musicModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist music modals');
+    }
+  }, [musicModalStates, projectId]);
+
+  // Persist text input modals to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const key = projectId ? `canvas:${projectId}:textModals` : 'canvas:textModals';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(textInputStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist text modals');
+    }
+  }, [textInputStates, projectId]);
 
   // Sync generatedVideoUrl prop to the most recently created video modal
   useEffect(() => {
@@ -2246,11 +2429,18 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedImageModalIds={setSelectedImageModalIds}
             setSelectedVideoModalIds={setSelectedVideoModalIds}
             setSelectedMusicModalIds={setSelectedMusicModalIds}
+            onPersistImageModalMove={onPersistImageModalMove}
+            onPersistTextModalMove={onPersistTextModalMove}
           />
           {/* Transformer for selected nodes */}
           {selectedImageIndices.length > 0 && (
             <Transformer
               ref={transformerRef}
+              keepRatio={true}
+              rotateEnabled={true}
+              rotateAnchorOffset={30}
+              anchorSize={12}
+              rotationSnaps={isShiftPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : undefined}
               boundBoxFunc={(oldBox, newBox) => {
                 // Limit resize to prevent negative dimensions
                 if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
@@ -2309,6 +2499,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         scale={scale}
         position={position}
         groups={groups}
+        onAddImageToCanvas={onAddImageToCanvas}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        onPersistImageModalDelete={onPersistImageModalDelete}
+        onPersistVideoModalCreate={onPersistVideoModalCreate}
+        onPersistVideoModalMove={onPersistVideoModalMove}
+        onPersistVideoModalDelete={onPersistVideoModalDelete}
+        onPersistMusicModalCreate={onPersistMusicModalCreate}
+        onPersistMusicModalMove={onPersistMusicModalMove}
+        onPersistMusicModalDelete={onPersistMusicModalDelete}
+        onPersistTextModalCreate={onPersistTextModalCreate}
+        onPersistTextModalMove={onPersistTextModalMove}
+        onPersistTextModalDelete={onPersistTextModalDelete}
       />
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (

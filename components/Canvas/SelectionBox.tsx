@@ -42,6 +42,10 @@ interface SelectionBoxProps {
   setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMusicModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -75,6 +79,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSelectedImageModalIds,
   setSelectedVideoModalIds,
   setSelectedMusicModalIds,
+  onPersistImageModalMove,
+  onPersistVideoModalMove,
+  onPersistMusicModalMove,
 }) => {
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
@@ -320,6 +327,45 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           // Clear original positions
           originalPositionsRef.current = null;
           originalTightRectRef.current = null;
+
+          // Persist final positions for image generator modals once at drag end
+          if (onPersistImageModalMove) {
+            selectedImageModalIds.forEach((modalId) => {
+              const modalState = imageModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                Promise.resolve(onPersistImageModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+              }
+            });
+          }
+
+          // Persist final positions for video generator modals
+          if (onPersistVideoModalMove) {
+            selectedVideoModalIds.forEach((modalId) => {
+              const modalState = videoModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                Promise.resolve(onPersistVideoModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+              }
+            });
+          }
+
+          // Persist final positions for music generator modals
+          if (onPersistMusicModalMove) {
+            selectedMusicModalIds.forEach((modalId) => {
+              const modalState = musicModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                Promise.resolve(onPersistMusicModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+              }
+            });
+          }
+          // Persist final positions for text inputs
+          if (onPersistTextModalMove) {
+            selectedTextInputIds.forEach((textId) => {
+              const textState = textInputStates.find(t => t.id === textId);
+              if (textState) {
+                Promise.resolve(onPersistTextModalMove(textId, { x: textState.x, y: textState.y })).catch(console.error);
+              }
+            });
+          }
         }}
       >
         {/* Group name label at top left corner, outside the box */}
