@@ -27,11 +27,11 @@ interface SelectionBoxProps {
   setIsGroupNameModalOpen: (open: boolean) => void;
   setSelectionTightRect: (rect: { x: number; y: number; width: number; height: number } | null) => void;
   handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
-  setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number }>>>;
+  setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>>>;
   setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>>>;
   setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>>>;
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>>>;
-  textInputStates: Array<{ id: string; x: number; y: number }>;
+  textInputStates: Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>;
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>;
   musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>;

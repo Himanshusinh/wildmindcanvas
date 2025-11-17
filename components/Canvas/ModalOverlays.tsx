@@ -9,7 +9,7 @@ import { MusicUploadModal } from '@/components/MusicUploadModal';
 import Konva from 'konva';
 
 interface ModalOverlaysProps {
-  textInputStates: Array<{ id: string; x: number; y: number; value?: string }>;
+  textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>;
@@ -22,7 +22,7 @@ interface ModalOverlaysProps {
   selectedMusicModalId: string | null;
   selectedMusicModalIds: string[];
   clearAllSelections: () => void;
-  setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; value?: string }>>>;
+  setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>>;
   setSelectedTextInputId: (id: string | null) => void;
   setSelectedTextInputIds: (ids: string[]) => void;
   setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
@@ -61,9 +61,14 @@ interface ModalOverlaysProps {
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
   // Text generator persistence callbacks
-  onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string }) => void | Promise<void>;
+  onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
+  // Connector (node-to-node) persistence
+  connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
+  onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
+  onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
+  onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
 }
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
@@ -118,6 +123,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
+  connections: externalConnections,
+  onConnectionsChange,
+  onPersistConnectorCreate,
+  onPersistConnectorDelete,
 }) => {
   // Helper function to check if a component is in a group
   const isInGroup = (textId?: string, imageModalId?: string, videoModalId?: string, musicModalId?: string): boolean => {
@@ -129,8 +138,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     }
     return false;
   };
-  // Connection state
-  const [connections, setConnections] = useState<Array<{ from: string; to: string; color: string }>>([]);
+  // Connection state (supports controlled or uncontrolled usage)
+  const [localConnections, setLocalConnections] = useState<Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
+  const connections = externalConnections ?? localConnections;
   const [activeDrag, setActiveDrag] = useState<null | { from: string; color: string; startX: number; startY: number; currentX: number; currentY: number }>(null);
 
   // Event listeners for node drag lifecycle
@@ -157,11 +167,42 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
         return;
       }
+
+      // Determine component types for both ends and enforce allowed connections
+      const fromType = getComponentType(activeDrag.from);
+      const toType = getComponentType(id);
+      const allowedMap: Record<string, string[]> = {
+        text: ['image', 'video', 'music'],
+        image: ['video'],
+        video: ['video'],
+        music: ['video'],
+      };
+
+      if (!fromType || !toType || !allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
+        // Not an allowed connection — cancel drag and exit without creating it
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
+        return;
+      }
+
       // Add connection if not duplicate
-      setConnections(prev => {
-        if (prev.find(c => c.from === activeDrag.from && c.to === id)) return prev;
-        return [...prev, { from: activeDrag.from, to: id, color: activeDrag.color }];
-      });
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send');
+      const toCenter = computeNodeCenter(id, 'receive');
+      const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const newConn = { id: connectorId, from: activeDrag.from, to: id, color: activeDrag.color, fromX: fromCenter?.x, fromY: fromCenter?.y, toX: toCenter?.x, toY: toCenter?.y };
+      const exists = connections.find((c: any) => c.from === activeDrag.from && c.to === id);
+      if (!exists) {
+        if (onConnectionsChange) {
+          try { onConnectionsChange([...connections, newConn]); } catch (e) { console.warn('onConnectionsChange failed', e); }
+        } else {
+          setLocalConnections(prev => [...prev, newConn]);
+        }
+
+        // Persist connector via parent handler if provided
+        if (onPersistConnectorCreate) {
+          try { Promise.resolve(onPersistConnectorCreate(newConn)).catch(console.error); } catch (e) { console.error('onPersistConnectorCreate failed', e); }
+        }
+      }
       setActiveDrag(null);
       try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
     };
@@ -189,6 +230,28 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
 
   // Compute line endpoints. Prefer anchoring to the inner frame element (if present),
   // then to the overlay container, falling back to the small node center.
+  // Determine modal/component type for a given overlay/node id. Reads
+  // `data-modal-component` from overlay or nearest ancestor and returns a
+  // lowercase string like 'text' | 'image' | 'video' | 'music'.
+  const getComponentType = (id?: string | null): string | null => {
+    if (!id) return null;
+    const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement | null;
+    if (overlay) {
+      const attr = overlay.getAttribute('data-modal-component') || (overlay.dataset as any).modalComponent;
+      if (attr) return String(attr).toLowerCase();
+    }
+    const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`) as HTMLElement | null;
+    if (frameEl) {
+      const comp = frameEl.closest('[data-modal-component]') as HTMLElement | null;
+      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
+    }
+    const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+    if (nodeEl) {
+      const comp = nodeEl.closest('[data-modal-component]') as HTMLElement | null;
+      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
+    }
+    return null;
+  };
   const computeNodeCenter = (id: string, side: 'send' | 'receive'): { x: number; y: number } | null => {
     if (!id) return null;
     // Prefer frame element (set via data-frame-id on inner frame)
@@ -196,8 +259,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     if (frameEl) {
       const rect = frameEl.getBoundingClientRect();
       const centerY = rect.top + rect.height / 2;
-      if (side === 'send') return { x: rect.right, y: centerY };
-      return { x: rect.left, y: centerY };
+      if (side === 'send') return { x: Math.round(rect.right), y: Math.round(centerY) };
+      return { x: Math.round(rect.left), y: Math.round(centerY) };
     }
 
     // Next prefer the overlay container
@@ -205,15 +268,46 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     if (overlay) {
       const rect = overlay.getBoundingClientRect();
       const centerY = rect.top + rect.height / 2;
-      if (side === 'send') return { x: rect.right, y: centerY };
-      return { x: rect.left, y: centerY };
+      if (side === 'send') return { x: Math.round(rect.right), y: Math.round(centerY) };
+      return { x: Math.round(rect.left), y: Math.round(centerY) };
     }
 
     // Fallback: use the small node element position (circle center)
     const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+    }
+
+    // If DOM elements are not present (or during transforms), try computing from stage transform
+    try {
+      const stage = stageRef?.current as any;
+      if (stage && typeof stage.container === 'function') {
+        const containerRect = stage.container().getBoundingClientRect();
+        // Try to find modal state by id to get its canvas coords and size
+        const findModal = () => {
+          const t = textInputStates.find(t => t.id === id);
+          if (t) return { x: t.x, y: t.y, width: 300, height: 100 };
+          const im = imageModalStates.find(m => m.id === id);
+          if (im) return { x: im.x, y: im.y, width: (im as any).frameWidth || 600, height: (im as any).frameHeight || 400 };
+          const vm = videoModalStates.find(m => m.id === id);
+          if (vm) return { x: vm.x, y: vm.y, width: (vm as any).frameWidth || 600, height: (vm as any).frameHeight || 338 };
+          const mm = musicModalStates.find(m => m.id === id);
+          if (mm) return { x: mm.x, y: mm.y, width: (mm as any).frameWidth || 600, height: (mm as any).frameHeight || 300 };
+          return null;
+        };
+        const modal = findModal();
+        if (modal) {
+          const centerX = Math.round(containerRect.left + position.x + (modal.x * scale) + ((modal.width * scale) / 2));
+          const centerY = Math.round(containerRect.top + position.y + (modal.y * scale) + ((modal.height * scale) / 2));
+          if (side === 'send') return { x: Math.round(centerX + (modal.width * scale) / 2), y: centerY };
+          return { x: Math.round(centerX - (modal.width * scale) / 2), y: centerY };
+        }
+      }
+    } catch (err) {
+      // ignore and fallbacki
+    }
+    return null;
   };
 
   const connectionLines = connections.map(conn => {
@@ -222,6 +316,33 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     if (!fromCenter || !toCenter) return null;
     return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
   }).filter(Boolean) as Array<{ from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
+
+  // Compute bounding rect for a node/modal to place the run icon just outside
+  const computeNodeBounds = (id: string): DOMRect | null => {
+    if (!id) return null;
+    const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`) as HTMLElement | null;
+    if (frameEl) return frameEl.getBoundingClientRect();
+    const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement | null;
+    if (overlay) return overlay.getBoundingClientRect();
+    const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+    if (nodeEl) return nodeEl.getBoundingClientRect();
+    return null;
+  };
+
+  
+
+  // Compute stroke size mapping from canvas scale so lines get thicker when zoomed in
+  const effectiveScale = typeof scale === 'number' && !isNaN(scale) ? scale : 1;
+  const computeStrokeForScale = (base = 2) => {
+    // Multiply base by current scale, clamp to a reasonable range
+    const raw = base * effectiveScale;
+    return Math.max(0.5, Math.min(8, Math.round(raw * 10) / 10));
+  };
+
+  const computeCircleRadiusForScale = (base = 3) => {
+    const raw = base * effectiveScale;
+    return Math.max(1, Math.min(8, Math.round(raw * 10) / 10));
+  };
 
   return (
     <>
@@ -233,26 +354,29 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           <g key={`${line.from}-${line.to}`}>
             <path
               d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
-              stroke={line.color}
-              strokeWidth={3}
+              stroke="#3A8DFF"
+              strokeWidth={computeStrokeForScale(2)}
               fill="none"
               strokeLinecap="round"
-              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+              vectorEffect="non-scaling-stroke"
+              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))' }}
             />
-            <circle cx={line.fromX} cy={line.fromY} r={4} fill={line.color} />
-            <circle cx={line.toX} cy={line.toY} r={4} fill={line.color} />
+            <circle cx={line.fromX} cy={line.fromY} r={computeCircleRadiusForScale(3)} fill="#3A8DFF" vectorEffect="non-scaling-stroke" />
+            <circle cx={line.toX} cy={line.toY} r={computeCircleRadiusForScale(3)} fill="#3A8DFF" vectorEffect="non-scaling-stroke" />
           </g>
         ))}
         {activeDrag && (
           <path
             d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-            stroke={activeDrag.color}
-            strokeWidth={2}
+            stroke="#3A8DFF"
+            strokeWidth={computeStrokeForScale(1.6)}
+            vectorEffect="non-scaling-stroke"
             fill="none"
             strokeDasharray="6 4"
           />
         )}
       </svg>
+      
       {/* Text Input Overlays */}
       {textInputStates.map((textState) => (
         <TextInput
@@ -260,6 +384,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           id={textState.id}
           x={textState.x}
           y={textState.y}
+          autoFocusInput={(textState as any).autoFocusInput}
           isSelected={selectedTextInputId === textState.id || selectedTextInputIds.includes(textState.id)}
           onConfirm={(text) => {
             if (onTextCreate) {
@@ -646,48 +771,34 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           }}
           onMusicSelect={onMusicSelect}
           onGenerate={async (prompt, model, frame, aspectRatio) => {
-            if (onMusicGenerate) {
-              try {
-                const url = await onMusicGenerate(prompt, model, frame, aspectRatio);
-                if (url) {
-                  setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url } : m));
-                  if (onPersistMusicModalMove) {
-                    const frameWidth = 600;
-                    const frameHeight = 300;
-                    Promise.resolve(onPersistMusicModalMove(modalState.id, {
-                      generatedMusicUrl: url,
-                      model,
-                      frame,
-                      aspectRatio,
-                      frameWidth,
-                      frameHeight,
-                      prompt,
-                    } as any)).catch(console.error);
-                  }
+            if (!onMusicGenerate) return null;
+            try {
+              const url = await onMusicGenerate(prompt, model, frame, aspectRatio);
+              if (url) {
+                setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url } : m));
+                if (onPersistMusicModalMove) {
+                  const frameWidth = 600;
+                  const frameHeight = 300;
+                  Promise.resolve(onPersistMusicModalMove(modalState.id, {
+                    generatedMusicUrl: url,
+                    model,
+                    frame,
+                    aspectRatio,
+                    frameWidth,
+                    frameHeight,
+                  })).catch(console.error);
                 }
-              } catch (e) {
-                console.error('Error generating music:', e);
               }
+            } catch (err) {
+              console.error('[ModalOverlays] music generation failed', err);
             }
+            return null;
           }}
           generatedMusicUrl={modalState.generatedMusicUrl}
-          initialModel={(modalState as any).model}
-          initialFrame={(modalState as any).frame}
-          initialAspectRatio={(modalState as any).aspectRatio}
-          initialPrompt={(modalState as any).prompt}
-          onOptionsChange={(opts) => {
-            setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
-            if (onPersistMusicModalMove) {
-              Promise.resolve(onPersistMusicModalMove(modalState.id, opts as any)).catch(console.error);
-            }
-          }}
           onSelect={() => {
-            // Clear all other selections first
             clearAllSelections();
-            // Then set this modal as selected
             setSelectedMusicModalId(modalState.id);
             setSelectedMusicModalIds([modalState.id]);
-            // Context menu removed - icons are now shown at top-right corner of modal
           }}
           onDelete={() => {
             setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
@@ -696,40 +807,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
               Promise.resolve(onPersistMusicModalDelete(modalState.id)).catch(console.error);
             }
           }}
-          onDownload={async () => {
-            // Download the generated music if available
-            if (modalState.generatedMusicUrl) {
-              try {
-                // Fetch the music to handle CORS issues
-                const response = await fetch(modalState.generatedMusicUrl);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `generated-music-${modalState.id}-${Date.now()}.mp3`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-              } catch (error) {
-                console.error('Failed to download music:', error);
-                // Fallback: try direct download
-                const link = document.createElement('a');
-                link.href = modalState.generatedMusicUrl!;
-                link.download = `generated-music-${modalState.id}-${Date.now()}.mp3`;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
-            }
-          }}
           onDuplicate={() => {
-            // Create a duplicate of the music modal to the right
             const duplicated = {
               id: `music-modal-${Date.now()}`,
-              x: modalState.x + 600 + 50, // 600px width + 50px spacing
-              y: modalState.y, // Same Y position
+              x: modalState.x + 600 + 50,
+              y: modalState.y,
               generatedMusicUrl: modalState.generatedMusicUrl,
             };
             setMusicModalStates(prev => [...prev, duplicated]);
@@ -741,9 +823,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           x={modalState.x}
           y={modalState.y}
           onPositionChange={isInGroup(undefined, undefined, undefined, modalState.id) ? undefined : (newX, newY) => {
-            setMusicModalStates(prev => prev.map(m => 
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
+            setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
           }}
           onPositionCommit={isInGroup(undefined, undefined, undefined, modalState.id) ? undefined : (finalX, finalY) => {
             if (onPersistMusicModalMove) {

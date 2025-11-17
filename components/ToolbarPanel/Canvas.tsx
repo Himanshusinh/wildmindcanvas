@@ -13,8 +13,6 @@ import { ModalOverlays } from './ModalOverlays';
 import { SelectionBox } from './SelectionBox';
 import { MediaActionIcons } from './MediaActionIcons';
 import { GroupLabel } from './GroupLabel';
-import AvatarButton from './AvatarButton';
-import ProfilePopup from './ProfilePopup';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -178,7 +176,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
   const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
@@ -3319,20 +3316,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           (contextMenuModalType === 'music' && musicModalStates.find(m => m.id === contextMenuModalId)?.generatedMusicUrl)
         ))}
       />
-
-      {/* Avatar button (opens profile popup) */}
-      <AvatarButton
-        scale={scale}
-        onClick={() => {
-          setIsProfileOpen(true);
-        }}
-      />
-      <ProfilePopup
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        scale={scale}
-      />
-
       {/* Group Name Modal */}
       <GroupNameModal
         isOpen={isGroupNameModalOpen}

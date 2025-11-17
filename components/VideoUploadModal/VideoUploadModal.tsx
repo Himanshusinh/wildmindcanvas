@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import '../common/canvasCaptureGuard';
 import FrameSpinner from '../common/FrameSpinner';
 
 interface VideoUploadModalProps {
@@ -90,6 +91,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
+  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
 
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
@@ -398,15 +400,18 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: `${16 * scale}px`,
-          border: isSelected ? `${4 * scale}px solid #60B8FF` : `${2 * scale}px solid #3A8DFF`,
-          transition: 'border 0.3s ease, box-shadow 0.3s ease',
-          boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
+          borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+          borderTop: `${2 * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
+          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
+          borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
+          transition: 'border 0.18s ease, box-shadow 0.3s ease',
+          boxShadow: isHovered ? 'none' : `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: isDraggingContainer ? 'grabbing' : 'grab',
-          overflow: 'hidden',
+          overflow: 'visible',
           position: 'relative',
           zIndex: 2,
         }}
@@ -420,7 +425,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                borderRadius: `${16 * scale}px`,
+                borderRadius: isHovered ? '0px' : `${16 * scale}px`,
               }}
               onEnded={() => {
                 setIsPlaying(false);
@@ -513,26 +518,33 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           <div
             data-node-id={id}
             data-node-side="receive"
-            onMouseUp={(e) => {
+            onPointerUp={(e) => {
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
               window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id, side: 'receive' } }));
+              try {
+                const active: any = (window as any).__canvas_active_capture;
+                if (active?.element && typeof active?.pid === 'number') {
+                  try { active.element.releasePointerCapture(active.pid); } catch (err) {}
+                  delete (window as any).__canvas_active_capture;
+                }
+              } catch (err) {}
             }}
             style={{
               position: 'absolute',
               left: `${-12 * scale}px`,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: `${18 * scale}px`,
-              height: `${18 * scale}px`,
+              width: `${20 * scale}px`,
+              height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: isSelected ? '#60B8FF' : '#3A8DFF',
+              backgroundColor: '#60B8FF',
               boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
               cursor: 'pointer',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
-              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
               transition: 'opacity 0.18s ease',
               pointerEvents: 'auto',
             }}
@@ -543,11 +555,28 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             data-node-side="send"
             onPointerDown={(e: React.PointerEvent) => {
               const el = e.currentTarget as HTMLElement;
-              try { el.setPointerCapture?.(e.pointerId); } catch (err) {}
+              const pid = e.pointerId;
+              try { el.setPointerCapture?.(pid); } catch (err) {}
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
-              const color = isSelected ? '#60B8FF' : '#3A8DFF';
+              const color = '#3A8DFF';
+
+              const handlePointerUp = (pe: any) => {
+                try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
+                window.removeEventListener('canvas-node-complete', handleComplete as any);
+                window.removeEventListener('pointerup', handlePointerUp as any);
+              };
+
+              const handleComplete = () => {
+                try { el.releasePointerCapture?.(pid); } catch (err) {}
+                window.removeEventListener('canvas-node-complete', handleComplete as any);
+                window.removeEventListener('pointerup', handlePointerUp as any);
+              };
+
+              window.addEventListener('canvas-node-complete', handleComplete as any);
+              window.addEventListener('pointerup', handlePointerUp as any);
+
               window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
             }}
             style={{
@@ -558,12 +587,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               width: `${18 * scale}px`,
               height: `${18 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: isSelected ? '#60B8FF' : '#3A8DFF',
+              backgroundColor: '#60B8FF',
               boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
               cursor: 'grab',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
-              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
               transition: 'opacity 0.18s ease, transform 0.12s ease',
               pointerEvents: 'auto',
             }}
@@ -582,11 +611,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           width: `${600 * scale}px`,
           maxWidth: '90vw',
           padding: `${16 * scale}px`,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: '#ffffff',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: 'none',
-          borderTop: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
           transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
@@ -597,7 +624,10 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           gap: `${12 * scale}px`,
           pointerEvents: isHovered ? 'auto' : 'none',
           overflow: 'hidden',
-          zIndex: 1,
+          zIndex: 3,
+          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
+          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${2 * scale}px solid ${frameBorderColor}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -623,7 +653,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             style={{
               flex: 1,
               padding: `${10 * scale}px ${14 * scale}px`,
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backgroundColor: '#ffffff',
               border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
               borderRadius: `${10 * scale}px`,
               fontSize: `${13 * scale}px`,
@@ -702,9 +732,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 onOptionsChange?.({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
               }}
               style={{
-                width: '100%',
-                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  width: '100%',
+                  padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                  backgroundColor: '#ffffff',
                 border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
                 borderRadius: `${10 * scale}px`,
                 fontSize: `${12 * scale}px`,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import '../common/canvasCaptureGuard';
 import FrameSpinner from '../common/FrameSpinner';
 
 interface ImageUploadModalProps {
@@ -27,7 +28,8 @@ interface ImageUploadModalProps {
   initialFrame?: string;
   initialAspectRatio?: string;
   initialPrompt?: string;
-  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
+  initialCount?: number;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -54,6 +56,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   initialFrame,
   initialAspectRatio,
   initialPrompt,
+  initialCount,
   onOptionsChange,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
@@ -68,6 +71,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [imageCount, setImageCount] = useState<number>(initialCount ?? 1);
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -78,6 +82,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
+  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
 
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
@@ -97,6 +102,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   useEffect(() => {
     if (typeof initialPrompt === 'string' && initialPrompt !== prompt) setPrompt(initialPrompt);
   }, [initialPrompt]);
+
+  useEffect(() => {
+    if (typeof initialCount === 'number' && initialCount !== imageCount) setImageCount(initialCount);
+  }, [initialCount]);
 
   // Listen for global node-drag active state so nodes remain visible while dragging
   useEffect(() => {
@@ -439,17 +448,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: `${16 * scale}px`,
-          border: isSelected ? `${4 * scale}px solid #FF77A9` : `${2 * scale}px solid #FF4D8D`,
+          borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+          // keep top/left/right borders, but remove bottom border when controls are hovered
+          borderTop: `${2 * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
+          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
+          borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
           boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: isDraggingContainer ? 'grabbing' : 'grab',
-          overflow: 'hidden',
+          overflow: 'visible',
           position: 'relative',
           zIndex: 1,
-          transition: 'border 0.3s ease, box-shadow 0.3s ease',
+          transition: 'border 0.18s ease, box-shadow 0.3s ease',
         }}
       >
         {generatedImageUrl ? (
@@ -461,7 +474,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               height: '100%',
               objectFit: 'cover',
               pointerEvents: 'none',
-              borderRadius: `${16 * scale}px`,
+              borderRadius: isHovered ? '0px' : `${16 * scale}px`,
             }}
             draggable={false}
           />
@@ -494,26 +507,33 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           <div
             data-node-id={id}
             data-node-side="receive"
-            onMouseUp={(e) => {
+            onPointerUp={(e) => {
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
               window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id, side: 'receive' } }));
+              try {
+                const active: any = (window as any).__canvas_active_capture;
+                if (active?.element && typeof active?.pid === 'number') {
+                  try { active.element.releasePointerCapture(active.pid); } catch (err) {}
+                  delete (window as any).__canvas_active_capture;
+                }
+              } catch (err) {}
             }}
             style={{
               position: 'absolute',
               left: `${-12 * scale}px`,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: `${18 * scale}px`,
-              height: `${18 * scale}px`,
+              width: `${20 * scale}px`,
+              height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: isSelected ? '#FF77A9' : '#FF4D8D',
+              backgroundColor: '#60B8FF',
               boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
               cursor: 'pointer',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
-              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
               transition: 'opacity 0.18s ease, transform 0.12s ease',
               pointerEvents: 'auto',
             }}
@@ -524,11 +544,32 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             data-node-side="send"
             onPointerDown={(e: React.PointerEvent) => {
               const el = e.currentTarget as HTMLElement;
-              try { el.setPointerCapture?.(e.pointerId); } catch (err) {}
+              const pid = e.pointerId;
+              try { el.setPointerCapture?.(pid); } catch (err) {}
+              // store active capture so receiver can release if needed
+              try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) {}
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
-              const color = isSelected ? '#FF77A9' : '#FF4D8D';
+              const color = '#3A8DFF';
+
+              const handlePointerUp = (pe: any) => {
+                try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
+                try { delete (window as any).__canvas_active_capture; } catch (err) {}
+                window.removeEventListener('canvas-node-complete', handleComplete as any);
+                window.removeEventListener('pointerup', handlePointerUp as any);
+              };
+
+              const handleComplete = () => {
+                try { el.releasePointerCapture?.(pid); } catch (err) {}
+                try { delete (window as any).__canvas_active_capture; } catch (err) {}
+                window.removeEventListener('canvas-node-complete', handleComplete as any);
+                window.removeEventListener('pointerup', handlePointerUp as any);
+              };
+
+              window.addEventListener('canvas-node-complete', handleComplete as any);
+              window.addEventListener('pointerup', handlePointerUp as any);
+
               window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
             }}
             style={{
@@ -536,15 +577,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               right: `${-12 * scale}px`,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: `${18 * scale}px`,
-              height: `${18 * scale}px`,
+              width: `${20 * scale}px`,
+              height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: isSelected ? '#FF77A9' : '#FF4D8D',
+              backgroundColor: '#60B8FF',
               boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
               cursor: 'grab',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
-              zIndex: 5000,
-              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0.14,
+              zIndex: 10,
+              opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
               transition: 'opacity 0.18s ease',
               pointerEvents: 'auto',
             }}
@@ -566,7 +607,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: 'none',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
           transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
@@ -576,8 +616,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           flexDirection: 'column',
           gap: `${12 * scale}px`,
           pointerEvents: isHovered ? 'auto' : 'none',
-          overflow: 'hidden',
+          overflow: 'visible',
           zIndex: 1,
+          // Add left, right and bottom borders to match the frame border color/weight
+          borderLeft: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
+          borderRight: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
+          borderBottom: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -592,7 +636,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const val = e.target.value;
                 setPrompt(val);
                 if (onOptionsChange) {
-                  onOptionsChange({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame });
+                  onOptionsChange({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, imageCount } as any);
                 }
               }}
               onKeyDown={(e) => {
@@ -605,19 +649,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               style={{
                 flex: 1,
                 padding: `${10 * scale}px ${14 * scale}px`,
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
+                backgroundColor: '#ffffff',
+                border: 'none',
                 borderRadius: `${10 * scale}px`,
                 fontSize: `${13 * scale}px`,
                 color: '#1f2937',
                 outline: 'none',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+                e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+                e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.border = 'none';
                 e.currentTarget.style.boxShadow = 'none';
               }}
               onMouseDown={(e) => e.stopPropagation()}
@@ -662,7 +706,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 </svg>
               ) : (
                 <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3" />
+                  <path d="M6 12h9" />
+                  <path d="M13 6l6 6-6 6" />
                 </svg>
               )}
             </button>
@@ -671,16 +716,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           {/* Settings Row */}
           <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Model Selector */}
-            <div style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px` }}>
+            <div style={{ position: 'relative', flex: '0 0 auto', width: `${220 * scale}px`, minWidth: `${120 * scale}px`, overflow: 'visible', zIndex: 3002 }}>
               <select
                 value={selectedModel}
                 style={{
-                  width: '100%',
-                  padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
-                  borderRadius: `${10 * scale}px`,
-                  fontSize: `${12 * scale}px`,
+                    width: '100%',
+                    padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                    backgroundColor: '#ffffff',
+                  zIndex: 3002,
+                  border: `1px solid ${frameBorderColor}`,
+                  borderRadius: `${9999 * scale}px`,
+                  fontSize: `${13 * scale}px`,
                   fontWeight: '500',
                   color: '#1f2937',
                   outline: 'none',
@@ -691,15 +737,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   backgroundPosition: `right ${12 * scale}px center`,
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+                  e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                onChange={(e) => {
+                  onChange={(e) => {
                   const newModel = e.target.value;
                   setSelectedModel(newModel);
                   // Reset to default aspect ratio when model changes if current ratio is not supported
@@ -742,7 +788,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     const ar = w && h ? (w / h) : 1;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
-                    onOptionsChange({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                    onOptionsChange({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
                   }
                 }}
               >
@@ -772,8 +818,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               </select>
             </div>
 
+            
+
             {/* Aspect Ratio Selector */}
-            <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', overflow: 'visible', zIndex: 3002 }}>
               <select
                 value={selectedAspectRatio}
                 onChange={(e) => {
@@ -785,17 +833,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     const ar = w && h ? (w / h) : 1;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
-                    onOptionsChange({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                    onOptionsChange({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
                   }
                 }}
                 style={{
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  border: `${1 * scale}px solid rgba(59, 130, 246, 0.2)`,
-                  borderRadius: `${10 * scale}px`,
-                  fontSize: `${12 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  zIndex: 3002,
+                  border: `1px solid ${frameBorderColor}`,
+                  borderRadius: `${9999 * scale}px`,
+                  fontSize: `${13 * scale}px`,
                   fontWeight: '600',
-                  color: '#3b82f6',
+                  color: '#1f2937',
                   minWidth: `${70 * scale}px`,
                   outline: 'none',
                   cursor: 'pointer',
@@ -805,11 +854,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   backgroundPosition: `right ${10 * scale}px center`,
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                  e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+                  e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
                   e.currentTarget.style.boxShadow = 'none';
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -821,6 +870,46 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 ))}
               </select>
             </div>
+              {/* Image count +/- control (1..4) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: `${8 * scale}px` }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); const next = Math.max(1, imageCount - 1); setImageCount(next); if (onOptionsChange) onOptionsChange({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount: next } as any); }}
+                  disabled={imageCount <= 1}
+                  title="Decrease images"
+                  style={{
+                    width: `${32 * scale}px`,
+                    height: `${32 * scale}px`,
+                    borderRadius: `${9999 * scale}px`,
+                    border: `1px solid rgba(0,0,0,0.08)`,
+                    backgroundColor: '#ffffff',
+                    cursor: imageCount <= 1 ? 'not-allowed' : 'pointer',
+                    fontSize: `${13 * scale}px`,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                  }}
+                >
+                  -
+                </button>
+                <div style={{ minWidth: `${28 * scale}px`, textAlign: 'center', fontWeight: 600, fontSize: `${13 * scale}px`, color: '#1f2937' }}>{imageCount}</div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); const next = Math.min(4, imageCount + 1); setImageCount(next); if (onOptionsChange) onOptionsChange({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount: next } as any); }}
+                  disabled={imageCount >= 4}
+                  title="Increase images"
+                  style={{
+                    width: `${32 * scale}px`,
+                    height: `${32 * scale}px`,
+                    borderRadius: `${9999 * scale}px`,
+                    border: `1px solid rgba(0,0,0,0.08)`,
+                    backgroundColor: '#ffffff',
+                    cursor: imageCount >= 4 ? 'not-allowed' : 'pointer',
+                    fontSize: `${13 * scale}px`,
+                    fontWeight: 600,
+                    lineHeight: 1,
+                  }}
+                >
+                  +
+                </button>
+              </div>
           </div>
           {/* Commit Row (shows after generation) */}
           {generatedImageUrl && onAddToCanvas && (

@@ -5,14 +5,16 @@ import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 
 interface GroupLabelProps {
-  group: { id: string; name?: string; itemIndices: number[] };
+  group: { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] };
   images: ImageUpload[];
   handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
+  onGroupMove?: (groupId: string, deltaX: number, deltaY: number) => void;
 }
 
-export const GroupLabel: React.FC<GroupLabelProps> = ({ group, images, handleImageUpdateWithGroup }) => {
-  // Compute group bounding box from image indices
+export const GroupLabel: React.FC<GroupLabelProps> = ({ group, images, handleImageUpdateWithGroup, onGroupMove }) => {
+  // Compute group bounding box from image indices and other members
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
   group.itemIndices.forEach(idx => {
     const it = images[idx];
     if (!it) return;
@@ -25,16 +27,23 @@ export const GroupLabel: React.FC<GroupLabelProps> = ({ group, images, handleIma
     maxX = Math.max(maxX, ix + iw);
     maxY = Math.max(maxY, iy + ih);
   });
-  
+
+  if (group.imageModalIds) {
+    group.imageModalIds.forEach(() => {
+      // modals are approximately 600x400
+      // we cannot compute exact positions here without parent state; assume they are within images bounds
+    });
+  }
+
   if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
     return null;
   }
-  
+
   const labelX = minX - 6;
   const labelY = Math.min(minY - 28, minY - 6);
   const name = group.name || 'Group';
   const labelWidth = Math.max(60, name.length * 8 + 20);
-  
+
   return (
     <Group
       key={group.id}
@@ -47,6 +56,7 @@ export const GroupLabel: React.FC<GroupLabelProps> = ({ group, images, handleIma
         const newY = node.y();
         const deltaX = newX - labelX;
         const deltaY = newY - labelY;
+
         // Move all items in the group
         group.itemIndices.forEach(idx => {
           const it = images[idx];
@@ -55,7 +65,13 @@ export const GroupLabel: React.FC<GroupLabelProps> = ({ group, images, handleIma
           const oy = it.y || 0;
           handleImageUpdateWithGroup(idx, { x: ox + deltaX, y: oy + deltaY });
         });
-        // Reset visual position back (items have moved)
+
+        // Notify parent to persist a single grouped move operation
+        if (onGroupMove) {
+          try { onGroupMove(group.id, deltaX, deltaY); } catch (e) { /* ignore */ }
+        }
+
+        // Reset visual label position (items moved instead)
         node.position({ x: labelX, y: labelY });
       }}
     >

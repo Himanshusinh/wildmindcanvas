@@ -10,13 +10,32 @@ interface ToolbarPanelProps {
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload }) => {
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
 
   const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => {
-    // Always update state and call callback, even if tool is already selected
-    // This allows clicking the same tool again to trigger actions (like creating new text input)
-    setSelectedTool(tool);
+    // Debounce guard: ignore repeated clicks on same tool within 400ms
+    const now = Date.now();
+    if (lastToolClick.current.tool === tool && now - lastToolClick.current.time < 400) {
+      return;
+    }
+    lastToolClick.current = { tool, time: now };
+
+    // Only 'cursor' and 'move' are persistent selected tools. Other tools (text/image/video/music)
+    // act on single-click and should not remain visually selected.
+    const persistent = tool === 'cursor' || tool === 'move';
+    if (persistent) {
+      // Update selected state so the button shows as active
+      setSelectedTool(tool);
+    }
+    // Always invoke the callback so parent can open modals or handle the action
     if (onToolSelect) {
       onToolSelect(tool);
+      // If this is a non-persistent tool, immediately revert selection back to cursor
+      // so the UI (and stage cursor/drag behavior) continues behaving like the select tool.
+      if (!persistent) {
+        // Use a microtask so parent can handle the initial tool action (open modal, etc.)
+        setTimeout(() => onToolSelect('cursor'), 0);
+      }
     }
   };
 
@@ -159,17 +178,21 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
                 : 'none',
             }}
             onMouseEnter={(e) => {
+              // Force pointer cursor when hovering toolbar icons to avoid
+              // global stage cursors (grab) leaking through.
+              try { document.body.style.cursor = 'pointer'; } catch (err) {}
               if (selectedTool !== tool.id) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)';
                 e.currentTarget.style.color = '#1f2937';
-                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
               }
             }}
             onMouseLeave={(e) => {
+              try { document.body.style.cursor = ''; } catch (err) {}
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.color = '#4b5563';
-                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
               }
             }}
           >
@@ -205,11 +228,13 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.2s ease',
           }}
           onMouseEnter={(e) => {
+            try { document.body.style.cursor = 'pointer'; } catch (err) {}
             e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
             e.currentTarget.style.color = '#22c55e';
             e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
+            try { document.body.style.cursor = ''; } catch (err) {}
             e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             e.currentTarget.style.color = '#4b5563';
             e.currentTarget.style.transform = 'scale(1)';
