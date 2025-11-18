@@ -25,7 +25,7 @@ export interface CanvasProject {
 }
 
 export interface CanvasOp {
-  type: 'create' | 'update' | 'delete' | 'move' | 'resize' | 'select' | 'connect' | 'group' | 'ungroup';
+  type: 'create' | 'update' | 'delete' | 'move' | 'resize' | 'select' | 'connect';
   elementId?: string;
   elementIds?: string[];
   data: Record<string, any>;

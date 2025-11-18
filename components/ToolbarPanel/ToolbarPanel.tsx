@@ -5,9 +5,10 @@ import { useState, useRef } from 'react';
 interface ToolbarPanelProps {
   onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => void;
   onUpload?: (files: File[]) => void;
+  isHidden?: boolean;
 }
 
-export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload }) => {
+export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
@@ -140,18 +141,19 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           position: 'fixed',
           left: '20px',
           top: '50%',
-          transform: 'translateY(-50%)',
+          transform: isHidden ? 'translate(-100%, -50%)' : 'translateY(-50%)',
           zIndex: 10001,
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
           padding: '12px 8px',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: '#ffffff',
           borderRadius: '16px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+          opacity: isHidden ? 0 : 1,
+          pointerEvents: isHidden ? 'none' : 'auto',
+          transition: 'opacity 0.3s ease, transform 0.3s ease',
         }}
       >
         {tools.map((tool) => (

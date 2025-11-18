@@ -44,12 +44,15 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [isModelHovered, setIsModelHovered] = useState(false);
   const [isTextFocused, setIsTextFocused] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Only autofocus the inner textarea when allowed. Default is to autofocus
@@ -72,10 +75,27 @@ export const TextInput: React.FC<TextInputProps> = ({
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+
+    if (isModelDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isModelDropdownOpen]);
+
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
+  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderWidth = 2;
+  const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
+  const controlFontSize = `${13 * scale}px`;
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -170,13 +190,13 @@ export const TextInput: React.FC<TextInputProps> = ({
         backgroundColor: (isHovered || isModelHovered) ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: isHovered ? '0px' : `${12 * scale}px`,
-        borderTop: `${2 * scale}px solid ${frameBorderColor}`,
-        borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-        borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-        borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
-        transition: 'border 0.3s ease, box-shadow 0.3s ease',
-        boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(31, 38, 135, 0.37)`,
+        borderRadius: (isHovered || isPinned) ? '0px' : `${12 * scale}px`,
+        borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        transition: 'border 0.3s ease',
+        boxShadow: 'none',
         minWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
@@ -361,8 +381,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             width: `${18 * scale}px`,
             height: `${18 * scale}px`,
             borderRadius: '50%',
-            backgroundColor: '#60B8FF',
-            boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+            backgroundColor: '#437eb5',
             cursor: 'pointer',
             border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
             zIndex: 5000,
@@ -383,7 +402,7 @@ export const TextInput: React.FC<TextInputProps> = ({
               try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) {}
               e.stopPropagation();
               e.preventDefault();
-              const color = '#3A8DFF';
+              const color = '#437eb5';
 
               const handlePointerUp = (pe: any) => {
                 try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
@@ -412,8 +431,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             width: `${18 * scale}px`,
             height: `${18 * scale}px`,
             borderRadius: '50%',
-            backgroundColor: '#60B8FF',
-            boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+            backgroundColor: '#437eb5',
             cursor: 'grab',
             border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
             zIndex: 5000,
@@ -423,6 +441,56 @@ export const TextInput: React.FC<TextInputProps> = ({
           }}
         />
       </>
+      {/* Pin Icon Button - Bottom Right */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsPinned(!isPinned);
+        }}
+        style={{
+          position: 'absolute',
+          bottom: `${8 * scale}px`,
+          right: `${8 * scale}px`,
+          width: `${28 * scale}px`,
+          height: `${28 * scale}px`,
+          borderRadius: `${6 * scale}px`,
+          backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+          border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 20,
+          opacity: isHovered ? 1 : 0,
+          transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+          pointerEvents: 'auto',
+          boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+        }}
+        onMouseEnter={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+          }
+        }}
+        title={isPinned ? 'Unpin controls' : 'Pin controls'}
+      >
+        <svg
+          width={16 * scale}
+          height={16 * scale}
+          viewBox="0 0 24 24"
+          fill={isPinned ? '#437eb5' : 'none'}
+          stroke={isPinned ? '#437eb5' : '#4b5563'}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+        </svg>
+      </button>
       <textarea
         ref={inputRef}
         value={text}
@@ -439,7 +507,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         style={{
           background: (isHovered || isModelHovered) ? '#ffffff' : 'rgba(255, 255, 255, 0.2)',
           border: (isHovered || isModelHovered) ? `${1 * scale}px solid rgba(0,0,0,0.06)` : `${1 * scale}px solid rgba(255, 255, 255, 0.3)`,
-          borderRadius: isHovered ? '0px' : `${8 * scale}px`,
+          borderRadius: (isHovered || isPinned) ? '0px' : `${8 * scale}px`,
           padding: `${10 * scale}px`,
           color: '#1f2937',
           fontSize: `${16 * scale}px`,
@@ -519,59 +587,112 @@ export const TextInput: React.FC<TextInputProps> = ({
           borderTop: 'none',
           borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
           boxShadow: 'none',
-          transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
           opacity: isHovered ? 1 : 0,
-          maxHeight: isHovered ? '200px' : '0px',
+          maxHeight: (isHovered || isPinned) ? '200px' : '0px',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
-          pointerEvents: isHovered ? 'auto' : 'none',
-          overflow: 'hidden',
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+          overflow: 'visible',
           zIndex: 1,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: `${2 * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Model Selector */}
-        <div style={{ position: 'relative', width: '100%' }} onMouseEnter={() => setIsModelHovered(true)} onMouseLeave={() => setIsModelHovered(false)}>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
+        {/* Model Selector - Custom Dropdown */}
+        <div ref={modelDropdownRef} style={{ position: 'relative', width: '100%', overflow: 'visible', zIndex: 3002 }} onMouseEnter={() => setIsModelHovered(true)} onMouseLeave={() => setIsModelHovered(false)}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsModelDropdownOpen(!isModelDropdownOpen);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{
               width: '100%',
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
               backgroundColor: '#ffffff',
-              border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
-              borderRadius: `${10 * scale}px`,
-              fontSize: `${12 * scale}px`,
+              border: `1px solid ${dropdownBorderColor}`,
+              borderRadius: `${9999 * scale}px`,
+              fontSize: controlFontSize,
               fontWeight: '500',
               color: '#1f2937',
               outline: 'none',
               cursor: 'pointer',
-              appearance: 'none',
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: `right ${12 * scale}px center`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              textAlign: 'left',
             }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#3b82f6';
-              e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
           >
-            <option value="GPT-4">GPT-4</option>
-            <option value="GPT-3.5">GPT-3.5</option>
-            <option value="Claude 3">Claude 3</option>
-            <option value="Gemini Pro">Gemini Pro</option>
-            <option value="Llama 2">Llama 2</option>
-          </select>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+            <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+              <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          
+          {isModelDropdownOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: `${4 * scale}px`,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${12 * scale}px`,
+                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                maxHeight: `${200 * scale}px`,
+                overflowY: 'auto',
+                zIndex: 3003,
+                padding: `${4 * scale}px 0`,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {['GPT-4', 'GPT-3.5', 'Claude 3', 'Gemini Pro', 'Llama 2'].map((model) => (
+                <div
+                  key={model}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedModel(model);
+                    setIsModelDropdownOpen(false);
+                  }}
+                  style={{
+                    padding: `${8 * scale}px ${16 * scale}px`,
+                    fontSize: controlFontSize,
+                    color: '#1f2937',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {selectedModel === model && (
+                    <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  <span>{model}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

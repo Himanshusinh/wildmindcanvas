@@ -61,6 +61,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -75,6 +76,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '16:9');
   const [selectedDuration, setSelectedDuration] = useState<number>(initialDuration ?? 3);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
+  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
+  const durationDropdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (wasJustPlayed) {
       const t = setTimeout(() => setWasJustPlayed(false), 400);
@@ -91,7 +98,10 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
+  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderWidth = 2;
+  const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
+  const controlFontSize = `${13 * scale}px`;
 
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
@@ -123,6 +133,26 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+      if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(event.target as Node)) {
+        setIsAspectRatioDropdownOpen(false);
+      }
+      if (durationDropdownRef.current && !durationDropdownRef.current.contains(event.target as Node)) {
+        setIsDurationDropdownOpen(false);
+      }
+    };
+
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isDurationDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isDurationDropdownOpen]);
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -400,13 +430,13 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: isHovered ? '0px' : `${16 * scale}px`,
-          borderTop: `${2 * scale}px solid ${frameBorderColor}`,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
-          transition: 'border 0.18s ease, box-shadow 0.3s ease',
-          boxShadow: isHovered ? 'none' : `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
+          borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
+          borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          transition: 'border 0.18s ease',
+          boxShadow: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -425,7 +455,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+                borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
               }}
               onEnded={() => {
                 setIsPlaying(false);
@@ -539,8 +569,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               width: `${20 * scale}px`,
               height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: '#60B8FF',
-              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              backgroundColor: '#437eb5',
               cursor: 'pointer',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
@@ -560,7 +589,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
-              const color = '#3A8DFF';
+              const color = '#437eb5';
 
               const handlePointerUp = (pe: any) => {
                 try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
@@ -587,8 +616,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               width: `${18 * scale}px`,
               height: `${18 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: '#60B8FF',
-              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              backgroundColor: '#437eb5',
               cursor: 'grab',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
@@ -598,6 +626,56 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             }}
           />
         </>
+        {/* Pin Icon Button - Bottom Right */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+            border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isPinned ? '#437eb5' : '#4b5563'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
         {/* Delete button removed - now handled by context menu in header */}
       </div>
 
@@ -616,18 +694,18 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
-          transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
-          opacity: isHovered ? 1 : 0,
-          maxHeight: isHovered ? '500px' : '0px',
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+          opacity: (isHovered || isPinned) ? 1 : 0,
+          maxHeight: (isHovered || isPinned) ? '500px' : '0px',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
-          pointerEvents: isHovered ? 'auto' : 'none',
-          overflow: 'hidden',
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+          overflow: 'visible',
           zIndex: 3,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: `${2 * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -654,18 +732,18 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               flex: 1,
               padding: `${10 * scale}px ${14 * scale}px`,
               backgroundColor: '#ffffff',
-              border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
+              border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${10 * scale}px`,
-              fontSize: `${13 * scale}px`,
+              fontSize: controlFontSize,
               color: '#1f2937',
               outline: 'none',
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#3b82f6';
-              e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+              e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+              e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.border = `1px solid ${dropdownBorderColor}`;
               e.currentTarget.style.boxShadow = 'none';
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -679,23 +757,23 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: (prompt.trim() && !isGenerating) ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
               border: 'none',
               borderRadius: `${10 * scale}px`,
               cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
               color: 'white',
-              boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
+              boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
               padding: 0,
               opacity: isGenerating ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
               if (prompt.trim() && !isGenerating) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (prompt.trim() && !isGenerating) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -709,7 +787,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               </svg>
             ) : (
               <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <path d="M6 12h9" />
+                <path d="M13 6l6 6-6 6" />
               </svg>
             )}
           </button>
@@ -717,106 +796,264 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
         {/* Settings Row */}
         <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Model Selector */}
-          <div style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px` }}>
-            <select
-              value={selectedModel}
-              onChange={(e) => {
-                const newModel = e.target.value;
-                setSelectedModel(newModel);
+          {/* Model Selector - Custom Dropdown */}
+          <div ref={modelDropdownRef} style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px`, overflow: 'visible', zIndex: 3002 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsModelDropdownOpen(!isModelDropdownOpen);
+                setIsAspectRatioDropdownOpen(false);
+                setIsDurationDropdownOpen(false);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
+                fontWeight: '500',
+                color: '#1f2937',
+                outline: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isModelDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {['Seedance 1.0 Pro', 'Seedance 1.0 Lite'].map((model) => (
+                  <div
+                    key={model}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedModel(model);
+                      setIsModelDropdownOpen(false);
                 const [w, h] = selectedAspectRatio.split(':').map(Number);
                 const frameWidth = 600;
                 const ar = w && h ? (w / h) : 16/9;
                 const rawHeight = Math.round(frameWidth / ar);
                 const frameHeight = Math.max(400, rawHeight);
-                onOptionsChange?.({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
+                      onOptionsChange?.({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
               }}
               style={{
-                  width: '100%',
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedModel === model && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{model}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Aspect Ratio Selector - Custom Dropdown */}
+          <div ref={aspectRatioDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAspectRatioDropdownOpen(!isAspectRatioDropdownOpen);
+                setIsModelDropdownOpen(false);
+                setIsDurationDropdownOpen(false);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                   backgroundColor: '#ffffff',
-                border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
-                borderRadius: `${10 * scale}px`,
-                fontSize: `${12 * scale}px`,
-                fontWeight: '500',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
+                fontWeight: '600',
                 color: '#1f2937',
+                minWidth: `${70 * scale}px`,
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: `right ${12 * scale}px center`,
-                }}
-                onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.boxShadow = 'none';
+            >
+              <span>{selectedAspectRatio}</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isAspectRatioDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                  minWidth: `${100 * scale}px`,
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <option value="Seedance 1.0 Pro">Seedance 1.0 Pro</option>
-              <option value="Seedance 1.0 Lite">Seedance 1.0 Lite</option>
-            </select>
-          </div>
-
-          {/* Aspect Ratio Selector */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={selectedAspectRatio}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedAspectRatio(val);
-                const [w, h] = val.split(':').map(Number);
+                {['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'].map((ratio) => (
+                  <div
+                    key={ratio}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAspectRatio(ratio);
+                      setIsAspectRatioDropdownOpen(false);
+                      const [w, h] = ratio.split(':').map(Number);
                 const frameWidth = 600;
                 const ar = w && h ? (w / h) : 16/9;
                 const rawHeight = Math.round(frameWidth / ar);
                 const frameHeight = Math.max(400, rawHeight);
-                onOptionsChange?.({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
+                      onOptionsChange?.({ model: selectedModel, aspectRatio: ratio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
+                    }}
+                    style={{
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedAspectRatio === ratio ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedAspectRatio === ratio ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedAspectRatio !== ratio) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedAspectRatio !== ratio) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedAspectRatio === ratio && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{ratio}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Duration Selector - Custom Dropdown */}
+          <div ref={durationDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsDurationDropdownOpen(!isDurationDropdownOpen);
+                setIsModelDropdownOpen(false);
+                setIsAspectRatioDropdownOpen(false);
               }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                border: `${1 * scale}px solid rgba(59, 130, 246, 0.2)`,
-                borderRadius: `${10 * scale}px`,
-                fontSize: `${12 * scale}px`,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
                 fontWeight: '600',
-                color: '#3b82f6',
+                color: '#1f2937',
                 minWidth: `${70 * scale}px`,
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: `right ${10 * scale}px center`,
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
-                e.currentTarget.style.boxShadow = 'none';
+            >
+              <span>{selectedDuration}s</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isDurationDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isDurationDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                  minWidth: `${100 * scale}px`,
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-              <option value="1:1">1:1</option>
-              <option value="4:3">4:3</option>
-              <option value="3:4">3:4</option>
-              <option value="21:9">21:9</option>
-            </select>
-          </div>
-          {/* Duration Selector */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={String(selectedDuration)}
-              onChange={(e) => {
-                const dur = Math.max(1, Math.min(30, Number(e.target.value)));
+                {[3, 5, 10, 15].map((dur) => (
+                  <div
+                    key={dur}
+                    onClick={(e) => {
+                      e.stopPropagation();
                 setSelectedDuration(dur);
+                      setIsDurationDropdownOpen(false);
                 const [w, h] = selectedAspectRatio.split(':').map(Number);
                 const frameWidth = 600;
                 const ar = w && h ? (w / h) : 16/9;
@@ -825,36 +1062,36 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 onOptionsChange?.({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: dur, frameWidth, frameHeight });
               }}
               style={{
-                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                border: `${1 * scale}px solid rgba(16, 185, 129, 0.25)`,
-                borderRadius: `${10 * scale}px`,
-                fontSize: `${12 * scale}px`,
-                fontWeight: '600',
-                color: '#10b981',
-                minWidth: `${70 * scale}px`,
-                outline: 'none',
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
                 cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `right ${10 * scale}px center`,
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#10b981';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(16, 185, 129, 0.15)`;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.25)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <option value="3">3s</option>
-              <option value="5">5s</option>
-              <option value="10">10s</option>
-              <option value="15">15s</option>
-            </select>
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedDuration === dur ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedDuration === dur ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedDuration !== dur) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedDuration !== dur) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedDuration === dur && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{dur}s</span>
+          </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

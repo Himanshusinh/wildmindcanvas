@@ -10,6 +10,7 @@ interface HeaderProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  isHidden?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRedo,
   canUndo = true,
   canRedo = false,
+  isHidden = false,
 }) => {
   // Use prop directly to avoid hydration mismatches - only use state when editing
   const [editingValue, setEditingValue] = useState(initialProjectName);
@@ -74,6 +76,10 @@ export const Header: React.FC<HeaderProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
+        opacity: isHidden ? 0 : 1,
+        transform: isHidden ? 'translateY(-100%)' : 'translateY(0)',
+        pointerEvents: isHidden ? 'none' : 'auto',
+        transition: 'opacity 0.3s ease, transform 0.3s ease',
       }}
     >
       {/* Undo Button */}
@@ -85,11 +91,9 @@ export const Header: React.FC<HeaderProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: '8px',
-          backgroundColor: canUndo ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.05)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          backgroundColor: canUndo ? '#ffffff' : '#f3f4f6',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
           color: canUndo ? '#111827' : '#9ca3af',
           cursor: canUndo && onUndo ? 'pointer' : 'default',
           transition: 'all 0.2s',
@@ -97,10 +101,10 @@ export const Header: React.FC<HeaderProps> = ({
         }}
         onClick={() => { if (canUndo && onUndo) onUndo(); }}
         onMouseEnter={(e) => {
-          if (canUndo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          if (canUndo) e.currentTarget.style.backgroundColor = '#f9fafb';
         }}
         onMouseLeave={(e) => {
-          if (canUndo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          if (canUndo) e.currentTarget.style.backgroundColor = '#ffffff';
         }}
         title="Undo (Ctrl/Cmd+Z)"
       >
@@ -119,11 +123,9 @@ export const Header: React.FC<HeaderProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: '8px',
-          backgroundColor: canRedo ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.05)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+          backgroundColor: canRedo ? '#ffffff' : '#f3f4f6',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
           color: canRedo ? '#111827' : '#9ca3af',
           cursor: canRedo && onRedo ? 'pointer' : 'default',
           transition: 'all 0.2s',
@@ -131,10 +133,10 @@ export const Header: React.FC<HeaderProps> = ({
         }}
         onClick={() => { if (canRedo && onRedo) onRedo(); }}
         onMouseEnter={(e) => {
-          if (canRedo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          if (canRedo) e.currentTarget.style.backgroundColor = '#f9fafb';
         }}
         onMouseLeave={(e) => {
-          if (canRedo) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          if (canRedo) e.currentTarget.style.backgroundColor = '#ffffff';
         }}
         title="Redo (Ctrl+Y / Shift+Ctrl/Cmd+Z)"
       >
@@ -153,20 +155,18 @@ export const Header: React.FC<HeaderProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: '8px',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+          backgroundColor: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
           color: '#4b5563',
           cursor: 'pointer',
           transition: 'all 0.2s',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          e.currentTarget.style.backgroundColor = '#f9fafb';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          e.currentTarget.style.backgroundColor = '#ffffff';
         }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -178,12 +178,10 @@ export const Header: React.FC<HeaderProps> = ({
       <div
         style={{
           padding: '6px 10px',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: '#ffffff',
           borderRadius: '8px',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
         }}
       >
         {isEditing ? (
@@ -204,7 +202,7 @@ export const Header: React.FC<HeaderProps> = ({
               fontWeight: '500',
               outline: 'none',
               minWidth: '120px',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              backgroundColor: '#f9fafb',
             }}
           />
         ) : (
@@ -221,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
               minWidth: '120px',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.backgroundColor = '#f9fafb';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -243,21 +241,19 @@ export const Header: React.FC<HeaderProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '8px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-            color: '#4b5563',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-          }}
+            backgroundColor: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+          color: '#4b5563',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f9fafb';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#ffffff';
+        }}
           title="Switch Project"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

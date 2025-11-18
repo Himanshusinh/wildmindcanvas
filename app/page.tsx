@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Canvas } from '@/components/Canvas';
+import GenerationQueue, { GenerationQueueItem } from '@/components/Canvas/GenerationQueue';
 import { ToolbarPanel } from '@/components/ToolbarPanel';
 import { Header } from '@/components/Header';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -12,6 +13,8 @@ import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCu
 import { ProjectSelector } from '@/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
 import { useOpManager } from '@/hooks/useOpManager';
+import { useProject } from '@/hooks/useProject';
+import { useUIVisibility } from '@/hooks/useUIVisibility';
 import { buildProxyDownloadUrl, buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
 
@@ -24,10 +27,9 @@ function CanvasApp({ user }: CanvasAppProps) {
   const [imageGenerators, setImageGenerators] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
-  // Groups state (persisted via snapshot and ops)
-  const [groups, setGroups] = useState<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>(new Map());
   // Connectors (node-to-node links)
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
   const snapshotLoadedRef = useRef(false);
@@ -35,17 +37,6 @@ function CanvasApp({ user }: CanvasAppProps) {
   const [realtimeActive, setRealtimeActive] = useState(false);
   const realtimeActiveRef = useRef(false);
   const persistTimerRef = useRef<number | null>(null);
-  const [projectName, setProjectName] = useState(() => {
-    // Load from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('canvas-project-name') || 'Untitled';
-    }
-    return 'Untitled';
-  });
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [showProjectSelector, setShowProjectSelector] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const initRef = useRef(false); // Prevent multiple initializations
   const currentUser = user;
   const viewportCenterRef = useRef<{ x: number; y: number; scale: number }>({
     x: 5000000, // Center of 1,000,000 x 1,000,000 infinite canvas
@@ -53,57 +44,21 @@ function CanvasApp({ user }: CanvasAppProps) {
     scale: 1,
   });
 
-  // Initialize project when user is loaded
-  useEffect(() => {
-    const initProject = async () => {
-      if (!currentUser) {
-        setIsInitializing(false);
-        return;
-      }
-      
-      if (initRef.current) return; // Already initializing
-      if (projectId) {
-        setIsInitializing(false);
-        return; // Already initialized
-      }
+  // Use project management hook
+  const {
+    projectId,
+    projectName,
+    showProjectSelector,
+    isInitializing,
+    setProjectId,
+    setProjectName,
+    setShowProjectSelector,
+    handleProjectSelect,
+  } = useProject({ currentUser });
 
-      initRef.current = true;
+  // Use UI visibility hook
+  const { isUIHidden, setIsUIHidden } = useUIVisibility();
 
-      // Check if we have a project ID in localStorage
-      const savedProjectId = localStorage.getItem('canvas-project-id');
-      if (savedProjectId) {
-        // Try to load existing project
-        try {
-          const project = await getProject(savedProjectId);
-          if (project) {
-            setProjectId(savedProjectId);
-            setProjectName(project.name);
-            setIsInitializing(false);
-            initRef.current = false; // Reset for future use
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to load project:', error);
-          // Project doesn't exist, show project selector
-        }
-      }
-
-      // Show project selector to let user choose or create
-      setIsInitializing(false);
-      setShowProjectSelector(true);
-      initRef.current = false; // Reset after showing selector
-    };
-
-    initProject();
-  }, [currentUser]); // Only depend on currentUser, not projectId
-
-  const handleProjectSelect = (project: CanvasProject) => {
-    setProjectId(project.id);
-    setProjectName(project.name);
-    setShowProjectSelector(false);
-    localStorage.setItem('canvas-project-id', project.id);
-    localStorage.setItem('canvas-project-name', project.name);
-  };
 
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
     viewportCenterRef.current = { x: center.x, y: center.y, scale };
@@ -149,7 +104,6 @@ function CanvasApp({ user }: CanvasAppProps) {
                 y: element.y || 0,
                 width: element.width || 400,
                 height: element.height || 400,
-                groupId: element.meta?.groupId,
                 ...(element.id && { elementId: element.id }),
               };
               newImages.push(newImage);
@@ -189,7 +143,6 @@ function CanvasApp({ user }: CanvasAppProps) {
             y: element.y || 0,
             width: element.width || 400,
             height: element.height || 400,
-            groupId: element.meta?.groupId,
             ...(element.id && { elementId: element.id }),
           };
           setImages((prev) => {
@@ -216,58 +169,8 @@ function CanvasApp({ user }: CanvasAppProps) {
           });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
-          const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#3A8DFF', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
+          const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
           setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
-        }
-      } else if (op.type === 'update' && op.elementId) {
-        // Update existing element
-        const updates = op.data.updates || {};
-        // Try update a persisted media element first
-        setImages((prev) => {
-          const index = prev.findIndex(img => (img as any).elementId === op.elementId);
-          if (index >= 0 && updates) {
-            const newImages = [...prev];
-            newImages[index] = { ...newImages[index], ...updates };
-            return newImages;
-          }
-          return prev;
-        });
-        // Update a generator modal if matched (needed for undo/redo)
-        setImageGenerators((prev) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], ...updates } as any;
-            return next;
-          }
-          return prev;
-        });
-        setVideoGenerators((prev) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], ...updates } as any;
-            return next;
-          }
-          return prev;
-        });
-        setMusicGenerators((prev) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], ...updates } as any;
-            return next;
-          }
-          return prev;
-        });
-        // If this update modified meta.connections, update connectors state accordingly (backwards compat)
-        if (updates && updates.meta && Array.isArray(updates.meta.connections)) {
-          const conns = (updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
-          setConnectors(prev => {
-            // remove existing connectors from this source then append new ones
-            const filtered = prev.filter(p => p.from !== op.elementId);
-            return [...filtered, ...conns];
-          });
         }
       } else if (op.type === 'delete' && op.elementId) {
         // Delete element - directly remove from state (don't call handleImageDelete to avoid sending another delete op)
@@ -355,6 +258,55 @@ function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
+      } else if (op.type === 'update' && op.elementId && op.data.updates) {
+        // Also handle regular element updates
+        setImages((prev) => {
+          const elementId = op.elementId!;
+          const index = prev.findIndex(img => (img as any).elementId === elementId);
+          if (index >= 0 && op.data.updates) {
+            const newImages = [...prev];
+            newImages[index] = { ...newImages[index], ...op.data.updates };
+            return newImages;
+          }
+          return prev;
+        });
+        // Update a generator modal if matched (needed for undo/redo)
+        setImageGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
+        setVideoGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
+        setMusicGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
+        // If this update modified meta.connections, update connectors state accordingly (backwards compat)
+        if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
+          const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
+          setConnectors(prev => {
+            // remove existing connectors from this source then append new ones
+            const filtered = prev.filter(p => p.from !== op.elementId);
+            return [...filtered, ...conns];
+          });
+        }
       }
     },
   });
@@ -637,36 +589,12 @@ function CanvasApp({ user }: CanvasAppProps) {
     textGenerators.forEach((t) => {
       elements[t.id] = { id: t.id, type: 'text-generator', x: t.x, y: t.y, meta: { value: t.value || '' } };
     });
-    // Groups
-    groups.forEach((grp) => {
-      // compute approximate bounds from member images
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const memberElementIds: string[] = [];
-      (grp.itemIndices || []).forEach(idx => {
-        const it = images[idx];
-        if (!it) return;
-        const ix = it.x || 0;
-        const iy = it.y || 0;
-        const iw = it.width || 0;
-        const ih = it.height || 0;
-        minX = Math.min(minX, ix);
-        minY = Math.min(minY, iy);
-        maxX = Math.max(maxX, ix + iw);
-        maxY = Math.max(maxY, iy + ih);
-        if ((it as any).elementId) memberElementIds.push((it as any).elementId);
-      });
-      const x = isFinite(minX) ? minX : 0;
-      const y = isFinite(minY) ? minY : 0;
-      const width = isFinite(maxX) ? (maxX - minX) : 0;
-      const height = isFinite(maxY) ? (maxY - minY) : 0;
-      elements[grp.id] = { id: grp.id, type: 'group', x, y, width, height, meta: { name: grp.name || 'Group', memberElementIds, textIds: grp.textIds || [], imageModalIds: grp.imageModalIds || [], videoModalIds: grp.videoModalIds || [], musicModalIds: grp.musicModalIds || [] } };
-    });
     // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
     // Also include connector elements as top-level elements so snapshots contain explicit connector records
     const connectorsToUseFinal = connectorsOverride ?? connectors;
     connectorsToUseFinal.forEach(c => {
       if (!c || !c.id) return;
-      elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
+      elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
     });
     return elements;
   };
@@ -691,7 +619,7 @@ function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, groups, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -723,62 +651,44 @@ function CanvasApp({ user }: CanvasAppProps) {
                   width: element.width || 400,
                   height: element.height || 400,
                   rotation: element.rotation || 0,
-                  groupId: element.meta?.groupId,
                   ...(element.id && { elementId: element.id }),
                 };
                 newImages.push(newImage);
                 // If this element had connections in meta, collect them
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'image-generator') {
                 newImageGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'connector') {
                 // Top-level connector element
-                newConnectors.push({ id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#3A8DFF', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor });
-              } else if (element.type === 'image-generator') {
+                newConnectors.push({ id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor });
               } else if (element.type === 'video-generator') {
                 newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'music-generator') {
                 newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'text-generator') {
                 newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#3A8DFF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
-              } else if (element.type === 'group') {
-                // hydrate groups map
-                const grp = { id: element.id, name: element.meta?.name || 'Group', itemIndices: [] as number[], textIds: element.meta?.textIds || [], imageModalIds: element.meta?.imageModalIds || [], videoModalIds: element.meta?.videoModalIds || [], musicModalIds: element.meta?.musicModalIds || [] };
-                // Try to map memberElementIds back to image indices where possible
-                const memberIds: string[] = element.meta?.memberElementIds || [];
-                memberIds.forEach((mid: string) => {
-                  const idx = newImages.findIndex(img => (img as any).elementId === mid);
-                  if (idx >= 0) grp.itemIndices.push(idx);
-                });
-                if (grp.itemIndices.length > 0 || (grp.textIds && grp.textIds.length > 0)) {
-                  setGroups(prev => {
-                    const m = new Map(prev);
-                    m.set(grp.id, grp);
-                    return m;
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               }
@@ -790,6 +700,7 @@ function CanvasApp({ user }: CanvasAppProps) {
           setMusicGenerators(newMusicGenerators);
           setTextGenerators(newTextGenerators);
           setConnectors(newConnectors);
+          
         }
       } catch (e) {
         console.warn('No current snapshot to hydrate or failed to fetch', e);
@@ -1460,16 +1371,29 @@ function CanvasApp({ user }: CanvasAppProps) {
     model: string, 
     frame: string, 
     aspectRatio: string,
-    modalId?: string
-  ): Promise<string | null> => {
-    try {
-      console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId });
-      
-      // Ensure we have a project ID
-      if (!projectId) {
-        throw new Error('Project not initialized. Please refresh the page.');
-      }
+    modalId?: string,
+    imageCount?: number
+  ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
+    console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
 
+    // Ensure we have a project ID
+    if (!projectId) {
+      throw new Error('Project not initialized. Please refresh the page.');
+    }
+
+    const queuedCount = Math.max(1, imageCount || 1);
+    const baseId = `${modalId || 'image'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const jobEntries: GenerationQueueItem[] = Array.from({ length: queuedCount }, (_, idx) => ({
+      id: `${baseId}-${idx}`,
+      prompt: (prompt || '').trim() || 'Untitled prompt',
+      model,
+      total: queuedCount,
+      index: idx + 1,
+      startedAt: Date.now(),
+    }));
+    setGenerationQueue((prev) => [...prev, ...jobEntries]);
+
+    try {
       // Parse aspect ratio to get width/height if needed
       const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
       const aspectRatioValue = widthRatio / heightRatio;
@@ -1494,17 +1418,28 @@ function CanvasApp({ user }: CanvasAppProps) {
         aspectRatio,
         projectId,
         genWidth,
-        genHeight
+        genHeight,
+        queuedCount
       );
       
       console.log('Image generated successfully:', result);
-      // Do NOT create a canvas image here. Only return URL for generator overlay.
-      // ModalOverlays will persist the generatedImageUrl to the generator element.
-      return result.url;
+      // Return URL(s) for generator overlay
+      // Always return images array if present (even for single image when imageCount > 1)
+      if (result.images && Array.isArray(result.images) && result.images.length > 0) {
+        return {
+          url: result.url,
+          images: result.images.map(img => ({ url: img.url })),
+        };
+      }
+      // Fallback to single URL
+      return { url: result.url };
     } catch (error: any) {
       console.error('Error generating image:', error);
       alert(error.message || 'Failed to generate image. Please try again.');
       throw error; // Re-throw to let the modal handle the error display
+    } finally {
+      const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
+      setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
     }
   };
 
@@ -1589,11 +1524,13 @@ function CanvasApp({ user }: CanvasAppProps) {
             onRedo={() => { console.log('[Ops] click redo', { canRedo }); if (canRedo) redo(); }}
             canUndo={canUndo}
             canRedo={canRedo}
+            isHidden={isUIHidden}
           />
         )}
         {projectId ? (
           <>
             <Canvas 
+              isUIHidden={isUIHidden}
               images={images} 
               onViewportChange={handleViewportChange}
               onImageUpdate={handleImageUpdate}
@@ -1708,11 +1645,24 @@ function CanvasApp({ user }: CanvasAppProps) {
               externalMusicModals={musicGenerators}
               externalTextModals={textGenerators}
               connections={connectors}
-              onConnectionsChange={setConnectors}
+        onConnectionsChange={(connections) => {
+          setConnectors(connections.map((conn) => ({
+            id: conn.id ?? `${conn.from}-${conn.to}-${Date.now()}`,
+            from: conn.from,
+            to: conn.to,
+            color: conn.color,
+            fromX: conn.fromX,
+            fromY: conn.fromY,
+            toX: conn.toX,
+            toY: conn.toY,
+            fromAnchor: conn.fromAnchor,
+            toAnchor: conn.toAnchor,
+          })));
+        }}
               onPersistConnectorCreate={async (connector) => {
                 // Ensure a stable id for connector
                 const cid = connector.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`;
-                const connToAdd = { id: cid, from: connector.from, to: connector.to, color: connector.color || '#3A8DFF', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor };
+                const connToAdd = { id: cid, from: connector.from, to: connector.to, color: connector.color || '#437eb5', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor };
 
                 // Optimistic update
                 setConnectors(prev => prev.some(c => c.id === cid) ? prev : [...prev, connToAdd]);
@@ -1725,7 +1675,7 @@ function CanvasApp({ user }: CanvasAppProps) {
                       type: 'connector',
                       from: connector.from,
                       to: connector.to,
-                      meta: { color: connector.color || '#3A8DFF', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor },
+                      meta: { color: connector.color || '#437eb5', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor },
                     } as any;
                     const inverse = { type: 'delete', elementId: cid, data: {}, requestId: '', clientTs: 0 } as any;
                     console.log('[Connector] appending create op for connector', cid, elementPayload);
@@ -1948,54 +1898,8 @@ function CanvasApp({ user }: CanvasAppProps) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
                 }
                 }}
-                onGroupsChange={setGroups}
-                  // Group persistence handlers
-                  onPersistGroupCreate={async (group) => {
-                    // Optimistic update of groups map (store basic info)
-                    setGroups(prev => {
-                      const m = new Map(prev);
-                      m.set(group.id, { id: group.id, name: group.name, itemIndices: group.itemIndices || [], textIds: group.textIds || [], imageModalIds: group.imageModalIds || [], videoModalIds: group.videoModalIds || [], musicModalIds: group.musicModalIds || [] });
-                      return m;
-                    });
-                    // Broadcast via realtime
-                    if (realtimeActive) {
-                      try { realtimeRef.current?.sendGroupCreate(group); } catch (e) { console.warn('realtime send group.create failed', e); }
-                    }
-                    // Append op for undo/redo and persistence
-                    if (projectId && opManagerInitialized) {
-                      const memberElementIds: string[] = [];
-                      (group.itemIndices || []).forEach((idx: number) => { const it = images[idx]; if (it && (it as any).elementId) memberElementIds.push((it as any).elementId); });
-                      await appendOp({ type: 'group', elementId: group.id, data: { element: { id: group.id, type: 'group', x: group.x || 0, y: group.y || 0, width: group.width || 0, height: group.height || 0, meta: { name: group.name || 'Group', memberElementIds, textIds: group.textIds || [] } } }, inverse: { type: 'ungroup', elementId: group.id, data: {}, requestId: '', clientTs: 0 } as any } as any).catch(console.error);
-                    }
-                  }}
-                  onPersistGroupMove={async (groupId, delta, memberElementIds) => {
-                    // Broadcast via realtime
-                    if (realtimeActive) {
-                      try { realtimeRef.current?.sendGroupMove(groupId, delta, memberElementIds); } catch (e) { console.warn('realtime send group.move failed', e); }
-                    }
-                    // Persist a single move op for all member elements
-                    if (projectId && opManagerInitialized && memberElementIds && memberElementIds.length > 0) {
-                      await appendOp({ type: 'move', elementIds: memberElementIds, data: { delta }, inverse: { type: 'move', elementIds: memberElementIds, data: { delta: { x: -delta.x, y: -delta.y } }, requestId: '', clientTs: 0 } as any } as any).catch(console.error);
-                    }
-                  }}
-                  onPersistGroupDelete={async (groupId) => {
-                    // Capture snapshot for inverse
-                    const snapshot = groups.get(groupId);
-                    // Optimistic remove
-                    setGroups(prev => {
-                      const m = new Map(prev);
-                      m.delete(groupId);
-                      return m;
-                    });
-                    if (realtimeActive) {
-                      try { realtimeRef.current?.sendGroupDelete(groupId); } catch (e) { console.warn('realtime send group.delete failed', e); }
-                    }
-                    if (projectId && opManagerInitialized) {
-                      await appendOp({ type: 'ungroup', elementId: groupId, data: {}, inverse: snapshot ? { type: 'group', elementId: groupId, data: { element: { id: groupId, type: 'group', x: snapshot.x || 0, y: snapshot.y || 0, width: snapshot.width || 0, height: snapshot.height || 0, meta: { name: snapshot.name || 'Group' } } }, requestId: '', clientTs: 0 } as any : undefined as any }).catch(console.error);
-                    }
-                  }}
             />
-            <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} />
+            <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
           </>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -2003,6 +1907,7 @@ function CanvasApp({ user }: CanvasAppProps) {
           </div>
         )}
       </div>
+      <GenerationQueue items={generationQueue} />
     </main>
   );
 }

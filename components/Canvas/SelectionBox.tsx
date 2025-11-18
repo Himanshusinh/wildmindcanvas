@@ -1,9 +1,30 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Rect, Group, Text, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
+
+const GRID_GAP = 10; // Minimal gap between components
+const GRID_PADDING = 8; // Minimal equal padding on all sides (left, right, top, bottom)
+const GRID_ITEM_MIN_SIZE = 80;
+const ARRANGE_ANIMATION_DURATION = 420;
+const BUTTON_OVERFLOW_PADDING = 72;
+
+interface SelectedComponent {
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal';
+  id: number | string;
+  key: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+type ArrangeTarget = SelectedComponent & {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+};
 
 interface SelectionBoxProps {
   selectionBox: { startX: number; startY: number; currentX: number; currentY: number } | null;
@@ -17,26 +38,17 @@ interface SelectionBoxProps {
   selectedTextInputIds: string[];
   images: ImageUpload[];
   selectionDragOriginRef: React.MutableRefObject<{ x: number; y: number } | null>;
-  setPendingGroupItems: (items: {
-    imageIndices: number[];
-    textIds: string[];
-    imageModalIds: string[];
-    videoModalIds: string[];
-    musicModalIds: string[];
-  }) => void;
-  setIsGroupNameModalOpen: (open: boolean) => void;
   setSelectionTightRect: (rect: { x: number; y: number; width: number; height: number } | null) => void;
+  setIsDragSelection?: (value: boolean) => void;
   handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
   setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>>>;
-  setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>>>;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>>>;
-  setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>>>;
+  setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
+  setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
+  setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
   textInputStates: Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>;
-  imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
-  videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }>;
-  musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>;
-  groups: Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>;
-  setGroups: React.Dispatch<React.SetStateAction<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>>;
+  imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
+  videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
+  musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
   setSelectedTextInputIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -46,6 +58,7 @@ interface SelectionBoxProps {
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -60,9 +73,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   selectedTextInputIds,
   images,
   selectionDragOriginRef,
-  setPendingGroupItems,
-  setIsGroupNameModalOpen,
   setSelectionTightRect,
+  setIsDragSelection,
   handleImageUpdateWithGroup,
   setTextInputStates,
   setImageModalStates,
@@ -72,8 +84,6 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   imageModalStates,
   videoModalStates,
   musicModalStates,
-  groups,
-  setGroups,
   setSelectedImageIndices,
   setSelectedTextInputIds,
   setSelectedImageModalIds,
@@ -82,6 +92,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   onPersistImageModalMove,
   onPersistVideoModalMove,
   onPersistMusicModalMove,
+  onPersistTextModalMove,
+  onImageUpdate,
 }) => {
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
@@ -99,6 +111,17 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   const selectionGroupRef = React.useRef<Konva.Group>(null);
   const transformerRef = React.useRef<Konva.Transformer>(null);
   
+  const arrangeStateRef = useRef<{ selectionKey: string; order: string[]; bounds?: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null);
+  const arrangeAnimationFrameRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    return () => {
+      if (arrangeAnimationFrameRef.current) {
+        cancelAnimationFrame(arrangeAnimationFrameRef.current);
+        arrangeAnimationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   // Calculate total number of selected items
   const totalSelected = selectedImageIndices.length + 
@@ -107,53 +130,426 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                        selectedMusicModalIds.length + 
                        selectedTextInputIds.length;
 
-  // Check if selected items form a group
-  // A group matches if the selected items exactly match a group's items
-  let currentGroup: { id: string; name?: string } | null = null;
-  
-  // Check all groups to see if any group matches the current selection
-  for (const group of groups.values()) {
-    // Check if selected images match group's itemIndices
-    const selectedImagesSet = new Set(selectedImageIndices);
-    const groupImagesSet = new Set(group.itemIndices || []);
-    const imagesMatch = selectedImagesSet.size === groupImagesSet.size &&
-                       Array.from(selectedImagesSet).every(idx => groupImagesSet.has(idx));
+
+  // Keyboard handler for "G" key to trigger arrange
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only trigger if "G" key is pressed (case-insensitive)
+      if (e.key.toLowerCase() !== 'g' || e.repeat) {
+        return;
+      }
+
+      // Don't trigger if user is typing in an input/textarea/select
+      const target = e.target as Element | null;
+      const isTyping = target instanceof HTMLInputElement || 
+                      target instanceof HTMLTextAreaElement || 
+                      target instanceof HTMLSelectElement;
+      if (isTyping) {
+        return;
+      }
+
+      // Only trigger if there's a selection
+      if (!selectionTightRect) {
+        return;
+      }
+
+      // Check if there are at least 2 components selected
+      if (totalSelected < 2) {
+        return;
+      }
+
+
+      // Prevent default behavior and trigger arrange
+      e.preventDefault();
+      triggerArrange(selectionTightRect);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectionTightRect, totalSelected, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds]);
+
+  const buildSelectionKey = () => {
+    const serializeNumbers = (values: number[]) => values.slice().sort((a, b) => a - b).join(',');
+    const serializeStrings = (values: string[]) => values.slice().sort().join(',');
+    return [
+      `img:${serializeNumbers(selectedImageIndices)}`,
+      `text:${serializeStrings(selectedTextInputIds)}`,
+      `imgModal:${serializeStrings(selectedImageModalIds)}`,
+      `vidModal:${serializeStrings(selectedVideoModalIds)}`,
+      `musicModal:${serializeStrings(selectedMusicModalIds)}`,
+    ].join('|');
+  };
+
+  const collectSelectedComponents = (): SelectedComponent[] => {
+    const components: SelectedComponent[] = [];
     
-    // Check if selected text inputs match group's textIds
-    const selectedTextsSet = new Set(selectedTextInputIds);
-    const groupTextsSet = new Set(group.textIds || []);
-    const textsMatch = selectedTextsSet.size === groupTextsSet.size &&
-                      Array.from(selectedTextsSet).every(id => groupTextsSet.has(id));
-    
-    // Check if selected image modals match group's imageModalIds
-    const selectedImageModalsSet = new Set(selectedImageModalIds);
-    const groupImageModalsSet = new Set(group.imageModalIds || []);
-    const imageModalsMatch = selectedImageModalsSet.size === groupImageModalsSet.size &&
-                            Array.from(selectedImageModalsSet).every(id => groupImageModalsSet.has(id));
-    
-    // Check if selected video modals match group's videoModalIds
-    const selectedVideoModalsSet = new Set(selectedVideoModalIds);
-    const groupVideoModalsSet = new Set(group.videoModalIds || []);
-    const videoModalsMatch = selectedVideoModalsSet.size === groupVideoModalsSet.size &&
-                            Array.from(selectedVideoModalsSet).every(id => groupVideoModalsSet.has(id));
-    
-    // Check if selected music modals match group's musicModalIds
-    const selectedMusicModalsSet = new Set(selectedMusicModalIds);
-    const groupMusicModalsSet = new Set(group.musicModalIds || []);
-    const musicModalsMatch = selectedMusicModalsSet.size === groupMusicModalsSet.size &&
-                            Array.from(selectedMusicModalsSet).every(id => groupMusicModalsSet.has(id));
-    
-    // If all selected items match this group exactly, this is the current group
-    if (imagesMatch && textsMatch && imageModalsMatch && videoModalsMatch && musicModalsMatch &&
-        (selectedImagesSet.size > 0 || selectedTextsSet.size > 0 || selectedImageModalsSet.size > 0 || 
-         selectedVideoModalsSet.size > 0 || selectedMusicModalsSet.size > 0)) {
-      currentGroup = { id: group.id, name: group.name };
-      break;
+    selectedImageIndices.forEach((idx) => {
+      const img = images[idx];
+      if (!img) return;
+      components.push({
+        type: 'image',
+        id: idx,
+        key: `image-${idx}`,
+        width: img.width || GRID_ITEM_MIN_SIZE,
+        height: img.height || GRID_ITEM_MIN_SIZE,
+        x: img.x || 0,
+        y: img.y || 0,
+      });
+    });
+
+    selectedTextInputIds.forEach((id) => {
+      const text = textInputStates.find((t) => t.id === id);
+      if (!text) return;
+      components.push({
+        type: 'text',
+        id,
+        key: `text-${id}`,
+        width: 600,
+        height: 400,
+        x: text.x || 0,
+        y: text.y || 0,
+      });
+    });
+
+    selectedImageModalIds.forEach((id) => {
+      const modal = imageModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'imageModal',
+        id,
+        key: `imgModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedVideoModalIds.forEach((id) => {
+      const modal = videoModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'videoModal',
+        id,
+        key: `videoModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedMusicModalIds.forEach((id) => {
+      const modal = musicModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'musicModal',
+        id,
+        key: `musicModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 300,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    return components;
+  };
+
+  const computeGridDimensions = (count: number) => {
+    if (count <= 0) {
+      return { cols: 1, rows: 1 };
     }
-  }
+    const cols = Math.max(1, Math.ceil(Math.sqrt(count)));
+    const rows = Math.max(1, Math.ceil(count / cols));
+    return { cols, rows };
+  };
+
+  const cancelArrangeAnimation = () => {
+    if (arrangeAnimationFrameRef.current) {
+      cancelAnimationFrame(arrangeAnimationFrameRef.current);
+      arrangeAnimationFrameRef.current = null;
+    }
+  };
+
+  const applyAnimatedPositions = (targets: ArrangeTarget[], progress: number) => {
+    const imageUpdates: Array<{ index: number; x: number; y: number }> = [];
+    const textUpdates = new Map<string, { x: number; y: number }>();
+    const imageModalUpdates = new Map<string, { x: number; y: number }>();
+    const videoModalUpdates = new Map<string, { x: number; y: number }>();
+    const musicModalUpdates = new Map<string, { x: number; y: number }>();
+
+    targets.forEach((target) => {
+      const currentX = target.from.x + (target.to.x - target.from.x) * progress;
+      const currentY = target.from.y + (target.to.y - target.from.y) * progress;
+
+      switch (target.type) {
+        case 'image':
+          imageUpdates.push({ index: target.id as number, x: currentX, y: currentY });
+          break;
+        case 'text':
+          textUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'imageModal':
+          imageModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'videoModal':
+          videoModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'musicModal':
+          musicModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+      }
+    });
+
+    if (imageUpdates.length) {
+      imageUpdates.forEach(({ index, x, y }) => {
+        handleImageUpdateWithGroup(index, { x, y });
+      });
+    }
+
+    if (textUpdates.size) {
+      setTextInputStates((prev) =>
+        prev.map((text) => {
+          const update = textUpdates.get(text.id);
+          return update ? { ...text, ...update } : text;
+        })
+      );
+    }
+
+    if (imageModalUpdates.size) {
+      setImageModalStates((prev) =>
+        prev.map((modal) => {
+          const update = imageModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (videoModalUpdates.size) {
+      setVideoModalStates((prev) =>
+        prev.map((modal) => {
+          const update = videoModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (musicModalUpdates.size) {
+      setMusicModalStates((prev) =>
+        prev.map((modal) => {
+          const update = musicModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+  };
+
+  const persistFinalPositions = (targets: ArrangeTarget[]) => {
+    if (onPersistImageModalMove) {
+      targets
+        .filter((t) => t.type === 'imageModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistImageModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistVideoModalMove) {
+      targets
+        .filter((t) => t.type === 'videoModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistVideoModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistMusicModalMove) {
+      targets
+        .filter((t) => t.type === 'musicModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistMusicModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistTextModalMove) {
+      targets
+        .filter((t) => t.type === 'text')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistTextModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+  };
+
+  const updateSelectionBoundsFromTargets = (targets: ArrangeTarget[]) => {
+    if (!targets.length) return;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    targets.forEach((target) => {
+      minX = Math.min(minX, target.to.x);
+      minY = Math.min(minY, target.to.y);
+      maxX = Math.max(maxX, target.to.x + target.width);
+      maxY = Math.max(maxY, target.to.y + target.height);
+    });
+
+    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+      // Add equal padding on all sides, plus extra space on top for buttons
+      setSelectionTightRect({
+        x: minX - GRID_PADDING,
+        y: minY - BUTTON_OVERFLOW_PADDING,
+        width: Math.max(1, maxX - minX + GRID_PADDING * 2),
+        height: Math.max(1, maxY - minY + BUTTON_OVERFLOW_PADDING + GRID_PADDING),
+      });
+      if (setIsDragSelection) {
+        setIsDragSelection(true);
+      }
+    }
+  };
+
+  const animateArrangeTargets = (targets: ArrangeTarget[]) => {
+    cancelArrangeAnimation();
+    if (!targets.length) return;
+
+    const start = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(1, elapsed / ARRANGE_ANIMATION_DURATION);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      applyAnimatedPositions(targets, eased);
+
+      if (progress < 1) {
+        arrangeAnimationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        arrangeAnimationFrameRef.current = null;
+        applyAnimatedPositions(targets, 1);
+        persistFinalPositions(targets);
+      }
+    };
+
+    arrangeAnimationFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  const triggerArrange = (rect: { x: number; y: number; width: number; height: number }) => {
+    const components = collectSelectedComponents();
+    if (components.length < 2) {
+      return;
+    }
+
+    const selectionKey = buildSelectionKey();
+    const componentMap = new Map(components.map((comp) => [comp.key, comp]));
+
+    const order = arrangeStateRef.current?.order || Array.from(componentMap.keys());
+    const orderedComponents: SelectedComponent[] = order
+      .map((key) => componentMap.get(key))
+      .filter((comp): comp is SelectedComponent => Boolean(comp));
+
+    // Check if this is a new selection (first time arranging these components)
+    const isNewSelection = !arrangeStateRef.current || arrangeStateRef.current.selectionKey !== selectionKey;
+    
+    let bounds: { minX: number; minY: number; maxX: number; maxY: number };
+    
+    // Calculate grid dimensions
+    const { cols, rows } = computeGridDimensions(orderedComponents.length);
+    const gap = GRID_GAP;
+    const padding = GRID_PADDING;
+    
+    if (isNewSelection) {
+      // First click: Calculate minimal bounds based on component sizes, not scattered positions
+      // Find the center point of all components
+      let centerX = 0, centerY = 0;
+      orderedComponents.forEach((comp) => {
+        centerX += comp.x + comp.width / 2;
+        centerY += comp.y + comp.height / 2;
+      });
+      centerX /= orderedComponents.length;
+      centerY /= orderedComponents.length;
+      
+      // Calculate the minimal grid size needed based on component dimensions
+      let maxComponentWidth = 0, maxComponentHeight = 0;
+      orderedComponents.forEach((comp) => {
+        maxComponentWidth = Math.max(maxComponentWidth, comp.width);
+        maxComponentHeight = Math.max(maxComponentHeight, comp.height);
+      });
+      
+      // Calculate minimal grid dimensions
+      const cellWidth = maxComponentWidth;
+      const cellHeight = maxComponentHeight;
+      const gridWidth = cellWidth * cols + gap * (cols - 1);
+      const gridHeight = cellHeight * rows + gap * (rows - 1);
+      
+      // Center the grid at the components' center point
+      const gridStartX = centerX - gridWidth / 2;
+      const gridStartY = centerY - gridHeight / 2;
+      
+      bounds = {
+        minX: gridStartX - padding,
+        minY: gridStartY - padding,
+        maxX: gridStartX + gridWidth + padding,
+        maxY: gridStartY + gridHeight + padding,
+      };
+      
+      // Store the bounds and order for this selection
+      arrangeStateRef.current = {
+        selectionKey,
+        order: Array.from(componentMap.keys()),
+        bounds,
+      };
+    } else {
+      // Subsequent clicks: Use stored bounds (don't reduce spacing further)
+      // Just shuffle the order
+      if (arrangeStateRef.current && arrangeStateRef.current.order.length > 1) {
+        const rotated = arrangeStateRef.current.order.shift();
+        if (rotated && arrangeStateRef.current) {
+          arrangeStateRef.current.order.push(rotated);
+        }
+      }
+      
+      // Use stored bounds from first arrangement
+      bounds = (arrangeStateRef.current?.bounds) || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    }
+
+    // Use stored bounds to create a compact arrangement area
+    const tightWidth = bounds.maxX - bounds.minX - padding * 2;
+    const tightHeight = bounds.maxY - bounds.minY - padding * 2;
+    
+    // Calculate grid dimensions based on tight bounds
+    const availableWidth = Math.max(tightWidth - gap * (cols - 1), GRID_ITEM_MIN_SIZE * cols);
+    const availableHeight = Math.max(tightHeight - gap * (rows - 1), GRID_ITEM_MIN_SIZE * rows);
+    const cellWidth = Math.max(GRID_ITEM_MIN_SIZE, availableWidth / cols);
+    const cellHeight = Math.max(GRID_ITEM_MIN_SIZE, availableHeight / rows);
+    
+    // Position grid starting from the stored bounds with minimal padding
+    const startX = bounds.minX + padding;
+    const startY = bounds.minY + padding;
+
+    const targets: ArrangeTarget[] = orderedComponents.map((component, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const toX = startX + col * (cellWidth + gap) + (cellWidth - component.width) / 2;
+      const toY = startY + row * (cellHeight + gap); // Align to top of row, no vertical centering
+      return {
+        ...component,
+        from: { x: component.x, y: component.y },
+        to: { x: toX, y: toY },
+      };
+    });
+
+    animateArrangeTargets(targets);
+    updateSelectionBoundsFromTargets(targets);
+  };
 
 
-  // Only show icons if there are 2 or more components selected
+  // Show SelectionBox if:
+  // 1. There's a selection rect AND it's a drag selection with 2+ components, OR
+  // 2. There's a selection rect AND a group is selected (for group dragging and ungroup button)
   if (selectionTightRect && isDragSelection && totalSelected >= 2) {
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
@@ -368,38 +764,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           }
         }}
       >
-        {/* Group name label at top left corner, outside the box */}
-        {currentGroup && currentGroup.name && (
-          <Group x={-6} y={-28}>
-            <Rect
-              x={0}
-              y={0}
-              width={Math.max(60, (currentGroup.name.length * 8) + 20)}
-              height={22}
-              fill="#111827"
-              stroke="#374151"
-              strokeWidth={1}
-              cornerRadius={6}
-            />
-            <Text
-              x={10}
-              y={4}
-              text={currentGroup.name}
-              fontSize={12}
-              fontFamily="Arial"
-              fill="#ffffff"
-            />
-          </Group>
-        )}
+        {/* Group name is rendered by GroupLabel component, not here */}
         <Rect
           x={0}
           y={0}
           width={selectionTightRect.width}
           height={selectionTightRect.height}
-          fill={currentGroup ? "rgba(147, 197, 253, 0.35)" : "rgba(147, 197, 253, 0.18)"}
+          fill="rgba(147, 197, 253, 0.18)"
           stroke="#60A5FA"
           strokeWidth={4}
-          dash={currentGroup ? undefined : [5, 5]}
+          dash={[5, 5]}
           listening={true}
           cornerRadius={0}
         />
@@ -408,184 +782,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
           y={-40}
         >
-          {/* Group/Ungroup button */}
-          {currentGroup ? (
-            // Ungroup button
-            <Group
-              onClick={(e) => {
-                e.cancelBubble = true;
-                const groupToUngroup = currentGroup;
-                if (!groupToUngroup) return;
-                
-                // Remove the group
-                setGroups(prev => {
-                  const newGroups = new Map(prev);
-                  newGroups.delete(groupToUngroup.id);
-                  return newGroups;
-                });
-                
-                // Remove groupId from all images in the group
-                const group = groups.get(groupToUngroup.id);
-                if (group) {
-                  // Remove groupId from all images
-                  group.itemIndices.forEach(index => {
-                    const img = images[index];
-                    if (img && img.groupId) {
-                      handleImageUpdateWithGroup(index, { groupId: undefined });
-                    }
-                  });
-                }
-                
-                // Clear selection
-                setSelectedImageIndices([]);
-                setSelectedTextInputIds([]);
-                setSelectedImageModalIds([]);
-                setSelectedVideoModalIds([]);
-                setSelectedMusicModalIds([]);
-                setSelectionTightRect(null);
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#111827"
-                stroke="#374151"
-                strokeWidth={1}
-                cornerRadius={8}
-                shadowColor="rgba(0, 0, 0, 0.3)"
-                shadowBlur={4}
-                shadowOffset={{ x: 0, y: 2 }}
-              />
-              {/* Ungroup icon - split/layers icon */}
-              <Group x={8} y={8}>
-                <Rect x={0} y={0} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-                <Rect x={12} y={0} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-                <Rect x={2} y={6} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-                <Rect x={12} y={6} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-                <Rect x={4} y={12} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-                <Rect x={12} y={12} width={8} height={4} fill="#ef4444" cornerRadius={1} />
-              </Group>
-            </Group>
-          ) : (
-            // Group button
-            <Group
-              onClick={(e) => {
-                e.cancelBubble = true;
-                // Use the selected items from selection arrays
-                setPendingGroupItems({
-                  imageIndices: [...selectedImageIndices],
-                  textIds: [...selectedTextInputIds],
-                  imageModalIds: [...selectedImageModalIds],
-                  videoModalIds: [...selectedVideoModalIds],
-                  musicModalIds: [...selectedMusicModalIds],
-                });
-                setIsGroupNameModalOpen(true);
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#111827"
-                stroke="#374151"
-                strokeWidth={1}
-                cornerRadius={8}
-                shadowColor="rgba(0, 0, 0, 0.3)"
-                shadowBlur={4}
-                shadowOffset={{ x: 0, y: 2 }}
-              />
-              {/* Group icon - layers/stack icon */}
-              <Group x={8} y={8}>
-                <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-              </Group>
-            </Group>
-          )}
           {/* Arrange button */}
           <Group
             x={48}
             onClick={(e) => {
               e.cancelBubble = true;
-              const rect = selectionTightRect;
-              if (!rect) return;
-              const sel = [...selectedImageIndices];
-              if (sel.length === 0) return;
-              // Simple grid layout inside rect preserving item sizes; top-left flow
-              const padding = 12;
-              const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
-              let col = 0;
-              let row = 0;
-              let currentY = rect.y + padding;
-              let maxRowHeight = 0;
-              let currentX = rect.x + padding;
-              sel.forEach((idx, i) => {
-                const it = images[idx];
-                if (!it) return;
-                const iw = it.width || 100;
-                const ih = it.height || 100;
-                if (col >= cols || (currentX + iw + padding) > (rect.x + rect.width)) {
-                  // next row
-                  row += 1;
-                  col = 0;
-                  currentX = rect.x + padding;
-                  currentY += maxRowHeight + padding;
-                  maxRowHeight = 0;
-                }
-                handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
-                currentX += iw + padding;
-                maxRowHeight = Math.max(maxRowHeight, ih);
-                col += 1;
-              });
-              // Update tight rect after arrange
-              // Recompute bounds of selected items
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              sel.forEach(idx => {
-                const it = images[idx];
-                if (!it) return;
-                const ix = it.x || 0;
-                const iy = it.y || 0;
-                const iw = it.width || 0;
-                const ih = it.height || 0;
-                minX = Math.min(minX, ix);
-                minY = Math.min(minY, iy);
-                maxX = Math.max(maxX, ix + iw);
-                maxY = Math.max(maxY, iy + ih);
-              });
-              if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-                setSelectionTightRect({
-                  x: minX,
-                  y: minY,
-                  width: Math.max(1, maxX - minX),
-                  height: Math.max(1, maxY - minY),
-                });
+                if (selectionTightRect) {
+                  triggerArrange(selectionTightRect);
               }
             }}
             onMouseEnter={(e) => {
@@ -606,20 +809,29 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               y={0}
               width={36}
               height={36}
-              fill="#111827"
-              stroke="#374151"
+                fill="#ffffff"
+                stroke="rgba(15,23,42,0.12)"
               strokeWidth={1}
-              cornerRadius={8}
-              shadowColor="rgba(0, 0, 0, 0.3)"
-              shadowBlur={4}
-              shadowOffset={{ x: 0, y: 2 }}
-            />
-            {/* Arrange icon - grid/layout icon */}
-            <Group x={8} y={8}>
-              <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-              <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-              <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-              <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+                cornerRadius={10}
+                shadowColor="rgba(15,23,42,0.18)"
+                shadowBlur={6}
+                shadowOffset={{ x: 0, y: 3 }}
+              />
+              <Group x={9} y={9}>
+                {[0, 1, 2].map((row) => (
+                  [0, 1, 2].map((col) => (
+                    <Rect
+                      key={`tight-arrange-${row}-${col}`}
+                      x={col * 8}
+                      y={row * 8}
+                      width={6}
+                      height={6}
+                      cornerRadius={2}
+                      fill={row === col ? '#2563eb' : '#cbd5f5'}
+                      opacity={row === col ? 0.95 : 1}
+                    />
+                  ))
+                ))}
             </Group>
           </Group>
         </Group>
@@ -671,87 +883,19 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         {/* Toolbar buttons at top center, outside selection area - only show if 2+ items selected */}
         {totalSelected >= 2 && (
           <Group
-            x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 42}
+            x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 18}
             y={-40}
           >
-            {/* Group button */}
-            <Group
-              onClick={(e) => {
-                e.cancelBubble = true;
-                setPendingGroupItems({
-                  imageIndices: [...selectedImageIndices],
-                  textIds: [...selectedTextInputIds],
-                  imageModalIds: [...selectedImageModalIds],
-                  videoModalIds: [...selectedVideoModalIds],
-                  musicModalIds: [...selectedMusicModalIds],
-                });
-                setIsGroupNameModalOpen(true);
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#111827"
-                stroke="#374151"
-                strokeWidth={1}
-                cornerRadius={8}
-                shadowColor="rgba(0, 0, 0, 0.3)"
-                shadowBlur={4}
-                shadowOffset={{ x: 0, y: 2 }}
-              />
-              <Group x={8} y={8}>
-                <Rect x={0} y={0} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={2} y={6} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={4} y={12} width={20} height={4} fill="#60a5fa" cornerRadius={1} />
-              </Group>
-            </Group>
             {/* Arrange button */}
             <Group
               x={48}
               onClick={(e) => {
                 e.cancelBubble = true;
-                const sel = [...selectedImageIndices];
-                if (sel.length === 0) return;
                 const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
                 const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
                 const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
                 const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
-                const padding = 12;
-                const cols = Math.max(1, Math.round(Math.sqrt(sel.length)));
-                let col = 0;
-                let currentY = boxY + padding;
-                let maxRowHeight = 0;
-                let currentX = boxX + padding;
-                sel.forEach((idx) => {
-                  const it = images[idx];
-                  if (!it) return;
-                  const iw = it.width || 100;
-                  const ih = it.height || 100;
-                  if (col >= cols || (currentX + iw + padding) > (boxX + boxWidth)) {
-                    col = 0;
-                    currentX = boxX + padding;
-                    currentY += maxRowHeight + padding;
-                    maxRowHeight = 0;
-                  }
-                  handleImageUpdateWithGroup(idx, { x: currentX, y: currentY });
-                  currentX += iw + padding;
-                  maxRowHeight = Math.max(maxRowHeight, ih);
-                  col += 1;
-                });
+                triggerArrange({ x: boxX, y: boxY, width: boxWidth, height: boxHeight });
               }}
               onMouseEnter={(e) => {
                 const stage = e.target.getStage();
@@ -771,19 +915,29 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 y={0}
                 width={36}
                 height={36}
-                fill="#111827"
-                stroke="#374151"
+                fill="#ffffff"
+                stroke="rgba(15,23,42,0.12)"
                 strokeWidth={1}
-                cornerRadius={8}
-                shadowColor="rgba(0, 0, 0, 0.3)"
-                shadowBlur={4}
-                shadowOffset={{ x: 0, y: 2 }}
+                cornerRadius={10}
+                shadowColor="rgba(15,23,42,0.18)"
+                shadowBlur={6}
+                shadowOffset={{ x: 0, y: 3 }}
               />
-              <Group x={8} y={8}>
-                <Rect x={0} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={12} y={0} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={0} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
-                <Rect x={12} y={12} width={8} height={8} fill="#60a5fa" cornerRadius={1} />
+              <Group x={9} y={9}>
+                {[0, 1, 2].map((row) => (
+                  [0, 1, 2].map((col) => (
+                    <Rect
+                      key={`toolbar-arrange-${row}-${col}`}
+                      x={col * 8}
+                      y={row * 8}
+                      width={6}
+                      height={6}
+                      cornerRadius={2}
+                      fill={row === col ? '#2563eb' : '#cbd5f5'}
+                      opacity={row === col ? 0.95 : 1}
+                    />
+                  ))
+                ))}
               </Group>
             </Group>
           </Group>

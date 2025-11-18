@@ -30,8 +30,6 @@ export interface ImageUpload {
   fontSize?: number;
   fontFamily?: string;
   fill?: string;
-  // For grouping
-  groupId?: string;
   // For op tracking and persistence
   elementId?: string;
 }

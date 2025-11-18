@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
-import { Model3DOverlay } from './Model3DOverlay';
+import { Model3DOverlay } from '../Canvas/Model3DOverlay';
 import { ContextMenu } from '@/components/ContextMenu';
-import { GroupNameModal } from '@/components/GroupNameModal';
-import { CanvasImage } from './CanvasImage';
-import { TextElements } from './TextElements';
-import { ModalOverlays } from './ModalOverlays';
-import { SelectionBox } from './SelectionBox';
-import { MediaActionIcons } from './MediaActionIcons';
-import { GroupLabel } from './GroupLabel';
+import { CanvasImage } from '../Canvas/CanvasImage';
+import { TextElements } from '../Canvas/TextElements';
+import { ModalOverlays } from '../Canvas/ModalOverlays';
+import { SelectionBox } from '../Canvas/SelectionBox';
+import { MediaActionIcons } from '../Canvas/MediaActionIcons';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -28,7 +26,7 @@ interface CanvasProps {
   isImageModalOpen?: boolean;
   onImageModalClose?: () => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string) => Promise<string | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
@@ -59,12 +57,6 @@ interface CanvasProps {
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
-  // Group persistence callbacks
-  onPersistGroupCreate?: (group: { id: string; name?: string; x?: number; y?: number; width?: number; height?: number; itemIndices?: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }) => void | Promise<void>;
-  onPersistGroupDelete?: (groupId: string) => void | Promise<void>;
-  onPersistGroupMove?: (groupId: string, delta: { x: number; y: number }, memberElementIds: string[]) => void | Promise<void>;
-  // Notify parent of groups state changes so snapshot can include groups
-  onGroupsChange?: (groups: Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>) => void;
   // Connector props
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
   onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
@@ -83,6 +75,7 @@ const INFINITE_CANVAS_SIZE = 1000000; // 1 million pixels - truly infinite canva
 const DOT_SPACING = 30; // Distance between dots in pixels
 const DOT_SIZE = 4; // Size of each dot in pixels
 const DOT_OPACITY = 0.10; // Dot darkness (0.0 = invisible, 1.0 = fully black) - adjust this value to make dots darker/lighter
+
 
 export const Canvas: React.FC<CanvasProps> = ({ 
   images = [], 
@@ -128,10 +121,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
-  onPersistGroupCreate,
-  onPersistGroupDelete,
-  onPersistGroupMove,
-  onGroupsChange,
   connections,
   onConnectionsChange,
   onPersistConnectorCreate,
@@ -167,15 +156,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
   const [contextMenuModalId, setContextMenuModalId] = useState<string | null>(null);
   const [contextMenuModalType, setContextMenuModalType] = useState<'image' | 'video' | 'music' | null>(null);
-  const [groups, setGroups] = useState<Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>>(new Map());
   // Tight selection rect calculated from selected items (canvas coords)
   const [selectionTightRect, setSelectionTightRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   // Track if selection came from drag (marquee selection) - only show icons for drag selections
   const [isDragSelection, setIsDragSelection] = useState(false);
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
-  const [isGroupNameModalOpen, setIsGroupNameModalOpen] = useState(false);
-  const [pendingGroupItems, setPendingGroupItems] = useState<{ imageIndices: number[]; textIds: string[]; imageModalIds: string[]; videoModalIds: string[]; musicModalIds: string[] } | null>(null);
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
@@ -262,59 +248,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // Helper function to check if current selection is a group
-  const isCurrentSelectionAGroup = (): boolean => {
-    if (selectedImageIndices.length === 0 && selectedTextInputIds.length === 0 && 
-        selectedImageModalIds.length === 0 && selectedVideoModalIds.length === 0 && 
-        selectedMusicModalIds.length === 0) {
-      return false;
-    }
-    
-    // Check all groups to see if any group matches the current selection
-    for (const group of groups.values()) {
-      const selectedImagesSet = new Set(selectedImageIndices);
-      const groupImagesSet = new Set(group.itemIndices || []);
-      const imagesMatch = selectedImagesSet.size === groupImagesSet.size &&
-                         Array.from(selectedImagesSet).every(idx => groupImagesSet.has(idx));
-      
-      const selectedTextsSet = new Set(selectedTextInputIds);
-      const groupTextsSet = new Set(group.textIds || []);
-      const textsMatch = selectedTextsSet.size === groupTextsSet.size &&
-                        Array.from(selectedTextsSet).every(id => groupTextsSet.has(id));
-      
-      const selectedImageModalsSet = new Set(selectedImageModalIds);
-      const groupImageModalsSet = new Set(group.imageModalIds || []);
-      const imageModalsMatch = selectedImageModalsSet.size === groupImageModalsSet.size &&
-                              Array.from(selectedImageModalsSet).every(id => groupImageModalsSet.has(id));
-      
-      const selectedVideoModalsSet = new Set(selectedVideoModalIds);
-      const groupVideoModalsSet = new Set(group.videoModalIds || []);
-      const videoModalsMatch = selectedVideoModalsSet.size === groupVideoModalsSet.size &&
-                              Array.from(selectedVideoModalsSet).every(id => groupVideoModalsSet.has(id));
-      
-      const selectedMusicModalsSet = new Set(selectedMusicModalIds);
-      const groupMusicModalsSet = new Set(group.musicModalIds || []);
-      const musicModalsMatch = selectedMusicModalsSet.size === groupMusicModalsSet.size &&
-                              Array.from(selectedMusicModalsSet).every(id => groupMusicModalsSet.has(id));
-      
-      if (imagesMatch && textsMatch && imageModalsMatch && videoModalsMatch && musicModalsMatch &&
-          (selectedImagesSet.size > 0 || selectedTextsSet.size > 0 || selectedImageModalsSet.size > 0 || 
-           selectedVideoModalsSet.size > 0 || selectedMusicModalsSet.size > 0)) {
-        return true;
-      }
-    }
-    return false;
-  };
 
   // Helper function to clear all selections
   // clearSelectionBoxes: if true, also clears selection boxes (for empty canvas clicks)
   // if false, keeps selection boxes (for component switching)
   const clearAllSelections = (clearSelectionBoxes: boolean = false) => {
-    // Don't clear if current selection is a group - groups persist when clicking outside
-    if (isCurrentSelectionAGroup()) {
-      return;
-    }
-    
     setSelectedImageIndex(null);
     setSelectedImageIndices([]);
     setSelectedTextInputId(null);
@@ -1096,54 +1034,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         
         if (hasMultipleSelections) {
           // Delete all selected components in the region
-          
-          // Check if the selected items form a group and delete the group
-          let groupToDelete: string | null = null;
-          for (const group of groups.values()) {
-            const selectedImagesSet = new Set(selectedImageIndices);
-            const groupImagesSet = new Set(group.itemIndices || []);
-            const imagesMatch = selectedImagesSet.size === groupImagesSet.size &&
-                             Array.from(selectedImagesSet).every(idx => groupImagesSet.has(idx));
-            
-            const selectedTextsSet = new Set(selectedTextInputIds);
-            const groupTextsSet = new Set(group.textIds || []);
-            const textsMatch = selectedTextsSet.size === groupTextsSet.size &&
-                            Array.from(selectedTextsSet).every(id => groupTextsSet.has(id));
-            
-            const selectedImageModalsSet = new Set(selectedImageModalIds);
-            const groupImageModalsSet = new Set(group.imageModalIds || []);
-            const imageModalsMatch = selectedImageModalsSet.size === groupImageModalsSet.size &&
-                                   Array.from(selectedImageModalsSet).every(id => groupImageModalsSet.has(id));
-            
-            const selectedVideoModalsSet = new Set(selectedVideoModalIds);
-            const groupVideoModalsSet = new Set(group.videoModalIds || []);
-            const videoModalsMatch = selectedVideoModalsSet.size === groupVideoModalsSet.size &&
-                                   Array.from(selectedVideoModalsSet).every(id => groupVideoModalsSet.has(id));
-            
-            const selectedMusicModalsSet = new Set(selectedMusicModalIds);
-            const groupMusicModalsSet = new Set(group.musicModalIds || []);
-            const musicModalsMatch = selectedMusicModalsSet.size === groupMusicModalsSet.size &&
-                                   Array.from(selectedMusicModalsSet).every(id => groupMusicModalsSet.has(id));
-            
-            if (imagesMatch && textsMatch && imageModalsMatch && videoModalsMatch && musicModalsMatch &&
-                (selectedImagesSet.size > 0 || selectedTextsSet.size > 0 || selectedImageModalsSet.size > 0 || 
-                 selectedVideoModalsSet.size > 0 || selectedMusicModalsSet.size > 0)) {
-              groupToDelete = group.id;
-              break;
-            }
-          }
-          
-          // Delete the group if it exists
-          if (groupToDelete) {
-            setGroups(prev => {
-              const newGroups = new Map(prev);
-              newGroups.delete(groupToDelete!);
-              try { onGroupsChange?.(newGroups); } catch (e) { /* ignore */ }
-              return newGroups;
-            });
-            try { if (onPersistGroupDelete) { onPersistGroupDelete(groupToDelete); } } catch (e) { console.error('onPersistGroupDelete failed', e); }
-          }
-          
           // Delete all selected images
           if (selectedImageIndices.length > 0 && onImageDelete) {
             // Delete in reverse order to maintain correct indices
@@ -1257,23 +1147,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         setIsDragSelection(false);
       }
       
-      // Handle Ctrl+G / Cmd+G for creating groups
-      if ((e.ctrlKey || e.metaKey) && e.key === 'g' && !e.repeat) {
-        e.preventDefault();
-        // Check if we have enough items to group (at least 2)
-        // For now, we'll focus on images - can be extended later for other types
-        if (selectedImageIndices.length > 1) {
-          // Store pending group items and show naming modal
-          setPendingGroupItems({
-            imageIndices: [...selectedImageIndices],
-            textIds: [],
-            imageModalIds: [],
-            videoModalIds: [],
-            musicModalIds: [],
-          });
-          setIsGroupNameModalOpen(true);
-        }
-      }
       // Handle Ctrl/Cmd + A = Select All components on canvas
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.repeat) {
         // Avoid when typing in inputs
@@ -1366,7 +1239,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         });
 
         if (any) {
-          setSelectionTightRect({ x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) });
+          const width = maxX - minX;
+          const height = maxY - minY;
+          setSelectionTightRect({ 
+            x: minX, 
+            y: minY, 
+            width: Math.max(1, width), 
+            height: Math.max(1, height) 
+          });
           setIsDragSelection(true);
         } else {
           setSelectionTightRect(null);
@@ -1459,7 +1339,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
 
           if (found) {
-            return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+            const width = maxX - minX;
+            const height = maxY - minY;
+            return { 
+              x: minX, 
+              y: minY, 
+              width: Math.max(1, width), 
+              height: Math.max(1, height) 
+            };
           }
 
           // Nothing selected
@@ -2137,8 +2024,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
               // Calculate tight rect - ensure we're using the actual bounds
               // The calculation should already be tight, but we ensure no extra padding
-              const calculatedWidth = Math.max(1, maxX - minX);
-              const calculatedHeight = Math.max(1, maxY - minY);
+              const width = maxX - minX;
+              const height = maxY - minY;
+              const calculatedWidth = Math.max(1, width);
+              const calculatedHeight = Math.max(1, height);
               
               setSelectionTightRect({
                 x: minX,
@@ -2630,257 +2519,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Canvas is truly infinite - no need to expand, it's already massive
   // Fixed at 1,000,000 x 1,000,000 pixels - can handle 100+ 8K images easily
 
-  // Helper function to calculate group bounds
-  const calculateGroupBounds = (group: { itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }): { x: number; y: number; width: number; height: number } | null => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    // Check images
-    group.itemIndices.forEach(idx => {
-      const img = images[idx];
-      if (img) {
-        const imgX = img.x || 0;
-        const imgY = img.y || 0;
-        const imgWidth = img.width || 0;
-        const imgHeight = img.height || 0;
-        minX = Math.min(minX, imgX);
-        minY = Math.min(minY, imgY);
-        maxX = Math.max(maxX, imgX + imgWidth);
-        maxY = Math.max(maxY, imgY + imgHeight);
-      }
-    });
-    
-    // Check text inputs
-    if (group.textIds) {
-      group.textIds.forEach(textId => {
-        const textState = textInputStates.find(t => t.id === textId);
-        if (textState) {
-          minX = Math.min(minX, textState.x);
-          minY = Math.min(minY, textState.y);
-          maxX = Math.max(maxX, textState.x + 300); // Approximate width
-          maxY = Math.max(maxY, textState.y + 100); // Approximate height
-        }
-      });
-    }
-    
-    // Check image modals
-    if (group.imageModalIds) {
-      group.imageModalIds.forEach(modalId => {
-        const modalState = imageModalStates.find(m => m.id === modalId);
-        if (modalState) {
-          minX = Math.min(minX, modalState.x);
-          minY = Math.min(minY, modalState.y);
-          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
-          maxY = Math.max(maxY, modalState.y + 400); // Approximate height
-        }
-      });
-    }
-    
-    // Check video modals
-    if (group.videoModalIds) {
-      group.videoModalIds.forEach(modalId => {
-        const modalState = videoModalStates.find(m => m.id === modalId);
-        if (modalState) {
-          minX = Math.min(minX, modalState.x);
-          minY = Math.min(minY, modalState.y);
-          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
-          maxY = Math.max(maxY, modalState.y + 400); // Approximate height
-        }
-      });
-    }
-    
-    // Check music modals
-    if (group.musicModalIds) {
-      group.musicModalIds.forEach(modalId => {
-        const modalState = musicModalStates.find(m => m.id === modalId);
-        if (modalState) {
-          minX = Math.min(minX, modalState.x);
-          minY = Math.min(minY, modalState.y);
-          maxX = Math.max(maxX, modalState.x + 600); // Approximate width
-          maxY = Math.max(maxY, modalState.y + 300); // Approximate height
-        }
-      });
-    }
-    
-    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      return null;
-    }
-    
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
-  };
-
-  // Helper function to check if a component is inside group bounds
-  const isComponentInsideGroupBounds = (x: number, y: number, width: number, height: number, groupBounds: { x: number; y: number; width: number; height: number }): boolean => {
-    const componentRight = x + width;
-    const componentBottom = y + height;
-    const boundsRight = groupBounds.x + groupBounds.width;
-    const boundsBottom = groupBounds.y + groupBounds.height;
-    
-    // Component is inside if it overlaps with the bounds (with some tolerance)
-    return (
-      x < boundsRight &&
-      componentRight > groupBounds.x &&
-      y < boundsBottom &&
-      componentBottom > groupBounds.y
-    );
-  };
-
-  // Wrapper for onImageUpdate that handles group movement
+  // Wrapper for onImageUpdate
   const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
-    const image = images[index];
-    if (!image) return;
-
-    // Check if this image is in a group
-    if (image.groupId) {
-      const group = groups.get(image.groupId);
-      if (group) {
-        // Calculate delta if position changed
-        const oldX = image.x || 0;
-        const oldY = image.y || 0;
-        const newX = updates.x !== undefined ? updates.x : oldX;
-        const newY = updates.y !== undefined ? updates.y : oldY;
-        const deltaX = newX - oldX;
-        const deltaY = newY - oldY;
-
-        // If position changed, check if component will be outside group bounds
-        if (deltaX !== 0 || deltaY !== 0) {
-          // Calculate current group bounds BEFORE moving
-          const currentGroupBounds = calculateGroupBounds(group);
-          if (currentGroupBounds) {
-            const finalWidth = updates.width !== undefined ? updates.width : (image.width || 0);
-            const finalHeight = updates.height !== undefined ? updates.height : (image.height || 0);
-            
-            // Check if this component will be outside the group bounds after the move
-            const willBeOutside = !isComponentInsideGroupBounds(newX, newY, finalWidth, finalHeight, currentGroupBounds);
-            
-            if (willBeOutside) {
-              // Component is moving outside - don't move the group, just remove it from the group
-              // Update groups and persist membership change
-              setGroups(prev => {
-                const newGroups = new Map(prev);
-                const updatedGroup = newGroups.get(image.groupId!);
-                if (updatedGroup) {
-                  const updated = { ...updatedGroup, itemIndices: updatedGroup.itemIndices.filter(idx => idx !== index) };
-                  if (updated.itemIndices.length === 0) {
-                    newGroups.delete(image.groupId!);
-                  } else {
-                    newGroups.set(image.groupId!, updated);
-                  }
-                }
-                try { onGroupsChange?.(newGroups); } catch (e) { /* ignore */ }
-
-                // Persist group update or deletion
-                try {
-                  const ug = newGroups.get(image.groupId!);
-                  if (!ug) {
-                    // group deleted
-                    onPersistGroupDelete?.(image.groupId!);
-                  } else {
-                    // upsert group element
-                    onPersistGroupCreate?.({ id: ug.id, name: ug.name, itemIndices: ug.itemIndices, textIds: ug.textIds, imageModalIds: ug.imageModalIds, videoModalIds: ug.videoModalIds, musicModalIds: ug.musicModalIds });
-                  }
-                } catch (e) {
-                  console.error('failed persisting group membership change', e);
-                }
-
-                return newGroups;
-              });
-              
-              // Remove groupId from the image and update position
-              if (onImageUpdate) {
-                onImageUpdate(index, { ...updates, groupId: undefined });
-              }
-              
-              // Remove from selection if it was selected
-              if (selectedImageIndices.includes(index)) {
-                setSelectedImageIndices(prev => prev.filter(idx => idx !== index));
-              }
-              
-              // Don't move the group, just return (component has already been updated above)
-              return;
-            }
-          }
-          
-          // Component is staying inside - move all items in the group by the same delta
-          // Move all images in the group
-          group.itemIndices.forEach((groupIndex) => {
-            if (groupIndex !== index && images[groupIndex]) {
-              const groupImage = images[groupIndex];
-              const currentX = groupImage.x || 0;
-              const currentY = groupImage.y || 0;
-              if (onImageUpdate) {
-                onImageUpdate(groupIndex, {
-                  x: currentX + deltaX,
-                  y: currentY + deltaY,
-                });
-              }
-            }
-          });
-
-          // Move text elements in the group
-          if (group.textIds) {
-            group.textIds.forEach((textId) => {
-              setTextInputStates((prev) =>
-                prev.map((textState) =>
-                  textState.id === textId
-                    ? { ...textState, x: textState.x + deltaX, y: textState.y + deltaY }
-                    : textState
-                )
-              );
-            });
-          }
-
-          // Move image modals in the group
-          if (group.imageModalIds) {
-            group.imageModalIds.forEach((modalId) => {
-              setImageModalStates((prev) =>
-                prev.map((modalState) =>
-                  modalState.id === modalId
-                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
-                    : modalState
-                )
-              );
-            });
-          }
-
-          // Move video modals in the group
-          if (group.videoModalIds) {
-            group.videoModalIds.forEach((modalId) => {
-              setVideoModalStates((prev) =>
-                prev.map((modalState) =>
-                  modalState.id === modalId
-                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
-                    : modalState
-                )
-              );
-            });
-          }
-
-          // Move music modals in the group
-          if (group.musicModalIds) {
-            group.musicModalIds.forEach((modalId) => {
-              setMusicModalStates((prev) =>
-                prev.map((modalState) =>
-                  modalState.id === modalId
-                    ? { ...modalState, x: modalState.x + deltaX, y: modalState.y + deltaY }
-                    : modalState
-                )
-              );
-            });
-          }
-        }
-      }
-    }
-
-    // Always update the dragged item
     if (onImageUpdate) {
       onImageUpdate(index, updates);
     }
   };
+
+
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -3029,26 +2675,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             setContextMenuOpen={setContextMenuOpen}
             handleImageUpdateWithGroup={handleImageUpdateWithGroup}
           />
-          {/* Group labels overlay */}
-          {Array.from(groups.values()).map((grp) => (
-            <GroupLabel
-              key={grp.id}
-              group={grp}
-              images={images}
-              handleImageUpdateWithGroup={handleImageUpdateWithGroup}
-              onGroupMove={(groupId, dx, dy) => {
-                // Compute member element IDs for persistence (only include persisted elementIds)
-                const memberElementIds: string[] = [];
-                (grp.itemIndices || []).forEach(idx => {
-                  const it = images[idx];
-                  if (it && (it as any).elementId) {
-                    memberElementIds.push((it as any).elementId);
-                  }
-                });
-                try { onPersistGroupMove?.(groupId, { x: dx, y: dy }, memberElementIds); } catch (e) { console.error('onPersistGroupMove failed', e); }
-              }}
-            />
-          ))}
           {/* Selection Rect & Toolbar */}
           <SelectionBox
             selectionBox={selectionBox}
@@ -3062,9 +2688,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedTextInputIds={selectedTextInputIds}
             images={images}
             selectionDragOriginRef={selectionDragOriginRef}
-            setPendingGroupItems={setPendingGroupItems}
-            setIsGroupNameModalOpen={setIsGroupNameModalOpen}
             setSelectionTightRect={setSelectionTightRect}
+            setIsDragSelection={setIsDragSelection}
             handleImageUpdateWithGroup={handleImageUpdateWithGroup}
             setTextInputStates={setTextInputStates}
             setImageModalStates={setImageModalStates}
@@ -3074,8 +2699,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             imageModalStates={imageModalStates}
             videoModalStates={videoModalStates}
             musicModalStates={musicModalStates}
-            groups={groups}
-            setGroups={setGroups}
             setSelectedImageIndices={setSelectedImageIndices}
             setSelectedTextInputIds={setSelectedTextInputIds}
             setSelectedImageModalIds={setSelectedImageModalIds}
@@ -3083,6 +2706,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedMusicModalIds={setSelectedMusicModalIds}
             onPersistImageModalMove={onPersistImageModalMove}
             onPersistTextModalMove={onPersistTextModalMove}
+            onImageUpdate={onImageUpdate}
           />
           {/* Transformer for selected nodes */}
           {selectedImageIndices.length > 0 && (
@@ -3138,6 +2762,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setMusicModalStates={setMusicModalStates}
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
+        setSelectedImageIndices={setSelectedImageIndices}
         onTextCreate={onTextCreate}
         onImageSelect={onImageSelect}
         onImageGenerate={onImageGenerate}
@@ -3150,7 +2775,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
-        groups={groups}
         onAddImageToCanvas={onAddImageToCanvas}
         onPersistImageModalCreate={onPersistImageModalCreate}
         onPersistImageModalMove={onPersistImageModalMove}
@@ -3315,69 +2939,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           (contextMenuModalType === 'video' && videoModalStates.find(m => m.id === contextMenuModalId)?.generatedVideoUrl) ||
           (contextMenuModalType === 'music' && musicModalStates.find(m => m.id === contextMenuModalId)?.generatedMusicUrl)
         ))}
-      />
-      {/* Group Name Modal */}
-      <GroupNameModal
-        isOpen={isGroupNameModalOpen}
-        onClose={() => {
-          setIsGroupNameModalOpen(false);
-          setPendingGroupItems(null);
-        }}
-        onConfirm={(name) => {
-          if (pendingGroupItems) {
-            const groupId = `group-${Date.now()}-${Math.random()}`;
-            setGroups(prev => {
-              const newGroups = new Map(prev);
-              newGroups.set(groupId, {
-                id: groupId,
-                name,
-                itemIndices: pendingGroupItems.imageIndices,
-                textIds: pendingGroupItems.textIds,
-                imageModalIds: pendingGroupItems.imageModalIds,
-                videoModalIds: pendingGroupItems.videoModalIds,
-                musicModalIds: pendingGroupItems.musicModalIds,
-              });
-              // Notify parent of groups change so snapshot can include groups
-              try { onGroupsChange?.(newGroups); } catch (e) { /* ignore */ }
-              return newGroups;
-            });
-            // Update images to have groupId
-            pendingGroupItems.imageIndices.forEach(index => {
-              if (onImageUpdate) {
-                onImageUpdate(index, { groupId });
-              }
-            });
-            // compute approximate bounds for group persistence
-            try {
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              pendingGroupItems.imageIndices.forEach(index => {
-                const it = images[index];
-                if (!it) return;
-                const ix = it.x || 0;
-                const iy = it.y || 0;
-                const iw = it.width || 0;
-                const ih = it.height || 0;
-                minX = Math.min(minX, ix);
-                minY = Math.min(minY, iy);
-                maxX = Math.max(maxX, ix + iw);
-                maxY = Math.max(maxY, iy + ih);
-              });
-              const gx = isFinite(minX) ? minX : 0;
-              const gy = isFinite(minY) ? minY : 0;
-              const gw = isFinite(maxX) ? (maxX - minX) : 0;
-              const gh = isFinite(maxY) ? (maxY - minY) : 0;
-              // call persist callback
-              try {
-                onPersistGroupCreate?.({ id: groupId, name, x: gx, y: gy, width: gw, height: gh, itemIndices: pendingGroupItems.imageIndices, textIds: pendingGroupItems.textIds, imageModalIds: pendingGroupItems.imageModalIds, videoModalIds: pendingGroupItems.videoModalIds, musicModalIds: pendingGroupItems.musicModalIds });
-              } catch (e) { console.error('onPersistGroupCreate failed', e); }
-            } catch (e) {
-              /* ignore */
-            }
-            setIsGroupNameModalOpen(false);
-            setPendingGroupItems(null);
-          }
-        }}
-        defaultName={`Group ${groups.size + 1}`}
       />
     </div>
   );

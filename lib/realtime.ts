@@ -42,10 +42,6 @@ export type RealtimeEvent =
   | { type: 'media.create'; media: MediaElement }
   | { type: 'media.update'; id: string; updates: Partial<MediaElement> }
   | { type: 'media.delete'; id: string }
-  | { type: 'group.create'; group: any }
-  | { type: 'group.update'; id: string; updates: any }
-  | { type: 'group.delete'; id: string }
-  | { type: 'group.move'; id: string; delta: { x: number; y: number }; elementIds?: string[] };
 
 export class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -111,14 +107,6 @@ export class RealtimeClient {
               this.emit({ type: 'init', overlays: msg.overlays, media: Array.isArray(msg.media) ? msg.media : [] });
             } else if (msg.type === 'generator.create' && msg.overlay) {
               this.emit({ type: 'generator.create', overlay: msg.overlay });
-            } else if (msg.type === 'group.create' && msg.group) {
-              this.emit({ type: 'group.create', group: msg.group });
-            } else if (msg.type === 'group.update' && msg.id && msg.updates) {
-              this.emit({ type: 'group.update', id: msg.id, updates: msg.updates });
-            } else if (msg.type === 'group.delete' && msg.id) {
-              this.emit({ type: 'group.delete', id: msg.id });
-            } else if (msg.type === 'group.move' && msg.id && msg.delta) {
-              this.emit({ type: 'group.move', id: msg.id, delta: msg.delta, elementIds: Array.isArray(msg.elementIds) ? msg.elementIds : [] });
             } else if (msg.type === 'generator.update' && msg.id && msg.updates) {
               this.emit({ type: 'generator.update', id: msg.id, updates: msg.updates });
             } else if (msg.type === 'generator.delete' && msg.id) {
@@ -189,19 +177,6 @@ export class RealtimeClient {
     this.send({ type: 'media.delete', id, projectId: this.projectId });
   }
 
-  // Group helpers
-  sendGroupCreate(group: any) {
-    this.send({ type: 'group.create', group, projectId: this.projectId });
-  }
-  sendGroupUpdate(id: string, updates: any) {
-    this.send({ type: 'group.update', id, updates, projectId: this.projectId });
-  }
-  sendGroupDelete(id: string) {
-    this.send({ type: 'group.delete', id, projectId: this.projectId });
-  }
-  sendGroupMove(id: string, delta: { x: number; y: number }, elementIds?: string[]) {
-    this.send({ type: 'group.move', id, delta, elementIds, projectId: this.projectId });
-  }
 
   disconnect() {
     try {

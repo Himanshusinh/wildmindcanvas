@@ -206,8 +206,9 @@ export async function generateImageForCanvas(
   aspectRatio: string,
   projectId: string,
   width?: number,
-  height?: number
-): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string }> {
+  height?: number,
+  imageCount?: number
+): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
@@ -226,6 +227,7 @@ export async function generateImageForCanvas(
         width,
         height,
         aspectRatio, // Pass aspectRatio for proper model mapping
+        imageCount, // Pass imageCount to generate multiple images
         meta: {
           source: 'canvas',
           projectId,

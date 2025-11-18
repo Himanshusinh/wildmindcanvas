@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TextInput } from '@/components/TextInput';
 import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { VideoUploadModal } from '@/components/VideoUploadModal';
@@ -10,9 +10,9 @@ import Konva from 'konva';
 
 interface ModalOverlaysProps {
   textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
-  imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; generatedImageUrls?: string[]; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; imageCount?: number; isGenerating?: boolean }>;
   videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
-  musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }>;
+  musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -25,6 +25,7 @@ interface ModalOverlaysProps {
   setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>>;
   setSelectedTextInputId: (id: string | null) => void;
   setSelectedTextInputIds: (ids: string[]) => void;
+  setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
   setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedImageModalId: (id: string | null) => void;
   setSelectedImageModalIds: (ids: string[]) => void;
@@ -34,9 +35,12 @@ interface ModalOverlaysProps {
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedMusicModalId: (id: string | null) => void;
   setSelectedMusicModalIds: (ids: string[]) => void;
+  setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
+  setIsDragSelection?: (value: boolean) => void;
+  images?: Array<{ x?: number; y?: number; width?: number; height?: number; [key: string]: any }>;
   onTextCreate?: (text: string, x: number, y: number) => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string) => Promise<string | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
   onMusicSelect?: (file: File) => void;
@@ -46,7 +50,6 @@ interface ModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
-  groups: Map<string, { id: string; name?: string; itemIndices: number[]; textIds?: string[]; imageModalIds?: string[]; videoModalIds?: string[]; musicModalIds?: string[] }>;
   onAddImageToCanvas?: (url: string) => void;
   // Persistence callbacks for image generator modals
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
@@ -88,6 +91,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setTextInputStates,
   setSelectedTextInputId,
   setSelectedTextInputIds,
+  setSelectedImageIndices,
   setImageModalStates,
   setSelectedImageModalId,
   setSelectedImageModalIds,
@@ -97,6 +101,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setMusicModalStates,
   setSelectedMusicModalId,
   setSelectedMusicModalIds,
+  setSelectionTightRect,
+  setIsDragSelection,
+  images = [],
   onTextCreate,
   onImageSelect,
   onImageGenerate,
@@ -109,7 +116,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
-  groups,
   onAddImageToCanvas,
   onPersistImageModalCreate,
   onPersistImageModalMove,
@@ -128,20 +134,19 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistConnectorCreate,
   onPersistConnectorDelete,
 }) => {
-  // Helper function to check if a component is in a group
-  const isInGroup = (textId?: string, imageModalId?: string, videoModalId?: string, musicModalId?: string): boolean => {
-    for (const group of groups.values()) {
-      if (textId && group.textIds?.includes(textId)) return true;
-      if (imageModalId && group.imageModalIds?.includes(imageModalId)) return true;
-      if (videoModalId && group.videoModalIds?.includes(videoModalId)) return true;
-      if (musicModalId && group.musicModalIds?.includes(musicModalId)) return true;
-    }
-    return false;
-  };
   // Connection state (supports controlled or uncontrolled usage)
   const [localConnections, setLocalConnections] = useState<Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
   const connections = externalConnections ?? localConnections;
   const [activeDrag, setActiveDrag] = useState<null | { from: string; color: string; startX: number; startY: number; currentX: number; currentY: number }>(null);
+  const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
+  
+  // Force recalculation when viewport changes
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      setViewportUpdateKey(prev => prev + 1);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [position.x, position.y, scale]);
 
   // Event listeners for node drag lifecycle
   useEffect(() => {
@@ -310,12 +315,74 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     return null;
   };
 
-  const connectionLines = connections.map(conn => {
-    const fromCenter = computeNodeCenter(conn.from, 'send');
-    const toCenter = computeNodeCenter(conn.to, 'receive');
-    if (!fromCenter || !toCenter) return null;
-    return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
-  }).filter(Boolean) as Array<{ from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
+  // Memoize connection lines to recalculate when viewport changes
+  const connectionLines = useMemo(() => {
+    // Define computeNodeCenter inside useMemo to ensure it uses latest values
+    const computeNodeCenter = (id: string, side: 'send' | 'receive'): { x: number; y: number } | null => {
+      if (!id) return null;
+      // Prefer frame element (set via data-frame-id on inner frame)
+      const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`);
+      if (frameEl) {
+        const rect = frameEl.getBoundingClientRect();
+        const centerY = rect.top + rect.height / 2;
+        if (side === 'send') return { x: Math.round(rect.right), y: Math.round(centerY) };
+        return { x: Math.round(rect.left), y: Math.round(centerY) };
+      }
+
+      // Next prefer the overlay container
+      const overlay = document.querySelector(`[data-overlay-id="${id}"]`);
+      if (overlay) {
+        const rect = overlay.getBoundingClientRect();
+        const centerY = rect.top + rect.height / 2;
+        if (side === 'send') return { x: Math.round(rect.right), y: Math.round(centerY) };
+        return { x: Math.round(rect.left), y: Math.round(centerY) };
+      }
+
+      // Fallback: use the small node element position (circle center)
+      const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
+      }
+
+      // If DOM elements are not present (or during transforms), try computing from stage transform
+      try {
+        const stage = stageRef?.current as any;
+        if (stage && typeof stage.container === 'function') {
+          const containerRect = stage.container().getBoundingClientRect();
+          // Try to find modal state by id to get its canvas coords and size
+          const findModal = () => {
+            const t = textInputStates.find(t => t.id === id);
+            if (t) return { x: t.x, y: t.y, width: 300, height: 100 };
+            const im = imageModalStates.find(m => m.id === id);
+            if (im) return { x: im.x, y: im.y, width: (im as any).frameWidth || 600, height: (im as any).frameHeight || 400 };
+            const vm = videoModalStates.find(m => m.id === id);
+            if (vm) return { x: vm.x, y: vm.y, width: (vm as any).frameWidth || 600, height: (vm as any).frameHeight || 338 };
+            const mm = musicModalStates.find(m => m.id === id);
+            if (mm) return { x: mm.x, y: mm.y, width: (mm as any).frameWidth || 600, height: (mm as any).frameHeight || 300 };
+            return null;
+          };
+          const modal = findModal();
+          if (modal) {
+            const centerX = Math.round(containerRect.left + position.x + (modal.x * scale) + ((modal.width * scale) / 2));
+            const centerY = Math.round(containerRect.top + position.y + (modal.y * scale) + ((modal.height * scale) / 2));
+            if (side === 'send') return { x: Math.round(centerX + (modal.width * scale) / 2), y: centerY };
+            return { x: Math.round(centerX - (modal.width * scale) / 2), y: centerY };
+          }
+        }
+      } catch (err) {
+        // ignore and fallback
+      }
+      return null;
+    };
+
+    return connections.map(conn => {
+      const fromCenter = computeNodeCenter(conn.from, 'send');
+      const toCenter = computeNodeCenter(conn.to, 'receive');
+      if (!fromCenter || !toCenter) return null;
+      return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
+    }).filter(Boolean) as Array<{ from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportUpdateKey, stageRef]);
 
   // Compute bounding rect for a node/modal to place the run icon just outside
   const computeNodeBounds = (id: string): DOMRect | null => {
@@ -354,21 +421,21 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           <g key={`${line.from}-${line.to}`}>
             <path
               d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
-              stroke="#3A8DFF"
+              stroke="#437eb5"
               strokeWidth={computeStrokeForScale(2)}
               fill="none"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
               style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))' }}
             />
-            <circle cx={line.fromX} cy={line.fromY} r={computeCircleRadiusForScale(3)} fill="#3A8DFF" vectorEffect="non-scaling-stroke" />
-            <circle cx={line.toX} cy={line.toY} r={computeCircleRadiusForScale(3)} fill="#3A8DFF" vectorEffect="non-scaling-stroke" />
+            <circle cx={line.fromX} cy={line.fromY} r={computeCircleRadiusForScale(3)} fill="#437eb5" vectorEffect="non-scaling-stroke" />
+            <circle cx={line.toX} cy={line.toY} r={computeCircleRadiusForScale(3)} fill="#437eb5" vectorEffect="non-scaling-stroke" />
           </g>
         ))}
         {activeDrag && (
           <path
             d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-            stroke="#3A8DFF"
+            stroke="#437eb5"
             strokeWidth={computeStrokeForScale(1.6)}
             vectorEffect="non-scaling-stroke"
             fill="none"
@@ -403,7 +470,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
             setSelectedTextInputId(null);
           }}
-          onPositionChange={isInGroup(textState.id) ? undefined : (newX, newY) => {
+          onPositionChange={(newX, newY) => {
             setTextInputStates(prev => prev.map(t => 
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
@@ -462,10 +529,22 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           onGenerate={async (prompt, model, frame, aspectRatio) => {
             if (onImageGenerate) {
               try {
-                const imageUrl = await onImageGenerate(prompt, model, frame, aspectRatio, modalState.id);
-                if (imageUrl) {
-                  // Keep the modal visible and show the generated image inside the frame
-                  setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedImageUrl: imageUrl } : m));
+                const imageCount = (modalState as any).imageCount || 1;
+                const result = await onImageGenerate(prompt, model, frame, aspectRatio, modalState.id, imageCount);
+                if (result) {
+                  // Extract image URLs
+                  const imageUrls = result.images && result.images.length > 0 
+                    ? result.images.map(img => img.url)
+                    : result.url 
+                      ? [result.url]
+                      : [];
+                  
+                  // Keep the modal visible and show the generated image(s) inside the frame
+                  setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { 
+                    ...m, 
+                    generatedImageUrl: imageUrls[0] || null,
+                    generatedImageUrls: imageUrls,
+                  } : m));
                   if (onPersistImageModalMove) {
                     // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
                     const [w, h] = aspectRatio.split(':').map(Number);
@@ -474,14 +553,15 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
                     const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
                     const frameHeight = Math.max(400, rawHeight);
                     Promise.resolve(onPersistImageModalMove(modalState.id, {
-                      generatedImageUrl: imageUrl,
+                      generatedImageUrl: imageUrls[0] || null,
+                      generatedImageUrls: imageUrls,
                       model,
                       frame,
                       aspectRatio,
                       frameWidth,
                       frameHeight,
                       prompt,
-                    })).catch(console.error);
+                    } as any)).catch(console.error);
                   }
                 }
               } catch (error) {
@@ -491,6 +571,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             }
           }}
           generatedImageUrl={modalState.generatedImageUrl}
+          generatedImageUrls={(modalState as any).generatedImageUrls}
+          isGenerating={(modalState as any).isGenerating}
           initialModel={(modalState as any).model}
           initialFrame={(modalState as any).frame}
           initialAspectRatio={(modalState as any).aspectRatio}
@@ -562,12 +644,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={isInGroup(undefined, modalState.id) ? undefined : (newX, newY) => {
+          onPositionChange={(newX, newY) => {
             setImageModalStates(prev => prev.map(m => 
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));
           }}
-          onPositionCommit={isInGroup(undefined, modalState.id) ? undefined : (finalX, finalY) => {
+          onPositionCommit={(finalX, finalY) => {
             if (onPersistImageModalMove) {
               Promise.resolve(onPersistImageModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
             }
@@ -575,6 +657,15 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           stageRef={stageRef}
           scale={scale}
           position={position}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onImageGenerate={onImageGenerate}
+          initialCount={(modalState as any).imageCount}
+          onUpdateModalState={(modalId, updates) => {
+            setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+            if (onPersistImageModalMove) {
+              Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+            }
+          }}
         />
       ))}
       {/* Video Upload Modal Overlays */}
@@ -741,12 +832,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={isInGroup(undefined, undefined, modalState.id) ? undefined : (newX, newY) => {
+          onPositionChange={(newX, newY) => {
             setVideoModalStates(prev => prev.map(m => 
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));
           }}
-          onPositionCommit={isInGroup(undefined, undefined, modalState.id) ? undefined : (finalX, finalY) => {
+          onPositionCommit={(finalX, finalY) => {
             if (onPersistVideoModalMove) {
               Promise.resolve(onPersistVideoModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
             }
@@ -822,10 +913,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}
-          onPositionChange={isInGroup(undefined, undefined, undefined, modalState.id) ? undefined : (newX, newY) => {
+          onPositionChange={(newX, newY) => {
             setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
           }}
-          onPositionCommit={isInGroup(undefined, undefined, undefined, modalState.id) ? undefined : (finalX, finalY) => {
+          onPositionCommit={(finalX, finalY) => {
             if (onPersistMusicModalMove) {
               Promise.resolve(onPersistMusicModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
             }

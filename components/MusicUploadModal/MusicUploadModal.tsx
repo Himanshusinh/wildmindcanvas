@@ -61,6 +61,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -73,6 +74,10 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [duration, setDuration] = useState(0);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -83,7 +88,10 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
+  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderWidth = 2;
+  const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
+  const controlFontSize = `${13 * scale}px`;
 
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
@@ -113,6 +121,23 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   useEffect(() => { if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel); }, [initialModel]);
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+      if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(event.target as Node)) {
+        setIsAspectRatioDropdownOpen(false);
+      }
+    };
+
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isModelDropdownOpen, isAspectRatioDropdownOpen]);
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -498,13 +523,13 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: isHovered ? '0px' : `${16 * scale}px`,
-          borderTop: `${2 * scale}px solid ${frameBorderColor}`,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
-          transition: 'border 0.18s ease, box-shadow 0.3s ease',
-          boxShadow: isHovered ? 'none' : `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
+          borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
+          borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          transition: 'border 0.18s ease',
+          boxShadow: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -560,23 +585,23 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               height: `${56 * scale}px`,
               borderRadius: '50%',
               border: 'none',
-              backgroundColor: generatedMusicUrl ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: generatedMusicUrl ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
               color: generatedMusicUrl ? 'white' : '#9ca3af',
               cursor: generatedMusicUrl ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: generatedMusicUrl ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
+              boxShadow: generatedMusicUrl ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
               flexShrink: 0,
             }}
             onMouseEnter={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
               }
             }}
           >
@@ -615,7 +640,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 style={{
                   width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
                   height: '100%',
-                  backgroundColor: generatedMusicUrl ? '#3b82f6' : 'rgba(59, 130, 246, 0.3)',
+                  backgroundColor: generatedMusicUrl ? '#437eb5' : 'rgba(67, 126, 181, 0.3)',
                   borderRadius: `${3 * scale}px`,
                   transition: isDraggingProgress ? 'none' : 'width 0.1s linear',
                   position: 'relative',
@@ -633,7 +658,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                       height: `${12 * scale}px`,
                       borderRadius: '50%',
                       backgroundColor: '#ffffff',
-                      border: `${2 * scale}px solid #3b82f6`,
+                      border: `${2 * scale}px solid #437eb5`,
                       boxShadow: `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.2)`,
                       cursor: 'grab',
                     }}
@@ -679,8 +704,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 width: `${20 * scale}px`,
                 height: `${20 * scale}px`,
                 borderRadius: '50%',
-                backgroundColor: '#60B8FF',
-                boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+                backgroundColor: '#437eb5',
                 cursor: 'pointer',
                 border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
                 zIndex: 5000,
@@ -700,7 +724,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 if (!id) return;
                 e.stopPropagation();
                 e.preventDefault();
-                const color = '#3A8DFF';
+                const color = '#437eb5';
 
                 const handlePointerUp = (pe: any) => {
                   try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
@@ -727,8 +751,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                 width: `${20 * scale}px`,
                 height: `${20 * scale}px`,
                 borderRadius: '50%',
-                backgroundColor: '#60B8FF',
-                boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+                backgroundColor: '#437eb5',
                 cursor: 'grab',
                 border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
                 zIndex: 5000,
@@ -739,6 +762,56 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
             />
           </>
         </div>
+        {/* Pin Icon Button - Bottom Right */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+            border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isPinned ? '#437eb5' : '#4b5563'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
         {/* Close music frame wrapper */}
       </div>
 
@@ -757,18 +830,18 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
-          transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
-          opacity: isHovered ? 1 : 0,
-          maxHeight: isHovered ? '500px' : '0px',
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+          opacity: (isHovered || isPinned) ? 1 : 0,
+          maxHeight: (isHovered || isPinned) ? '500px' : '0px',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
-          pointerEvents: isHovered ? 'auto' : 'none',
-          overflow: 'hidden',
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+          overflow: 'visible',
           zIndex: 3,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: `${2 * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -795,18 +868,18 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               flex: 1,
               padding: `${10 * scale}px ${14 * scale}px`,
               backgroundColor: '#ffffff',
-              border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
+              border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${10 * scale}px`,
-              fontSize: `${13 * scale}px`,
+              fontSize: controlFontSize,
               color: '#1f2937',
               outline: 'none',
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#3b82f6';
-              e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
+              e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+              e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.border = `1px solid ${dropdownBorderColor}`;
               e.currentTarget.style.boxShadow = 'none';
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -820,23 +893,23 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: (prompt.trim() && !isGenerating) ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
               border: 'none',
               borderRadius: `${10 * scale}px`,
               cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
               color: 'white',
-              boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
+              boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
               padding: 0,
               opacity: isGenerating ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
               if (prompt.trim() && !isGenerating) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (prompt.trim() && !isGenerating) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -850,7 +923,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
               </svg>
             ) : (
               <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <path d="M6 12h9" />
+                <path d="M13 6l6 6-6 6" />
               </svg>
             )}
           </button>
@@ -858,95 +932,195 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
 
         {/* Settings Row */}
         <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Model Selector */}
-          <div style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px` }}>
-            <select
-              value={selectedModel}
-              onChange={(e) => {
-                const newModel = e.target.value;
-                setSelectedModel(newModel);
-                const frameWidth = 600;
-                const frameHeight = 300;
-                onOptionsChange?.({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight });
+          {/* Model Selector - Custom Dropdown */}
+          <div ref={modelDropdownRef} style={{ position: 'relative', flex: 1, minWidth: `${140 * scale}px`, overflow: 'visible', zIndex: 3002 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsModelDropdownOpen(!isModelDropdownOpen);
+                setIsAspectRatioDropdownOpen(false);
               }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
                 padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                 backgroundColor: '#ffffff',
-                border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
-                borderRadius: `${10 * scale}px`,
-                fontSize: `${12 * scale}px`,
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
                 fontWeight: '500',
                 color: '#1f2937',
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `right ${12 * scale}px center`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                textAlign: 'left',
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
             >
-              <option value="MusicGen">MusicGen</option>
-              <option value="AudioCraft">AudioCraft</option>
-              <option value="MusicLM">MusicLM</option>
-              <option value="Jukebox">Jukebox</option>
-              <option value="Mubert">Mubert</option>
-            </select>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isModelDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {['MusicGen', 'AudioCraft', 'MusicLM', 'Jukebox', 'Mubert'].map((model) => (
+                  <div
+                    key={model}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedModel(model);
+                      setIsModelDropdownOpen(false);
+                      const frameWidth = 600;
+                      const frameHeight = 300;
+                      onOptionsChange?.({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                    }}
+                    style={{
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedModel === model && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{model}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Aspect Ratio Selector */}
-          <div style={{ position: 'relative' }}>
-            <select
-              value={selectedAspectRatio}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedAspectRatio(val);
-                const frameWidth = 600;
-                const frameHeight = 300;
-                onOptionsChange?.({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, frameWidth, frameHeight });
+          {/* Aspect Ratio Selector - Custom Dropdown */}
+          <div ref={aspectRatioDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAspectRatioDropdownOpen(!isAspectRatioDropdownOpen);
+                setIsModelDropdownOpen(false);
               }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                border: `${1 * scale}px solid rgba(59, 130, 246, 0.2)`,
-                borderRadius: `${10 * scale}px`,
-                fontSize: `${12 * scale}px`,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
                 fontWeight: '600',
-                color: '#3b82f6',
+                color: '#1f2937',
                 minWidth: `${70 * scale}px`,
                 outline: 'none',
                 cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `right ${10 * scale}px center`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = `0 0 0 ${2 * scale}px rgba(59, 130, 246, 0.1)`;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
             >
-              <option value="1:1">1:1</option>
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-              <option value="4:3">4:3</option>
-              <option value="3:4">3:4</option>
-              <option value="21:9">21:9</option>
-            </select>
+              <span>{selectedAspectRatio}</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isAspectRatioDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                  minWidth: `${100 * scale}px`,
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'].map((ratio) => (
+                  <div
+                    key={ratio}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAspectRatio(ratio);
+                      setIsAspectRatioDropdownOpen(false);
+                      const frameWidth = 600;
+                      const frameHeight = 300;
+                      onOptionsChange?.({ model: selectedModel, aspectRatio: ratio, frame: selectedFrame, prompt, frameWidth, frameHeight });
+                    }}
+                    style={{
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedAspectRatio === ratio ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedAspectRatio === ratio ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedAspectRatio !== ratio) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedAspectRatio !== ratio) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedAspectRatio === ratio && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{ratio}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         

@@ -324,7 +324,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       <Group
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        draggable={!imageData.groupId}
+        draggable={true}
         x={x}
         y={y}
         rotation={rotation}

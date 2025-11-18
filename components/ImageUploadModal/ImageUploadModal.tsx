@@ -11,6 +11,8 @@ interface ImageUploadModalProps {
   onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
   onImageSelect?: (file: File) => void;
   generatedImageUrl?: string | null;
+  generatedImageUrls?: string[]; // Array for multiple images (when imageCount > 1)
+  isGenerating?: boolean; // Show loading spinner when generating
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
@@ -30,6 +32,9 @@ interface ImageUploadModalProps {
   initialPrompt?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
   initialCount?: number;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -38,6 +43,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onClose,
   onGenerate,
   generatedImageUrl,
+  generatedImageUrls,
+  isGenerating: externalIsGenerating,
   stageRef,
   scale,
   position,
@@ -58,9 +65,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   initialPrompt,
   initialCount,
   onOptionsChange,
+  onPersistImageModalCreate,
+  onImageGenerate,
+  onUpdateModalState,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -72,6 +83,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageCount, setImageCount] = useState<number>(initialCount ?? 1);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -82,16 +97,126 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)';
+  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderWidth = 2;
+  const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
 
   const handleGenerate = async () => {
-    if (onGenerate && prompt.trim() && !isGenerating) {
+    if (prompt.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
       setIsGenerating(true);
       try {
-        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio);
+        // Calculate frame dimensions for positioning
+        const [w, h] = selectedAspectRatio.split(':').map(Number);
+        const frameWidth = 600;
+        const ar = w && h ? (w / h) : 1;
+        const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
+        const frameHeight = Math.max(400, rawHeight);
+        
+        // Create ALL frames immediately (before generation starts)
+        // This ensures both frames show loading animation
+        const modalIds: string[] = [];
+        const currentModalId = id || `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create current modal if it doesn't exist
+        if (!id && onPersistImageModalCreate) {
+          const currentModal = {
+            id: currentModalId,
+            x: x,
+            y: y,
+            generatedImageUrl: null as string | null,
+            isGenerating: true, // Mark as generating to show loading
+            frameWidth,
+            frameHeight,
+            model: selectedModel,
+            frame: selectedFrame,
+            aspectRatio: selectedAspectRatio,
+            prompt,
+            imageCount: 1,
+          };
+          await Promise.resolve(onPersistImageModalCreate(currentModal));
+        }
+        modalIds.push(currentModalId);
+        
+        // Create additional frames if imageCount > 1
+        for (let i = 1; i < imageCount; i++) {
+          const offsetX = i * (frameWidth + 50);
+          const newX = x + offsetX;
+          const newY = y;
+          
+          const newModalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`;
+          const newModal = {
+            id: newModalId,
+            x: newX,
+            y: newY,
+            generatedImageUrl: null as string | null,
+            isGenerating: true, // Mark as generating to show loading
+            frameWidth,
+            frameHeight,
+            model: selectedModel,
+            frame: selectedFrame,
+            aspectRatio: selectedAspectRatio,
+            prompt,
+            imageCount: 1,
+          };
+          
+          await Promise.resolve(onPersistImageModalCreate(newModal));
+          modalIds.push(newModalId);
+        }
+        
+        // Now make ONE API call with the full imageCount
+        // The backend will generate all images in parallel, ensuring they are different
+        console.log(`[Image Generation] Starting generation of ${imageCount} images`);
+        const result = await onImageGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, currentModalId, imageCount);
+        console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
+        
+        // Extract all generated image URLs
+        const imageUrls: string[] = [];
+        if (result) {
+          console.log(`[Image Generation] Result structure:`, {
+            hasImages: !!result.images,
+            imagesLength: result.images?.length || 0,
+            hasUrl: !!result.url,
+            fullResult: result
+          });
+          
+          if (result.images && Array.isArray(result.images) && result.images.length > 0) {
+            // Multiple images returned
+            imageUrls.push(...result.images.map(img => img.url).filter(url => url));
+            console.log(`[Image Generation] Extracted ${imageUrls.length} images from images array`);
+          } else if (result.url) {
+            // Single image returned (fallback)
+            imageUrls.push(result.url);
+            console.log(`[Image Generation] Using single URL fallback`);
+          }
+        } else {
+          console.warn(`[Image Generation] No result returned from API`);
+        }
+        
+        console.log(`[Image Generation] Final extracted ${imageUrls.length} image URLs (requested ${imageCount})`);
+        
+        if (imageUrls.length < imageCount) {
+          console.warn(`[Image Generation] WARNING: Requested ${imageCount} images but only got ${imageUrls.length}`);
+        }
+        
+        // Update all frames with their respective images
+        // Only show images when all are ready
+        for (let i = 0; i < modalIds.length && i < imageUrls.length; i++) {
+          if (onUpdateModalState) {
+            onUpdateModalState(modalIds[i], {
+              generatedImageUrl: imageUrls[i],
+              isGenerating: false, // Mark as completed
+              model: selectedModel,
+              frame: selectedFrame,
+              aspectRatio: selectedAspectRatio,
+              prompt,
+              frameWidth,
+              frameHeight,
+            } as any);
+          }
+        }
       } catch (error) {
-        console.error('Error generating image:', error);
-        alert('Failed to generate image. Please try again.');
+        console.error('Error generating images:', error);
+        alert('Failed to generate images. Please try again.');
       } finally {
         setIsGenerating(false);
       }
@@ -125,6 +250,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   useEffect(() => {
     if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio);
   }, [initialAspectRatio]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setIsModelDropdownOpen(false);
+      }
+      if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(event.target as Node)) {
+        setIsAspectRatioDropdownOpen(false);
+      }
+    };
+
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isModelDropdownOpen, isAspectRatioDropdownOpen]);
 
   // Get available aspect ratios based on selected model
   const getAvailableAspectRatios = () => {
@@ -170,6 +312,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       { value: '3:4', label: '3:4' },
     ];
   };
+
+  const controlFontSize = `${13 * scale}px`;
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -448,13 +592,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+          borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
           // keep top/left/right borders, but remove bottom border when controls are hovered
-          borderTop: `${2 * scale}px solid ${frameBorderColor}`,
-          borderLeft: `${2 * scale}px solid ${frameBorderColor}`,
-          borderRight: `${2 * scale}px solid ${frameBorderColor}`,
-          borderBottom: isHovered ? 'none' : `${2 * scale}px solid ${frameBorderColor}`,
-          boxShadow: `0 ${8 * scale}px ${32 * scale}px 0 rgba(0, 0, 0, 0.15)`,
+          borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          boxShadow: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -462,7 +606,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           overflow: 'visible',
           position: 'relative',
           zIndex: 1,
-          transition: 'border 0.18s ease, box-shadow 0.3s ease',
+          transition: 'border 0.18s ease',
         }}
       >
         {generatedImageUrl ? (
@@ -474,7 +618,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               height: '100%',
               objectFit: 'cover',
               pointerEvents: 'none',
-              borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+              borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
             }}
             draggable={false}
           />
@@ -497,7 +641,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             </svg>
           </div>
         )}
-        {isGenerating && (
+        {(isGenerating || externalIsGenerating) && !generatedImageUrl && (
           <FrameSpinner scale={scale} label="Generating image…" />
         )}
         {/* Connection Nodes - always rendered but subtle until hovered or during drag
@@ -528,8 +672,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               width: `${20 * scale}px`,
               height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: '#60B8FF',
-              boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+              backgroundColor: '#437eb5',
               cursor: 'pointer',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
               zIndex: 5000,
@@ -551,7 +694,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               if (!id) return;
               e.stopPropagation();
               e.preventDefault();
-              const color = '#3A8DFF';
+              const color = '#437eb5';
 
               const handlePointerUp = (pe: any) => {
                 try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
@@ -580,7 +723,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               width: `${20 * scale}px`,
               height: `${20 * scale}px`,
               borderRadius: '50%',
-              backgroundColor: '#60B8FF',
+              backgroundColor: '#437eb5',
               boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
               cursor: 'grab',
               border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
@@ -591,6 +734,56 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             }}
           />
         </>
+        {/* Pin Icon Button - Bottom Right */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+            border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isPinned ? '#437eb5' : '#4b5563'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
         {/* Delete button removed - now handled by context menu in header */}
       </div>
 
@@ -609,19 +802,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
-          transform: isHovered ? 'translateY(0)' : `translateY(-100%)`,
-          opacity: isHovered ? 1 : 0,
-          maxHeight: isHovered ? '500px' : '0px',
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+          opacity: (isHovered || isPinned) ? 1 : 0,
+          maxHeight: (isHovered || isPinned) ? '500px' : '0px',
           display: 'flex',
           flexDirection: 'column',
           gap: `${12 * scale}px`,
-          pointerEvents: isHovered ? 'auto' : 'none',
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
           overflow: 'visible',
           zIndex: 1,
           // Add left, right and bottom borders to match the frame border color/weight
-          borderLeft: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
-          borderRight: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
-          borderBottom: `${2 * scale}px solid ${isSelected ? '#3b82f6' : 'rgba(0,0,0,0.1)'}`,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -675,23 +868,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: (prompt.trim() && !isGenerating) ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.1)',
+                backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
                 border: 'none',
                 borderRadius: `${10 * scale}px`,
                 cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
                 color: 'white',
-                boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)` : 'none',
+                boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
                 padding: 0,
                 opacity: isGenerating ? 0.6 : 1,
               }}
               onMouseEnter={(e) => {
                 if (prompt.trim()) {
-                  e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(59, 130, 246, 0.5)`;
+                  e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
                 }
               }}
               onMouseLeave={(e) => {
                 if (prompt.trim()) {
-                  e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(59, 130, 246, 0.4)`;
+                  e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
                 }
               }}
               onMouseDown={(e) => e.stopPropagation()}
@@ -715,41 +908,71 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
           {/* Settings Row */}
           <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Model Selector */}
-            <div style={{ position: 'relative', flex: '0 0 auto', width: `${220 * scale}px`, minWidth: `${120 * scale}px`, overflow: 'visible', zIndex: 3002 }}>
-              <select
-                value={selectedModel}
+            {/* Model Selector - Custom Dropdown */}
+            <div ref={modelDropdownRef} style={{ position: 'relative', flex: '0 0 auto', width: `${220 * scale}px`, minWidth: `${120 * scale}px`, overflow: 'visible', zIndex: 3002 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsModelDropdownOpen(!isModelDropdownOpen);
+                  setIsAspectRatioDropdownOpen(false);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
                 style={{
                     width: '100%',
                     padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                     backgroundColor: '#ffffff',
-                  zIndex: 3002,
-                  border: `1px solid ${frameBorderColor}`,
+                  border: `1px solid ${dropdownBorderColor}`,
                   borderRadius: `${9999 * scale}px`,
-                  fontSize: `${13 * scale}px`,
+                  fontSize: controlFontSize,
                   fontWeight: '500',
                   color: '#1f2937',
                   outline: 'none',
                   cursor: 'pointer',
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: `right ${12 * scale}px center`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  textAlign: 'left',
                 }}
-                onFocus={(e) => {
-                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
-                  e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
-                  e.currentTarget.style.boxShadow = 'none';
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+                <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                  <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              
+              {isModelDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: `${4 * scale}px`,
+                    backgroundColor: '#ffffff',
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: `${12 * scale}px`,
+                    boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                    maxHeight: `${300 * scale}px`,
+                    overflowY: 'auto',
+                    zIndex: 3003,
+                    padding: `${4 * scale}px 0`,
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                  const newModel = e.target.value;
-                  setSelectedModel(newModel);
-                  // Reset to default aspect ratio when model changes if current ratio is not supported
-                  const modelLower = newModel.toLowerCase();
+                >
+                  {/* FAL Models */}
+                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderBottom: `1px solid ${dropdownBorderColor}`, marginBottom: `${4 * scale}px` }}>
+                    FAL Models
+                  </div>
+                  {['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].map((model) => (
+                    <div
+                      key={model}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModel(model);
+                        setIsModelDropdownOpen(false);
+                        // Reset aspect ratio if needed
+                        const modelLower = model.toLowerCase();
                   let availableRatios: Array<{ value: string; label: string }>;
                   if (modelLower.includes('flux')) {
                     availableRatios = [
@@ -788,87 +1011,310 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     const ar = w && h ? (w / h) : 1;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
-                    onOptionsChange({ model: newModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
-                  }
-                }}
-              >
-                {/* FAL Models */}
-                <optgroup label="FAL Models">
-                  <option value="Google Nano Banana">Google Nano Banana</option>
-                  <option value="Seedream v4">Seedream v4</option>
-                  <option value="Imagen 4 Ultra">Imagen 4 Ultra</option>
-                  <option value="Imagen 4">Imagen 4</option>
-                  <option value="Imagen 4 Fast">Imagen 4 Fast</option>
-                </optgroup>
-                
-                {/* BFL Flux Models */}
-                <optgroup label="Flux Models">
-                  <option value="Flux Kontext Max">Flux Kontext Max</option>
-                  <option value="Flux Kontext Pro">Flux Kontext Pro</option>
-                  <option value="Flux Pro 1.1 Ultra">Flux Pro 1.1 Ultra</option>
-                  <option value="Flux Pro 1.1">Flux Pro 1.1</option>
-                  <option value="Flux Pro">Flux Pro</option>
-                  <option value="Flux Dev">Flux Dev</option>
-                </optgroup>
+                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                        }
+                      }}
+                      style={{
+                        padding: `${8 * scale}px ${16 * scale}px`,
+                        fontSize: controlFontSize,
+                        color: '#1f2937',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {selectedModel === model && (
+                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      <span>{model}</span>
+                    </div>
+                  ))}
+                  
+                  {/* Flux Models */}
+                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, borderBottom: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px`, marginBottom: `${4 * scale}px` }}>
+                    Flux Models
+                  </div>
+                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Flux Pro', 'Flux Dev'].map((model) => (
+                    <div
+                      key={model}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModel(model);
+                        setIsModelDropdownOpen(false);
+                        // Reset aspect ratio if needed
+                        const modelLower = model.toLowerCase();
+                        let availableRatios: Array<{ value: string; label: string }>;
+                        if (modelLower.includes('flux')) {
+                          availableRatios = [
+                            { value: '1:1', label: '1:1' },
+                            { value: '16:9', label: '16:9' },
+                            { value: '9:16', label: '9:16' },
+                            { value: '4:3', label: '4:3' },
+                            { value: '3:4', label: '3:4' },
+                            { value: '3:2', label: '3:2' },
+                            { value: '2:3', label: '2:3' },
+                            { value: '21:9', label: '21:9' },
+                            { value: '9:21', label: '9:21' },
+                            { value: '16:10', label: '16:10' },
+                            { value: '10:16', label: '10:16' },
+                          ];
+                        } else {
+                          availableRatios = [
+                            { value: '1:1', label: '1:1' },
+                            { value: '16:9', label: '16:9' },
+                            { value: '9:16', label: '9:16' },
+                            { value: '4:3', label: '4:3' },
+                            { value: '3:4', label: '3:4' },
+                            { value: '3:2', label: '3:2' },
+                            { value: '2:3', label: '2:3' },
+                            { value: '21:9', label: '21:9' },
+                            { value: '5:4', label: '5:4' },
+                            { value: '4:5', label: '4:5' },
+                          ];
+                        }
+                        if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
+                          setSelectedAspectRatio(availableRatios[0].value);
+                        }
+                        if (onOptionsChange) {
+                          const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
+                          const frameWidth = 600;
+                          const ar = w && h ? (w / h) : 1;
+                          const rawHeight = Math.round(frameWidth / ar);
+                          const frameHeight = Math.max(400, rawHeight);
+                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                        }
+                      }}
+                      style={{
+                        padding: `${8 * scale}px ${16 * scale}px`,
+                        fontSize: controlFontSize,
+                        color: '#1f2937',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {selectedModel === model && (
+                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      <span>{model}</span>
+                    </div>
+                  ))}
                 
                 {/* Replicate Models */}
-                <optgroup label="Replicate Models">
-                  <option value="Seedream v4 4K">Seedream v4 4K</option>
-                </optgroup>
-              </select>
+                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px` }}>
+                    Replicate Models
             </div>
-
-            
-
-            {/* Aspect Ratio Selector */}
-              <div style={{ position: 'relative', overflow: 'visible', zIndex: 3002 }}>
-              <select
-                value={selectedAspectRatio}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedAspectRatio(val);
+                  {['Seedream v4 4K'].map((model) => (
+                    <div
+                      key={model}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedModel(model);
+                        setIsModelDropdownOpen(false);
+                        // Reset aspect ratio if needed
+                        const modelLower = model.toLowerCase();
+                        let availableRatios: Array<{ value: string; label: string }>;
+                        if (modelLower.includes('flux')) {
+                          availableRatios = [
+                            { value: '1:1', label: '1:1' },
+                            { value: '16:9', label: '16:9' },
+                            { value: '9:16', label: '9:16' },
+                            { value: '4:3', label: '4:3' },
+                            { value: '3:4', label: '3:4' },
+                            { value: '3:2', label: '3:2' },
+                            { value: '2:3', label: '2:3' },
+                            { value: '21:9', label: '21:9' },
+                            { value: '9:21', label: '9:21' },
+                            { value: '16:10', label: '16:10' },
+                            { value: '10:16', label: '10:16' },
+                          ];
+                        } else {
+                          availableRatios = [
+                            { value: '1:1', label: '1:1' },
+                            { value: '16:9', label: '16:9' },
+                            { value: '9:16', label: '9:16' },
+                            { value: '4:3', label: '4:3' },
+                            { value: '3:4', label: '3:4' },
+                            { value: '3:2', label: '3:2' },
+                            { value: '2:3', label: '2:3' },
+                            { value: '21:9', label: '21:9' },
+                            { value: '5:4', label: '5:4' },
+                            { value: '4:5', label: '4:5' },
+                          ];
+                        }
+                        if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
+                          setSelectedAspectRatio(availableRatios[0].value);
+                        }
                   if (onOptionsChange) {
-                    const [w, h] = val.split(':').map(Number);
+                          const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
                     const frameWidth = 600;
                     const ar = w && h ? (w / h) : 1;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
-                    onOptionsChange({ model: selectedModel, aspectRatio: val, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
-                  }
+                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                        }
+                      }}
+                      style={{
+                        padding: `${8 * scale}px ${16 * scale}px`,
+                        fontSize: controlFontSize,
+                        color: '#1f2937',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedModel !== model) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {selectedModel === model && (
+                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      <span>{model}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            
+
+            {/* Aspect Ratio Selector - Custom Dropdown */}
+            <div ref={aspectRatioDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAspectRatioDropdownOpen(!isAspectRatioDropdownOpen);
+                  setIsModelDropdownOpen(false);
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
                 style={{
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                   backgroundColor: '#ffffff',
-                  zIndex: 3002,
-                  border: `1px solid ${frameBorderColor}`,
+                  border: `1px solid ${dropdownBorderColor}`,
                   borderRadius: `${9999 * scale}px`,
-                  fontSize: `${13 * scale}px`,
+                  fontSize: controlFontSize,
                   fontWeight: '600',
                   color: '#1f2937',
                   minWidth: `${70 * scale}px`,
                   outline: 'none',
                   cursor: 'pointer',
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 4L6 8L10 4' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: `right ${10 * scale}px center`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                 }}
-                onFocus={(e) => {
-                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
-                  e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
-                  e.currentTarget.style.boxShadow = 'none';
+              >
+                <span>{selectedAspectRatio}</span>
+                <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                  <path d="M2 4L6 8L10 4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              
+              {isAspectRatioDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: `${4 * scale}px`,
+                    backgroundColor: '#ffffff',
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: `${12 * scale}px`,
+                    boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                    maxHeight: `${200 * scale}px`,
+                    overflowY: 'auto',
+                    zIndex: 3003,
+                    padding: `${4 * scale}px 0`,
+                    minWidth: `${100 * scale}px`,
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 {getAvailableAspectRatios().map((ratio) => (
-                  <option key={ratio.value} value={ratio.value}>
-                    {ratio.label}
-                  </option>
-                ))}
-              </select>
+                    <div
+                      key={ratio.value}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAspectRatio(ratio.value);
+                        setIsAspectRatioDropdownOpen(false);
+                        if (onOptionsChange) {
+                          const [w, h] = ratio.value.split(':').map(Number);
+                          const frameWidth = 600;
+                          const ar = w && h ? (w / h) : 1;
+                          const rawHeight = Math.round(frameWidth / ar);
+                          const frameHeight = Math.max(400, rawHeight);
+                          onOptionsChange({ model: selectedModel, aspectRatio: ratio.value, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                        }
+                      }}
+                      style={{
+                        padding: `${8 * scale}px ${16 * scale}px`,
+                        fontSize: controlFontSize,
+                        color: '#1f2937',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: selectedAspectRatio === ratio.value ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderLeft: selectedAspectRatio === ratio.value ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedAspectRatio !== ratio.value) {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedAspectRatio !== ratio.value) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {selectedAspectRatio === ratio.value && (
+                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      <span>{ratio.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
               {/* Image count +/- control (1..4) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: `${8 * scale}px` }}>
