@@ -31,7 +31,7 @@ interface CanvasProps {
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
   generatedVideoUrl?: string | null;
   isMusicModalOpen?: boolean;
   onMusicModalClose?: () => void;
@@ -140,7 +140,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   });
   const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
-  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection

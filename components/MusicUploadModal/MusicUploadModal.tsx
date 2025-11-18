@@ -981,9 +981,9 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                   overflowY: 'auto',
                   zIndex: 3003,
                   padding: `${4 * scale}px 0`,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
                 {['MusicGen', 'AudioCraft', 'MusicLM', 'Jukebox', 'Mubert'].map((model) => (
                   <div
                     key={model}
@@ -991,10 +991,10 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                       e.stopPropagation();
                       setSelectedModel(model);
                       setIsModelDropdownOpen(false);
-                      const frameWidth = 600;
-                      const frameHeight = 300;
+                const frameWidth = 600;
+                const frameHeight = 300;
                       onOptionsChange?.({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight });
-                    }}
+              }}
                     style={{
                       padding: `${8 * scale}px ${16 * scale}px`,
                       fontSize: controlFontSize,
@@ -1076,9 +1076,9 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
                   zIndex: 3003,
                   padding: `${4 * scale}px 0`,
                   minWidth: `${100 * scale}px`,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
                 {['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'].map((ratio) => (
                   <div
                     key={ratio}

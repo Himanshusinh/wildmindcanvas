@@ -300,8 +300,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           break;
         case 'musicModal':
           musicModalUpdates.set(target.id as string, { x: currentX, y: currentY });
-          break;
-      }
+      break;
+    }
     });
 
     if (imageUpdates.length) {
@@ -783,35 +783,35 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           y={-40}
         >
           {/* Arrange button */}
-          <Group
+            <Group
             x={48}
-            onClick={(e) => {
-              e.cancelBubble = true;
+              onClick={(e) => {
+                e.cancelBubble = true;
                 if (selectionTightRect) {
                   triggerArrange(selectionTightRect);
               }
-            }}
-            onMouseEnter={(e) => {
-              const stage = e.target.getStage();
-              if (stage) {
-                stage.container().style.cursor = 'pointer';
-              }
-            }}
-            onMouseLeave={(e) => {
-              const stage = e.target.getStage();
-              if (stage) {
-                stage.container().style.cursor = 'default';
-              }
-            }}
-          >
-            <Rect
-              x={0}
-              y={0}
-              width={36}
-              height={36}
+              }}
+              onMouseEnter={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'pointer';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'default';
+                }
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={36}
+                height={36}
                 fill="#ffffff"
                 stroke="rgba(15,23,42,0.12)"
-              strokeWidth={1}
+                strokeWidth={1}
                 cornerRadius={10}
                 shadowColor="rgba(15,23,42,0.18)"
                 shadowBlur={6}
@@ -820,7 +820,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               <Group x={9} y={9}>
                 {[0, 1, 2].map((row) => (
                   [0, 1, 2].map((col) => (
-                    <Rect
+              <Rect
                       key={`tight-arrange-${row}-${col}`}
                       x={col * 8}
                       y={row * 8}

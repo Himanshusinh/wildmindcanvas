@@ -4,14 +4,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { TextInput } from '@/components/TextInput';
 import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { VideoUploadModal } from '@/components/VideoUploadModal';
-import { getReplicateQueueStatus, getReplicateQueueResult } from '@/lib/api';
+import { getReplicateQueueStatus, getReplicateQueueResult, getFalQueueStatus, getFalQueueResult, getMiniMaxVideoStatus, getMiniMaxVideoFile } from '@/lib/api';
 import { MusicUploadModal } from '@/components/MusicUploadModal';
 import Konva from 'konva';
 
 interface ModalOverlaysProps {
   textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; generatedImageUrls?: string[]; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; imageCount?: number; isGenerating?: boolean }>;
-  videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
@@ -29,7 +29,7 @@ interface ModalOverlaysProps {
   setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedImageModalId: (id: string | null) => void;
   setSelectedImageModalIds: (ids: string[]) => void;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
+  setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedVideoModalId: (id: string | null) => void;
   setSelectedVideoModalIds: (ids: string[]) => void;
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
@@ -42,11 +42,11 @@ interface ModalOverlaysProps {
   onImageSelect?: (file: File) => void;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onMusicSelect?: (file: File) => void;
   onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => Promise<string | null>;
   generatedVideoUrl?: string | null;
-  generatedMusicUrl?: string | null;
+  generatedMusicUrl?: string | null;  
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -681,13 +681,15 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
               Promise.resolve(onPersistVideoModalDelete(modalState.id)).catch(console.error);
             }
           }}
-          onGenerate={async (prompt, model, frame, aspectRatio) => {
+          onGenerate={async (prompt, model, frame, aspectRatio, duration, resolution) => {
             if (!onVideoGenerate) return null;
             try {
-              // Submit generation (returns taskId + generationId)
-              const submitRes = await onVideoGenerate(prompt, model, frame, aspectRatio, modalState.duration || 5, modalState.id);
+              // Submit generation (returns taskId + generationId + provider)
+              const submitRes = await onVideoGenerate(prompt, model, frame, aspectRatio, duration || modalState.duration || 5, resolution || modalState.resolution, modalState.id);
               const taskId = submitRes?.taskId;
               const generationId = submitRes?.generationId;
+              const provider = submitRes?.provider || 'replicate'; // Default to replicate for backward compatibility
+              
               if (onPersistVideoModalMove) {
                 const [w, h] = aspectRatio.split(':').map(Number);
                 const frameWidth = 600;
@@ -699,37 +701,99 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
                   frame,
                   aspectRatio,
                   prompt,
+                  duration: duration || modalState.duration || 5,
+                  resolution: resolution || modalState.resolution,
                   frameWidth,
                   frameHeight,
                   taskId,
                   generationId,
+                  provider,
                   status: 'submitted',
                 } as any)).catch(console.error);
               }
               // Optimistic state update with tracking fields
-              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, taskId, generationId } : m));
+              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider } : m));
               if (!taskId) return null;
+              
+              // Determine which service to poll based on provider or model
+              const isFalModel = provider === 'fal' || model?.toLowerCase().includes('sora') || model?.toLowerCase().includes('veo') || model?.toLowerCase().includes('ltx');
+              const isMiniMaxModel = provider === 'minimax' || model?.toLowerCase().includes('minimax') || model?.toLowerCase().includes('hailuo');
+              
               // Poll for completion
               const pollIntervalMs = 3000;
               const maxAttempts = 600; // ~30 minutes max
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
-                  const statusData = await getReplicateQueueStatus(taskId);
-                  const statusVal = String(statusData?.status || '').toLowerCase();
-                  if (statusVal === 'completed' || statusVal === 'succeeded' || statusVal === 'success') {
-                    // Fetch result via helper
-                    const resultData = await getReplicateQueueResult(taskId);
-                    // Determine URL from known shapes
-                    let videoUrl: string | null = null;
-                    if (Array.isArray(resultData?.videos) && resultData.videos[0]?.url) {
-                      videoUrl = resultData.videos[0].url;
-                    } else if (resultData?.video?.url) {
-                      videoUrl = resultData.video.url;
-                    } else if (typeof resultData?.output === 'string' && resultData.output.startsWith('http')) {
-                      videoUrl = resultData.output;
-                    } else if (Array.isArray(resultData?.output) && typeof resultData.output[0] === 'string') {
-                      videoUrl = resultData.output[0];
+                  let statusData: any;
+                  let statusVal: string;
+                  
+                  // Use appropriate polling endpoint based on provider
+                  if (isFalModel) {
+                    statusData = await getFalQueueStatus(taskId);
+                    statusVal = String(statusData?.status || '').toLowerCase();
+                  } else if (isMiniMaxModel) {
+                    statusData = await getMiniMaxVideoStatus(taskId);
+                    // MiniMax status structure: result.status or base_resp.status_code
+                    // Check result.status_code (0 = success, 1 = processing)
+                    const resultStatusCode = statusData?.result?.status_code;
+                    const baseRespCode = statusData?.base_resp?.status_code;
+                    const resultStatus = statusData?.result?.status || statusData?.status;
+                    
+                    // MiniMax: 0 = success, 1 = processing, other = error
+                    // Also check if file_id exists (indicates completion)
+                    const hasFileId = !!(statusData?.result?.file_id || statusData?.file_id);
+                    
+                    if (hasFileId || resultStatusCode === 0 || baseRespCode === 0 || resultStatus === 'SUCCESS' || resultStatus === 'success') {
+                      statusVal = 'completed';
+                    } else if (resultStatusCode === 1 || baseRespCode === 1 || resultStatus === 'PROCESSING' || resultStatus === 'processing') {
+                      statusVal = 'processing';
+                    } else {
+                      statusVal = 'failed';
                     }
+                  } else {
+                    // Default to Replicate
+                    statusData = await getReplicateQueueStatus(taskId);
+                    statusVal = String(statusData?.status || '').toLowerCase();
+                  }
+                  
+                  if (statusVal === 'completed' || statusVal === 'succeeded' || statusVal === 'success') {
+                    // Fetch result via appropriate helper
+                    let resultData: any;
+                    let videoUrl: string | null = null;
+                    
+                    if (isFalModel) {
+                      resultData = await getFalQueueResult(taskId);
+                    } else if (isMiniMaxModel) {
+                      // MiniMax: get file_id from status response and fetch file
+                      const fileId = statusData?.result?.file_id || statusData?.file_id;
+                      if (fileId && generationId) {
+                        resultData = await getMiniMaxVideoFile(fileId, generationId);
+                        // MiniMax file response structure: processVideoFile returns videos array
+                        if (resultData?.videos && Array.isArray(resultData.videos) && resultData.videos[0]?.url) {
+                          videoUrl = resultData.videos[0].url;
+                        } else {
+                          videoUrl = resultData?.download_url || resultData?.url || resultData?.result?.download_url || resultData?.file?.url;
+                        }
+                      }
+                    } else {
+                      resultData = await getReplicateQueueResult(taskId);
+                    }
+                    
+                    // Determine URL from known shapes (for non-MiniMax)
+                    if (!videoUrl) {
+                      if (Array.isArray(resultData?.videos) && resultData.videos[0]?.url) {
+                        videoUrl = resultData.videos[0].url;
+                      } else if (resultData?.video?.url) {
+                        videoUrl = resultData.video.url;
+                      } else if (typeof resultData?.output === 'string' && resultData.output.startsWith('http')) {
+                        videoUrl = resultData.output;
+                      } else if (Array.isArray(resultData?.output) && typeof resultData.output[0] === 'string') {
+                        videoUrl = resultData.output[0];
+                      } else if (resultData?.data?.video?.url) {
+                        videoUrl = resultData.data.video.url;
+                      }
+                    }
+                    
                     if (videoUrl) {
                       setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedVideoUrl: videoUrl } : m));
                       if (onPersistVideoModalMove) {
@@ -742,14 +806,25 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
                     }
                     // If result doesn't include URL yet, continue polling briefly
                   } else if (statusVal === 'failed' || statusVal === 'error') {
-                    console.error('[Canvas Video Poll] generation failed', { taskId, status: statusVal });
+                    console.error('[Canvas Video Poll] generation failed', { taskId, status: statusVal, provider });
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'failed' } as any)).catch(console.error);
                     }
                     break;
                   }
-                } catch (pollErr) {
-                  console.warn('[Canvas Video Poll] status check error', pollErr);
+                } catch (pollErr: any) {
+                  // Handle 404 - prediction not found, stop polling
+                  if (pollErr?.status === 404 || pollErr?.isNotFound) {
+                    console.error('[Canvas Video Poll] Prediction not found (404)', { taskId, provider, error: pollErr?.message });
+                    if (onPersistVideoModalMove) {
+                      Promise.resolve(onPersistVideoModalMove(modalState.id, { 
+                        status: 'failed',
+                        error: pollErr?.message || 'Prediction not found. The prediction may have been deleted or expired.'
+                      } as any)).catch(console.error);
+                    }
+                    break; // Stop polling
+                  }
+                  console.warn('[Canvas Video Poll] status check error', pollErr, { provider, taskId });
                 }
                 await new Promise(r => setTimeout(r, pollIntervalMs));
               }
@@ -766,9 +841,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           initialFrame={modalState.frame}
           initialAspectRatio={modalState.aspectRatio}
           initialDuration={modalState.duration || 5}
+          initialResolution={modalState.resolution}
           initialPrompt={modalState.prompt}
           onOptionsChange={(opts) => {
-            setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, duration: (opts as any).duration ?? m.duration, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
+            setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, duration: (opts as any).duration ?? m.duration, resolution: (opts as any).resolution ?? m.resolution, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
             if (onPersistVideoModalMove) {
               Promise.resolve(onPersistVideoModalMove(modalState.id, opts as any)).catch(console.error);
             }

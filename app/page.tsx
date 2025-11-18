@@ -1448,14 +1448,14 @@ function CanvasApp({ user }: CanvasAppProps) {
     processMediaFile(file, images.length);
   };
 
-  const handleVideoGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string): Promise<{ generationId?: string; taskId?: string } | null> => {
+  const handleVideoGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string): Promise<{ generationId?: string; taskId?: string; provider?: string } | null> => {
     if (!projectId || !prompt.trim()) {
       console.error('Missing projectId or prompt');
       return { generationId: undefined, taskId: undefined };
     }
 
     try {
-      console.log('Generate video:', { prompt, model, frame, aspectRatio, duration });
+      console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution });
       
       // Call video generation API
       const result = await generateVideoForCanvas(
@@ -1464,16 +1464,17 @@ function CanvasApp({ user }: CanvasAppProps) {
         aspectRatio,
         projectId,
         duration,
-        '1080p'
+        resolution || '1080p'
       );
 
       console.log('Video generation started:', result);
 
-      // For now, video generation is async and uses a queue system
-      // The taskId is returned, and we need to poll for the result
-      // TODO: Implement polling for video result
-      // For now, return null so the modal stays open; once URL is available via polling, we can update.
-      return { generationId: result.generationId, taskId: result.taskId };
+      // Return provider info so frontend knows which service to poll
+      return { 
+        generationId: result.generationId, 
+        taskId: result.taskId,
+        provider: result.provider, // 'fal', 'replicate', 'minimax', or 'runway'
+      };
     } catch (error: any) {
       console.error('Error generating video:', error);
       alert(error.message || 'Failed to generate video. Please try again.');

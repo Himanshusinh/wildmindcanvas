@@ -5,4 +5,5 @@
 	4.	Write high-quality, reusable, efficient code with clear names and minimal duplication.
     5.  Use a predictable folder layout
     6.  Each component/module should do one job and be as small as reasonable (single responsibility).
+    7.  If you find the code is repeating and not being used then remove that 
 

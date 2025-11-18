@@ -187,9 +187,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         flexDirection: 'column',
         gap: `${1 * scale}px`,
         padding: `${12 * scale}px`,
-        backgroundColor: (isHovered || isModelHovered) ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backgroundColor: '#ffffff',
         borderRadius: (isHovered || isPinned) ? '0px' : `${12 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
@@ -212,9 +210,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             left: 0,
             width: '100%',
             padding: `${6 * scale}px ${12 * scale}px`,
-            backgroundColor: '#f0f2f5',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
+          backgroundColor: '#ffffff',
             color: '#1f2937',
             fontSize: `${12 * scale}px`,
             fontWeight: '600',
@@ -262,9 +258,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             title="Delete"
             style={{
               padding: 0,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              backgroundColor: '#ffffff',
               border: `1px solid rgba(0, 0, 0, 0.1)`,
               borderRadius: `${8 * scale}px`,
               color: '#4b5563',
@@ -278,7 +272,7 @@ export const TextInput: React.FC<TextInputProps> = ({
               (e.currentTarget as HTMLElement).style.boxShadow = `0 ${6 * scale}px ${14 * scale}px rgba(16, 185, 129, 0.12)`;
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff';
               (e.currentTarget as HTMLElement).style.color = '#4b5563';
               (e.currentTarget as HTMLElement).style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
             }}
@@ -299,9 +293,7 @@ export const TextInput: React.FC<TextInputProps> = ({
             title="Duplicate"
             style={{
               padding: 0,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              backgroundColor: '#ffffff',
               border: `1px solid rgba(0, 0, 0, 0.1)`,
               borderRadius: `${8 * scale}px`,
               color: '#4b5563',
@@ -315,7 +307,7 @@ export const TextInput: React.FC<TextInputProps> = ({
               (e.currentTarget as HTMLElement).style.boxShadow = `0 ${6 * scale}px ${14 * scale}px rgba(59,130,246,0.12)`;
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff';
               (e.currentTarget as HTMLElement).style.color = '#4b5563';
               (e.currentTarget as HTMLElement).style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
             }}
@@ -454,7 +446,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           width: `${28 * scale}px`,
           height: `${28 * scale}px`,
           borderRadius: `${6 * scale}px`,
-          backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff',
           border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
           display: 'flex',
           alignItems: 'center',
@@ -473,7 +465,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         }}
         onMouseLeave={(e) => {
           if (!isPinned) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = '#ffffff';
           }
         }}
         title={isPinned ? 'Unpin controls' : 'Pin controls'}
@@ -505,8 +497,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         placeholder="Enter text here..."
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          background: (isHovered || isModelHovered) ? '#ffffff' : 'rgba(255, 255, 255, 0.2)',
-          border: (isHovered || isModelHovered) ? `${1 * scale}px solid rgba(0,0,0,0.06)` : `${1 * scale}px solid rgba(255, 255, 255, 0.3)`,
+          background: '#ffffff',
+          border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
           borderRadius: (isHovered || isPinned) ? '0px' : `${8 * scale}px`,
           padding: `${10 * scale}px`,
           color: '#1f2937',
@@ -545,8 +537,6 @@ export const TextInput: React.FC<TextInputProps> = ({
             cursor: 'pointer',
             boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`,
             padding: 0,
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
             transition: 'none',
           }}
           disabled={!text.trim()}
@@ -581,8 +571,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           width: `calc(100% + ${2 * scale}px)`,
           padding: `${12 * scale}px`,
           backgroundColor: '#ffffff',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
           border: 'none',
           borderTop: 'none',
           borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
@@ -651,9 +639,9 @@ export const TextInput: React.FC<TextInputProps> = ({
                 overflowY: 'auto',
                 zIndex: 3003,
                 padding: `${4 * scale}px 0`,
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
               {['GPT-4', 'GPT-3.5', 'Claude 3', 'Gemini Pro', 'Llama 2'].map((model) => (
                 <div
                   key={model}

@@ -3,12 +3,23 @@
 import { useState, useRef, useEffect } from 'react';
 import '../common/canvasCaptureGuard';
 import FrameSpinner from '../common/FrameSpinner';
+import {
+  getModelDurations,
+  getModelDefaultDuration,
+  getModelAspectRatios,
+  getModelDefaultAspectRatio,
+  getModelResolutions,
+  getModelDefaultResolution,
+  isValidDurationForModel,
+  isValidAspectRatioForModel,
+  isValidResolutionForModel,
+} from '@/lib/videoModelConfig';
 
 interface VideoUploadModalProps {
   isOpen: boolean;
   id?: string;
   onClose: () => void;
-  onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number) => void;
+  onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string) => void;
   onVideoSelect?: (file: File) => void;
   generatedVideoUrl?: string | null;
   stageRef: React.RefObject<any>;
@@ -29,7 +40,8 @@ interface VideoUploadModalProps {
   initialAspectRatio?: string;
   initialPrompt?: string;
   initialDuration?: number;
-  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; frameWidth?: number; frameHeight?: number }) => void;
+  initialResolution?: string;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number }) => void;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -56,6 +68,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   initialAspectRatio,
   initialPrompt,
   initialDuration,
+  initialResolution,
   onOptionsChange,
   onVideoSelect,
 }) => {
@@ -74,14 +87,23 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Seedance 1.0 Pro');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '16:9');
-  const [selectedDuration, setSelectedDuration] = useState<number>(initialDuration ?? 3);
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState(
+    initialAspectRatio ?? getModelDefaultAspectRatio(initialModel ?? 'Seedance 1.0 Pro')
+  );
+  const [selectedDuration, setSelectedDuration] = useState<number>(
+    initialDuration ?? getModelDefaultDuration(initialModel ?? 'Seedance 1.0 Pro')
+  );
+  const [selectedResolution, setSelectedResolution] = useState<string>(
+    initialResolution ?? getModelDefaultResolution(initialModel ?? 'Seedance 1.0 Pro')
+  );
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
+  const [isResolutionDropdownOpen, setIsResolutionDropdownOpen] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const durationDropdownRef = useRef<HTMLDivElement>(null);
+  const resolutionDropdownRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (wasJustPlayed) {
       const t = setTimeout(() => setWasJustPlayed(false), 400);
@@ -107,7 +129,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     if (onGenerate && prompt.trim() && !isGenerating) {
       setIsGenerating(true);
       try {
-        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, selectedDuration);
+        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, selectedDuration, selectedResolution);
         // Polling handled by parent (ModalOverlays) after onGenerate resolves
       } catch (err) {
         console.error('Error generating video:', err);
@@ -133,6 +155,30 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
+  useEffect(() => { if (initialResolution && initialResolution !== selectedResolution) setSelectedResolution(initialResolution); }, [initialResolution]);
+
+  // Update duration, aspect ratio, and resolution when model changes
+  useEffect(() => {
+    const defaultDuration = getModelDefaultDuration(selectedModel);
+    const defaultAspectRatio = getModelDefaultAspectRatio(selectedModel);
+    const defaultResolution = getModelDefaultResolution(selectedModel);
+
+    // Update duration if current is not valid for new model
+    if (!isValidDurationForModel(selectedModel, selectedDuration)) {
+      setSelectedDuration(defaultDuration);
+    }
+
+    // Update aspect ratio if current is not valid for new model
+    if (!isValidAspectRatioForModel(selectedModel, selectedAspectRatio)) {
+      setSelectedAspectRatio(defaultAspectRatio);
+    }
+
+    // Update resolution if current is not valid for new model
+    if (!isValidResolutionForModel(selectedModel, selectedResolution)) {
+      setSelectedResolution(defaultResolution);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedModel]); // Only run when model changes
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -146,13 +192,16 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       if (durationDropdownRef.current && !durationDropdownRef.current.contains(event.target as Node)) {
         setIsDurationDropdownOpen(false);
       }
+      if (resolutionDropdownRef.current && !resolutionDropdownRef.current.contains(event.target as Node)) {
+        setIsResolutionDropdownOpen(false);
+      }
     };
 
-    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isDurationDropdownOpen) {
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isDurationDropdownOpen || isResolutionDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isDurationDropdownOpen]);
+  }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isDurationDropdownOpen, isResolutionDropdownOpen]);
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -719,7 +768,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               onChange={(e) => {
                 const val = e.target.value;
                 setPrompt(val);
-                onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, duration: selectedDuration });
+                onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, duration: selectedDuration, resolution: selectedResolution });
               }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -808,9 +857,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                width: '100%',
-                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-                backgroundColor: '#ffffff',
+                  width: '100%',
+                  padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                  backgroundColor: '#ffffff',
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${9999 * scale}px`,
                 fontSize: controlFontSize,
@@ -842,36 +891,67 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                   border: `1px solid ${dropdownBorderColor}`,
                   borderRadius: `${12 * scale}px`,
                   boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
-                  maxHeight: `${200 * scale}px`,
-                  overflowY: 'auto',
                   zIndex: 3003,
                   padding: `${4 * scale}px 0`,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                {['Seedance 1.0 Pro', 'Seedance 1.0 Lite'].map((model) => (
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${4 * scale}px`, padding: `${4 * scale}px` }}>
+                {['Sora 2 Pro', 'Veo 3.1 Pro', 'Veo 3.1 Fast Pro', 'Kling 2.5 Turbo Pro', 'Seedance 1.0 Pro', 'Seedance 1.0 Lite', 'PixVerse v5', 'LTX V2 Pro', 'LTX V2 Fast', 'WAN 2.5', 'WAN 2.5 Fast', 'MiniMax-Hailuo-02', 'T2V-01-Director'].map((model) => (
                   <div
                     key={model}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedModel(model);
                       setIsModelDropdownOpen(false);
-                const [w, h] = selectedAspectRatio.split(':').map(Number);
+                      
+                      // Get valid options for the new model
+                      const defaultDuration = getModelDefaultDuration(model);
+                      const defaultAspectRatio = getModelDefaultAspectRatio(model);
+                      const defaultResolution = getModelDefaultResolution(model);
+                      
+                      // Update duration if current is not valid
+                      const newDuration = isValidDurationForModel(model, selectedDuration) 
+                        ? selectedDuration 
+                        : defaultDuration;
+                      
+                      // Update aspect ratio if current is not valid
+                      const newAspectRatio = isValidAspectRatioForModel(model, selectedAspectRatio)
+                        ? selectedAspectRatio
+                        : defaultAspectRatio;
+                      
+                      // Update resolution if current is not valid
+                      const newResolution = isValidResolutionForModel(model, selectedResolution)
+                        ? selectedResolution
+                        : defaultResolution;
+                      
+                      // Update state
+                      if (newDuration !== selectedDuration) {
+                        setSelectedDuration(newDuration);
+                      }
+                      if (newAspectRatio !== selectedAspectRatio) {
+                        setSelectedAspectRatio(newAspectRatio);
+                      }
+                      if (newResolution !== selectedResolution) {
+                        setSelectedResolution(newResolution);
+                      }
+                      
+                      const [w, h] = newAspectRatio.split(':').map(Number);
                 const frameWidth = 600;
                 const ar = w && h ? (w / h) : 16/9;
                 const rawHeight = Math.round(frameWidth / ar);
                 const frameHeight = Math.max(400, rawHeight);
-                      onOptionsChange?.({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
-              }}
+                      onOptionsChange?.({ model, aspectRatio: newAspectRatio, frame: selectedFrame, prompt, duration: newDuration, resolution: newResolution, frameWidth, frameHeight });
+                    }}
               style={{
-                      padding: `${8 * scale}px ${16 * scale}px`,
+                      padding: `${6 * scale}px ${12 * scale}px`,
                       fontSize: controlFontSize,
                       color: '#1f2937',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                      borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                      borderRadius: `${6 * scale}px`,
                     }}
                     onMouseEnter={(e) => {
                       if (selectedModel !== model) {
@@ -892,6 +972,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                     <span>{model}</span>
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </div>
@@ -908,7 +989,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{
-                  padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
                   backgroundColor: '#ffffff',
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${9999 * scale}px`,
@@ -948,7 +1029,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-                {['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'].map((ratio) => (
+                {getModelAspectRatios(selectedModel).map((ratio) => (
                   <div
                     key={ratio}
                     onClick={(e) => {
@@ -960,7 +1041,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 const ar = w && h ? (w / h) : 16/9;
                 const rawHeight = Math.round(frameWidth / ar);
                 const frameHeight = Math.max(400, rawHeight);
-                      onOptionsChange?.({ model: selectedModel, aspectRatio: ratio, frame: selectedFrame, prompt, duration: selectedDuration, frameWidth, frameHeight });
+                      onOptionsChange?.({ model: selectedModel, aspectRatio: ratio, frame: selectedFrame, prompt, duration: selectedDuration, resolution: selectedResolution, frameWidth, frameHeight });
                     }}
                     style={{
                       padding: `${8 * scale}px ${16 * scale}px`,
@@ -989,7 +1070,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                       </svg>
                     )}
                     <span>{ratio}</span>
-                  </div>
+          </div>
                 ))}
               </div>
             )}
@@ -1047,7 +1128,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-                {[3, 5, 10, 15].map((dur) => (
+                {getModelDurations(selectedModel).map((dur) => (
                   <div
                     key={dur}
                     onClick={(e) => {
@@ -1059,7 +1140,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 const ar = w && h ? (w / h) : 16/9;
                 const rawHeight = Math.round(frameWidth / ar);
                 const frameHeight = Math.max(400, rawHeight);
-                onOptionsChange?.({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: dur, frameWidth, frameHeight });
+                onOptionsChange?.({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: dur, resolution: selectedResolution, frameWidth, frameHeight });
               }}
               style={{
                       padding: `${8 * scale}px ${16 * scale}px`,
@@ -1088,6 +1169,106 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                       </svg>
                     )}
                     <span>{dur}s</span>
+          </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Resolution Selector - Custom Dropdown */}
+          <div ref={resolutionDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsResolutionDropdownOpen(!isResolutionDropdownOpen);
+                setIsModelDropdownOpen(false);
+                setIsAspectRatioDropdownOpen(false);
+                setIsDurationDropdownOpen(false);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${9999 * scale}px`,
+                fontSize: controlFontSize,
+                fontWeight: '600',
+                color: '#1f2937',
+                minWidth: `${80 * scale}px`,
+                outline: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>{selectedResolution}</span>
+              <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isResolutionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M2 4L6 8L10 4" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            
+            {isResolutionDropdownOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: `${4 * scale}px`,
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${12 * scale}px`,
+                  boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                  maxHeight: `${200 * scale}px`,
+                  overflowY: 'auto',
+                  zIndex: 3003,
+                  padding: `${4 * scale}px 0`,
+                  minWidth: `${100 * scale}px`,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+                {getModelResolutions(selectedModel).map((res) => (
+                  <div
+                    key={res}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedResolution(res);
+                      setIsResolutionDropdownOpen(false);
+                      const [w, h] = selectedAspectRatio.split(':').map(Number);
+                      const frameWidth = 600;
+                      const ar = w && h ? (w / h) : 16/9;
+                      const rawHeight = Math.round(frameWidth / ar);
+                      const frameHeight = Math.max(400, rawHeight);
+                      onOptionsChange?.({ model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, duration: selectedDuration, resolution: res, frameWidth, frameHeight });
+                    }}
+                    style={{
+                      padding: `${8 * scale}px ${16 * scale}px`,
+                      fontSize: controlFontSize,
+                      color: '#1f2937',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedResolution === res ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                      borderLeft: selectedResolution === res ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedResolution !== res) {
+                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedResolution !== res) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {selectedResolution === res && (
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    <span>{res}</span>
           </div>
                 ))}
               </div>

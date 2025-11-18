@@ -13,6 +13,7 @@ import { SelectionBox } from './SelectionBox';
 import { MediaActionIcons } from './MediaActionIcons';
 import AvatarButton from './AvatarButton';
 import ProfilePopup from './ProfilePopup';
+import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent } from '@/lib/canvasHelpers';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -33,7 +34,7 @@ interface CanvasProps {
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
   generatedVideoUrl?: string | null;
   isMusicModalOpen?: boolean;
   onMusicModalClose?: () => void;
@@ -144,7 +145,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   });
   const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
-  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
@@ -170,87 +171,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
-  // Helper to check for nearby existing modal to avoid duplicate creations
-  const existsNearby = (arr: Array<{ x: number; y: number }>, x: number, y: number, threshold = 12) => {
-    for (const it of arr) {
-      const dx = (it.x || 0) - x;
-      const dy = (it.y || 0) - y;
-      if (dx * dx + dy * dy <= threshold * threshold) return true;
-    }
-    return false;
-  };
 
-  // Find an available canvas position near (cx, cy) that doesn't collide with
-  // existing components. This tries the center first, then searches in a
-  // spiral outwards until it finds a free spot or reaches maxRadius.
-  const findAvailablePositionNear = (cx: number, cy: number, threshold = 60, maxRadius = 600) => {
-    // Build a combined list of occupied points from all component types
-    const occupied: Array<{ x: number; y: number }> = [];
-    textInputStates.forEach(t => occupied.push({ x: t.x, y: t.y }));
-    imageModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
-    videoModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
-    musicModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
-    images.forEach(img => { if (img) occupied.push({ x: img.x || 0, y: img.y || 0 }); });
-
-    if (!existsNearby(occupied, cx, cy, threshold)) return { x: cx, y: cy };
-
-    // Spiral search: increment radius by step, sample multiple angles
-    const step = 40;
-    for (let r = step; r <= maxRadius; r += step) {
-      const samples = Math.ceil((2 * Math.PI * r) / step);
-      for (let i = 0; i < samples; i++) {
-        const angle = (i / samples) * Math.PI * 2;
-        const nx = Math.round(cx + Math.cos(angle) * r);
-        const ny = Math.round(cy + Math.sin(angle) * r);
-        if (!existsNearby(occupied, nx, ny, threshold)) {
-          return { x: nx, y: ny };
-        }
-      }
-    }
-
-    // Fallback: return original center if no free spot found
-    return { x: cx, y: cy };
-  };
-
-  // Helper to set cursor on the Konva stage. By default we only allow the
-  // cursor to change for 'cursor', 'move', and 'text' tools. Some callers
-  // (space panning, explicit Shift selection) can force cursor changes by
-  // passing `force = true`.
-  const applyStageCursor = (style: string, force = false) => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    try {
-      if (force) {
-        stage.container().style.cursor = style;
-        return;
-      }
-      // If callers want a text cursor but the user is actually interacting
-      // with a text input overlay (focused textarea/input) or hovering a
-      // text modal, don't force the global stage to show the I-beam; keep a
-      // pointer/default instead so the experience feels like clicking a UI
-      // control rather than editing the stage.
-      if (style === 'text') {
-        try {
-          const active = document.activeElement;
-          const hoveringTextOverlay = !!document.querySelector('[data-modal-component="text"]:hover');
-          const isInputFocused = active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || (active as HTMLElement).isContentEditable);
-          if (isInputFocused || hoveringTextOverlay) {
-            stage.container().style.cursor = 'pointer';
-            return;
-          }
-        } catch (err) { /* ignore DOM errors */ }
-      }
-
-      if (selectedTool === 'cursor' || selectedTool === 'move') {
-        stage.container().style.cursor = style;
-      } else if (selectedTool === 'text' && style === 'text') {
-        stage.container().style.cursor = 'text';
-      } else {
-        stage.container().style.cursor = 'default';
-      }
-    } catch (err) {
-      // ignore
-    }
+  // Wrapper for applyStageCursor to use stageRef
+  const applyStageCursorWrapper = (style: string, force = false) => {
+    applyStageCursor(stageRef.current, style, selectedTool, force);
   };
 
 
@@ -258,7 +182,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   // clearSelectionBoxes: if true, also clears selection boxes (for empty canvas clicks)
   // if false, keeps selection boxes (for component switching)
   const clearAllSelections = (clearSelectionBoxes: boolean = false) => {
-    
     setSelectedImageIndex(null);
     setSelectedImageIndices([]);
     setSelectedTextInputId(null);
@@ -282,189 +205,27 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Truly infinite canvas - fixed massive size
   const canvasSize = { width: INFINITE_CANVAS_SIZE, height: INFINITE_CANVAS_SIZE };
 
-  // Helper function to check if a position overlaps with existing components
-  const checkOverlap = (x: number, y: number, width: number = 600, height: number = 400, padding: number = 100): boolean => {
-    // Expand check rect with padding
-    const checkRect = { 
-      x: x - padding, 
-      y: y - padding, 
-      width: width + padding * 2, 
-      height: height + padding * 2 
-    };
-    
-    // Check against uploaded images/videos
-    for (const img of images) {
-      if (img.type === 'text' || img.type === 'model3d') continue;
-      const imgWidth = img.width || 400;
-      const imgHeight = img.height || 400;
-      const imgRect = {
-        x: (img.x || 0) - padding,
-        y: (img.y || 0) - padding,
-        width: imgWidth + padding * 2,
-        height: imgHeight + padding * 2,
-      };
-      if (
-        checkRect.x < imgRect.x + imgRect.width &&
-        checkRect.x + checkRect.width > imgRect.x &&
-        checkRect.y < imgRect.y + imgRect.height &&
-        checkRect.y + checkRect.height > imgRect.y
-      ) {
-        return true;
-      }
-    }
-    
-    // Check against text inputs (estimated size: 300x100)
-    for (const textState of textInputStates) {
-      const textRect = { 
-        x: textState.x - padding, 
-        y: textState.y - padding, 
-        width: 300 + padding * 2, 
-        height: 100 + padding * 2 
-      };
-      if (
-        checkRect.x < textRect.x + textRect.width &&
-        checkRect.x + checkRect.width > textRect.x &&
-        checkRect.y < textRect.y + textRect.height &&
-        checkRect.y + checkRect.height > textRect.y
-      ) {
-        return true;
-      }
-    }
-    
-    // Check against image modals (600px wide, ~400px tall for 1:1 aspect ratio)
-    for (const modalState of imageModalStates) {
-      const modalRect = { 
-        x: modalState.x - padding, 
-        y: modalState.y - padding, 
-        width: 600 + padding * 2, 
-        height: 400 + padding * 2 
-      };
-      if (
-        checkRect.x < modalRect.x + modalRect.width &&
-        checkRect.x + checkRect.width > modalRect.x &&
-        checkRect.y < modalRect.y + modalRect.height &&
-        checkRect.y + checkRect.height > modalRect.y
-      ) {
-        return true;
-      }
-    }
-    
-    // Check against video modals (600px wide, ~400px tall for 16:9 aspect ratio)
-    for (const modalState of videoModalStates) {
-      const modalRect = { 
-        x: modalState.x - padding, 
-        y: modalState.y - padding, 
-        width: 600 + padding * 2, 
-        height: 400 + padding * 2 
-      };
-      if (
-        checkRect.x < modalRect.x + modalRect.width &&
-        checkRect.x + checkRect.width > modalRect.x &&
-        checkRect.y < modalRect.y + modalRect.height &&
-        checkRect.y + checkRect.height > modalRect.y
-      ) {
-        return true;
-      }
-    }
-    
-    // Check against music modals (600px wide, ~300px tall)
-    for (const modalState of musicModalStates) {
-      const modalRect = { 
-        x: modalState.x - padding, 
-        y: modalState.y - padding, 
-        width: 600 + padding * 2, 
-        height: 300 + padding * 2 
-      };
-      if (
-        checkRect.x < modalRect.x + modalRect.width &&
-        checkRect.x + checkRect.width > modalRect.x &&
-        checkRect.y < modalRect.y + modalRect.height &&
-        checkRect.y + checkRect.height > modalRect.y
-      ) {
-        return true;
-      }
-    }
-    
-    return false;
+  // Wrapper functions for helpers that need component state
+  const checkOverlapWrapper = (x: number, y: number, width: number = 600, height: number = 400, padding: number = 100): boolean => {
+    return checkOverlap(x, y, width, height, images, textInputStates, imageModalStates, videoModalStates, musicModalStates, padding);
   };
 
-  // Helper function to find blank space for new component
-  const findBlankSpace = (componentWidth: number = 600, componentHeight: number = 400): { x: number; y: number } => {
-    // Check if canvas is empty
-    const isEmpty = images.length === 0 && 
-                    textInputStates.length === 0 && 
-                    imageModalStates.length === 0 && 
-                    videoModalStates.length === 0 && 
-                    musicModalStates.length === 0;
-    
-    if (isEmpty) {
-      // Center on screen when canvas is empty
-      const centerX = (viewportSize.width / 2 - position.x) / scale;
-      const centerY = (viewportSize.height / 2 - position.y) / scale;
-      return { x: centerX - componentWidth / 2, y: centerY - componentHeight / 2 };
-    }
-    
-    // Find blank space starting from viewport center
-    const centerX = (viewportSize.width / 2 - position.x) / scale;
-    const centerY = (viewportSize.height / 2 - position.y) / scale;
-    
-    // Try positions in a spiral pattern from center with larger spacing
-    const spacing = Math.max(componentWidth, componentHeight) + 200; // Space between attempts (component size + padding)
-    const maxAttempts = 100; // Search further
-    
-    // First try center position
-    if (!checkOverlap(centerX - componentWidth / 2, centerY - componentHeight / 2, componentWidth, componentHeight)) {
-      return { x: centerX - componentWidth / 2, y: centerY - componentHeight / 2 };
-    }
-    
-    // Spiral search pattern
-    for (let radius = 1; radius < maxAttempts; radius++) {
-      // Try 8 directions at each radius
-      for (let angle = 0; angle < 360; angle += 45) {
-        const rad = (angle * Math.PI) / 180;
-        const x = centerX - componentWidth / 2 + Math.cos(rad) * radius * spacing;
-        const y = centerY - componentHeight / 2 + Math.sin(rad) * radius * spacing;
-        
-        if (!checkOverlap(x, y, componentWidth, componentHeight)) {
-          return { x, y };
-        }
-      }
-    }
-    
-    // Fallback: try positions further away in a grid pattern
-    const gridSpacing = spacing;
-    for (let row = -10; row <= 10; row++) {
-      for (let col = -10; col <= 10; col++) {
-        if (row === 0 && col === 0) continue; // Skip center (already checked)
-        const x = centerX - componentWidth / 2 + col * gridSpacing;
-        const y = centerY - componentHeight / 2 + row * gridSpacing;
-        
-        if (!checkOverlap(x, y, componentWidth, componentHeight)) {
-          return { x, y };
-        }
-      }
-    }
-    
-    // Last resort: return a position far to the right
-    return { x: centerX + 1000, y: centerY - componentHeight / 2 };
+  const findBlankSpaceWrapper = (componentWidth: number = 600, componentHeight: number = 400): { x: number; y: number } => {
+    return findBlankSpace(componentWidth, componentHeight, images, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportSize, position, scale);
   };
 
-  // Helper function to pan viewport to focus on a component
-  const focusOnComponent = (canvasX: number, canvasY: number, componentWidth: number = 600, componentHeight: number = 400) => {
-    // Calculate the position to center the component on screen
-    const targetScreenX = viewportSize.width / 2;
-    const targetScreenY = viewportSize.height / 2;
-    
-    // Convert canvas coordinates to screen coordinates
-    const componentCenterX = canvasX + componentWidth / 2;
-    const componentCenterY = canvasY + componentHeight / 2;
-    
-    // Calculate new position to center the component
-    const newPosX = targetScreenX - componentCenterX * scale;
-    const newPosY = targetScreenY - componentCenterY * scale;
-    
-    setPosition({ x: newPosX, y: newPosY });
-    setTimeout(() => updateViewportCenter({ x: newPosX, y: newPosY }, scale), 0);
+  const focusOnComponentWrapper = (canvasX: number, canvasY: number, componentWidth: number = 600, componentHeight: number = 400) => {
+    focusOnComponent(canvasX, canvasY, componentWidth, componentHeight, viewportSize, scale, setPosition, updateViewportCenter);
+  };
+
+  const findAvailablePositionNearWrapper = (cx: number, cy: number, threshold = 60, maxRadius = 600) => {
+    const occupied: Array<{ x: number; y: number }> = [];
+    textInputStates.forEach(t => occupied.push({ x: t.x, y: t.y }));
+    imageModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
+    videoModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
+    musicModalStates.forEach(m => occupied.push({ x: m.x, y: m.y }));
+    images.forEach(img => { if (img) occupied.push({ x: img.x || 0, y: img.y || 0 }); });
+    return findAvailablePositionNear(cx, cy, occupied, threshold, maxRadius);
   };
 
   // Automatically create text input at center when text tool is selected
@@ -479,7 +240,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
       lastCreateTimesRef.current.text = now;
 
-      const blankPos = findBlankSpace(300, 100);
+      const blankPos = findBlankSpaceWrapper(300, 100);
       // If a text input already exists near this spot, skip creating another
       if (existsNearby(textInputStates, blankPos.x, blankPos.y)) {
         prevSelectedToolRef.current = selectedTool;
@@ -492,7 +253,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         Promise.resolve(onPersistTextModalCreate(modal)).catch(console.error);
       }
       // Auto-focus on new component
-      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 300, 100), 100);
+      setTimeout(() => focusOnComponentWrapper(blankPos.x, blankPos.y, 300, 100), 100);
     }
     prevSelectedToolRef.current = selectedTool;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -506,7 +267,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (now - last < 400) return;
       lastCreateTimesRef.current.image = now;
 
-      const blankPos = findBlankSpace(600, 400);
+      const blankPos = findBlankSpaceWrapper(600, 400);
       // If an image modal already exists near this spot, skip creating another
       if (existsNearby(imageModalStates, blankPos.x, blankPos.y)) return;
       const newId = `image-${Date.now()}-${Math.random()}`;
@@ -516,7 +277,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         Promise.resolve(onPersistImageModalCreate(modal)).catch(console.error);
       }
       // Auto-focus on new component
-      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
+      setTimeout(() => focusOnComponentWrapper(blankPos.x, blankPos.y, 600, 400), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isImageModalOpen, toolClickCounter]);
@@ -529,7 +290,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (now - last < 400) return;
       lastCreateTimesRef.current.video = now;
 
-      const blankPos = findBlankSpace(600, 400);
+      const blankPos = findBlankSpaceWrapper(600, 400);
       if (existsNearby(videoModalStates, blankPos.x, blankPos.y)) return;
       const newId = `video-${Date.now()}-${Math.random()}`;
       setVideoModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedVideoUrl: null }]);
@@ -537,7 +298,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         Promise.resolve(onPersistVideoModalCreate({ id: newId, x: blankPos.x, y: blankPos.y, generatedVideoUrl: null })).catch(console.error);
       }
       // Auto-focus on new component
-      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 400), 100);
+      setTimeout(() => focusOnComponentWrapper(blankPos.x, blankPos.y, 600, 400), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isVideoModalOpen, toolClickCounter]);
@@ -550,7 +311,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (now - last < 400) return;
       lastCreateTimesRef.current.music = now;
 
-      const blankPos = findBlankSpace(600, 300);
+      const blankPos = findBlankSpaceWrapper(600, 300);
       if (existsNearby(musicModalStates, blankPos.x, blankPos.y)) return;
       const newId = `music-${Date.now()}-${Math.random()}`;
       setMusicModalStates(prev => [...prev, { id: newId, x: blankPos.x, y: blankPos.y, generatedMusicUrl: null }]);
@@ -558,7 +319,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         Promise.resolve(onPersistMusicModalCreate({ id: newId, x: blankPos.x, y: blankPos.y, generatedMusicUrl: null })).catch(console.error);
       }
       // Auto-focus on new component
-      setTimeout(() => focusOnComponent(blankPos.x, blankPos.y, 600, 300), 100);
+      setTimeout(() => focusOnComponentWrapper(blankPos.x, blankPos.y, 600, 300), 100);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isMusicModalOpen, toolClickCounter]);
@@ -922,13 +683,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
         setIsSpacePressed(true);
-        applyStageCursor('grab', true);
+        applyStageCursorWrapper('grab', true);
       }
       
       if (e.shiftKey) {
         setIsShiftPressed(true);
         // Force crosshair while Shift is pressed
-        applyStageCursor('crosshair', true);
+        applyStageCursorWrapper('crosshair', true);
       }
       
       // Quick-create shortcuts (keyboard): t = text, i = image, v = video, m = music
@@ -946,7 +707,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               lastCreateTimesRef.current.text = now;
               const canvasX = (viewportSize.width / 2 - position.x) / scale;
               const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNear(canvasX, canvasY);
+              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
               const newId = `text-${Date.now()}-${Math.random()}`;
               const newModal = { id: newId, x: pos.x, y: pos.y, autoFocusInput: true };
               setTextInputStates(prev => [...prev, newModal]);
@@ -966,7 +727,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               lastCreateTimesRef.current.image = now;
               const canvasX = (viewportSize.width / 2 - position.x) / scale;
               const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNear(canvasX, canvasY);
+              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
               const newId = `img-${Date.now()}-${Math.random()}`;
               const newModal = { id: newId, x: pos.x, y: pos.y };
               setImageModalStates(prev => [...prev, newModal]);
@@ -986,7 +747,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               lastCreateTimesRef.current.video = now;
               const canvasX = (viewportSize.width / 2 - position.x) / scale;
               const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNear(canvasX, canvasY);
+              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
               const newId = `video-${Date.now()}-${Math.random()}`;
               const newModal = { id: newId, x: pos.x, y: pos.y };
               setVideoModalStates(prev => [...prev, newModal]);
@@ -1006,7 +767,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               lastCreateTimesRef.current.music = now;
               const canvasX = (viewportSize.width / 2 - position.x) / scale;
               const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNear(canvasX, canvasY);
+              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
               const newId = `music-${Date.now()}-${Math.random()}`;
               const newModal = { id: newId, x: pos.x, y: pos.y };
               setMusicModalStates(prev => [...prev, newModal]);
@@ -1479,14 +1240,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         const stage = stageRef.current;
         if (stage && !isPanning) {
           if (selectedTool === 'text') {
-            applyStageCursor('text');
+            applyStageCursorWrapper('text');
           } else if (selectedTool === 'cursor') {
-            applyStageCursor('default');
+            applyStageCursorWrapper('default');
           } else if (selectedTool === 'move') {
-            applyStageCursor('grab');
+            applyStageCursorWrapper('grab');
           } else {
             // Non-persistent tools should show pointer by default
-            applyStageCursor('pointer');
+            applyStageCursorWrapper('pointer');
           }
         }
       }
@@ -1496,13 +1257,13 @@ export const Canvas: React.FC<CanvasProps> = ({
         const stage = stageRef.current;
         if (stage && !isPanning) {
           if (selectedTool === 'cursor') {
-            applyStageCursor('default');
+            applyStageCursorWrapper('default');
           } else if (selectedTool === 'move') {
-            applyStageCursor('grab');
+            applyStageCursorWrapper('grab');
           } else if (selectedTool === 'text') {
-            applyStageCursor('text');
+            applyStageCursorWrapper('text');
           } else {
-            applyStageCursor('pointer');
+            applyStageCursorWrapper('pointer');
           }
         }
       }
@@ -1677,15 +1438,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       
       // Reset cursor to default for cursor tool or after Shift selection
       if (selectedTool === 'cursor') {
-        applyStageCursor('default');
+        applyStageCursorWrapper('default');
       } else if (!isShiftPressed) {
         // Reset cursor when Shift is released
         if (selectedTool === 'move') {
-          applyStageCursor('grab');
+          applyStageCursorWrapper('grab');
         } else if (selectedTool === 'text') {
-          applyStageCursor('text');
+          applyStageCursorWrapper('text');
         } else {
-          applyStageCursor('pointer');
+          applyStageCursorWrapper('pointer');
         }
       }
 
@@ -2240,7 +2001,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       clearAllSelections(true);
       // When user clicks plain canvas (not starting pan/selection), show pointer cursor
       try {
-        applyStageCursor('pointer');
+        applyStageCursorWrapper('pointer');
       } catch (err) {
         // ignore if helper not available
       }
@@ -2290,8 +2051,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Clear previous selection visuals (but keep group selections)
         setSelectionBox(null);
         {
-          setSelectionTightRect(null);
-          setIsDragSelection(false);
+        setSelectionTightRect(null);
+        setIsDragSelection(false);
         }
       }
       return;
@@ -2303,7 +2064,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (stage) {
         setIsPanning(true);
         stage.draggable(true);
-        applyStageCursor('grabbing', true);
+        applyStageCursorWrapper('grabbing', true);
       }
       return;
     }
@@ -2319,8 +2080,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectionBox(null);
           // Don't clear selection box if it's a group - groups persist
           {
-            setSelectionTightRect(null);
-            setIsDragSelection(false);
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
           }
         }
         return;
@@ -2338,7 +2099,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (stage) {
         setIsPanning(true);
         stage.draggable(true);
-        applyStageCursor('grabbing', true);
+        applyStageCursorWrapper('grabbing', true);
       }
       return;
     }
@@ -2348,7 +2109,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (stage) {
         setIsPanning(true);
         stage.draggable(true);
-        applyStageCursor('grabbing', true);
+        applyStageCursorWrapper('grabbing', true);
       }
     } else if (clickedOnElement && isMoveTool) {
       // If move tool is selected, allow panning even when clicking on elements
@@ -2356,7 +2117,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (stage) {
         setIsPanning(true);
         stage.draggable(true);
-        applyStageCursor('grabbing', true);
+        applyStageCursorWrapper('grabbing', true);
       }
     } else if (clickedOnElement) {
       // For other tools, prepare for potential drag-to-pan
@@ -2385,7 +2146,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (stage) {
           setIsPanning(true);
           stage.draggable(true);
-          applyStageCursor('grabbing', true);
+          applyStageCursorWrapper('grabbing', true);
           // Disable element dragging when panning
           const allNodes = stage.find('Image');
           allNodes.forEach((node) => {
@@ -2428,7 +2189,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const stage = stageRef.current;
         if (stage) {
           stage.draggable(false);
-          applyStageCursor('crosshair', true);
+          applyStageCursorWrapper('crosshair', true);
         }
 
         setSelectionBox({
@@ -2495,15 +2256,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       setIsDraggingFromElement(false);
       setMouseDownPos(null);
       if (selectedTool === 'text') {
-        applyStageCursor('text');
+        applyStageCursorWrapper('text');
       } else if (selectedTool === 'move') {
-        applyStageCursor('grab');
+        applyStageCursorWrapper('grab');
       } else if (selectedTool === 'cursor') {
-        applyStageCursor('default'); // Cursor tool always shows default cursor
+        applyStageCursorWrapper('default'); // Cursor tool always shows default cursor
       } else {
         // Non-persistent single-click tools (image/video/music/etc.) should
         // not change the stage into a panning/grab cursor. Use pointer.
-        applyStageCursor('pointer');
+        applyStageCursorWrapper('pointer');
       }
     }
   };

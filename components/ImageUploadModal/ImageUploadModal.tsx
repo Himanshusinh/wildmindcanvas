@@ -1048,7 +1048,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, borderBottom: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px`, marginBottom: `${4 * scale}px` }}>
                     Flux Models
                   </div>
-                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Flux Pro', 'Flux Dev'].map((model) => (
+                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1',].map((model) => (
                     <div
                       key={model}
                       onClick={(e) => {

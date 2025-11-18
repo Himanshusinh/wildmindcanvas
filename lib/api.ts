@@ -304,7 +304,7 @@ export async function generateVideoForCanvas(
   projectId: string,
   duration?: number,
   resolution?: string
-): Promise<{ mediaId?: string; url?: string; storagePath?: string; generationId?: string; taskId?: string }> {
+): Promise<{ mediaId?: string; url?: string; storagePath?: string; generationId?: string; taskId?: string; provider?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -382,15 +382,94 @@ export async function generateVideoForCanvas(
 }
 
 /**
+ * Poll FAL queue status
+ */
+export async function getFalQueueStatus(requestId: string): Promise<any> {
+  const res = await fetch(`${API_GATEWAY_URL}/fal/queue/status?requestId=${encodeURIComponent(requestId)}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store', // Disable caching for polling
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || 'Failed to fetch FAL status');
+  return json?.data || json;
+}
+
+/**
+ * Fetch FAL queue result (final output)
+ */
+export async function getFalQueueResult(requestId: string): Promise<any> {
+  const res = await fetch(`${API_GATEWAY_URL}/fal/queue/result?requestId=${encodeURIComponent(requestId)}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store', // Disable caching for polling
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || 'Failed to fetch FAL result');
+  return json?.data || json;
+}
+
+/**
  * Poll Replicate queue status (generic for Seedance/Kling/WAN/etc.)
  */
 export async function getReplicateQueueStatus(requestId: string): Promise<any> {
   const res = await fetch(`${API_GATEWAY_URL}/replicate/queue/status?requestId=${encodeURIComponent(requestId)}`, {
     method: 'GET',
     credentials: 'include',
+    cache: 'no-store', // Disable caching for polling
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.message || 'Failed to fetch status');
+  if (!res.ok) {
+    // Handle 404 specifically - prediction not found
+    if (res.status === 404) {
+      const error = new Error(json?.message || 'Prediction not found. The prediction may have been deleted or expired.');
+      (error as any).status = 404;
+      (error as any).isNotFound = true;
+      throw error;
+    }
+    throw new Error(json?.message || 'Failed to fetch status');
+  }
+  return json?.data || json;
+}
+
+/**
+ * Poll MiniMax video status
+ */
+export async function getMiniMaxVideoStatus(taskId: string): Promise<any> {
+  const res = await fetch(`${API_GATEWAY_URL}/minimax/video/status?task_id=${encodeURIComponent(taskId)}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store', // Disable caching for polling
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Handle 404 specifically - task not found
+    if (res.status === 404) {
+      const error = new Error(json?.message || 'Task not found. The task may have been deleted or expired.');
+      (error as any).status = 404;
+      (error as any).isNotFound = true;
+      throw error;
+    }
+    throw new Error(json?.message || 'Failed to fetch MiniMax status');
+  }
+  return json?.data || json;
+}
+
+/**
+ * Fetch MiniMax video file (final output)
+ */
+export async function getMiniMaxVideoFile(fileId: string, historyId?: string): Promise<any> {
+  const params = new URLSearchParams({ file_id: fileId });
+  if (historyId) params.append('history_id', historyId);
+  const res = await fetch(`${API_GATEWAY_URL}/minimax/video/file?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.message || 'Failed to fetch MiniMax video file');
+  }
   return json?.data || json;
 }
 
@@ -401,6 +480,7 @@ export async function getReplicateQueueResult(requestId: string): Promise<any> {
   const res = await fetch(`${API_GATEWAY_URL}/replicate/queue/result?requestId=${encodeURIComponent(requestId)}`, {
     method: 'GET',
     credentials: 'include',
+    cache: 'no-store', // Disable caching for polling
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.message || 'Failed to fetch result');
