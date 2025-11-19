@@ -27,27 +27,57 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
       if (checkedRef.current) return;
       checkedRef.current = true;
 
+      // Helper to log to both console and localStorage (persists after redirect)
+      const logDebug = (message: string, data?: unknown) => {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
+        console.log(logEntry);
+        try {
+          const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';
+          const logs = JSON.parse(existingLogs);
+          logs.push(logEntry);
+          // Keep only last 50 logs
+          if (logs.length > 50) logs.shift();
+          localStorage.setItem('authguard_debug_logs', JSON.stringify(logs));
+        } catch {
+          // Ignore localStorage errors
+        }
+      };
+
       try {
         // Detect if we're in development (localhost with different ports)
         const isDev = typeof window !== 'undefined' && 
           (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         
+        logDebug('[AuthGuard] Starting auth check', {
+          hostname: window.location.hostname,
+          href: window.location.href,
+          isDev,
+          apiBase: process.env.NEXT_PUBLIC_API_BASE_URL || 'NOT SET'
+        });
+
+        // Log all cookies
+        if (typeof document !== 'undefined') {
+          const allCookies = document.cookie;
+          logDebug('[AuthGuard] All cookies', { cookies: allCookies });
+          const cookieArray = document.cookie.split(';').map(c => c.trim());
+          logDebug('[AuthGuard] Parsed cookies', { cookieArray });
+        }
+
         // In development, cookies from localhost:3000 won't be accessible on localhost:3001
         // So we'll be more lenient - allow access if API check passes, otherwise allow anyway
-        console.log('[AuthGuard] environment', { hostname: window.location.hostname, isDev });
-
         if (isDev) {
           // Try to verify with API - if it works, we're authenticated
           // Note: In dev, cookies won't be shared between ports, so API might fail
           // but we'll allow access anyway for development convenience
           try {
-            console.log('[AuthGuard] Dev mode: calling checkAuthStatus');
+            logDebug('[AuthGuard] Dev mode: calling checkAuthStatus');
             const isValid = await checkAuthStatus();
-            console.log('[AuthGuard] Dev mode: checkAuthStatus result', isValid);
+            logDebug('[AuthGuard] Dev mode: checkAuthStatus result', { isValid });
             if (isValid) {
               // Fetch user info
               const user = await getCurrentUser();
-              console.log('[AuthGuard] Dev mode: fetched user', user?.uid);
+              logDebug('[AuthGuard] Dev mode: fetched user', { uid: user?.uid, username: user?.username });
               if (user && onUserLoaded) {
                 onUserLoaded(user);
               }
@@ -57,41 +87,53 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
             }
           } catch (apiError: unknown) {
             // API check failed (connection refused, etc.) - in dev we allow access
-            console.warn('Development mode: API check failed, allowing access for development');
+            logDebug('[AuthGuard] Dev mode: API check failed', { error: String(apiError) });
           }
           
           // API check failed (likely no cookie on this port), but in dev we allow access
           // User is already logged in on main project, so allow canvas access
-          console.warn('Development mode: Allowing access for development. In production, cookies will be shared across subdomains.');
+          logDebug('[AuthGuard] Dev mode: Allowing access for development');
           setIsAuth(true);
           setIsChecking(false);
           return;
         } else {
           // Production: Check cookie first, then verify with API
           const hasCookie = isAuthenticated();
-          console.log('[AuthGuard] Prod mode: cookie present?', hasCookie, 'cookies', typeof document !== 'undefined' ? document.cookie : 'n/a');
+          logDebug('[AuthGuard] Prod mode: cookie check', {
+            hasCookie,
+            cookieString: typeof document !== 'undefined' ? document.cookie : 'n/a',
+            cookieLength: typeof document !== 'undefined' ? document.cookie.length : 0
+          });
           
           if (hasCookie) {
             // Verify the session is still valid by checking with API
             try {
-              console.log('[AuthGuard] Prod mode: calling checkAuthStatus');
+              logDebug('[AuthGuard] Prod mode: calling checkAuthStatus');
               const isValid = await checkAuthStatus();
-              console.log('[AuthGuard] Prod mode: checkAuthStatus result', isValid);
+              logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
               if (isValid) {
                 // Fetch user info
                 const user = await getCurrentUser();
-                console.log('[AuthGuard] Prod mode: fetched user', user?.uid);
+                logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username });
                 if (user && onUserLoaded) {
                   onUserLoaded(user);
                 }
                 setIsAuth(true);
                 setIsChecking(false);
                 return;
+              } else {
+                logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - session invalid');
               }
             } catch (apiError) {
-              console.error('[AuthGuard] Prod mode: API auth check failed', apiError);
+              logDebug('[AuthGuard] Prod mode: API auth check threw error', {
+                error: String(apiError),
+                errorName: (apiError as Error)?.name,
+                errorMessage: (apiError as Error)?.message
+              });
               // In production, if API check fails, redirect to login
             }
+          } else {
+            logDebug('[AuthGuard] Prod mode: No cookie found - will redirect');
           }
         }
 
@@ -102,15 +144,45 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
            window.location.hostname === 'studio.wildmindai.com');
         
         const mainProjectUrl = isProd 
-          ? 'https://wildmindai.com/view/signup'
+          ? 'https://www.wildmindai.com/view/signup'
           : 'http://localhost:3000/view/signup';
         
         // Redirect with return URL so user can come back after login
         const returnUrl = encodeURIComponent(window.location.href);
-        console.log('[AuthGuard] Redirecting to signup', { mainProjectUrl, returnUrl });
+        logDebug('[AuthGuard] NOT AUTHENTICATED - Will redirect to signup', {
+          mainProjectUrl,
+          returnUrl,
+          reason: 'No valid session found'
+        });
+        
+        // Add delay to allow logs to be saved and visible
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        logDebug('[AuthGuard] Executing redirect now');
         window.location.href = `${mainProjectUrl}?returnUrl=${returnUrl}`;
       } catch (error) {
-        console.error('[AuthGuard] Auth check threw error', error);
+        const logDebug = (message: string, data?: unknown) => {
+          const timestamp = new Date().toISOString();
+          const logEntry = `[${timestamp}] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
+          console.error(logEntry);
+          try {
+            const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';
+            const logs = JSON.parse(existingLogs);
+            logs.push(logEntry);
+            if (logs.length > 50) logs.shift();
+            localStorage.setItem('authguard_debug_logs', JSON.stringify(logs));
+          } catch {
+            // Ignore localStorage errors
+          }
+        };
+        
+        logDebug('[AuthGuard] Auth check threw error', {
+          error: String(error),
+          errorName: (error as Error)?.name,
+          errorMessage: (error as Error)?.message,
+          stack: (error as Error)?.stack
+        });
+        
         // On error, redirect to signup page
         const isProd = typeof window !== 'undefined' && 
           (window.location.hostname === 'wildmindai.com' || 
@@ -118,9 +190,14 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
            window.location.hostname === 'studio.wildmindai.com');
         
         const mainProjectUrl = isProd 
-          ? 'https://wildmindai.com/view/signup'
+          ? 'https://www.wildmindai.com/view/signup'
           : 'http://localhost:3000/view/signup';
-        console.log('[AuthGuard] Redirecting due to error', { mainProjectUrl });
+        
+        logDebug('[AuthGuard] Redirecting due to error', { mainProjectUrl });
+        
+        // Add delay to allow logs to be saved
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         window.location.href = mainProjectUrl;
       }
     };
