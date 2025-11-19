@@ -32,6 +32,12 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
+  // Smooth hover state management to prevent flickering
+  const [isMediaHovered, setIsMediaHovered] = useState(false);
+  // Use drag position if dragging, otherwise use imageData position
+  // This prevents the image from snapping back to old position during drag
+  const [currentX, setCurrentX] = useState(imageData.x || 50);
+  const [currentY, setCurrentY] = useState(imageData.y || 50);
   const imageRef = useRef<Konva.Image>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animRef = useRef<number | null>(null);
@@ -43,7 +49,33 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const transformRafRef = useRef<number | null>(null);
   const groupRef = useRef<Konva.Group>(null);
   const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const justFinishedDragRef = useRef(false);
+  const lastSentPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const lastReceivedPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const currentPositionRef = useRef<{ x: number; y: number }>({ x: imageData.x || 50, y: imageData.y || 50 });
   const isVideo = imageData.type === 'video';
+
+  // Sync with imageData when not dragging, but skip if we just finished dragging
+  // This prevents the position from being reset to the old value before parent updates
+  useEffect(() => {
+    if (!isDraggingImage && !justFinishedDragRef.current) {
+      const incomingX = imageData.x || 50;
+      const incomingY = imageData.y || 50;
+      
+      // Check if this is a new position from parent (different from what we last received)
+      const lastReceived = lastReceivedPositionRef.current;
+      if (!lastReceived || lastReceived.x !== incomingX || lastReceived.y !== incomingY) {
+        // Only update if it's different from current position
+        const current = currentPositionRef.current;
+        if (incomingX !== current.x || incomingY !== current.y) {
+          setCurrentX(incomingX);
+          setCurrentY(incomingY);
+          currentPositionRef.current = { x: incomingX, y: incomingY };
+          lastReceivedPositionRef.current = { x: incomingX, y: incomingY };
+        }
+      }
+    }
+  }, [imageData.x, imageData.y, isDraggingImage]);
 
   // Don't render if no URL (text elements don't have URLs)
   if (!imageData.url) return null;
@@ -179,9 +211,6 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       };
     }
   }, [isVideo, isPlaying]);
-
-  // Smooth hover state management to prevent flickering
-  const [isMediaHovered, setIsMediaHovered] = useState(false);
   
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -217,19 +246,6 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
   if (!img) return null;
 
-  // Use drag position if dragging, otherwise use imageData position
-  // This prevents the image from snapping back to old position during drag
-  const [currentX, setCurrentX] = useState(imageData.x || 50);
-  const [currentY, setCurrentY] = useState(imageData.y || 50);
-  
-  // Sync with imageData when not dragging
-  useEffect(() => {
-    if (!isDraggingImage) {
-      setCurrentX(imageData.x || 50);
-      setCurrentY(imageData.y || 50);
-    }
-  }, [imageData.x, imageData.y, isDraggingImage]);
-  
   const x = currentX;
   const y = currentY;
   const getDefaultWidth = () => {
@@ -339,6 +355,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     <>
       <Group
         ref={groupRef}
+        name={`canvas-image-${index}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         draggable={true}
@@ -355,26 +372,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           // Update position immediately to prevent snap-back
           setCurrentX(startX);
           setCurrentY(startY);
-        }}
-        onDragMove={(e) => {
-          // Update drag position ref and state during move
-          const node = e.target as Konva.Group;
-          const newX = node.x();
-          const newY = node.y();
-          dragPositionRef.current = { x: newX, y: newY };
-          // Update state to prevent snap-back (throttled via RAF)
-          if (!dragRafRef.current) {
-            dragRafRef.current = requestAnimationFrame(() => {
-              dragRafRef.current = null;
-              if (isDraggingImage && dragPositionRef.current) {
-                setCurrentX(dragPositionRef.current.x);
-                setCurrentY(dragPositionRef.current.y);
-              }
-            });
-          }
-          // Let Konva handle visual movement
-          const layer = (e.target as Konva.Node).getLayer();
-          layer?.batchDraw();
+          currentPositionRef.current = { x: startX, y: startY };
         }}
         onDragEnd={(e) => {
           const node = e.target as Konva.Group;
@@ -386,17 +384,55 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             cancelAnimationFrame(dragRafRef.current);
             dragRafRef.current = null;
           }
-          // Clear drag state
-          setIsDraggingImage(false);
-          dragPositionRef.current = null;
           // Update position immediately to prevent snap-back
           setCurrentX(finalX);
           setCurrentY(finalY);
+          currentPositionRef.current = { x: finalX, y: finalY };
+          // Store the position we're sending to parent
+          lastSentPositionRef.current = { x: finalX, y: finalY };
+          // Mark that we just finished dragging to prevent immediate sync
+          justFinishedDragRef.current = true;
+          // Clear drag state
+          setIsDraggingImage(false);
+          dragPositionRef.current = null;
           // Notify parent of position change
           onUpdate?.({
             x: finalX,
             y: finalY,
           });
+          // Allow sync after a short delay to let parent update
+          // Use setTimeout to ensure parent has time to process the update
+          setTimeout(() => {
+            justFinishedDragRef.current = false;
+          }, 100);
+        }}
+        onDragMove={(e) => {
+          // Update drag position ref and state during move
+          const node = e.target as Konva.Group;
+          const newX = node.x();
+          const newY = node.y();
+          dragPositionRef.current = { x: newX, y: newY };
+          // Update parent with real-time position during drag for action icons
+          if (isDraggingImage) {
+            onUpdate?.({
+              x: newX,
+              y: newY,
+            });
+          }
+          // Update state to prevent snap-back (throttled via RAF)
+          if (!dragRafRef.current) {
+            dragRafRef.current = requestAnimationFrame(() => {
+              dragRafRef.current = null;
+              if (isDraggingImage && dragPositionRef.current) {
+                setCurrentX(dragPositionRef.current.x);
+                setCurrentY(dragPositionRef.current.y);
+                currentPositionRef.current = { x: dragPositionRef.current.x, y: dragPositionRef.current.y };
+              }
+            });
+          }
+          // Let Konva handle visual movement
+          const layer = (e.target as Konva.Node).getLayer();
+          layer?.batchDraw();
         }}
         onTransform={(e) => {
           // Only redraw for smooth feedback; commit sizes on end

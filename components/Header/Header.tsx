@@ -244,16 +244,16 @@ export const Header: React.FC<HeaderProps> = ({
             backgroundColor: '#ffffff',
           border: '1px solid rgba(0, 0, 0, 0.1)',
           boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-          color: '#4b5563',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
+            color: '#4b5563',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = '#f9fafb';
-        }}
-        onMouseLeave={(e) => {
+          }}
+          onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = '#ffffff';
-        }}
+          }}
           title="Switch Project"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

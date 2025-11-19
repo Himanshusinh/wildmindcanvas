@@ -1375,11 +1375,11 @@ function CanvasApp({ user }: CanvasAppProps) {
     imageCount?: number
   ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
     console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
-
-    // Ensure we have a project ID
-    if (!projectId) {
-      throw new Error('Project not initialized. Please refresh the page.');
-    }
+      
+      // Ensure we have a project ID
+      if (!projectId) {
+        throw new Error('Project not initialized. Please refresh the page.');
+      }
 
     const queuedCount = Math.max(1, imageCount || 1);
     const baseId = `${modalId || 'image'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1897,8 +1897,8 @@ function CanvasApp({ user }: CanvasAppProps) {
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
                 if (projectId && opManagerInitialized) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
-                }
-                }}
+                    }
+                  }}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
           </>

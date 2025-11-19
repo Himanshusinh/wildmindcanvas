@@ -677,6 +677,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodesRef = useRef<Konva.Node[]>([]);
   const rafRef = useRef<number | null>(null);
+  const [transformerUpdateKey, setTransformerUpdateKey] = useState(0);
+  // Track real-time position of selected image during drag
+  const [selectedImageRealTimePosition, setSelectedImageRealTimePosition] = useState<{ x: number; y: number } | null>(null);
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
@@ -1886,7 +1889,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         const imageData = images[index];
         if (!imageData || imageData.type === 'model3d') return;
         
-        // Find the node by looking for Groups that match the image position
+        // First try to find node by name (more reliable)
+        const nodeByName = layer.findOne(`canvas-image-${index}`);
+        if (nodeByName && nodeByName instanceof Konva.Group) {
+          if (!nodes.includes(nodeByName)) {
+            nodes.push(nodeByName);
+          }
+        } else {
+          // Fallback: Find the node by looking for Groups that match the image position
+          // Use a larger tolerance to account for position updates after drag
         const allNodes = layer.getChildren();
         allNodes.forEach((node: Konva.Node) => {
           if (node instanceof Konva.Group) {
@@ -1895,26 +1906,31 @@ export const Canvas: React.FC<CanvasProps> = ({
             const imgX = imageData.x || 0;
             const imgY = imageData.y || 0;
             
-            // Match by position (with small tolerance)
-            if (Math.abs(nodeX - imgX) < 1 && Math.abs(nodeY - imgY) < 1) {
+              // Match by position (with larger tolerance to handle position updates)
+              const tolerance = 10; // Increased from 1 to handle position updates
+              if (Math.abs(nodeX - imgX) < tolerance && Math.abs(nodeY - imgY) < tolerance) {
               if (!nodes.includes(node)) {
                 nodes.push(node);
               }
             }
           }
         });
+        }
       });
       
       if (nodes.length > 0) {
         transformerRef.current.nodes(nodes);
         transformerRef.current.getLayer()?.batchDraw();
         selectedNodesRef.current = nodes;
+      } else {
+        // If no nodes found, clear transformer to prevent stale state
+        transformerRef.current.nodes([]);
       }
     } else if (transformerRef.current && selectedImageIndices.length === 0) {
       transformerRef.current.nodes([]);
       selectedNodesRef.current = [];
     }
-  }, [selectedImageIndices, images]);
+  }, [selectedImageIndices, images, position.x, position.y, scale, transformerUpdateKey]);
 
   // Handle drag to pan - enhanced for better navigation
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -2316,8 +2332,24 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Wrapper for onImageUpdate
   const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
-    if (onImageUpdate) {
+              if (onImageUpdate) {
       onImageUpdate(index, updates);
+              }
+    // Update real-time position for action icons during drag
+    if (updates.x !== undefined || updates.y !== undefined) {
+      if (index === selectedImageIndex) {
+        setSelectedImageRealTimePosition({
+          x: updates.x !== undefined ? updates.x : (images[index]?.x || 0),
+          y: updates.y !== undefined ? updates.y : (images[index]?.y || 0),
+                });
+              }
+            }
+    // Force Transformer re-attachment after position updates
+    if (updates.x !== undefined || updates.y !== undefined) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        setTransformerUpdateKey(prev => prev + 1);
+      }, 50);
     }
   };
 
@@ -2422,7 +2454,16 @@ export const Canvas: React.FC<CanvasProps> = ({
                 key={`${imageData.url}-${index}`} 
                 imageData={imageData}
                 index={actualIndex}
-                onUpdate={(updates) => handleImageUpdateWithGroup(actualIndex, updates)}
+                onUpdate={(updates) => {
+                  handleImageUpdateWithGroup(actualIndex, updates);
+                  // Clear real-time position when drag ends (when position is not being updated)
+                  if (updates.x === undefined && updates.y === undefined) {
+                    // Delay clearing to ensure final position is set
+                    setTimeout(() => {
+                      setSelectedImageRealTimePosition(null);
+                    }, 150);
+                  }
+                }}
                 onSelect={(e?: { ctrlKey?: boolean; metaKey?: boolean }) => {
                   
                   const isMultiSelect = e?.ctrlKey || e?.metaKey;
@@ -2590,7 +2631,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (
         <MediaActionIcons
-          selectedImage={images[selectedImageIndex]}
+          selectedImage={{
+            ...images[selectedImageIndex],
+            // Use real-time position if available (during drag), otherwise use imageData position
+            x: selectedImageRealTimePosition?.x ?? images[selectedImageIndex].x,
+            y: selectedImageRealTimePosition?.y ?? images[selectedImageIndex].y,
+          }}
           selectedImageIndex={selectedImageIndex}
           scale={scale}
           position={position}
