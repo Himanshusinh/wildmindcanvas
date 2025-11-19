@@ -535,3 +535,122 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
   return setCachedRequest(cacheKey, requestPromise);
 }
 
+/**
+ * Media Library Types
+ */
+export interface MediaItem {
+  id: string;
+  url: string;
+  type: 'image' | 'video' | 'music' | 'uploaded';
+  thumbnail?: string;
+  prompt?: string;
+  model?: string;
+  createdAt?: string;
+  storagePath?: string;
+  mediaId?: string;
+}
+
+export interface MediaLibraryResponse {
+  responseStatus: 'success' | 'error';
+  message?: string;
+  data?: {
+    images?: MediaItem[];
+    videos?: MediaItem[];
+    music?: MediaItem[];
+    uploaded?: MediaItem[];
+  };
+}
+
+/**
+ * Get user's media library (generated and uploaded)
+ */
+export async function getMediaLibrary(): Promise<MediaLibraryResponse> {
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to fetch media library' }));
+      return {
+        responseStatus: 'error',
+        message: error.message || 'Failed to fetch media library',
+      };
+    }
+
+    const result = await response.json();
+    return {
+      responseStatus: 'success',
+      data: result.data || {
+        images: [],
+        videos: [],
+        music: [],
+        uploaded: [],
+      },
+    };
+  } catch (error: any) {
+    return {
+      responseStatus: 'error',
+      message: error.message || 'Failed to fetch media library',
+    };
+  }
+}
+
+/**
+ * Save uploaded media from canvas to generation history
+ * This allows uploaded files to appear in "My Uploads" in the library
+ */
+export async function saveUploadedMedia(
+  url: string,
+  type: 'image' | 'video',
+  projectId?: string
+): Promise<{ success: boolean; id?: string; url?: string; storagePath?: string; historyId?: string; error?: string }> {
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        type,
+        projectId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to save uploaded media' }));
+      return {
+        success: false,
+        error: error.message || 'Failed to save uploaded media',
+      };
+    }
+
+    const result = await response.json();
+    if (result.responseStatus === 'success' && result.data) {
+      return {
+        success: true,
+        id: result.data.id,
+        url: result.data.url,
+        storagePath: result.data.storagePath,
+        historyId: result.data.historyId,
+      };
+    }
+
+    return {
+      success: false,
+      error: result.message || 'Failed to save uploaded media',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to save uploaded media',
+    };
+  }
+}
+

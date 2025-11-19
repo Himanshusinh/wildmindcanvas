@@ -108,20 +108,52 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
   if (!isOpen) return null;
 
   return (
+    <>
+      {/* Backdrop with glass effect blur */}
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 20000,
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(12px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+          pointerEvents: 'auto',
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}
+        onWheel={(e) => {
+          // Prevent canvas scrolling when backdrop is visible
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onTouchMove={(e) => {
+          // Prevent canvas touch scrolling
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      />
+      {/* Popup Content */}
     <div
       role="dialog"
       aria-modal="true"
       style={{
-        position: 'absolute',
+          position: 'fixed',
         left: 0,
         top: 0,
         right: 0,
         bottom: 0,
-        zIndex: 7000,
+        zIndex: 20001,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        pointerEvents: 'auto',
+          pointerEvents: 'none',
       }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -130,18 +162,19 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
       <div
         ref={panelRef}
         style={{
-          width: '800px',
-          maxWidth: '95%',
-          height: '650px',
-          maxHeight: '90vh',
-          background: '#ffffff',
-          border: '1px solid rgba(0, 0, 0, 0.08)',
-          borderRadius: '16px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: 'none',
+          borderRadius: '0',
+          boxShadow: 'none',
           padding: '0',
           display: 'flex',
           flexDirection: 'row',
           overflow: 'hidden',
+          pointerEvents: 'auto',
         }}
         onWheel={(e) => {
           // Prevent canvas scrolling when scrolling inside popup
@@ -151,17 +184,21 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           // Prevent canvas touch scrolling when touching inside popup
           e.stopPropagation();
         }}
+        onMouseDown={(e) => {
+          // Prevent clicks inside popup from closing it
+          e.stopPropagation();
+        }}
       >
         {/* Sidebar Navigation */}
           <div
             style={{
-            width: '220px',
+            width: '280px',
             height: '100%',
             background: '#ffffff',
             borderRight: '1px solid rgba(0, 0, 0, 0.06)',
               display: 'flex',
               flexDirection: 'column',
-            padding: '20px',
+            padding: '32px',
             overflow: 'hidden',
             }}
           >
@@ -217,10 +254,31 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
 
         {/* Main Content Area */}
         <div 
-          style={{ flex: 1, height: '100%', padding: '28px', background: '#ffffff', display: 'flex', flexDirection: 'column', overflow: 'auto', minHeight: 0 }}
+          style={{ 
+            flex: 1, 
+            height: '100%', 
+            padding: '40px', 
+            background: '#ffffff', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
+          }}
           onWheel={(e) => {
             // Prevent canvas scrolling when scrolling inside popup content
             e.stopPropagation();
+            // Allow scrolling within this container
+            const target = e.currentTarget;
+            const { scrollTop, scrollHeight, clientHeight } = target;
+            const isAtTop = scrollTop === 0;
+            const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
+            
+            // If at top and scrolling up, or at bottom and scrolling down, prevent default
+            if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+              e.preventDefault();
+            }
           }}
           onTouchMove={(e) => {
             // Prevent canvas touch scrolling when touching inside popup content
@@ -677,6 +735,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

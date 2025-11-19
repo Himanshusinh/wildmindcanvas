@@ -7,8 +7,9 @@ import { ToolbarPanel } from '@/components/ToolbarPanel';
 import { Header } from '@/components/Header';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Profile } from '@/components/Profile/Profile';
+import LibrarySidebar from '@/components/Canvas/LibrarySidebar';
 import { ImageUpload } from '@/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, getCurrentUser } from '@/lib/api';
+import { generateImageForCanvas, generateVideoForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/lib/canvasApi';
 import { ProjectSelector } from '@/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
@@ -1165,6 +1166,15 @@ function CanvasApp({ user }: CanvasAppProps) {
         }
         return updated;
       });
+
+      // Save uploaded video to generation history so it appears in "My Uploads"
+      if (projectId) {
+        import('../lib/api').then(({ saveUploadedMedia }) => {
+          saveUploadedMedia(url, 'video', projectId).catch((err) => {
+            console.warn('[processMediaFile] Failed to save uploaded video to history:', err);
+          });
+        });
+      }
     };
     } else {
       const img = new Image();
@@ -1241,6 +1251,15 @@ function CanvasApp({ user }: CanvasAppProps) {
           }
           return updated;
         });
+
+        // Save uploaded image to generation history so it appears in "My Uploads"
+        if (projectId) {
+          import('../lib/api').then(({ saveUploadedMedia }) => {
+            saveUploadedMedia(url, 'image', projectId).catch((err) => {
+              console.warn('[processMediaFile] Failed to save uploaded image to history:', err);
+            });
+          });
+        }
       };
 
       img.src = url;
@@ -1254,16 +1273,17 @@ function CanvasApp({ user }: CanvasAppProps) {
     });
   };
 
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
 
-  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => {
+  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => {
     // Always update to trigger effect, even if tool is the same
     // Use counter to force re-render when clicking same tool again
     if (tool === selectedTool) {
@@ -1285,6 +1305,11 @@ function CanvasApp({ user }: CanvasAppProps) {
     // Open music modal when music tool is selected
     if (tool === 'music') {
       setIsMusicModalOpen(true);
+    }
+    
+    // Open library sidebar when library tool is selected
+    if (tool === 'library') {
+      setIsLibraryOpen(true);
     }
   };
 
@@ -1343,6 +1368,70 @@ function CanvasApp({ user }: CanvasAppProps) {
         processMediaFile(file, images.length + index);
       });
     }
+  };
+
+  const addMediaToCanvas = (media: MediaItem, x?: number, y?: number) => {
+    // Add selected media to canvas
+    const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mediaUrl = media.url || media.thumbnail || '';
+    
+    // Determine media type
+    let mediaType: 'image' | 'video' | 'text' = 'image';
+    if (media.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i)) {
+      mediaType = 'video';
+    } else if (media.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i)) {
+      mediaType = 'video'; // Treat music as video for canvas display
+    }
+    
+    // Use provided coordinates or viewport center as fallback
+    const viewportCenter = viewportCenterRef.current;
+    const canvasX = x !== undefined ? x : viewportCenter.x - 200;
+    const canvasY = y !== undefined ? y : viewportCenter.y - 200;
+    
+    const newMedia: ImageUpload = {
+      type: mediaType,
+      url: mediaUrl,
+      x: canvasX,
+      y: canvasY,
+      width: 400,
+      height: 400,
+      elementId,
+    };
+    
+    setImages((prev) => [...prev, newMedia]);
+    
+    // Persist to backend if project exists
+    if (projectId && opManagerInitialized) {
+      appendOp({
+        type: 'create',
+        elementId,
+        data: {
+          element: {
+            id: elementId,
+            type: mediaType,
+            x: newMedia.x,
+            y: newMedia.y,
+            width: newMedia.width,
+            height: newMedia.height,
+            meta: {
+              url: mediaUrl,
+              mediaId: media.mediaId,
+              storagePath: media.storagePath,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
+      }).catch(console.error);
+    }
+  };
+
+  const handleLibraryMediaSelect = (media: MediaItem) => {
+    addMediaToCanvas(media);
+    setIsLibraryOpen(false);
+  };
+
+  const handleLibraryMediaDrop = (media: MediaItem, x: number, y: number) => {
+    addMediaToCanvas(media, x, y);
   };
 
   const handleProjectNameChange = async (name: string) => {
@@ -1539,6 +1628,7 @@ function CanvasApp({ user }: CanvasAppProps) {
               onImageDownload={handleImageDownload}
               onImageDuplicate={handleImageDuplicate}
               onImagesDrop={handleImagesDrop}
+              onLibraryMediaDrop={handleLibraryMediaDrop}
               selectedTool={selectedTool}
               onTextCreate={handleTextCreate}
               toolClickCounter={toolClickCounter}
@@ -1909,6 +1999,12 @@ function CanvasApp({ user }: CanvasAppProps) {
         )}
       </div>
       <GenerationQueue items={generationQueue} />
+      <LibrarySidebar
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelectMedia={handleLibraryMediaSelect}
+        scale={1}
+      />
     </main>
   );
 }

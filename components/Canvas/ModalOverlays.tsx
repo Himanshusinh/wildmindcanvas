@@ -46,7 +46,7 @@ interface ModalOverlaysProps {
   onMusicSelect?: (file: File) => void;
   onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => Promise<string | null>;
   generatedVideoUrl?: string | null;
-  generatedMusicUrl?: string | null;  
+  generatedMusicUrl?: string | null;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -389,10 +389,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         }
         seen.add(uniqueKey);
         
-        const fromCenter = computeNodeCenter(conn.from, 'send');
-        const toCenter = computeNodeCenter(conn.to, 'receive');
-        if (!fromCenter || !toCenter) return null;
-        return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
+    const fromCenter = computeNodeCenter(conn.from, 'send');
+    const toCenter = computeNodeCenter(conn.to, 'receive');
+    if (!fromCenter || !toCenter) return null;
+    return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
   }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportUpdateKey, stageRef]);
@@ -794,17 +794,17 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
                     
                     // Determine URL from known shapes (for non-MiniMax)
                     if (!videoUrl) {
-                      if (Array.isArray(resultData?.videos) && resultData.videos[0]?.url) {
-                        videoUrl = resultData.videos[0].url;
-                      } else if (resultData?.video?.url) {
-                        videoUrl = resultData.video.url;
-                      } else if (typeof resultData?.output === 'string' && resultData.output.startsWith('http')) {
-                        videoUrl = resultData.output;
-                      } else if (Array.isArray(resultData?.output) && typeof resultData.output[0] === 'string') {
-                        videoUrl = resultData.output[0];
+                    if (Array.isArray(resultData?.videos) && resultData.videos[0]?.url) {
+                      videoUrl = resultData.videos[0].url;
+                    } else if (resultData?.video?.url) {
+                      videoUrl = resultData.video.url;
+                    } else if (typeof resultData?.output === 'string' && resultData.output.startsWith('http')) {
+                      videoUrl = resultData.output;
+                    } else if (Array.isArray(resultData?.output) && typeof resultData.output[0] === 'string') {
+                      videoUrl = resultData.output[0];
                       } else if (resultData?.data?.video?.url) {
                         videoUrl = resultData.data.video.url;
-                      }
+                    }
                     }
                     
                     if (videoUrl) {

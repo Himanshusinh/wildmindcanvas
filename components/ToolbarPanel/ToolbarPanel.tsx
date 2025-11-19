@@ -3,17 +3,17 @@
 import { useState, useRef } from 'react';
 
 interface ToolbarPanelProps {
-  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => void;
+  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => void;
   onUpload?: (files: File[]) => void;
   isHidden?: boolean;
 }
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library'>('cursor');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
 
-  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music') => {
+  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => {
     // Debounce guard: ignore repeated clicks on same tool within 400ms
     const now = Date.now();
     if (lastToolClick.current.tool === tool && now - lastToolClick.current.time < 400) {
@@ -21,7 +21,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
     }
     lastToolClick.current = { tool, time: now };
 
-    // Only 'cursor' and 'move' are persistent selected tools. Other tools (text/image/video/music)
+    // Only 'cursor' and 'move' are persistent selected tools. Other tools (text/image/video/music/library)
     // act on single-click and should not remain visually selected.
     const persistent = tool === 'cursor' || tool === 'move';
     if (persistent) {
@@ -123,6 +123,15 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Music',
+    },
+    {
+      id: 'library' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+        </svg>
+      ),
+      label: 'Library',
     },
   ];
 

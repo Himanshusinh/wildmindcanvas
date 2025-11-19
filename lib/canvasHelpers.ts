@@ -54,7 +54,7 @@ export function findAvailablePositionNear(
 export function applyStageCursor(
   stage: Konva.Stage | null,
   style: string,
-  selectedTool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined,
+  selectedTool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | undefined,
   force = false
 ): void {
   if (!stage) return;

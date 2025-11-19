@@ -82,30 +82,12 @@ export const Header: React.FC<HeaderProps> = ({
         transition: 'opacity 0.3s ease, transform 0.3s ease',
       }}
     >
-      {/* Undo Button */}
+      {/* Undo Button - Hidden but functionality preserved via keyboard shortcuts (Ctrl/Cmd+Z) */}
       <div
         style={{
-          width: '28px',
-          height: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '8px',
-          backgroundColor: canUndo ? '#ffffff' : '#f3f4f6',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-          color: canUndo ? '#111827' : '#9ca3af',
-          cursor: canUndo && onUndo ? 'pointer' : 'default',
-          transition: 'all 0.2s',
-          opacity: canUndo ? 1 : 0.6,
+          display: 'none',
         }}
         onClick={() => { if (canUndo && onUndo) onUndo(); }}
-        onMouseEnter={(e) => {
-          if (canUndo) e.currentTarget.style.backgroundColor = '#f9fafb';
-        }}
-        onMouseLeave={(e) => {
-          if (canUndo) e.currentTarget.style.backgroundColor = '#ffffff';
-        }}
         title="Undo (Ctrl/Cmd+Z)"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -114,30 +96,12 @@ export const Header: React.FC<HeaderProps> = ({
         </svg>
       </div>
 
-      {/* Redo Button */}
+      {/* Redo Button - Hidden but functionality preserved via keyboard shortcuts (Ctrl+Y / Shift+Ctrl/Cmd+Z) */}
       <div
         style={{
-          width: '28px',
-          height: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '8px',
-          backgroundColor: canRedo ? '#ffffff' : '#f3f4f6',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-          color: canRedo ? '#111827' : '#9ca3af',
-          cursor: canRedo && onRedo ? 'pointer' : 'default',
-          transition: 'all 0.2s',
-          opacity: canRedo ? 1 : 0.6,
+          display: 'none',
         }}
         onClick={() => { if (canRedo && onRedo) onRedo(); }}
-        onMouseEnter={(e) => {
-          if (canRedo) e.currentTarget.style.backgroundColor = '#f9fafb';
-        }}
-        onMouseLeave={(e) => {
-          if (canRedo) e.currentTarget.style.backgroundColor = '#ffffff';
-        }}
         title="Redo (Ctrl+Y / Shift+Ctrl/Cmd+Z)"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -146,35 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
         </svg>
       </div>
 
-      {/* Library Icon - Part 1 */}
-      <div
-        style={{
-          width: '28px',
-          height: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '8px',
-          backgroundColor: '#ffffff',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-          color: '#4b5563',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#f9fafb';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#ffffff';
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
-        </svg>
-      </div>
-
-      {/* Project Name - Part 2 */}
+      {/* Project Name */}
       <div
         style={{
           padding: '6px 10px',

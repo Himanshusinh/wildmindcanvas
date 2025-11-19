@@ -23,7 +23,8 @@ interface CanvasProps {
   onImageDownload?: (index: number) => void;
   onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
-  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music';
+  onLibraryMediaDrop?: (media: { id: string; url: string; type: 'image' | 'video' | 'music' | 'uploaded'; thumbnail?: string; prompt?: string; model?: string; createdAt?: string; storagePath?: string; mediaId?: string }, x: number, y: number) => void;
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library';
   onTextCreate?: (text: string, x: number, y: number) => void;
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
@@ -89,6 +90,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onImageDownload,
   onImageDuplicate,
   onImagesDrop,
+  onLibraryMediaDrop,
   selectedTool,
   onTextCreate,
   toolClickCounter = 0,
@@ -168,7 +170,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
 
@@ -2376,6 +2378,36 @@ export const Canvas: React.FC<CanvasProps> = ({
     
     if (containerRef.current) {
       containerRef.current.style.backgroundColor = '';
+    }
+
+    // Check if this is a library media drop (has JSON data)
+    try {
+      const mediaData = e.dataTransfer.getData('application/json');
+      if (mediaData) {
+        const media = JSON.parse(mediaData);
+        // Check if it's a valid media item from library
+        if (media && media.url && (media.type === 'image' || media.type === 'video' || media.type === 'music' || media.type === 'uploaded')) {
+          // Calculate canvas coordinates from drop position
+          if (stageRef.current && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            // Get drop position relative to container
+            const dropX = e.clientX - rect.left;
+            const dropY = e.clientY - rect.top;
+            
+            // Convert screen coordinates to canvas coordinates
+            // Account for stage position and scale
+            const canvasX = (dropX - position.x) / scale;
+            const canvasY = (dropY - position.y) / scale;
+            
+            if (onLibraryMediaDrop) {
+              onLibraryMediaDrop(media, canvasX, canvasY);
+            }
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      // Not a library media drop, continue with file handling
     }
 
     const files = Array.from(e.dataTransfer.files).filter((file) => {
