@@ -65,6 +65,18 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           // Production: Check cookie first, then verify with API
           const hasCookie = isAuthenticated();
           
+          // Debug logging in production
+          if (typeof window !== 'undefined') {
+            const cookies = document.cookie.split(';').map(c => c.trim());
+            const sessionCookie = cookies.find(c => c.startsWith('app_session='));
+            console.log('[AuthGuard] Production auth check:', {
+              hasCookie,
+              sessionCookiePresent: !!sessionCookie,
+              allCookies: cookies,
+              hostname: window.location.hostname,
+            });
+          }
+          
           if (hasCookie) {
             // Verify the session is still valid by checking with API
             try {
@@ -78,11 +90,15 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
                 setIsAuth(true);
                 setIsChecking(false);
                 return;
+              } else {
+                console.warn('[AuthGuard] Cookie present but API verification failed');
               }
             } catch (apiError) {
-              console.error('API auth check failed:', apiError);
+              console.error('[AuthGuard] API auth check failed:', apiError);
               // In production, if API check fails, redirect to login
             }
+          } else {
+            console.warn('[AuthGuard] No authentication cookie found in production');
           }
         }
 
