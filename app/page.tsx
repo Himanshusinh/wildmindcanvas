@@ -1028,19 +1028,56 @@ function CanvasApp({ user }: CanvasAppProps) {
     });
   };
 
-  const processMediaFile = (file: File, offsetIndex: number = 0) => {
-    const url = URL.createObjectURL(file);
+  const processMediaFile = async (file: File, offsetIndex: number = 0) => {
     const fileType = file.type.toLowerCase();
     const fileName = file.name.toLowerCase();
+    
+    // Convert File to data URI for uploading to Zata
+    const convertFileToDataUri = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+    
+    // Upload to Zata first (for images and videos only)
+    let zataUrl: string | null = null;
+    const isImage = fileType.startsWith('image/');
+    const isVideoFile = fileType.startsWith('video/') || 
+                    ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
+                      .some(ext => fileName.endsWith(ext));
+    
+    if ((isImage || isVideoFile) && projectId) {
+      try {
+        const dataUri = await convertFileToDataUri(file);
+        const { saveUploadedMedia } = await import('../lib/api');
+        const result = await saveUploadedMedia(dataUri, isImage ? 'image' : 'video', projectId);
+        if (result.success && result.url) {
+          zataUrl = result.url;
+          // Trigger library refresh after successful upload
+          // Use a delay to ensure the backend has processed and saved the entry
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('library-refresh'));
+          }, 1500);
+        } else {
+          console.warn('[processMediaFile] Failed to upload to Zata, using blob URL:', result.error);
+        }
+      } catch (err) {
+        console.warn('[processMediaFile] Error uploading to Zata, using blob URL:', err);
+      }
+    }
+    
+    // Use Zata URL if available, otherwise fall back to blob URL
+    const url = zataUrl || URL.createObjectURL(file);
     
     // Check for 3D model files
     const isModel3D = ['.obj', '.gltf', '.glb', '.fbx', '.mb', '.ma']
       .some(ext => fileName.endsWith(ext));
     
-    // Check for video files
-    const isVideo = fileType.startsWith('video/') || 
-                    ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
-                      .some(ext => fileName.endsWith(ext));
+    // Check for video files (reuse isVideoFile)
+    const isVideo = isVideoFile;
     
     if (isModel3D) {
       // Get current viewport center
@@ -1167,14 +1204,7 @@ function CanvasApp({ user }: CanvasAppProps) {
         return updated;
       });
 
-      // Save uploaded video to generation history so it appears in "My Uploads"
-      if (projectId) {
-        import('../lib/api').then(({ saveUploadedMedia }) => {
-          saveUploadedMedia(url, 'video', projectId).catch((err) => {
-            console.warn('[processMediaFile] Failed to save uploaded video to history:', err);
-          });
-        });
-      }
+      // File already uploaded to Zata and saved to history above
     };
     } else {
       const img = new Image();
@@ -1252,14 +1282,7 @@ function CanvasApp({ user }: CanvasAppProps) {
           return updated;
         });
 
-        // Save uploaded image to generation history so it appears in "My Uploads"
-        if (projectId) {
-          import('../lib/api').then(({ saveUploadedMedia }) => {
-            saveUploadedMedia(url, 'image', projectId).catch((err) => {
-              console.warn('[processMediaFile] Failed to save uploaded image to history:', err);
-            });
-          });
-        }
+        // File already uploaded to Zata and saved to history above
       };
 
       img.src = url;

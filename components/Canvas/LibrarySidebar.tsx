@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getMediaLibrary, MediaItem } from '@/lib/api';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
@@ -30,13 +30,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchMediaLibrary();
-    }
-  }, [isOpen]);
-
-  const fetchMediaLibrary = async () => {
+  const fetchMediaLibrary = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getMediaLibrary();
@@ -53,7 +47,27 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchMediaLibrary();
+    }
+  }, [isOpen, fetchMediaLibrary]);
+
+  // Listen for library refresh events (e.g., after upload)
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (isOpen) {
+        fetchMediaLibrary();
+      }
+    };
+
+    window.addEventListener('library-refresh', handleRefresh);
+    return () => {
+      window.removeEventListener('library-refresh', handleRefresh);
+    };
+  }, [isOpen, fetchMediaLibrary]);
 
   const handleMediaClick = (media: MediaItem) => {
     // Don't trigger click if we just finished dragging
