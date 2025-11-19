@@ -18,6 +18,8 @@ interface AuthGuardProps {
 export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
   const [isChecking, setIsChecking] = useState(true);
   const [isAuth, setIsAuth] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const debugLogsRef = useRef<string[]>([]); // Keep ref for access in useEffect
   const router = useRouter();
   const checkedRef = useRef(false); // Prevent multiple checks
 
@@ -27,11 +29,21 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
       if (checkedRef.current) return;
       checkedRef.current = true;
 
-      // Helper to log to both console and localStorage (persists after redirect)
+      // Helper to log to console, state (visible on page), and localStorage
       const logDebug = (message: string, data?: unknown) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
         console.log(logEntry);
+        
+        // Add to state so it's visible on page
+        setDebugLogs(prev => {
+          const newLogs = [...prev, logEntry];
+          // Keep only last 30 logs in state
+          const trimmed = newLogs.slice(-30);
+          debugLogsRef.current = trimmed; // Update ref too
+          return trimmed;
+        });
+        
         try {
           const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';
           const logs = JSON.parse(existingLogs);
@@ -149,17 +161,33 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         
         // Redirect with return URL so user can come back after login
         const returnUrl = encodeURIComponent(window.location.href);
+        
+        // Collect key debug info to pass in URL
+        // Read current logs from ref (avoids dependency issue)
+        const currentLogs = debugLogsRef.current;
+        const debugInfo = {
+          hasCookie: isAuthenticated(),
+          apiBase: process.env.NEXT_PUBLIC_API_BASE_URL || 'NOT SET',
+          hostname: window.location.hostname,
+          cookieCount: document.cookie.split(';').filter(c => c.trim()).length,
+          lastLog: currentLogs[currentLogs.length - 1] || 'none'
+        };
+        
         logDebug('[AuthGuard] NOT AUTHENTICATED - Will redirect to signup', {
           mainProjectUrl,
           returnUrl,
-          reason: 'No valid session found'
+          reason: 'No valid session found',
+          debugInfo
         });
         
-        // Add delay to allow logs to be saved and visible
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Add longer delay to allow logs to be read (10 seconds)
+        logDebug('[AuthGuard] Waiting 10 seconds before redirect - check debug panel below');
+        await new Promise(resolve => setTimeout(resolve, 10000));
         
         logDebug('[AuthGuard] Executing redirect now');
-        window.location.href = `${mainProjectUrl}?returnUrl=${returnUrl}`;
+        // Encode debug info in URL so it can be read on redirect page
+        const debugParam = encodeURIComponent(JSON.stringify(debugInfo));
+        window.location.href = `${mainProjectUrl}?returnUrl=${returnUrl}&debug=${debugParam}`;
       } catch (error) {
         const logDebug = (message: string, data?: unknown) => {
           const timestamp = new Date().toISOString();
@@ -218,13 +246,45 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
 
   if (!isAuth) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h2>
-          <p className="text-gray-600 mb-6">
-            Please log in to access Canvas. Redirecting to login page...
-          </p>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+        <div className="text-center max-w-2xl w-full mb-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h2>
+            <p className="text-gray-600 mb-4">
+              Please log in to access Canvas. Redirecting to login page...
+            </p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-sm text-gray-500">Redirecting in 10 seconds... Check debug logs below</p>
+          </div>
+          
+          {/* Debug Panel - Visible on page */}
+          <div className="bg-gray-900 text-green-400 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-bold mb-2 text-white">Debug Logs (Last 30 entries):</h3>
+            <div className="font-mono text-xs space-y-1">
+              {debugLogs.length === 0 ? (
+                <p className="text-gray-500">No logs yet...</p>
+              ) : (
+                debugLogs.map((log, idx) => (
+                  <div key={idx} className="border-b border-gray-700 pb-1">
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          
+          {/* Copy logs button */}
+          <button
+            onClick={() => {
+              const logsText = debugLogs.join('\n');
+              navigator.clipboard.writeText(logsText).then(() => {
+                alert('Logs copied to clipboard!');
+              });
+            }}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Copy All Logs to Clipboard
+          </button>
         </div>
       </div>
     );
