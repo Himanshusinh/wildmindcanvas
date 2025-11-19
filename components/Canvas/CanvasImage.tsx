@@ -31,6 +31,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
   const imageRef = useRef<Konva.Image>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const animRef = useRef<number | null>(null);
@@ -40,6 +41,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const originalAspectRatio = useRef<number>(1);
   const dragRafRef = useRef<number | null>(null);
   const transformRafRef = useRef<number | null>(null);
+  const groupRef = useRef<Konva.Group>(null);
+  const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
   const isVideo = imageData.type === 'video';
 
   // Don't render if no URL (text elements don't have URLs)
@@ -214,8 +217,21 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
   if (!img) return null;
 
-  const x = imageData.x || 50;
-  const y = imageData.y || 50;
+  // Use drag position if dragging, otherwise use imageData position
+  // This prevents the image from snapping back to old position during drag
+  const [currentX, setCurrentX] = useState(imageData.x || 50);
+  const [currentY, setCurrentY] = useState(imageData.y || 50);
+  
+  // Sync with imageData when not dragging
+  useEffect(() => {
+    if (!isDraggingImage) {
+      setCurrentX(imageData.x || 50);
+      setCurrentY(imageData.y || 50);
+    }
+  }, [imageData.x, imageData.y, isDraggingImage]);
+  
+  const x = currentX;
+  const y = currentY;
   const getDefaultWidth = () => {
     if (isVideo && img instanceof HTMLVideoElement) {
       return img.videoWidth || 640;
@@ -322,22 +338,64 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   return (
     <>
       <Group
+        ref={groupRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         draggable={true}
         x={x}
         y={y}
         rotation={rotation}
+        onDragStart={(e) => {
+          setIsDraggingImage(true);
+          // Store initial drag position to prevent snap-back
+          const node = e.target as Konva.Group;
+          const startX = node.x();
+          const startY = node.y();
+          dragPositionRef.current = { x: startX, y: startY };
+          // Update position immediately to prevent snap-back
+          setCurrentX(startX);
+          setCurrentY(startY);
+        }}
         onDragMove={(e) => {
-          // Let Konva handle visual movement; avoid React state churn for smoothness
+          // Update drag position ref and state during move
+          const node = e.target as Konva.Group;
+          const newX = node.x();
+          const newY = node.y();
+          dragPositionRef.current = { x: newX, y: newY };
+          // Update state to prevent snap-back (throttled via RAF)
+          if (!dragRafRef.current) {
+            dragRafRef.current = requestAnimationFrame(() => {
+              dragRafRef.current = null;
+              if (isDraggingImage && dragPositionRef.current) {
+                setCurrentX(dragPositionRef.current.x);
+                setCurrentY(dragPositionRef.current.y);
+              }
+            });
+          }
+          // Let Konva handle visual movement
           const layer = (e.target as Konva.Node).getLayer();
           layer?.batchDraw();
         }}
         onDragEnd={(e) => {
-          const node = e.target;
+          const node = e.target as Konva.Group;
+          // Get the final position from the node
+          const finalX = node.x();
+          const finalY = node.y();
+          // Clean up RAF
+          if (dragRafRef.current) {
+            cancelAnimationFrame(dragRafRef.current);
+            dragRafRef.current = null;
+          }
+          // Clear drag state
+          setIsDraggingImage(false);
+          dragPositionRef.current = null;
+          // Update position immediately to prevent snap-back
+          setCurrentX(finalX);
+          setCurrentY(finalY);
+          // Notify parent of position change
           onUpdate?.({
-            x: node.x(),
-            y: node.y(),
+            x: finalX,
+            y: finalY,
           });
         }}
         onTransform={(e) => {
