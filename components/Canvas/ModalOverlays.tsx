@@ -376,12 +376,25 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       return null;
     };
 
-    return connections.map(conn => {
-      const fromCenter = computeNodeCenter(conn.from, 'send');
-      const toCenter = computeNodeCenter(conn.to, 'receive');
-      if (!fromCenter || !toCenter) return null;
-      return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
-    }).filter(Boolean) as Array<{ from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
+    // Filter out duplicates and compute connection lines
+    const seen = new Set<string>();
+    return connections
+      .map(conn => {
+        // Create a unique key for deduplication
+        const uniqueKey = `${conn.from}-${conn.to}`;
+        
+        // Skip if we've already seen this connection
+        if (seen.has(uniqueKey)) {
+          return null;
+        }
+        seen.add(uniqueKey);
+        
+        const fromCenter = computeNodeCenter(conn.from, 'send');
+        const toCenter = computeNodeCenter(conn.to, 'receive');
+        if (!fromCenter || !toCenter) return null;
+        return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
+      })
+      .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
   }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportUpdateKey, stageRef]);
 
   // Compute bounding rect for a node/modal to place the run icon just outside
@@ -417,8 +430,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       <svg
         style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1999 }}
       >
-        {connectionLines.map(line => (
-          <g key={`${line.from}-${line.to}`}>
+        {connectionLines.map((line, index) => (
+          <g key={line.id || `conn-${line.from}-${line.to}-${index}`}>
             <path
               d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
               stroke="#437eb5"
