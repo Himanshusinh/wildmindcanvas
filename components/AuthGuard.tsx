@@ -109,43 +109,47 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           setIsChecking(false);
           return;
         } else {
-          // Production: Check cookie first, then verify with API
+          // Production: Try API check first (even without cookie, in case cookie is on different subdomain)
+          // The API will return 401 if no valid session, but we should still try
+          logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain)');
+          
+          try {
+            logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API)');
+            const isValid = await checkAuthStatus();
+            logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
+            
+            if (isValid) {
+              // Fetch user info
+              const user = await getCurrentUser();
+              logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username });
+              if (user && onUserLoaded) {
+                onUserLoaded(user);
+              }
+              setIsAuth(true);
+              setIsChecking(false);
+              return;
+            } else {
+              logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session');
+            }
+          } catch (apiError) {
+            logDebug('[AuthGuard] Prod mode: API auth check threw error', {
+              error: String(apiError),
+              errorName: (apiError as Error)?.name,
+              errorMessage: (apiError as Error)?.message
+            });
+            // Continue to redirect
+          }
+          
+          // Also check for cookie locally (for logging)
           const hasCookie = isAuthenticated();
-          logDebug('[AuthGuard] Prod mode: cookie check', {
+          logDebug('[AuthGuard] Prod mode: Local cookie check', {
             hasCookie,
             cookieString: typeof document !== 'undefined' ? document.cookie : 'n/a',
             cookieLength: typeof document !== 'undefined' ? document.cookie.length : 0
           });
           
-          if (hasCookie) {
-            // Verify the session is still valid by checking with API
-            try {
-              logDebug('[AuthGuard] Prod mode: calling checkAuthStatus');
-              const isValid = await checkAuthStatus();
-              logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
-              if (isValid) {
-                // Fetch user info
-                const user = await getCurrentUser();
-                logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username });
-                if (user && onUserLoaded) {
-                  onUserLoaded(user);
-                }
-                setIsAuth(true);
-                setIsChecking(false);
-                return;
-              } else {
-                logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - session invalid');
-              }
-            } catch (apiError) {
-              logDebug('[AuthGuard] Prod mode: API auth check threw error', {
-                error: String(apiError),
-                errorName: (apiError as Error)?.name,
-                errorMessage: (apiError as Error)?.message
-              });
-              // In production, if API check fails, redirect to login
-            }
-          } else {
-            logDebug('[AuthGuard] Prod mode: No cookie found - will redirect');
+          if (!hasCookie) {
+            logDebug('[AuthGuard] Prod mode: No cookie found locally - will redirect');
           }
         }
 
