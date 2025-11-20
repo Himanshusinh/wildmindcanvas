@@ -1098,112 +1098,20 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                     position: 'absolute',
                     top: '100%',
                     left: 0,
-                    right: 0,
+                    minWidth: `${400 * scale}px`,
+                    width: 'max-content',
                     marginTop: `${4 * scale}px`,
                     backgroundColor: '#ffffff',
                     border: `1px solid ${dropdownBorderColor}`,
                     borderRadius: `${12 * scale}px`,
                     boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
-                    maxHeight: `${300 * scale}px`,
-                    overflowY: 'auto',
                     zIndex: 3003,
                     padding: `${4 * scale}px 0`,
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 >
-                  {/* FAL Models */}
-                  {availableModels.some(m => ['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].includes(m)) && (
-                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderBottom: `1px solid ${dropdownBorderColor}`, marginBottom: `${4 * scale}px` }}>
-                      FAL Models
-                    </div>
-                  )}
-                  {['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].filter(model => availableModels.includes(model)).map((model) => (
-                    <div
-                      key={model}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedModel(model);
-                        setIsModelDropdownOpen(false);
-                        // Reset aspect ratio if needed
-                        const modelLower = model.toLowerCase();
-                  let availableRatios: Array<{ value: string; label: string }>;
-                  if (modelLower.includes('flux')) {
-                    availableRatios = [
-                      { value: '1:1', label: '1:1' },
-                      { value: '16:9', label: '16:9' },
-                      { value: '9:16', label: '9:16' },
-                      { value: '4:3', label: '4:3' },
-                      { value: '3:4', label: '3:4' },
-                      { value: '3:2', label: '3:2' },
-                      { value: '2:3', label: '2:3' },
-                      { value: '21:9', label: '21:9' },
-                      { value: '9:21', label: '9:21' },
-                      { value: '16:10', label: '16:10' },
-                      { value: '10:16', label: '10:16' },
-                    ];
-                  } else {
-                    availableRatios = [
-                      { value: '1:1', label: '1:1' },
-                      { value: '16:9', label: '16:9' },
-                      { value: '9:16', label: '9:16' },
-                      { value: '4:3', label: '4:3' },
-                      { value: '3:4', label: '3:4' },
-                      { value: '3:2', label: '3:2' },
-                      { value: '2:3', label: '2:3' },
-                      { value: '21:9', label: '21:9' },
-                      { value: '5:4', label: '5:4' },
-                      { value: '4:5', label: '4:5' },
-                    ];
-                  }
-                  if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
-                    setSelectedAspectRatio(availableRatios[0].value);
-                  }
-                  if (onOptionsChange) {
-                    const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
-                    const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 1;
-                    const rawHeight = Math.round(frameWidth / ar);
-                    const frameHeight = Math.max(400, rawHeight);
-                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
-                        }
-                      }}
-                      style={{
-                        padding: `${8 * scale}px ${16 * scale}px`,
-                        fontSize: controlFontSize,
-                        color: '#1f2937',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedModel !== model) {
-                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedModel !== model) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      {selectedModel === model && (
-                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                      <span>{model}</span>
-                    </div>
-                  ))}
-                  
-                  {/* Flux Models */}
-                  {availableModels.some(m => ['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1'].includes(m)) && (
-                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, borderBottom: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px`, marginBottom: `${4 * scale}px` }}>
-                      Flux Models
-                    </div>
-                  )}
-                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1'].filter(model => availableModels.includes(model)).map((model) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${4 * scale}px`, padding: `${4 * scale}px` }}>
+                  {availableModels.map((model) => (
                     <div
                       key={model}
                       onClick={(e) => {
@@ -1254,14 +1162,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                         }
                       }}
                       style={{
-                        padding: `${8 * scale}px ${16 * scale}px`,
+                        padding: `${6 * scale}px ${12 * scale}px`,
                         fontSize: controlFontSize,
                         color: '#1f2937',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                        borderRadius: `${6 * scale}px`,
+                        whiteSpace: 'nowrap',
+                        minWidth: 'max-content',
                       }}
                       onMouseEnter={(e) => {
                         if (selectedModel !== model) {
@@ -1279,95 +1189,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       )}
-                      <span>{model}</span>
+                      <span style={{ whiteSpace: 'nowrap' }}>{model}</span>
                     </div>
                   ))}
-                
-                {/* Replicate Models */}
-                  {availableModels.some(m => ['Seedream v4 4K'].includes(m)) && (
-                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px` }}>
-                      Replicate Models
-                    </div>
-                  )}
-                  {['Seedream v4 4K'].filter(model => availableModels.includes(model)).map((model) => (
-                    <div
-                      key={model}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedModel(model);
-                        setIsModelDropdownOpen(false);
-                        // Reset aspect ratio if needed
-                        const modelLower = model.toLowerCase();
-                        let availableRatios: Array<{ value: string; label: string }>;
-                        if (modelLower.includes('flux')) {
-                          availableRatios = [
-                            { value: '1:1', label: '1:1' },
-                            { value: '16:9', label: '16:9' },
-                            { value: '9:16', label: '9:16' },
-                            { value: '4:3', label: '4:3' },
-                            { value: '3:4', label: '3:4' },
-                            { value: '3:2', label: '3:2' },
-                            { value: '2:3', label: '2:3' },
-                            { value: '21:9', label: '21:9' },
-                            { value: '9:21', label: '9:21' },
-                            { value: '16:10', label: '16:10' },
-                            { value: '10:16', label: '10:16' },
-                          ];
-                        } else {
-                          availableRatios = [
-                            { value: '1:1', label: '1:1' },
-                            { value: '16:9', label: '16:9' },
-                            { value: '9:16', label: '9:16' },
-                            { value: '4:3', label: '4:3' },
-                            { value: '3:4', label: '3:4' },
-                            { value: '3:2', label: '3:2' },
-                            { value: '2:3', label: '2:3' },
-                            { value: '21:9', label: '21:9' },
-                            { value: '5:4', label: '5:4' },
-                            { value: '4:5', label: '4:5' },
-                          ];
-                        }
-                        if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
-                          setSelectedAspectRatio(availableRatios[0].value);
-                        }
-                  if (onOptionsChange) {
-                          const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
-                    const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 1;
-                    const rawHeight = Math.round(frameWidth / ar);
-                    const frameHeight = Math.max(400, rawHeight);
-                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
-                        }
-                      }}
-                      style={{
-                        padding: `${8 * scale}px ${16 * scale}px`,
-                        fontSize: controlFontSize,
-                        color: '#1f2937',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                        borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedModel !== model) {
-                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedModel !== model) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      {selectedModel === model && (
-                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                      <span>{model}</span>
-                    </div>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1514,38 +1339,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 </button>
               </div>
           </div>
-          {/* Commit Row (shows after generation) */}
-          {generatedImageUrl && onAddToCanvas && (
-            <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', justifyContent: 'flex-end' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddToCanvas(generatedImageUrl);
-                  // Close/remove this modal after adding to canvas to avoid duplicate view
-                  if (onDelete) onDelete();
-                }}
-                style={{
-                  padding: `${10 * scale}px ${14 * scale}px`,
-                  backgroundColor: 'rgba(34,197,94,0.9)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: `${10 * scale}px`,
-                  fontSize: `${12 * scale}px`,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(34, 197, 94, 0.35)`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(34, 197, 94, 0.5)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(34, 197, 94, 0.35)`;
-                }}
-              >
-                Add to Canvas
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>

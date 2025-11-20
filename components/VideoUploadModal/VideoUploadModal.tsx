@@ -1052,7 +1052,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                   position: 'absolute',
                   top: '100%',
                   left: 0,
-                  right: 0,
+                  minWidth: `${400 * scale}px`,
+                  width: 'max-content',
                   marginTop: `${4 * scale}px`,
                   backgroundColor: '#ffffff',
                   border: `1px solid ${dropdownBorderColor}`,
@@ -1119,6 +1120,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                       alignItems: 'center',
                       backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                       borderRadius: `${6 * scale}px`,
+                      whiteSpace: 'nowrap',
+                      minWidth: 'max-content',
                     }}
                     onMouseEnter={(e) => {
                       if (selectedModel !== model) {
@@ -1136,7 +1139,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     )}
-                    <span>{model}</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>{model}</span>
                   </div>
                 ))}
                 </div>
