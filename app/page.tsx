@@ -1576,7 +1576,8 @@ function CanvasApp({ user }: CanvasAppProps) {
     frame: string, 
     aspectRatio: string,
     modalId?: string,
-    imageCount?: number
+    imageCount?: number,
+    sourceImageUrl?: string
   ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
     console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
       
@@ -1623,7 +1624,8 @@ function CanvasApp({ user }: CanvasAppProps) {
         projectId,
         genWidth,
         genHeight,
-        queuedCount
+        queuedCount,
+        sourceImageUrl
       );
       
       console.log('Image generated successfully:', result);

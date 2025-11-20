@@ -41,7 +41,7 @@ interface ModalOverlaysProps {
   images?: ImageUpload[];
   onTextCreate?: (text: string, x: number, y: number) => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onMusicSelect?: (file: File) => void;
@@ -179,7 +179,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       const toType = getComponentType(id);
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music'],
-        image: ['video'],
+        image: ['image', 'video'],
         video: ['video'],
         music: ['video'],
       };
@@ -696,6 +696,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
               Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
             }
           }}
+          connections={connections}
+          imageModalStates={imageModalStates}
+          images={images}
         />
       ))}
       {/* Video Upload Modal Overlays */}

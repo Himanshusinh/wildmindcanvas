@@ -207,7 +207,8 @@ export async function generateImageForCanvas(
   projectId: string,
   width?: number,
   height?: number,
-  imageCount?: number
+  imageCount?: number,
+  sourceImageUrl?: string
 ): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
   const controller = new AbortController();
@@ -228,6 +229,7 @@ export async function generateImageForCanvas(
         height,
         aspectRatio, // Pass aspectRatio for proper model mapping
         imageCount, // Pass imageCount to generate multiple images
+        sourceImageUrl, // Pass sourceImageUrl for image-to-image generation
         meta: {
           source: 'canvas',
           projectId,

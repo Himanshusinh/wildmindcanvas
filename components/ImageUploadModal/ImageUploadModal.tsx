@@ -33,8 +33,11 @@ interface ImageUploadModalProps {
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
   initialCount?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
+  connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
+  imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  images?: Array<{ elementId?: string; url?: string; type?: string }>;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -68,6 +71,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onPersistImageModalCreate,
   onImageGenerate,
   onUpdateModalState,
+  connections = [],
+  imageModalStates = [],
+  images = [],
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -102,11 +108,103 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
 
   // Detect if this is an uploaded image (from library, local storage, or media)
-  // Check if model is 'Library Image' or 'Uploaded Image', or if there's no prompt and image exists (and not generating)
+  // An image is uploaded if:
+  // 1. Model is explicitly 'Library Image' or 'Uploaded Image', OR
+  // 2. Model is NOT one of the generation models (meaning it's truly uploaded, not generated)
+  const GENERATION_MODELS = [
+    'Google Nano Banana', 
+    'Seedream v4', 
+    'Imagen 4 Ultra', 
+    'Imagen 4', 
+    'Imagen 4 Fast',
+    'Flux Kontext Max', 
+    'Flux Kontext Pro', 
+    'Flux Pro 1.1 Ultra', 
+    'Flux Pro 1.1',
+    'Seedream v4 4K'
+  ];
+  const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
+  const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
+  // An image is uploaded (Media) if:
+  // 1. Model is explicitly 'Library Image' or 'Uploaded Image' (highest priority - check both initialModel and selectedModel), OR
+  // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
+  // Priority: Explicit model check first, then fallback detection
   const isUploadedImage = 
     initialModel === 'Library Image' || 
     initialModel === 'Uploaded Image' ||
-    (!initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
+    selectedModel === 'Library Image' ||
+    selectedModel === 'Uploaded Image' ||
+    (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
+
+  // Detect connected image nodes (for image-to-image generation)
+  const canvasImageEntries = images
+    .map((img, idx) => ({
+      id: img.elementId || `canvas-image-${idx}`,
+      url: img.url,
+      type: img.type,
+    }))
+    .filter(entry => entry.url && entry.type === 'image') as Array<{ id: string; url?: string }>;
+
+  const connectedImageConnections = connections.filter(conn => conn.to === id);
+  const connectedImageSource = connectedImageConnections
+    .map(conn => {
+      const modal = imageModalStates.find(img => img.id === conn.from);
+      if (modal?.generatedImageUrl) {
+        return { id: modal.id, url: modal.generatedImageUrl };
+      }
+      const canvasImage = canvasImageEntries.find(entry => entry.id === conn.from);
+      if (canvasImage?.url) {
+        return { id: canvasImage.id, url: canvasImage.url };
+      }
+      return null;
+    })
+    .find((entry): entry is { id: string; url: string } => Boolean(entry?.url));
+
+  const hasConnectedImage = Boolean(connectedImageSource?.url);
+  const sourceImageUrl = connectedImageSource?.url || null;
+
+  // Check if an image is already generated in this modal
+  const hasExistingImage = Boolean(generatedImageUrl && !isGenerating && !externalIsGenerating);
+  
+  // Filter models: 
+  // - If image is connected from another modal OR an image is already generated in this modal, only show image-to-image models
+  // - Otherwise, show all models
+  const IMAGE_TO_IMAGE_MODELS = ['Google Nano Banana'];
+  const ALL_MODELS = [
+    'Google Nano Banana', 
+    'Seedream v4', 
+    'Imagen 4 Ultra', 
+    'Imagen 4', 
+    'Imagen 4 Fast',
+    'Flux Kontext Max', 
+    'Flux Kontext Pro', 
+    'Flux Pro 1.1 Ultra', 
+    'Flux Pro 1.1',
+    'Seedream v4 4K'
+  ];
+  const availableModels = (hasConnectedImage || hasExistingImage) ? IMAGE_TO_IMAGE_MODELS : ALL_MODELS;
+  
+  // Determine source image URL: use connected image if available, otherwise use existing generated image
+  const finalSourceImageUrl = sourceImageUrl || (hasExistingImage ? generatedImageUrl : null);
+
+  // Auto-set model to Google Nano Banana when image is connected or already generated
+  // BUT NOT if this is an uploaded image (Media) - uploaded images should keep their model
+  useEffect(() => {
+    // Don't auto-set model for uploaded images (Media)
+    if (isUploadedImage) return;
+    
+    if ((hasConnectedImage || hasExistingImage) && selectedModel !== 'Google Nano Banana') {
+      setSelectedModel('Google Nano Banana');
+      onOptionsChange?.({
+        model: 'Google Nano Banana',
+        aspectRatio: selectedAspectRatio,
+        frame: selectedFrame,
+        prompt,
+        frameWidth: 600,
+        frameHeight: 400,
+      });
+    }
+  }, [hasConnectedImage, hasExistingImage, selectedModel, selectedAspectRatio, selectedFrame, prompt, onOptionsChange, isUploadedImage]);
 
   const handleGenerate = async () => {
     if (prompt.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
@@ -119,19 +217,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
         const frameHeight = Math.max(400, rawHeight);
         
-        // Create ALL frames immediately (before generation starts)
-        // This ensures both frames show loading animation
+        // Logic for frame creation:
+        // - If image is already generated in this modal (hasExistingImage), create a NEW frame next to it
+        // - If media image is connected but modal is empty, generate in the CURRENT frame
+        // - Otherwise, use the current frame
         const modalIds: string[] = [];
-        const currentModalId = id || `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Create current modal if it doesn't exist
-        if (!id && onPersistImageModalCreate) {
-          const currentModal = {
-            id: currentModalId,
-            x: x,
-            y: y,
+        let targetModalId: string;
+        let targetX = x;
+        let targetY = y;
+
+        // Only create a new frame if there's already a generated image in this modal
+        // If a media image is connected but modal is empty, generate in the current modal
+        if (hasExistingImage && generatedImageUrl) {
+          // Create a new frame next to the current one (to the right)
+          const offsetX = frameWidth + 50;
+          targetX = x + offsetX;
+          targetY = y;
+          targetModalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          const newModal = {
+            id: targetModalId,
+            x: targetX,
+            y: targetY,
             generatedImageUrl: null as string | null,
-            isGenerating: true, // Mark as generating to show loading
+            isGenerating: true,
             frameWidth,
             frameHeight,
             model: selectedModel,
@@ -140,15 +249,38 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             prompt,
             imageCount: 1,
           };
-          await Promise.resolve(onPersistImageModalCreate(currentModal));
+          await Promise.resolve(onPersistImageModalCreate(newModal));
+          modalIds.push(targetModalId);
+        } else {
+          // Use current frame
+          targetModalId = id || `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Create current modal if it doesn't exist
+          if (!id && onPersistImageModalCreate) {
+            const currentModal = {
+              id: targetModalId,
+              x: targetX,
+              y: targetY,
+              generatedImageUrl: null as string | null,
+              isGenerating: true,
+              frameWidth,
+              frameHeight,
+              model: selectedModel,
+              frame: selectedFrame,
+              aspectRatio: selectedAspectRatio,
+              prompt,
+              imageCount: 1,
+            };
+            await Promise.resolve(onPersistImageModalCreate(currentModal));
+          }
+          modalIds.push(targetModalId);
         }
-        modalIds.push(currentModalId);
         
         // Create additional frames if imageCount > 1
         for (let i = 1; i < imageCount; i++) {
           const offsetX = i * (frameWidth + 50);
-          const newX = x + offsetX;
-          const newY = y;
+          const newX = targetX + offsetX;
+          const newY = targetY;
           
           const newModalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`;
           const newModal = {
@@ -172,8 +304,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
-        console.log(`[Image Generation] Starting generation of ${imageCount} images`);
-        const result = await onImageGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, currentModalId, imageCount);
+        const isImageToImageMode = Boolean(finalSourceImageUrl);
+        console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
+        const result = await onImageGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, targetModalId, imageCount, finalSourceImageUrl || undefined);
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
         
         // Extract all generated image URLs
@@ -971,10 +1104,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 onMouseDown={(e) => e.stopPropagation()}
                 >
                   {/* FAL Models */}
-                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderBottom: `1px solid ${dropdownBorderColor}`, marginBottom: `${4 * scale}px` }}>
-                    FAL Models
-                  </div>
-                  {['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].map((model) => (
+                  {availableModels.some(m => ['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].includes(m)) && (
+                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderBottom: `1px solid ${dropdownBorderColor}`, marginBottom: `${4 * scale}px` }}>
+                      FAL Models
+                    </div>
+                  )}
+                  {['Google Nano Banana', 'Seedream v4', 'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast'].filter(model => availableModels.includes(model)).map((model) => (
                     <div
                       key={model}
                       onClick={(e) => {
@@ -1055,10 +1190,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   ))}
                   
                   {/* Flux Models */}
-                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, borderBottom: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px`, marginBottom: `${4 * scale}px` }}>
-                    Flux Models
-                  </div>
-                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1',].map((model) => (
+                  {availableModels.some(m => ['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1'].includes(m)) && (
+                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, borderBottom: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px`, marginBottom: `${4 * scale}px` }}>
+                      Flux Models
+                    </div>
+                  )}
+                  {['Flux Kontext Max', 'Flux Kontext Pro', 'Flux Pro 1.1 Ultra', 'Flux Pro 1.1'].filter(model => availableModels.includes(model)).map((model) => (
                     <div
                       key={model}
                       onClick={(e) => {
@@ -1139,10 +1276,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   ))}
                 
                 {/* Replicate Models */}
-                  <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px` }}>
-                    Replicate Models
-            </div>
-                  {['Seedream v4 4K'].map((model) => (
+                  {availableModels.some(m => ['Seedream v4 4K'].includes(m)) && (
+                    <div style={{ padding: `${6 * scale}px ${12 * scale}px`, fontSize: controlFontSize, fontWeight: '600', color: '#6b7280', borderTop: `1px solid ${dropdownBorderColor}`, marginTop: `${4 * scale}px` }}>
+                      Replicate Models
+                    </div>
+                  )}
+                  {['Seedream v4 4K'].filter(model => availableModels.includes(model)).map((model) => (
                     <div
                       key={model}
                       onClick={(e) => {
