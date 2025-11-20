@@ -352,6 +352,12 @@ export const TextInput: React.FC<TextInputProps> = ({
           <div
             data-node-id={id}
             data-node-side="receive"
+            onPointerEnter={(e) => {
+              window.dispatchEvent(new CustomEvent('canvas-node-hover', { detail: { nodeId: id } }));
+            }}
+            onPointerLeave={(e) => {
+              window.dispatchEvent(new CustomEvent('canvas-node-leave', { detail: { nodeId: id } }));
+            }}
             onPointerUp={(e) => {
               e.stopPropagation();
               e.preventDefault();

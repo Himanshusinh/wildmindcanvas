@@ -752,6 +752,14 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           <div
             data-node-id={id}
             data-node-side="receive"
+            onPointerEnter={(e) => {
+              if (!id) return;
+              window.dispatchEvent(new CustomEvent('canvas-node-hover', { detail: { nodeId: id } }));
+            }}
+            onPointerLeave={(e) => {
+              if (!id) return;
+              window.dispatchEvent(new CustomEvent('canvas-node-leave', { detail: { nodeId: id } }));
+            }}
             onPointerUp={(e) => {
               if (!id) return;
               e.stopPropagation();

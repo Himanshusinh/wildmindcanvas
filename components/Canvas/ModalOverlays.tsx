@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TextInput } from '@/components/TextInput';
 import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { VideoUploadModal } from '@/components/VideoUploadModal';
@@ -140,6 +140,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   const connections = externalConnections ?? localConnections;
   const [activeDrag, setActiveDrag] = useState<null | { from: string; color: string; startX: number; startY: number; currentX: number; currentY: number }>(null);
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   
   // Force recalculation when viewport changes
   useEffect(() => {
@@ -148,6 +149,97 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     });
     return () => cancelAnimationFrame(rafId);
   }, [position.x, position.y, scale]);
+
+  // Determine modal/component type for a given overlay/node id. Reads
+  // `data-modal-component` from overlay or nearest ancestor and returns a
+  // lowercase string like 'text' | 'image' | 'video' | 'music'.
+  const getComponentType = (id?: string | null): string | null => {
+    if (!id) return null;
+    const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement | null;
+    if (overlay) {
+      const attr = overlay.getAttribute('data-modal-component') || (overlay.dataset as any).modalComponent;
+      if (attr) return String(attr).toLowerCase();
+    }
+    const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`) as HTMLElement | null;
+    if (frameEl) {
+      const comp = frameEl.closest('[data-modal-component]') as HTMLElement | null;
+      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
+    }
+    const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+    if (nodeEl) {
+      // First check if the node itself has data-component-type (for canvas images)
+      const componentType = nodeEl.getAttribute('data-component-type');
+      if (componentType) return componentType.toLowerCase();
+      // Otherwise check for modal component in ancestor
+      const comp = nodeEl.closest('[data-modal-component]') as HTMLElement | null;
+      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
+    }
+    // Check if this is a canvas image (uploaded image) by looking for the node element
+    // Canvas images have IDs like "canvas-image-{index}" or "element-{timestamp}-{random}"
+    if (id.startsWith('canvas-image-') || id.startsWith('element-')) {
+      // Try to find the node element to get its component type
+      const canvasNodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+      if (canvasNodeEl) {
+        const componentType = canvasNodeEl.getAttribute('data-component-type');
+        if (componentType) return componentType.toLowerCase();
+      }
+      // Fallback: assume 'image' for canvas images
+      return 'image';
+    }
+    return null;
+  };
+
+  // Helper function to check if a connection would be valid
+  const checkConnectionValidity = useCallback((fromId: string, toId: string): boolean => {
+    if (fromId === toId) return false; // Can't connect to self
+
+    const fromType = getComponentType(fromId);
+    const toType = getComponentType(toId);
+    
+    if (!fromType || !toType) return false;
+
+    // Check basic allowed connections
+    const allowedMap: Record<string, string[]> = {
+      text: ['image', 'video', 'music'],
+      image: ['image', 'video'],
+      video: ['video'],
+      music: ['video'],
+    };
+
+    if (!allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
+      return false;
+    }
+
+    // Additional validation for media connections:
+    // Check if source is media (Library Image or Uploaded Image)
+    const fromModal = imageModalStates.find(m => m.id === fromId);
+    const isFromMedia = fromModal && (
+      fromModal.model === 'Library Image' || 
+      fromModal.model === 'Uploaded Image' ||
+      (!fromModal.model && fromModal.generatedImageUrl && !fromModal.prompt)
+    );
+
+    // Check if target is image generation modal
+    const toModal = imageModalStates.find(m => m.id === toId);
+    const isToImageGeneration = toType === 'image' && toModal;
+    const isToMedia = toModal && (
+      toModal.model === 'Library Image' || 
+      toModal.model === 'Uploaded Image' ||
+      (!toModal.model && toModal.generatedImageUrl && !toModal.prompt)
+    );
+
+    // Block: Image generation cannot connect to media
+    if (fromType === 'image' && fromModal && !isFromMedia && isToMedia) {
+      return false;
+    }
+
+    // Block: Media cannot connect to image generation that already has an image
+    if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
+      return false;
+    }
+
+    return true;
+  }, [imageModalStates]);
 
   // Event listeners for node drag lifecycle
   useEffect(() => {
@@ -191,6 +283,41 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         return;
       }
 
+      // Additional validation for media connections:
+      // 1. Media can only connect to empty image generation modals
+      // 2. Image generation modals cannot connect to media
+      
+      // Check if source is media (Library Image or Uploaded Image)
+      const fromModal = imageModalStates.find(m => m.id === activeDrag.from);
+      const isFromMedia = fromModal && (
+        fromModal.model === 'Library Image' || 
+        fromModal.model === 'Uploaded Image' ||
+        (!fromModal.model && fromModal.generatedImageUrl && !fromModal.prompt) // Fallback: has image but no prompt = uploaded
+      );
+
+      // Check if target is image generation modal
+      const toModal = imageModalStates.find(m => m.id === id);
+      const isToImageGeneration = toType === 'image' && toModal;
+      const isToMedia = toModal && (
+        toModal.model === 'Library Image' || 
+        toModal.model === 'Uploaded Image' ||
+        (!toModal.model && toModal.generatedImageUrl && !toModal.prompt) // Fallback: has image but no prompt = uploaded
+      );
+
+      // Block: Image generation cannot connect to media
+      if (fromType === 'image' && fromModal && !isFromMedia && isToMedia) {
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
+        return;
+      }
+
+      // Block: Media cannot connect to image generation that already has an image
+      if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
+        return;
+      }
+
       // Add connection if not duplicate
       const fromCenter = computeNodeCenter(activeDrag.from, 'send');
       const toCenter = computeNodeCenter(id, 'receive');
@@ -215,10 +342,53 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     const handleMove = (e: MouseEvent) => {
       if (!activeDrag) return;
       setActiveDrag(d => d ? { ...d, currentX: e.clientX, currentY: e.clientY } : d);
+      
+      // Check for nearby receive nodes and update cursor based on validity
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+      const proximityThreshold = 60; // pixels
+      
+      type NearestNode = {
+        id: string;
+        distance: number;
+      };
+      
+      let nearestNode: NearestNode | null = null;
+      
+      // Find all receive nodes and check distance
+      const receiveNodes = Array.from(document.querySelectorAll('[data-node-side="receive"]'));
+      for (const node of receiveNodes) {
+        const nodeId = node.getAttribute('data-node-id');
+        if (!nodeId) continue;
+        
+        const rect = node.getBoundingClientRect();
+        const nodeCenterX = rect.left + rect.width / 2;
+        const nodeCenterY = rect.top + rect.height / 2;
+        
+        const distance = Math.sqrt(
+          Math.pow(mouseX - nodeCenterX, 2) + Math.pow(mouseY - nodeCenterY, 2)
+        );
+        
+        if (distance < proximityThreshold) {
+          if (!nearestNode || distance < nearestNode.distance) {
+            nearestNode = { id: nodeId, distance };
+          }
+        }
+      }
+      
+      // Update cursor based on nearest node validity
+      if (nearestNode !== null) {
+        const nodeId = nearestNode.id;
+        const isValid = checkConnectionValidity(activeDrag.from, nodeId);
+        document.body.style.cursor = isValid ? 'pointer' : 'not-allowed';
+      } else {
+        document.body.style.cursor = 'default';
+      }
     };
     const handleUp = () => {
       if (activeDrag) {
         setActiveDrag(null);
+        document.body.style.cursor = ''; // Reset cursor
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
       }
     };
@@ -231,49 +401,144 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       window.removeEventListener('canvas-node-complete', handleComplete as any);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag]);
+  }, [activeDrag, connections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity]);
+
+  // Handle connection deletion
+  const handleDeleteConnection = useCallback((connectionId: string) => {
+    const connectionToDelete = connections.find(c => (c.id || `${c.from}-${c.to}`) === connectionId);
+    if (!connectionToDelete) return;
+
+    // Remove connection from state
+    if (onConnectionsChange) {
+      try {
+        onConnectionsChange(connections.filter(c => (c.id || `${c.from}-${c.to}`) !== connectionId));
+      } catch (e) {
+        console.warn('onConnectionsChange failed', e);
+      }
+    } else {
+      setLocalConnections(prev => prev.filter(c => (c.id || `${c.from}-${c.to}`) !== connectionId));
+    }
+
+    // Persist deletion via parent handler if provided
+    if (onPersistConnectorDelete && connectionToDelete.id) {
+      try {
+        Promise.resolve(onPersistConnectorDelete(connectionToDelete.id)).catch(console.error);
+      } catch (e) {
+        console.error('onPersistConnectorDelete failed', e);
+      }
+    }
+
+    // Clear selection
+    setSelectedConnectionId(null);
+  }, [connections, onConnectionsChange, onPersistConnectorDelete]);
+
+  // Handle keyboard delete key for selected connection
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle delete if a connection is selected and no input is focused
+      if (selectedConnectionId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        const activeElement = document.activeElement as HTMLElement | null;
+        const isInputFocused = activeElement && (
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          (activeElement.isContentEditable === true)
+        );
+        
+        if (!isInputFocused) {
+          e.preventDefault();
+          handleDeleteConnection(selectedConnectionId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedConnectionId, handleDeleteConnection]);
+
+  // Deselect connection when clicking on canvas or modals (but not on connection lines)
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | SVGElement;
+      // Don't deselect if clicking on a connection path, circle, or g element
+      if (target && (target.tagName === 'path' || target.tagName === 'circle' || target.tagName === 'g')) {
+        // Check if it's within our connection SVG
+        const svg = (target as any).closest?.('svg');
+        if (svg) {
+          return; // Don't deselect if clicking on connection SVG elements
+        }
+      }
+      // Deselect if clicking elsewhere
+      setSelectedConnectionId(null);
+    };
+
+    if (selectedConnectionId) {
+      document.addEventListener('click', handleDocumentClick);
+      return () => document.removeEventListener('click', handleDocumentClick);
+    }
+  }, [selectedConnectionId]);
+
+  // Handle node hover during drag to show cursor feedback for invalid connections
+  useEffect(() => {
+    if (!activeDrag) {
+      // Clear all validity states when not dragging
+      document.querySelectorAll('[data-node-side="receive"]').forEach(node => {
+        (node as HTMLElement).style.cursor = 'pointer';
+        node.removeAttribute('data-connection-invalid');
+      });
+      return;
+    }
+
+    const handleNodeHover = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { nodeId } = ce.detail || {};
+      if (!nodeId) return;
+
+      const nodeElement = document.querySelector(`[data-node-id="${nodeId}"][data-node-side="receive"]`) as HTMLElement | null;
+      if (!nodeElement) return;
+
+      // Check if connection would be valid
+      const isValid = checkConnectionValidity(activeDrag.from, nodeId);
+      
+      if (isValid) {
+        nodeElement.style.cursor = 'pointer';
+        nodeElement.removeAttribute('data-connection-invalid');
+      } else {
+        nodeElement.style.cursor = 'not-allowed';
+        nodeElement.setAttribute('data-connection-invalid', 'true');
+      }
+    };
+
+    const handleNodeLeave = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { nodeId } = ce.detail || {};
+      if (!nodeId) return;
+
+      const nodeElement = document.querySelector(`[data-node-id="${nodeId}"][data-node-side="receive"]`) as HTMLElement | null;
+      if (nodeElement) {
+        nodeElement.style.cursor = 'pointer';
+        nodeElement.removeAttribute('data-connection-invalid');
+      }
+    };
+
+    // Listen for hover events on receive nodes
+    window.addEventListener('canvas-node-hover', handleNodeHover as any);
+    window.addEventListener('canvas-node-leave', handleNodeLeave as any);
+    
+    return () => {
+      window.removeEventListener('canvas-node-hover', handleNodeHover as any);
+      window.removeEventListener('canvas-node-leave', handleNodeLeave as any);
+      // Clear validity states when drag ends
+      document.querySelectorAll('[data-node-side="receive"]').forEach(node => {
+        (node as HTMLElement).style.cursor = 'pointer';
+        node.removeAttribute('data-connection-invalid');
+      });
+    };
+  }, [activeDrag, checkConnectionValidity]);
 
   // Compute line endpoints. Prefer anchoring to the inner frame element (if present),
   // then to the overlay container, falling back to the small node center.
-  // Determine modal/component type for a given overlay/node id. Reads
-  // `data-modal-component` from overlay or nearest ancestor and returns a
-  // lowercase string like 'text' | 'image' | 'video' | 'music'.
-  const getComponentType = (id?: string | null): string | null => {
-    if (!id) return null;
-    const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement | null;
-    if (overlay) {
-      const attr = overlay.getAttribute('data-modal-component') || (overlay.dataset as any).modalComponent;
-      if (attr) return String(attr).toLowerCase();
-    }
-    const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`) as HTMLElement | null;
-    if (frameEl) {
-      const comp = frameEl.closest('[data-modal-component]') as HTMLElement | null;
-      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
-    }
-    const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
-    if (nodeEl) {
-      // First check if the node itself has data-component-type (for canvas images)
-      const componentType = nodeEl.getAttribute('data-component-type');
-      if (componentType) return componentType.toLowerCase();
-      // Otherwise check for modal component in ancestor
-      const comp = nodeEl.closest('[data-modal-component]') as HTMLElement | null;
-      if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
-    }
-    // Check if this is a canvas image (uploaded image) by looking for the node element
-    // Canvas images have IDs like "canvas-image-{index}" or "element-{timestamp}-{random}"
-    if (id.startsWith('canvas-image-') || id.startsWith('element-')) {
-      // Try to find the node element to get its component type
-      const canvasNodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
-      if (canvasNodeEl) {
-        const componentType = canvasNodeEl.getAttribute('data-component-type');
-        if (componentType) return componentType.toLowerCase();
-      }
-      // Fallback: assume 'image' for canvas images
-      return 'image';
-    }
-    return null;
-  };
   const computeNodeCenter = (id: string, side: 'send' | 'receive'): { x: number; y: number } | null => {
     if (!id) return null;
     // Prefer frame element (set via data-frame-id on inner frame)
@@ -447,21 +712,79 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       <svg
         style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1999 }}
       >
-        {connectionLines.map((line, index) => (
-          <g key={line.id || `conn-${line.from}-${line.to}-${index}`}>
-            <path
-              d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
-              stroke="#437eb5"
-              strokeWidth={computeStrokeForScale(2)}
-              fill="none"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))' }}
-            />
-            <circle cx={line.fromX} cy={line.fromY} r={computeCircleRadiusForScale(3)} fill="#437eb5" vectorEffect="non-scaling-stroke" />
-            <circle cx={line.toX} cy={line.toY} r={computeCircleRadiusForScale(3)} fill="#437eb5" vectorEffect="non-scaling-stroke" />
-          </g>
-        ))}
+        {connectionLines.map((line, index) => {
+          const connectionId = line.id || `conn-${line.from}-${line.to}-${index}`;
+          const isSelected = selectedConnectionId === connectionId;
+          const strokeColor = isSelected ? '#1e3a5f' : '#437eb5'; // Darker when selected
+          // When selected, use exactly 1px (not scaled). Otherwise use scaled width
+          const strokeWidth = isSelected ? 1 : computeStrokeForScale(2);
+          
+          return (
+            <g key={connectionId}>
+              <path
+                d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                style={{ 
+                  filter: isSelected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
+                  pointerEvents: 'auto', // Make path clickable
+                  cursor: 'pointer',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedConnectionId(connectionId);
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.stroke = '#2a4d73';
+                    e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2.2));
+                  } else {
+                    // Keep selected state (darker, 1px)
+                    e.currentTarget.style.stroke = '#1e3a5f';
+                    e.currentTarget.style.strokeWidth = '1';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.stroke = '#437eb5';
+                    e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2));
+                  } else {
+                    // Keep selected state
+                    e.currentTarget.style.stroke = '#1e3a5f';
+                    e.currentTarget.style.strokeWidth = '1';
+                  }
+                }}
+              />
+              <circle 
+                cx={line.fromX} 
+                cy={line.fromY} 
+                r={computeCircleRadiusForScale(3)} 
+                fill={strokeColor} 
+                vectorEffect="non-scaling-stroke"
+                style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedConnectionId(connectionId);
+                }}
+              />
+              <circle 
+                cx={line.toX} 
+                cy={line.toY} 
+                r={computeCircleRadiusForScale(3)} 
+                fill={strokeColor} 
+                vectorEffect="non-scaling-stroke"
+                style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedConnectionId(connectionId);
+                }}
+              />
+            </g>
+          );
+        })}
         {activeDrag && (
           <path
             d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}

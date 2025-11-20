@@ -145,6 +145,12 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                 data-node-id={nodeId}
                 data-node-side="receive"
                 data-component-type={imageData.type === 'video' ? 'video' : 'image'}
+                onPointerEnter={(e) => {
+                  window.dispatchEvent(new CustomEvent('canvas-node-hover', { detail: { nodeId } }));
+                }}
+                onPointerLeave={(e) => {
+                  window.dispatchEvent(new CustomEvent('canvas-node-leave', { detail: { nodeId } }));
+                }}
                 onPointerUp={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
