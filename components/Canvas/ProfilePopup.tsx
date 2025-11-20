@@ -162,14 +162,16 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
       <div
         ref={panelRef}
         style={{
-          width: '100vw',
-          height: '100vh',
+          width: '90vw',
+          maxWidth: '1200px',
+          height: '85vh',
+          maxHeight: '800px',
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: 'none',
-          borderRadius: '0',
-          boxShadow: 'none',
+          border: '1px solid rgba(0, 0, 0, 0.1)',
+          borderRadius: '20px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
           padding: '0',
           display: 'flex',
           flexDirection: 'row',
@@ -177,8 +179,9 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           pointerEvents: 'auto',
         }}
         onWheel={(e) => {
-          // Prevent canvas scrolling when scrolling inside popup
+          // Allow scrolling within popup, but prevent it from reaching canvas
           e.stopPropagation();
+          // Don't prevent default - allow normal scrolling
         }}
         onTouchMove={(e) => {
           // Prevent canvas touch scrolling when touching inside popup
@@ -257,36 +260,26 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           style={{ 
             flex: 1, 
             height: '100%', 
-            padding: '40px', 
+            padding: '0',
             background: '#ffffff', 
             display: 'flex', 
             flexDirection: 'column', 
-            overflowY: 'auto',
-            overflowX: 'hidden',
+            overflow: 'hidden',
             minHeight: 0,
-            WebkitOverflowScrolling: 'touch',
-          }}
-          onWheel={(e) => {
-            // Prevent canvas scrolling when scrolling inside popup content
-            e.stopPropagation();
-            // Allow scrolling within this container
-            const target = e.currentTarget;
-            const { scrollTop, scrollHeight, clientHeight } = target;
-            const isAtTop = scrollTop === 0;
-            const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1;
-            
-            // If at top and scrolling up, or at bottom and scrolling down, prevent default
-            if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
-              e.preventDefault();
-            }
-          }}
-          onTouchMove={(e) => {
-            // Prevent canvas touch scrolling when touching inside popup content
-            e.stopPropagation();
           }}
         >
-          {/* Header with close button */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+          {/* Header with close button - Sticky at top */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            padding: '40px 40px 28px 40px',
+            background: '#ffffff',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+          }}>
             <h3 style={{ margin: 0, fontSize: '20px', color: '#111827', fontWeight: 600 }}>
               {activeSection === 'profile' && 'Profile'}
               {activeSection === 'canvas' && 'Canvas'}
@@ -296,6 +289,27 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
             </h3>
             <button onClick={onClose} aria-label="Close profile" style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#6b7280', padding: '6px 10px', borderRadius: '8px', transition: 'all 0.2s ease' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>✕</button>
           </div>
+
+          {/* Scrollable Content Area */}
+          <div
+            style={{
+              flex: 1,
+              padding: '0 40px 40px 40px',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              WebkitOverflowScrolling: 'touch',
+            }}
+            onWheel={(e) => {
+              // Prevent canvas scrolling when scrolling inside popup content
+              e.stopPropagation();
+              // Allow normal scrolling within the container - don't prevent default
+              // The container's overflowY: 'auto' will handle the scrolling
+            }}
+            onTouchMove={(e) => {
+              // Prevent canvas touch scrolling when touching inside popup content
+              e.stopPropagation();
+            }}
+          >
 
           {/* Profile Section */}
           {activeSection === 'profile' && (
@@ -346,8 +360,8 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
             </div>
 
               {/* About You Section */}
-              <section style={{ marginBottom: '24px', padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>About You</h4>
+              <section style={{ marginBottom: '24px', padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>About You</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Username</div>
@@ -361,7 +375,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
               </section>
 
               {/* Active Plan Section */}
-              <section style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
+              <section style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
                 <div>
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>Active Plan</h4>
                   <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{userData?.plan ? `${userData.plan} Plan` : 'Free Plan'}</div>
@@ -376,11 +390,11 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           {/* Canvas Section */}
           {activeSection === 'canvas' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                <h4 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>Canvas Settings</h4>
+              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>Canvas Settings</h4>
                 
                 {/* Cursor Type */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
                   <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Cursor Type</div>
                   <select
                     value={canvasSettings.cursorType}
@@ -408,7 +422,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                 </div>
 
                 {/* Background Type */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
                   <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Background Type</div>
                   <select
                     value={canvasSettings.backgroundType}
@@ -435,7 +449,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                 </div>
 
                 {/* Dot Color */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
                   <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Dot Color</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
@@ -469,7 +483,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                 </div>
 
                 {/* Background Color */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
                   <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Background Color</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
@@ -503,7 +517,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                 </div>
 
                 {/* Dot Size */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
                   <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Dot Size</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '200px' }}>
                     <input
@@ -593,8 +607,8 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           {/* Theme Section */}
           {activeSection === 'theme' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>Theme</h4>
+              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>Theme</h4>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                   {/* Dark Mode Button */}
                   <button
@@ -671,26 +685,26 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           {/* Keyboard Shortcuts Section */}
           {activeSection === 'keyboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                <h4 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>Keyboard Shortcuts</h4>
+              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>Keyboard Shortcuts</h4>
                 
                 {/* Create Elements */}
                 <div style={{ marginBottom: '24px' }}>
                   <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>Create Elements</h5>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Text</span>
                       <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>T</kbd>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Image</span>
                       <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>I</kbd>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Video</span>
                       <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>V</kbd>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Music</span>
                       <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>M</kbd>
                     </div>
@@ -701,7 +715,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                 <div style={{ marginBottom: '24px' }}>
                   <h5 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#374151' }}>Actions</h5>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Select all</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <kbd style={{ padding: '6px 10px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '11px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>{typeof window !== 'undefined' && navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'}</kbd>
@@ -709,7 +723,7 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
                         <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>A</kbd>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
                       <span style={{ fontSize: '14px', color: '#111827' }}>Delete</span>
                       <kbd style={{ padding: '6px 12px', borderRadius: '8px', background: '#f3f4f6', border: '1px solid rgba(0, 0, 0, 0.1)', fontSize: '12px', fontWeight: 600, color: '#111827', fontFamily: 'monospace' }}>Delete</kbd>
                     </div>
@@ -726,12 +740,13 @@ const ProfilePopup: React.FC<Props> = ({ isOpen, onClose, scale = 1 }) => {
           {/* Notification Section */}
           {activeSection === 'notification' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px', border: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px', borderBottom: '1px solid rgba(0, 0, 0, 0.08)' }}>Notification Settings</h4>
+              <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>Notification Settings</h4>
                 <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>Notification preferences will be available here.</p>
               </div>
           </div>
           )}
+          </div>
         </div>
       </div>
     </div>

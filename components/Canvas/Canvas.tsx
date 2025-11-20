@@ -13,6 +13,7 @@ import { SelectionBox } from './SelectionBox';
 import { MediaActionIcons } from './MediaActionIcons';
 import AvatarButton from './AvatarButton';
 import ProfilePopup from './ProfilePopup';
+import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
 import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent } from '@/lib/canvasHelpers';
 
 interface CanvasProps {
@@ -1891,6 +1892,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         const imageData = images[index];
         if (!imageData || imageData.type === 'model3d') return;
         
+        // Skip uploaded images (blob URLs, Zata input URLs, or direct file uploads) - disable resize for them
+        // Uploaded images should have static frame size like generation frames
+        const isUploaded = 
+          imageData.file || // Direct file upload
+          (imageData.url && (
+            imageData.url.toLowerCase().startsWith('blob:') || 
+            imageData.url.toLowerCase().includes('/input/') ||
+            (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
+          ));
+        if (isUploaded) {
+          return; // Skip this image - don't attach Transformer (no resize handles)
+        }
+        
         // First try to find node by name (more reliable)
         const nodeByName = layer.findOne(`canvas-image-${index}`);
         if (nodeByName && nodeByName instanceof Konva.Group) {
@@ -1911,10 +1925,15 @@ export const Canvas: React.FC<CanvasProps> = ({
               // Match by position (with larger tolerance to handle position updates)
               const tolerance = 10; // Increased from 1 to handle position updates
               if (Math.abs(nodeX - imgX) < tolerance && Math.abs(nodeY - imgY) < tolerance) {
-              if (!nodes.includes(node)) {
-                nodes.push(node);
+                // Double-check: skip if it's marked as uploaded (has data-no-resize attribute)
+                const isUploadedNode = (node as any).attrs?.['data-no-resize'] === 'true';
+                if (isUploadedNode) {
+                  return; // Skip this image - don't attach Transformer
+                }
+                if (!nodes.includes(node)) {
+                  nodes.push(node);
+                }
               }
-            }
           }
         });
         }
@@ -2486,6 +2505,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                 key={`${imageData.url}-${index}`} 
                 imageData={imageData}
                 index={actualIndex}
+                stageRef={stageRef}
+                position={position}
+                scale={scale}
                 onUpdate={(updates) => {
                   handleImageUpdateWithGroup(actualIndex, updates);
                   // Clear real-time position when drag ends (when position is not being updated)
@@ -2575,24 +2597,45 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistTextModalMove={onPersistTextModalMove}
             onImageUpdate={onImageUpdate}
           />
-          {/* Transformer for selected nodes */}
-          {selectedImageIndices.length > 0 && (
-            <Transformer
-              ref={transformerRef}
-              keepRatio={true}
-              rotateEnabled={true}
-              rotateAnchorOffset={30}
-              anchorSize={12}
-              rotationSnaps={isShiftPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : undefined}
-              boundBoxFunc={(oldBox, newBox) => {
-                // Limit resize to prevent negative dimensions
-                if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
-                  return oldBox;
-                }
-                return newBox;
-              }}
-            />
-          )}
+          {/* Transformer for selected nodes - only for non-uploaded images */}
+          {selectedImageIndices.length > 0 && (() => {
+            // Check if any selected image is NOT uploaded (has resize enabled)
+            const hasResizableImage = selectedImageIndices.some(idx => {
+              const img = images[idx];
+              if (!img || img.type === 'model3d') return false;
+              
+              // Check if it's an uploaded image - if so, disable resize
+              const isUploaded = 
+                img.file || // Direct file upload
+                (img.url && (
+                  img.url.toLowerCase().startsWith('blob:') || 
+                  img.url.toLowerCase().includes('/input/') ||
+                  (img.url.toLowerCase().includes('upload-') && img.url.toLowerCase().includes('zata.ai'))
+                ));
+              
+              // Only allow resize for non-uploaded images
+              return !isUploaded;
+            });
+            
+            // Only show Transformer if there are resizable images selected
+            return hasResizableImage ? (
+              <Transformer
+                ref={transformerRef}
+                keepRatio={true}
+                rotateEnabled={true}
+                rotateAnchorOffset={30}
+                anchorSize={12}
+                rotationSnaps={isShiftPressed ? [0, 45, 90, 135, 180, 225, 270, 315] : undefined}
+                boundBoxFunc={(oldBox, newBox) => {
+                  // Limit resize to prevent negative dimensions
+                  if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) {
+                    return oldBox;
+                  }
+                  return newBox;
+                }}
+              />
+            ) : null;
+          })()}
         </Layer>
       </Stage>
       {/* 3D Models - rendered outside Konva as overlay */}
@@ -2601,6 +2644,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         allImages={images}
         stageRef={stageRef}
         onImageUpdate={onImageUpdate}
+      />
+      {/* Connection Nodes for uploaded images - rendered outside Konva as overlay */}
+      <CanvasImageConnectionNodes
+        images={images}
+        stageRef={stageRef}
+        position={position}
+        scale={scale}
+        selectedImageIndices={selectedImageIndices}
       />
       {/* Modal Overlays */}
       <ModalOverlays

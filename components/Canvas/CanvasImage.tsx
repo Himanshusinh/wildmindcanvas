@@ -13,6 +13,9 @@ interface CanvasImageProps {
   onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
   isSelected?: boolean;
   onDelete?: () => void;
+  stageRef?: React.RefObject<any>;
+  position?: { x: number; y: number };
+  scale?: number;
 }
 
 export const CanvasImage: React.FC<CanvasImageProps> = ({ 
@@ -21,13 +24,17 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   onUpdate, 
   onSelect, 
   isSelected: externalIsSelected, 
-  onDelete
+  onDelete,
+  stageRef,
+  position = { x: 0, y: 0 },
+  scale = 1,
 }) => {
   const [img, setImg] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
   const [isSelected, setIsSelected] = useState(false);
   const isSelectedState = externalIsSelected !== undefined ? externalIsSelected : isSelected;
   const [isPlaying, setIsPlaying] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [globalDragActive, setGlobalDragActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -212,12 +219,32 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     }
   }, [isVideo, isPlaying]);
   
+  // Generate unique ID for connection nodes
+  const nodeId = imageData.elementId || `canvas-image-${index}`;
+
+  // Check if this is an uploaded image (from local storage or library)
+  const isUploadedMedia = 
+    imageData.file || // Direct file upload
+    (imageData.url && (
+      imageData.url.toLowerCase().startsWith('blob:') || 
+      imageData.url.toLowerCase().includes('/input/') ||
+      (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
+    ));
+  
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
     setIsHovered(true);
     setIsMediaHovered(true);
+    // Dispatch event for connection nodes to detect hover
+    if (isUploadedMedia && nodeId) {
+      try {
+        window.dispatchEvent(new CustomEvent('canvas-image-hover', { 
+          detail: { index, nodeId, hovered: true } 
+        }));
+      } catch (err) {}
+    }
   };
 
   const handleMouseLeave = () => {
@@ -225,6 +252,14 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(false);
       setIsMediaHovered(false);
+      // Dispatch event for connection nodes to detect hover end
+      if (isUploadedMedia && nodeId) {
+        try {
+          window.dispatchEvent(new CustomEvent('canvas-image-hover', { 
+            detail: { index, nodeId, hovered: false } 
+          }));
+        } catch (err) {}
+      }
     }, 100);
   };
 
@@ -234,6 +269,16 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         clearTimeout(hoverTimeoutRef.current);
       }
     };
+  }, []);
+
+  // Listen for global node-drag active state so nodes remain visible while dragging
+  useEffect(() => {
+    const handleActive = (e: Event) => {
+      const ce = e as CustomEvent;
+      setGlobalDragActive(Boolean(ce.detail?.active));
+    };
+    window.addEventListener('canvas-node-active', handleActive as any);
+    return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
 
   // Format time helper
@@ -347,7 +392,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const frameBorderWidth = 2;
   const framePadding = 0; // No padding, image fills the frame
   const frameBackgroundColor = 'rgba(255, 255, 255, 0.95)';
-  const frameBorderColor = 'rgba(0, 0, 0, 0.1)';
+  // Use same border color as generation frames: rgba(0, 0, 0, 0.3) when not selected, #60A5FA when selected
+  const frameBorderColor = isSelectedState ? '#60A5FA' : 'rgba(0, 0, 0, 0.3)';
   const frameShadowBlur = 32;
   const frameShadowOpacity = 0.15;
 
@@ -362,6 +408,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         x={x}
         y={y}
         rotation={rotation}
+        {...(isUploadedMedia && { 'data-no-resize': 'true' })}
         onDragStart={(e) => {
           setIsDraggingImage(true);
           // Store initial drag position to prevent snap-back
@@ -435,11 +482,48 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           layer?.batchDraw();
         }}
         onTransform={(e) => {
+          // Disable transform for uploaded images - frame size should be static like generation frames
+          const isUploaded = 
+            imageData.file || // Direct file upload
+            (imageData.url && (
+              imageData.url.toLowerCase().startsWith('blob:') || 
+              imageData.url.toLowerCase().includes('/input/') ||
+              (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
+            ));
+          if (isUploaded) {
+            // Reset any transform that might have been applied - keep frame static
+            const node = e.target as Konva.Group;
+            if (node) {
+              node.scaleX(1);
+              node.scaleY(1);
+              node.rotation(0);
+            }
+            return;
+          }
           // Only redraw for smooth feedback; commit sizes on end
           const layer = (e.target as Konva.Node).getLayer();
           layer?.batchDraw();
         }}
         onTransformEnd={(e) => {
+          // Disable transform for uploaded images - frame size should be static like generation frames
+          const isUploaded = 
+            imageData.file || // Direct file upload
+            (imageData.url && (
+              imageData.url.toLowerCase().startsWith('blob:') || 
+              imageData.url.toLowerCase().includes('/input/') ||
+              (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
+            ));
+          if (isUploaded) {
+            // Reset any transform that might have been applied - keep frame static
+            const node = e.target as Konva.Group;
+            if (node) {
+              node.scaleX(1);
+              node.scaleY(1);
+              node.rotation(0); // Also reset rotation
+            }
+            onUpdate?.({ width: imageData.width, height: imageData.height, rotation: 0 }); // Reset to original size/rotation
+            return;
+          }
           const node = e.target as Konva.Group;
           if (!node) return;
           const scaleX = node.scaleX();
@@ -467,55 +551,16 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           // Video play/pause is handled by the center button on hover
         }}
       >
-        {/* Tooltip - Attached to Top, Full Width (for uploaded media) */}
-        {isMediaHovered && (
-          <Group x={0} y={-28} listening={false}>
-            <Rect
-              x={0}
-              y={0}
-              width={width}
-              height={28}
-              fill="#f0f2f5"
-              cornerRadius={[frameBorderRadius, frameBorderRadius, 0, 0]}
-              stroke={isSelectedState ? '#60A5FA' : frameBorderColor}
-              strokeWidth={isSelectedState ? 4 : frameBorderWidth}
-              strokeBottom={false}
-            />
-            <Text
-              x={12}
-              y={8}
-              text="Media"
-              fontSize={12}
-              fontFamily="Arial"
-              fill="#1f2937"
-              fontWeight="600"
-              listening={false}
-            />
-            {/* Resolution display - right aligned */}
-            {imageData.originalWidth && imageData.originalHeight && (
-              <Text
-                x={width -80}
-                y={8}
-                text={`${imageData.originalWidth} x ${imageData.originalHeight}`}
-                fontSize={12}
-                fontFamily="Arial"
-                fill="#1f2937"
-                fontWeight="600"
-                align="right"
-                listening={false}
-              />
-            )}
-          </Group>
-        )}
-        {/* Frame Background */}
+        {/* No tooltip for uploaded media - just show the frame like generation frames */}
+        {/* Frame Background - matching generation frame style */}
         <Rect
           x={0}
           y={0}
           width={width}
           height={height}
           fill={frameBackgroundColor}
-          cornerRadius={isMediaHovered ? 0 : frameBorderRadius}
-          stroke={isSelectedState ? '#60A5FA' : frameBorderColor}
+          cornerRadius={frameBorderRadius}
+          stroke={frameBorderColor}
           strokeWidth={isSelectedState ? 4 : frameBorderWidth}
           shadowBlur={frameShadowBlur}
           shadowOpacity={frameShadowOpacity}
@@ -532,7 +577,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             const y = 0;
             const w = width;
             const h = height;
-            const r = isMediaHovered ? 0 : frameBorderRadius;
+            const r = frameBorderRadius;
             ctx.moveTo(x + r, y);
             ctx.lineTo(x + w - r, y);
             ctx.quadraticCurveTo(x + w, y, x + w, y + r);
@@ -719,6 +764,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         </Group>
       )}
       {/* Resize handles removed - user requested to remove 4 corner dots */}
+      
+      {/* Connection nodes are now rendered outside Konva Layer via CanvasImageConnectionNodes component */}
     </>
   );
 };

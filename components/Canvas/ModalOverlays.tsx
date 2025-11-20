@@ -252,8 +252,24 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     }
     const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
     if (nodeEl) {
+      // First check if the node itself has data-component-type (for canvas images)
+      const componentType = nodeEl.getAttribute('data-component-type');
+      if (componentType) return componentType.toLowerCase();
+      // Otherwise check for modal component in ancestor
       const comp = nodeEl.closest('[data-modal-component]') as HTMLElement | null;
       if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
+    }
+    // Check if this is a canvas image (uploaded image) by looking for the node element
+    // Canvas images have IDs like "canvas-image-{index}" or "element-{timestamp}-{random}"
+    if (id.startsWith('canvas-image-') || id.startsWith('element-')) {
+      // Try to find the node element to get its component type
+      const canvasNodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
+      if (canvasNodeEl) {
+        const componentType = canvasNodeEl.getAttribute('data-component-type');
+        if (componentType) return componentType.toLowerCase();
+      }
+      // Fallback: assume 'image' for canvas images
+      return 'image';
     }
     return null;
   };

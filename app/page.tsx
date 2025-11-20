@@ -1127,6 +1127,7 @@ function CanvasApp({ user }: CanvasAppProps) {
         }).catch(console.error);
       }
     } else if (isVideo) {
+      // For videos, create a VideoUploadModal frame instead of directly adding to canvas
       const video = document.createElement('video');
       video.src = url;
       video.preload = 'metadata';
@@ -1135,150 +1136,100 @@ function CanvasApp({ user }: CanvasAppProps) {
         // Get current viewport center
         const center = viewportCenterRef.current;
         
-        // Scale down video to reasonable size (max 600px for largest dimension)
-        const maxDimension = 600;
-        const originalWidth = video.videoWidth;
-        const originalHeight = video.videoHeight;
-        let displayWidth = originalWidth;
-        let displayHeight = originalHeight;
+        // Keep original video dimensions - no scaling
+        const naturalWidth = video.videoWidth;
+        const naturalHeight = video.videoHeight;
         
-        if (originalWidth > maxDimension || originalHeight > maxDimension) {
-          const aspectRatio = originalWidth / originalHeight;
-          if (originalWidth > originalHeight) {
-            displayWidth = maxDimension;
-            displayHeight = maxDimension / aspectRatio;
-          } else {
-            displayHeight = maxDimension;
-            displayWidth = maxDimension * aspectRatio;
-          }
+        // Calculate frame dimensions (similar to VideoUploadModal)
+        const maxFrameWidth = 600;
+        const aspectRatio = naturalWidth / naturalHeight;
+        let frameWidth = maxFrameWidth;
+        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
+        
+        // If video is taller, adjust frame height
+        if (naturalHeight > naturalWidth) {
+          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
         
-        // Place video at the center of current viewport with slight offset for multiple files
+        // Place modal at the center of current viewport with slight offset for multiple files
         const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
         const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
-        const videoX = center.x - displayWidth / 2 + offsetX;
-        const videoY = center.y - displayHeight / 2 + offsetY;
+        const modalX = center.x - frameWidth / 2 + offsetX;
+        const modalY = center.y - frameHeight / 2 + offsetY;
 
-        const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const newImage: ImageUpload = {
-          file,
-          url,
-          type: 'video',
-          x: videoX,
-          y: videoY,
-          width: displayWidth,
-          height: displayHeight,
-          // Store original resolution for display in tooltip
-          originalWidth: originalWidth,
-          originalHeight: originalHeight,
-          elementId,
+        // Create video modal with uploaded video
+        const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newModal = {
+          id: modalId,
+          x: modalX,
+          y: modalY,
+          generatedVideoUrl: url, // Set the uploaded video URL
+          frameWidth,
+          frameHeight,
+          model: 'Uploaded Video', // Mark as uploaded
+          frame: 'Frame',
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`, // Approximate aspect ratio
+          prompt: '', // No prompt for uploaded videos
+          duration: 5, // Default duration
+          resolution: '720p', // Default resolution
         };
 
-      setImages((prev) => {
-        const updated = [...prev, newImage];
-        if (realtimeActive) {
-          console.log('[Realtime] media.create video', elementId);
-          realtimeRef.current?.sendMediaCreate({ id: elementId, kind: 'video', x: newImage.x || 0, y: newImage.y || 0, width: newImage.width, height: newImage.height, url: newImage.url });
-        }
-        // Send create op to server
-        if (projectId && opManagerInitialized) {
-          appendOp({
-            type: 'create',
-            elementId,
-            data: {
-              element: {
-                id: elementId,
-                type: 'video',
-                x: newImage.x,
-                y: newImage.y,
-                width: newImage.width,
-                height: newImage.height,
-                meta: {
-                  url: newImage.url,
-                },
-              },
-            },
-            inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-          }).catch(console.error);
-        }
-        return updated;
-      });
+        // Add to video generators (modals)
+        setVideoGenerators((prev) => {
+          const updated = [...prev, newModal];
+          return updated;
+        });
 
-      // File already uploaded to Zata and saved to history above
-    };
+        // File already uploaded to Zata and saved to history above
+      };
     } else {
+      // For images, create an ImageUploadModal frame instead of directly adding to canvas
       const img = new Image();
       
       img.onload = () => {
         // Get current viewport center
         const center = viewportCenterRef.current;
         
-        // Scale down image to reasonable size (max 600px for largest dimension)
-        const maxDimension = 600;
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-        let displayWidth = originalWidth;
-        let displayHeight = originalHeight;
+        // Keep original image dimensions - no scaling (use naturalWidth/naturalHeight for actual dimensions)
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
         
-        if (originalWidth > maxDimension || originalHeight > maxDimension) {
-          const aspectRatio = originalWidth / originalHeight;
-          if (originalWidth > originalHeight) {
-            displayWidth = maxDimension;
-            displayHeight = maxDimension / aspectRatio;
-          } else {
-            displayHeight = maxDimension;
-            displayWidth = maxDimension * aspectRatio;
-          }
+        // Calculate frame dimensions (similar to ImageUploadModal)
+        // Use a reasonable frame size, maintaining aspect ratio
+        const maxFrameWidth = 600;
+        const aspectRatio = naturalWidth / naturalHeight;
+        let frameWidth = maxFrameWidth;
+        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
+        
+        // If image is taller, adjust frame height
+        if (naturalHeight > naturalWidth) {
+          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
         
-        // Place image at the center of current viewport with slight offset for multiple images
+        // Place modal at the center of current viewport with slight offset for multiple images
         const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
         const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
-        const imageX = center.x - displayWidth / 2 + offsetX;
-        const imageY = center.y - displayHeight / 2 + offsetY;
+        const modalX = center.x - frameWidth / 2 + offsetX;
+        const modalY = center.y - frameHeight / 2 + offsetY;
 
-        const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const newImage: ImageUpload = {
-          file,
-          url,
-          type: 'image',
-          x: imageX,
-          y: imageY,
-          width: displayWidth,
-          height: displayHeight,
-          // Store original resolution for display in tooltip
-          originalWidth: img.naturalWidth || originalWidth,
-          originalHeight: img.naturalHeight || originalHeight,
-          elementId,
+        // Create image modal with uploaded image
+        const modalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newModal = {
+          id: modalId,
+          x: modalX,
+          y: modalY,
+          generatedImageUrl: url, // Set the uploaded image URL
+          frameWidth,
+          frameHeight,
+          model: 'Uploaded Image', // Optional: mark as uploaded
+          frame: 'Frame',
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`, // Approximate aspect ratio
+          prompt: '', // No prompt for uploaded images
         };
 
-        setImages((prev) => {
-          const updated = [...prev, newImage];
-          if (realtimeActive) {
-            console.log('[Realtime] media.create image', elementId);
-            realtimeRef.current?.sendMediaCreate({ id: elementId, kind: 'image', x: newImage.x || 0, y: newImage.y || 0, width: newImage.width, height: newImage.height, url: newImage.url });
-          }
-          // Send create op to server
-          if (projectId && opManagerInitialized) {
-            appendOp({
-              type: 'create',
-              elementId,
-              data: {
-                element: {
-                  id: elementId,
-                  type: 'image',
-                  x: newImage.x,
-                  y: newImage.y,
-                  width: newImage.width,
-                  height: newImage.height,
-                  meta: {
-                    url: newImage.url,
-                  },
-                },
-              },
-              inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-            }).catch(console.error);
-          }
+        // Add to image generators (modals) - this will be persisted via the Canvas component's onPersistImageModalCreate
+        setImageGenerators((prev) => {
+          const updated = [...prev, newModal];
           return updated;
         });
 
@@ -1394,8 +1345,6 @@ function CanvasApp({ user }: CanvasAppProps) {
   };
 
   const addMediaToCanvas = (media: MediaItem, x?: number, y?: number) => {
-    // Add selected media to canvas
-    const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const mediaUrl = media.url || media.thumbnail || '';
     
     // Determine media type
@@ -1406,45 +1355,188 @@ function CanvasApp({ user }: CanvasAppProps) {
       mediaType = 'video'; // Treat music as video for canvas display
     }
     
-    // Use provided coordinates or viewport center as fallback
-    const viewportCenter = viewportCenterRef.current;
-    const canvasX = x !== undefined ? x : viewportCenter.x - 200;
-    const canvasY = y !== undefined ? y : viewportCenter.y - 200;
-    
-    const newMedia: ImageUpload = {
-      type: mediaType,
-      url: mediaUrl,
-      x: canvasX,
-      y: canvasY,
-      width: 400,
-      height: 400,
-      elementId,
-    };
-    
-    setImages((prev) => [...prev, newMedia]);
-    
-    // Persist to backend if project exists
-    if (projectId && opManagerInitialized) {
-      appendOp({
-        type: 'create',
+    // For images, create an ImageUploadModal frame instead of directly adding to canvas
+    if (mediaType === 'image') {
+      // Use proxy URL if needed (for Zata URLs) - buildProxyResourceUrl is already imported
+      const imageUrl = (mediaUrl.includes('zata.ai') || mediaUrl.includes('zata')) 
+        ? buildProxyResourceUrl(mediaUrl) 
+        : mediaUrl;
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      const createModal = (width: number = 600, height: number = 400, aspectRatio: string = '1:1') => {
+        const viewportCenter = viewportCenterRef.current;
+        const modalX = x !== undefined ? x - width / 2 : viewportCenter.x - width / 2;
+        const modalY = y !== undefined ? y - height / 2 : viewportCenter.y - height / 2;
+        
+        const modalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newModal = {
+          id: modalId,
+          x: modalX,
+          y: modalY,
+          generatedImageUrl: mediaUrl, // Use original URL, ImageUploadModal will handle proxy if needed
+          frameWidth: width,
+          frameHeight: height,
+          model: 'Library Image',
+          frame: 'Frame',
+          aspectRatio,
+          prompt: '',
+        };
+        
+        // Add to image generators (modals) - this will trigger persistence via Canvas component
+        setImageGenerators((prev) => {
+          // Check if modal already exists to avoid duplicates
+          if (prev.some(m => m.id === modalId)) return prev;
+          return [...prev, newModal];
+        });
+        
+        console.log('[Library] Created image modal:', modalId, newModal);
+      };
+      
+      img.onload = () => {
+        // Get current viewport center or use provided coordinates
+        const viewportCenter = viewportCenterRef.current;
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
+        
+        // Calculate frame dimensions
+        const maxFrameWidth = 600;
+        const aspectRatio = naturalWidth / naturalHeight;
+        let frameWidth = maxFrameWidth;
+        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
+        
+        if (naturalHeight > naturalWidth) {
+          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
+        }
+        
+        createModal(frameWidth, frameHeight, `${Math.round(aspectRatio * 10) / 10}:1`);
+      };
+      
+      img.onerror = () => {
+        // If image fails to load, still create the modal with the URL
+        // The modal will handle displaying the image or error state
+        console.warn('[Library] Failed to load image for modal creation, creating modal anyway:', mediaUrl);
+        createModal(600, 400, '1:1');
+      };
+      
+      // Try loading the image
+      img.src = imageUrl;
+    } else if (mediaType === 'video') {
+      // For videos, create a VideoUploadModal frame instead of directly adding to canvas
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = () => {
+        const viewportCenter = viewportCenterRef.current;
+        const naturalWidth = video.videoWidth;
+        const naturalHeight = video.videoHeight;
+        
+        // Calculate frame dimensions
+        const maxFrameWidth = 600;
+        const aspectRatio = naturalWidth / naturalHeight;
+        let frameWidth = maxFrameWidth;
+        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
+        
+        if (naturalHeight > naturalWidth) {
+          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
+        }
+        
+        // Use provided coordinates or viewport center as fallback
+        const modalX = x !== undefined ? x - frameWidth / 2 : viewportCenter.x - frameWidth / 2;
+        const modalY = y !== undefined ? y - frameHeight / 2 : viewportCenter.y - frameHeight / 2;
+        
+        // Create video modal with library video
+        const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newModal = {
+          id: modalId,
+          x: modalX,
+          y: modalY,
+          generatedVideoUrl: mediaUrl,
+          frameWidth,
+          frameHeight,
+          model: 'Library Video',
+          frame: 'Frame',
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`,
+          prompt: '',
+          duration: 5,
+          resolution: '720p',
+        };
+        
+        // Add to video generators (modals)
+        setVideoGenerators((prev) => [...prev, newModal]);
+      };
+      
+      video.onerror = () => {
+        // If video fails to load, still create the modal with the URL
+        console.warn('[Library] Failed to load video for modal creation, creating modal anyway:', mediaUrl);
+        const viewportCenter = viewportCenterRef.current;
+        const modalX = x !== undefined ? x - 300 : viewportCenter.x - 300;
+        const modalY = y !== undefined ? y - 200 : viewportCenter.y - 200;
+        
+        const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newModal = {
+          id: modalId,
+          x: modalX,
+          y: modalY,
+          generatedVideoUrl: mediaUrl,
+          frameWidth: 600,
+          frameHeight: 400,
+          model: 'Library Video',
+          frame: 'Frame',
+          aspectRatio: '16:9',
+          prompt: '',
+          duration: 5,
+          resolution: '720p',
+        };
+        
+        setVideoGenerators((prev) => [...prev, newModal]);
+      };
+      
+      video.src = mediaUrl;
+    } else {
+      // For other media types (music, etc.), add directly to canvas (existing behavior)
+      const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const viewportCenter = viewportCenterRef.current;
+      const canvasX = x !== undefined ? x : viewportCenter.x - 200;
+      const canvasY = y !== undefined ? y : viewportCenter.y - 200;
+      
+      const newMedia: ImageUpload = {
+        type: mediaType,
+        url: mediaUrl,
+        x: canvasX,
+        y: canvasY,
+        width: 400,
+        height: 400,
         elementId,
-        data: {
-          element: {
-            id: elementId,
-            type: mediaType,
-            x: newMedia.x,
-            y: newMedia.y,
-            width: newMedia.width,
-            height: newMedia.height,
-            meta: {
-              url: mediaUrl,
-              mediaId: media.mediaId,
-              storagePath: media.storagePath,
+      };
+      
+      setImages((prev) => [...prev, newMedia]);
+      
+      // Persist to backend if project exists
+      if (projectId && opManagerInitialized) {
+        appendOp({
+          type: 'create',
+          elementId,
+          data: {
+            element: {
+              id: elementId,
+              type: mediaType,
+              x: newMedia.x,
+              y: newMedia.y,
+              width: newMedia.width,
+              height: newMedia.height,
+              meta: {
+                url: mediaUrl,
+                mediaId: media.mediaId,
+                storagePath: media.storagePath,
+              },
             },
           },
-        },
-        inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-      }).catch(console.error);
+          inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
+        }).catch(console.error);
+      }
     }
   };
 
@@ -1681,21 +1773,9 @@ function CanvasApp({ user }: CanvasAppProps) {
                     i.src = url;
                   });
 
-                  const maxDimension = 600;
-                  const originalWidth = img.naturalWidth || img.width;
-                  const originalHeight = img.naturalHeight || img.height;
-                  let displayWidth = originalWidth;
-                  let displayHeight = originalHeight;
-                  if (originalWidth > maxDimension || originalHeight > maxDimension) {
-                    const ar = originalWidth / originalHeight;
-                    if (originalWidth > originalHeight) {
-                      displayWidth = maxDimension;
-                      displayHeight = Math.round(maxDimension / ar);
-                    } else {
-                      displayHeight = maxDimension;
-                      displayWidth = Math.round(maxDimension * ar);
-                    }
-                  }
+                  // Keep original image dimensions - no scaling
+                  const displayWidth = img.naturalWidth || img.width;
+                  const displayHeight = img.naturalHeight || img.height;
 
                   // Place at current viewport center
                   const center = viewportCenterRef.current;
