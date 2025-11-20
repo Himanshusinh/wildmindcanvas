@@ -36,7 +36,7 @@ interface CanvasProps {
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string) => Promise<{ generationId?: string; taskId?: string } | null>;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   generatedVideoUrl?: string | null;
   isMusicModalOpen?: boolean;
   onMusicModalClose?: () => void;
@@ -2681,6 +2681,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setMusicModalStates={setMusicModalStates}
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
+        images={images}
         onTextCreate={onTextCreate}
         onImageSelect={onImageSelect}
         onImageGenerate={onImageGenerate}

@@ -7,6 +7,7 @@ import { VideoUploadModal } from '@/components/VideoUploadModal';
 import { getReplicateQueueStatus, getReplicateQueueResult, getFalQueueStatus, getFalQueueResult, getMiniMaxVideoStatus, getMiniMaxVideoFile } from '@/lib/api';
 import { MusicUploadModal } from '@/components/MusicUploadModal';
 import Konva from 'konva';
+import { ImageUpload } from '@/types/canvas';
 
 interface ModalOverlaysProps {
   textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
@@ -37,12 +38,12 @@ interface ModalOverlaysProps {
   setSelectedMusicModalIds: (ids: string[]) => void;
   setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
   setIsDragSelection?: (value: boolean) => void;
-  images?: Array<{ x?: number; y?: number; width?: number; height?: number; [key: string]: any }>;
+  images?: ImageUpload[];
   onTextCreate?: (text: string, x: number, y: number) => void;
   onImageSelect?: (file: File) => void;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
-  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
+  onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onMusicSelect?: (file: File) => void;
   onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => Promise<string | null>;
   generatedVideoUrl?: string | null;
@@ -710,11 +711,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
               Promise.resolve(onPersistVideoModalDelete(modalState.id)).catch(console.error);
             }
           }}
-          onGenerate={async (prompt, model, frame, aspectRatio, duration, resolution) => {
+          onGenerate={async (prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl) => {
             if (!onVideoGenerate) return null;
             try {
               // Submit generation (returns taskId + generationId + provider)
-              const submitRes = await onVideoGenerate(prompt, model, frame, aspectRatio, duration || modalState.duration || 5, resolution || modalState.resolution, modalState.id);
+              const submitRes = await onVideoGenerate(prompt, model, frame, aspectRatio, duration || modalState.duration || 5, resolution || modalState.resolution, modalState.id, firstFrameUrl, lastFrameUrl);
               const taskId = submitRes?.taskId;
               const generationId = submitRes?.generationId;
               const provider = submitRes?.provider || 'replicate'; // Default to replicate for backward compatibility
@@ -878,6 +879,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
               Promise.resolve(onPersistVideoModalMove(modalState.id, opts as any)).catch(console.error);
             }
           }}
+          connections={connections}
+          imageModalStates={imageModalStates}
+          images={images}
           onSelect={() => {
             // Clear all other selections first
             clearAllSelections();

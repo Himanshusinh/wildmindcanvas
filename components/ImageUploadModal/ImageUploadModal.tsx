@@ -100,7 +100,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
-  
+
   // Detect if this is an uploaded image (from library, local storage, or media)
   // Check if model is 'Library Image' or 'Uploaded Image', or if there's no prompt and image exists (and not generating)
   const isUploadedImage = 
@@ -743,92 +743,92 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         </>
         {/* Pin Icon Button - Bottom Right (only for generated images, not uploaded) */}
         {!isUploadedImage && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsPinned(!isPinned);
-            }}
-            style={{
-              position: 'absolute',
-              bottom: `${8 * scale}px`,
-              right: `${8 * scale}px`,
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              borderRadius: `${6 * scale}px`,
-              backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
-              border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              zIndex: 20,
-              opacity: isHovered ? 1 : 0,
-              transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
-              pointerEvents: 'auto',
-              boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-            }}
-            onMouseEnter={(e) => {
-              if (!isPinned) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isPinned) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-              }
-            }}
-            title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+            border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isPinned ? '#437eb5' : '#4b5563'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              width={16 * scale}
-              height={16 * scale}
-              viewBox="0 0 24 24"
-              fill={isPinned ? '#437eb5' : 'none'}
-              stroke={isPinned ? '#437eb5' : '#4b5563'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-            </svg>
-          </button>
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
         )}
         {/* Delete button removed - now handled by context menu in header */}
       </div>
 
       {/* Controls - Behind Frame, Slides Out on Hover (only for generated images, not uploaded) */}
       {!isUploadedImage && (
-        <div
-          className="controls-overlay"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            width: `${600 * scale}px`,
-            maxWidth: '90vw',
-            padding: `${16 * scale}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
-            boxShadow: 'none',
-            transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
-            opacity: (isHovered || isPinned) ? 1 : 0,
-            maxHeight: (isHovered || isPinned) ? '500px' : '0px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: `${12 * scale}px`,
-            pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
-            overflow: 'visible',
-            zIndex: 1,
-            // Add left, right and bottom borders to match the frame border color/weight
-            borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-            borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-            borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-          }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
+      <div
+        className="controls-overlay"
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          width: `${600 * scale}px`,
+          maxWidth: '90vw',
+          padding: `${16 * scale}px`,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
+          boxShadow: 'none',
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+          opacity: (isHovered || isPinned) ? 1 : 0,
+          maxHeight: (isHovered || isPinned) ? '500px' : '0px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: `${12 * scale}px`,
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+          overflow: 'visible',
+          zIndex: 1,
+          // Add left, right and bottom borders to match the frame border color/weight
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
           {/* Prompt Input */}
           <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>
             <input

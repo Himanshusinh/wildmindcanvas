@@ -32,19 +32,19 @@ export const VIDEO_MODEL_CONFIGS: Record<string, VideoModelConfig> = {
   },
 
   // Google Models
-  'Veo 3.1 Pro': {
-    model: 'Veo 3.1 Pro',
-    durations: [8],
-    defaultDuration: 8,
+  'Veo 3.1': {
+    model: 'Veo 3.1',
+    durations: [4, 6, 8],
+    defaultDuration: 4,
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],
     defaultAspectRatio: '16:9',
   },
-  'Veo 3.1 Fast Pro': {
-    model: 'Veo 3.1 Fast Pro',
-    durations: [8],
-    defaultDuration: 8,
+  'Veo 3.1 Fast': {
+    model: 'Veo 3.1 Fast',
+    durations: [4, 6, 8],
+    defaultDuration: 4,
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],

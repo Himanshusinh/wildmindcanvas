@@ -1177,11 +1177,11 @@ function CanvasApp({ user }: CanvasAppProps) {
         // Add to video generators (modals)
         setVideoGenerators((prev) => {
           const updated = [...prev, newModal];
-          return updated;
-        });
+        return updated;
+      });
 
-        // File already uploaded to Zata and saved to history above
-      };
+      // File already uploaded to Zata and saved to history above
+    };
     } else {
       // For images, create an ImageUploadModal frame instead of directly adding to canvas
       const img = new Image();
@@ -1441,9 +1441,9 @@ function CanvasApp({ user }: CanvasAppProps) {
         
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
-        }
-        
-        // Use provided coordinates or viewport center as fallback
+    }
+    
+    // Use provided coordinates or viewport center as fallback
         const modalX = x !== undefined ? x - frameWidth / 2 : viewportCenter.x - frameWidth / 2;
         const modalY = y !== undefined ? y - frameHeight / 2 : viewportCenter.y - frameHeight / 2;
         
@@ -1498,44 +1498,44 @@ function CanvasApp({ user }: CanvasAppProps) {
     } else {
       // For other media types (music, etc.), add directly to canvas (existing behavior)
       const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const viewportCenter = viewportCenterRef.current;
-      const canvasX = x !== undefined ? x : viewportCenter.x - 200;
-      const canvasY = y !== undefined ? y : viewportCenter.y - 200;
-      
-      const newMedia: ImageUpload = {
-        type: mediaType,
-        url: mediaUrl,
-        x: canvasX,
-        y: canvasY,
-        width: 400,
-        height: 400,
+    const viewportCenter = viewportCenterRef.current;
+    const canvasX = x !== undefined ? x : viewportCenter.x - 200;
+    const canvasY = y !== undefined ? y : viewportCenter.y - 200;
+    
+    const newMedia: ImageUpload = {
+      type: mediaType,
+      url: mediaUrl,
+      x: canvasX,
+      y: canvasY,
+      width: 400,
+      height: 400,
+      elementId,
+    };
+    
+    setImages((prev) => [...prev, newMedia]);
+    
+    // Persist to backend if project exists
+    if (projectId && opManagerInitialized) {
+      appendOp({
+        type: 'create',
         elementId,
-      };
-      
-      setImages((prev) => [...prev, newMedia]);
-      
-      // Persist to backend if project exists
-      if (projectId && opManagerInitialized) {
-        appendOp({
-          type: 'create',
-          elementId,
-          data: {
-            element: {
-              id: elementId,
-              type: mediaType,
-              x: newMedia.x,
-              y: newMedia.y,
-              width: newMedia.width,
-              height: newMedia.height,
-              meta: {
-                url: mediaUrl,
-                mediaId: media.mediaId,
-                storagePath: media.storagePath,
-              },
+        data: {
+          element: {
+            id: elementId,
+            type: mediaType,
+            x: newMedia.x,
+            y: newMedia.y,
+            width: newMedia.width,
+            height: newMedia.height,
+            meta: {
+              url: mediaUrl,
+              mediaId: media.mediaId,
+              storagePath: media.storagePath,
             },
           },
-          inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-        }).catch(console.error);
+        },
+        inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
+      }).catch(console.error);
       }
     }
   };
@@ -1652,14 +1652,14 @@ function CanvasApp({ user }: CanvasAppProps) {
     processMediaFile(file, images.length);
   };
 
-  const handleVideoGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string): Promise<{ generationId?: string; taskId?: string; provider?: string } | null> => {
+  const handleVideoGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string): Promise<{ generationId?: string; taskId?: string; provider?: string } | null> => {
     if (!projectId || !prompt.trim()) {
       console.error('Missing projectId or prompt');
       return { generationId: undefined, taskId: undefined };
     }
 
     try {
-      console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution });
+      console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
       
       // Call video generation API
       const result = await generateVideoForCanvas(
@@ -1668,7 +1668,9 @@ function CanvasApp({ user }: CanvasAppProps) {
         aspectRatio,
         projectId,
         duration,
-        resolution || '1080p'
+        resolution || '1080p',
+        firstFrameUrl,
+        lastFrameUrl
       );
 
       console.log('Video generation started:', result);

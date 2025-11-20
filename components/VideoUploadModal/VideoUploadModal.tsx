@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Fragment } from 'react';
 import '../common/canvasCaptureGuard';
 import FrameSpinner from '../common/FrameSpinner';
 import {
@@ -14,12 +14,29 @@ import {
   isValidAspectRatioForModel,
   isValidResolutionForModel,
 } from '@/lib/videoModelConfig';
+import { ImageUpload } from '@/types/canvas';
+
+const VIDEO_MODEL_OPTIONS = [
+  'Sora 2 Pro',
+  'Veo 3.1',
+  'Veo 3.1 Fast',
+  'Kling 2.5 Turbo Pro',
+  'Seedance 1.0 Pro',
+  'Seedance 1.0 Lite',
+  'PixVerse v5',
+  'LTX V2 Pro',
+  'LTX V2 Fast',
+  'WAN 2.5',
+  'WAN 2.5 Fast',
+  'MiniMax-Hailuo-02',
+  'T2V-01-Director',
+];
 
 interface VideoUploadModalProps {
   isOpen: boolean;
   id?: string;
   onClose: () => void;
-  onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string) => void;
+  onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, firstFrameUrl?: string, lastFrameUrl?: string) => void;
   onVideoSelect?: (file: File) => void;
   generatedVideoUrl?: string | null;
   stageRef: React.RefObject<any>;
@@ -42,6 +59,9 @@ interface VideoUploadModalProps {
   initialDuration?: number;
   initialResolution?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number }) => void;
+  connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
+  imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  images?: ImageUpload[];
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -71,6 +91,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   initialResolution,
   onOptionsChange,
   onVideoSelect,
+  connections = [],
+  imageModalStates = [],
+  images = [],
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -124,7 +147,18 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
   const controlFontSize = `${13 * scale}px`;
-  
+  const [isFrameOrderSwapped, setIsFrameOrderSwapped] = useState(false);
+  const hasInitializedDefaultsRef = useRef(false);
+  const previousFrameCountRef = useRef<number>(0);
+
+  const canvasImageEntries = images
+    .map((img, idx) => ({
+      id: img.elementId || `canvas-image-${idx}`,
+      url: img.url,
+      type: img.type,
+    }))
+    .filter(entry => entry.url && entry.type === 'image') as Array<{ id: string; url?: string }>;
+
   // Detect if this is an uploaded video (from library, local storage, or media)
   // Check if model is 'Library Video' or 'Uploaded Video', or if there's no prompt and video exists (and not generating)
   const isUploadedVideo = 
@@ -132,11 +166,125 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     initialModel === 'Uploaded Video' ||
     (!initialPrompt && !prompt && generatedVideoUrl && !isGenerating);
 
+  const connectedImageConnections = connections.filter(conn => conn.to === id);
+  const connectedImageSources = connectedImageConnections
+    .map(conn => {
+      const modal = imageModalStates.find(img => img.id === conn.from);
+      if (modal?.generatedImageUrl) {
+        return { id: modal.id, url: modal.generatedImageUrl };
+      }
+      const canvasImage = canvasImageEntries.find(entry => entry.id === conn.from);
+      if (canvasImage?.url) {
+        return { id: canvasImage.id, url: canvasImage.url };
+      }
+      return null;
+    })
+    .filter((entry): entry is { id: string; url: string } => Boolean(entry?.url));
+
+  const frameCount = connectedImageSources.length;
+  const firstFrameUrl = connectedImageSources[0]?.url || null;
+  const lastFrameUrl = connectedImageSources[1]?.url || null;
+  const isFirstLastMode = frameCount >= 2 && Boolean(firstFrameUrl && lastFrameUrl);
+  const hasSingleFrame = frameCount === 1 && Boolean(firstFrameUrl);
+  const availableModelOptions = (isFirstLastMode || hasSingleFrame)
+    ? ['Veo 3.1', 'Veo 3.1 Fast']
+    : VIDEO_MODEL_OPTIONS;
+  const isVeo31Model = selectedModel.toLowerCase().includes('veo 3.1');
+  const displayFirstFrameUrl = isFrameOrderSwapped ? lastFrameUrl : firstFrameUrl;
+  const displayLastFrameUrl = isFrameOrderSwapped ? firstFrameUrl : lastFrameUrl;
+
+  // Auto-set model to Veo 3.1 when frames are connected
+  // Only reset defaults when frames are first connected (0 -> 1 or 0 -> 2) or model changes, not when user changes aspect ratio/duration/resolution
+  useEffect(() => {
+    const currentFrameCount = frameCount;
+    const wasDisconnected = previousFrameCountRef.current === 0;
+    const isNowConnected = currentFrameCount > 0;
+    const justConnected = wasDisconnected && isNowConnected;
+    previousFrameCountRef.current = currentFrameCount;
+
+    if (!(isFirstLastMode || hasSingleFrame)) {
+      // Reset initialization flag when frames are disconnected
+      hasInitializedDefaultsRef.current = false;
+      return;
+    }
+    
+    const isCurrentVeo31 = selectedModel.toLowerCase().includes('veo 3.1');
+    const targetModel = isCurrentVeo31 ? selectedModel : 'Veo 3.1';
+    const defaultAspectRatio = getModelDefaultAspectRatio(targetModel);
+    const defaultDuration = getModelDefaultDuration(targetModel);
+    const defaultResolution = getModelDefaultResolution(targetModel);
+
+    // Only update model if it's not already a Veo 3.1 model
+    if (selectedModel !== targetModel) {
+      setSelectedModel(targetModel);
+      // When model changes, also update aspect ratio, duration, and resolution to defaults
+      setSelectedAspectRatio(defaultAspectRatio);
+      setSelectedDuration(defaultDuration);
+      setSelectedResolution(defaultResolution);
+      hasInitializedDefaultsRef.current = true;
+      onOptionsChange?.({
+        model: targetModel,
+        aspectRatio: defaultAspectRatio,
+        duration: defaultDuration,
+        frame: selectedFrame,
+        prompt,
+        resolution: defaultResolution,
+      });
+    } else if (!hasInitializedDefaultsRef.current || justConnected) {
+      // Initialize defaults only when frames are first connected (0 -> 1 or 0 -> 2)
+      // After that, let user change aspect ratio, duration, and resolution freely
+      setSelectedAspectRatio(defaultAspectRatio);
+      setSelectedDuration(defaultDuration);
+      setSelectedResolution(defaultResolution);
+      hasInitializedDefaultsRef.current = true;
+      onOptionsChange?.({
+        model: targetModel,
+        aspectRatio: defaultAspectRatio,
+        duration: defaultDuration,
+        frame: selectedFrame,
+        prompt,
+        resolution: defaultResolution,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isFirstLastMode,
+    hasSingleFrame,
+    frameCount,
+    selectedModel,
+    onOptionsChange,
+    selectedFrame,
+    prompt,
+    // Note: selectedAspectRatio, selectedDuration, and selectedResolution are intentionally NOT in deps
+    // to allow users to change them freely without the effect resetting them
+  ]);
+
+  useEffect(() => {
+    setIsFrameOrderSwapped(false);
+  }, [firstFrameUrl, lastFrameUrl]);
+
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
       setIsGenerating(true);
       try {
-        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, selectedDuration, selectedResolution);
+        // Pass first_frame_url and last_frame_url if 2 images are connected
+        const generationFirstFrame = isFirstLastMode && isFrameOrderSwapped
+          ? lastFrameUrl
+          : firstFrameUrl;
+        const generationLastFrame = isFirstLastMode && isFrameOrderSwapped
+          ? firstFrameUrl
+          : lastFrameUrl;
+
+        await onGenerate(
+          prompt, 
+          selectedModel, 
+          selectedFrame, 
+          selectedAspectRatio, 
+          selectedDuration, 
+          selectedResolution,
+          generationFirstFrame || undefined,
+          generationLastFrame || undefined
+        );
         // Polling handled by parent (ModalOverlays) after onGenerate resolves
       } catch (err) {
         console.error('Error generating video:', err);
@@ -684,91 +832,91 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         </>
         {/* Pin Icon Button - Bottom Right (only for generated videos, not uploaded) */}
         {!isUploadedVideo && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsPinned(!isPinned);
-            }}
-            style={{
-              position: 'absolute',
-              bottom: `${8 * scale}px`,
-              right: `${8 * scale}px`,
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              borderRadius: `${6 * scale}px`,
-              backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
-              border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              zIndex: 20,
-              opacity: isHovered ? 1 : 0,
-              transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
-              pointerEvents: 'auto',
-              boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-            }}
-            onMouseEnter={(e) => {
-              if (!isPinned) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isPinned) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-              }
-            }}
-            title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
+            border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isPinned ? '#437eb5' : '#4b5563'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg
-              width={16 * scale}
-              height={16 * scale}
-              viewBox="0 0 24 24"
-              fill={isPinned ? '#437eb5' : 'none'}
-              stroke={isPinned ? '#437eb5' : '#4b5563'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-            </svg>
-          </button>
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
         )}
         {/* Delete button removed - now handled by context menu in header */}
       </div>
 
       {/* Controls - Behind Frame, Slides Out on Hover (only for generated videos, not uploaded) */}
       {!isUploadedVideo && (
-        <div
-          className="controls-overlay"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            width: `${600 * scale}px`,
-            maxWidth: '90vw',
-            padding: `${16 * scale}px`,
-            backgroundColor: '#ffffff',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
-            boxShadow: 'none',
-            transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
-            opacity: (isHovered || isPinned) ? 1 : 0,
-            maxHeight: (isHovered || isPinned) ? '500px' : '0px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: `${12 * scale}px`,
-            pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
-            overflow: 'visible',
-            zIndex: 3,
-            borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-            borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-            borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-          }}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
+      <div
+        className="controls-overlay"
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          width: `${600 * scale}px`,
+          maxWidth: '90vw',
+          padding: `${16 * scale}px`,
+          backgroundColor: '#ffffff',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
+          boxShadow: 'none',
+          transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+          opacity: (isHovered || isPinned) ? 1 : 0,
+          maxHeight: (isHovered || isPinned) ? '500px' : '0px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: `${12 * scale}px`,
+          pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+          overflow: 'visible',
+          zIndex: 3,
+          borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         {/* Prompt Input */}
         <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>
           <input
@@ -866,6 +1014,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
                 setIsDurationDropdownOpen(false);
               }}
               onMouseDown={(e) => e.stopPropagation()}
+              title={isFirstLastMode ? 'Only Veo 3.1 models support connected frames' : undefined}
               style={{
                   width: '100%',
                   padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
@@ -907,7 +1056,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               onMouseDown={(e) => e.stopPropagation()}
             >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${4 * scale}px`, padding: `${4 * scale}px` }}>
-                {['Sora 2 Pro', 'Veo 3.1 Pro', 'Veo 3.1 Fast Pro', 'Kling 2.5 Turbo Pro', 'Seedance 1.0 Pro', 'Seedance 1.0 Lite', 'PixVerse v5', 'LTX V2 Pro', 'LTX V2 Fast', 'WAN 2.5', 'WAN 2.5 Fast', 'MiniMax-Hailuo-02', 'T2V-01-Director'].map((model) => (
+                {availableModelOptions.map((model) => (
                   <div
                     key={model}
                     onClick={(e) => {
@@ -1184,7 +1333,6 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               </div>
             )}
           </div>
-          
           {/* Resolution Selector - Custom Dropdown */}
           <div ref={resolutionDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
             <button
@@ -1284,6 +1432,114 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
               </div>
             )}
           </div>
+
+        {isVeo31Model && (hasSingleFrame || isFirstLastMode) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: `${6 * scale}px`, marginTop: `${6 * scale}px` }}>
+            <div style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: '#1f2937' }}>
+              {isFirstLastMode
+                ? 'First & Last Frame (auto-filled when two image nodes are connected)'
+                : 'First Frame (auto-filled when an image node is connected)'}
+        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: `${10 * scale}px`, flexWrap: 'wrap' }}>
+              {[
+                { label: 'First Frame', url: displayFirstFrameUrl, placeholder: 'Connect an image node for the first frame.' },
+                { label: 'Last Frame', url: displayLastFrameUrl, placeholder: 'Connect another image node for the last frame.' },
+              ].map((slot, idx) => (
+                <Fragment key={`${slot.label}-${isFrameOrderSwapped}-${slot.url || 'empty'}`}>
+                  <div
+                    style={{
+                      flex: '0 1 auto',
+                      width: `${110 * scale}px`,
+                      borderRadius: `${10 * scale}px`,
+                      padding: `${6 * scale}px`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: `${4 * scale}px`,
+                      backgroundColor: slot.url ? 'rgba(67, 126, 181, 0.07)' : 'transparent',
+                    }}
+                  >
+                    <span style={{ fontSize: `${11 * scale}px`, fontWeight: 600, color: '#1f2937' }}>{slot.label}</span>
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        height: `${70 * scale}px`,
+                        borderRadius: `${8 * scale}px`,
+                        overflow: 'hidden',
+                        border: slot.url ? 'none' : `1px solid ${dropdownBorderColor}`,
+                        backgroundColor: slot.url ? '#f8fafc' : '#f9fafb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        fontSize: `${10.5 * scale}px`,
+                        color: '#6b7280',
+                      }}
+                    >
+                      {slot.url ? (
+                        <img
+                          key={`${slot.label}-img-${isFrameOrderSwapped}-${slot.url}`}
+                          src={slot.url}
+                          alt={slot.label}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <span style={{ padding: `${6 * scale}px` }}>{slot.placeholder}</span>
+                      )}
+      </div>
+                  </div>
+                  {idx === 0 && isFirstLastMode && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setIsFrameOrderSwapped((prev) => !prev);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        width: `${34 * scale}px`,
+                        height: `${34 * scale}px`,
+                        borderRadius: '50%',
+                        border: 'none',
+                        backgroundColor: isFirstLastMode ? '#1f2937' : 'rgba(0,0,0,0.15)',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: isFirstLastMode ? 'pointer' : 'not-allowed',
+                        boxShadow: isFirstLastMode ? `0 ${3 * scale}px ${9 * scale}px rgba(0,0,0,0.25)` : 'none',
+                        transition: 'transform 0.15s ease',
+                        alignSelf: 'center',
+                      }}
+                      title={isFirstLastMode ? 'Swap first and last frame images' : 'Connect two image nodes to enable swapping'}
+                    >
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 7H7l3-3" />
+                        <path d="M7 17h10l-3 3" />
+                      </svg>
+                    </button>
+                  )}
+                </Fragment>
+              ))}
+            </div>
+            <div style={{ fontSize: `${11 * scale}px`, color: '#4b5563' }}>
+              {isFirstLastMode
+                ? 'Two frames detected — Veo will run in first/last frame mode. Use the swap button to switch frame order.'
+                : hasSingleFrame
+                  ? 'Single frame detected — Veo will run in image-to-video mode.'
+                  : 'No frames connected — Veo will run as pure text-to-video.'}
+            </div>
+          </div>
+        )}
+
         </div>
         </div>
       )}

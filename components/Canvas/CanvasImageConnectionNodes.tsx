@@ -65,15 +65,15 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
       const { index, hovered } = ce.detail || {};
       if (typeof index !== 'number') return;
       
-      setHoveredIndices(prev => {
-        const next = new Set(prev);
+          setHoveredIndices(prev => {
+            const next = new Set(prev);
         if (hovered) {
           next.add(index);
         } else {
           next.delete(index);
         }
-        return next;
-      });
+            return next;
+          });
     };
 
     window.addEventListener('canvas-image-hover', handleImageHover as any);

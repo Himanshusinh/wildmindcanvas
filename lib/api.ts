@@ -303,7 +303,9 @@ export async function generateVideoForCanvas(
   aspectRatio: string,
   projectId: string,
   duration?: number,
-  resolution?: string
+  resolution?: string,
+  firstFrameUrl?: string,
+  lastFrameUrl?: string
 ): Promise<{ mediaId?: string; url?: string; storagePath?: string; generationId?: string; taskId?: string; provider?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
@@ -322,6 +324,8 @@ export async function generateVideoForCanvas(
         aspectRatio,
         duration: duration || 5,
         resolution: resolution || '1080p',
+        firstFrameUrl,
+        lastFrameUrl,
         meta: {
           source: 'canvas',
           projectId,
