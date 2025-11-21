@@ -25,7 +25,9 @@ interface UpscalePluginModalProps {
   isSelected?: boolean;
   initialModel?: string;
   initialScale?: number;
-  onOptionsChange?: (opts: { model?: string; scale?: number }) => void;
+  initialSourceImageUrl?: string | null;
+  initialLocalUpscaledImageUrl?: string | null;
+  onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean }) => void;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
@@ -60,6 +62,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   isSelected,
   initialModel,
   initialScale,
+  initialSourceImageUrl,
+  initialLocalUpscaledImageUrl,
   onOptionsChange,
   onPersistUpscaleModalCreate,
   onUpdateModalState,
@@ -84,7 +88,14 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
-  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
+  const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
+  const onOptionsChangeRef = useRef(onOptionsChange);
+  
+  // Update ref when callback changes
+  useEffect(() => {
+    onOptionsChangeRef.current = onOptionsChange;
+  }, [onOptionsChange]);
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -107,17 +118,36 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     return sourceModal?.generatedImageUrl || null;
   }, [id, connections, imageModalStates]);
 
+  // Restore images from props on mount or when props change
   useEffect(() => {
-    if (connectedImageSource) {
+    if (initialSourceImageUrl !== undefined) {
+      setSourceImageUrl(initialSourceImageUrl);
+    }
+    if (initialLocalUpscaledImageUrl !== undefined) {
+      setLocalUpscaledImageUrl(initialLocalUpscaledImageUrl);
+    }
+  }, [initialSourceImageUrl, initialLocalUpscaledImageUrl]);
+
+  useEffect(() => {
+    if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
       setSourceImageUrl(connectedImageSource);
       // Clear dimming when image is connected
       setIsDimmed(false);
+      // Reset upscaled image when source changes (only if not persisted)
+      if (!initialLocalUpscaledImageUrl) {
+        setLocalUpscaledImageUrl(null);
+      }
+      // Persist the source image URL (only if it actually changed from initial)
+      if (onOptionsChangeRef.current && connectedImageSource !== initialSourceImageUrl) {
+        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+      }
     }
-  }, [connectedImageSource]);
+  }, [connectedImageSource, initialLocalUpscaledImageUrl, initialSourceImageUrl, sourceImageUrl]);
+  
 
   // Update image resolution when upscaled image loads
   useEffect(() => {
-    if (upscaledImageUrl) {
+    if (localUpscaledImageUrl || upscaledImageUrl) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -126,11 +156,11 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       img.onerror = () => {
         setImageResolution(null);
       };
-      img.src = upscaledImageUrl;
+      img.src = localUpscaledImageUrl || upscaledImageUrl || '';
     } else {
       setImageResolution(null);
     }
-  }, [upscaledImageUrl]);
+  }, [localUpscaledImageUrl, upscaledImageUrl]);
 
   // Listen for dimming events
   useEffect(() => {
@@ -180,6 +210,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
           y: e.clientY - rect.top,
         });
       }
+      // Initialize lastCanvasPosRef with current position
+      lastCanvasPosRef.current = { x, y };
       e.preventDefault();
       e.stopPropagation();
     }
@@ -206,8 +238,11 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
     const handleMouseUp = () => {
       setIsDraggingContainer(false);
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      if (onPositionCommit) {
+        // Use lastCanvasPosRef if available, otherwise use current x, y props
+        const finalX = lastCanvasPosRef.current?.x ?? x;
+        const finalY = lastCanvasPosRef.current?.y ?? y;
+        onPositionCommit(finalX, finalY);
       }
     };
 
@@ -257,6 +292,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     }
     
     setIsUpscaling(true);
+    // Persist isUpscaling state
+    if (onOptionsChange) {
+      onOptionsChange({ isUpscaling: true } as any);
+    }
     
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
@@ -344,6 +383,15 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
           isGenerating: false, // Clear loading state
         });
       }
+      
+      // Also store the upscaled image in the plugin
+      if (result && result !== localUpscaledImageUrl) {
+        setLocalUpscaledImageUrl(result);
+        // Persist the local upscaled image URL (only if it changed from initial)
+        if (onOptionsChangeRef.current && result !== initialLocalUpscaledImageUrl) {
+          onOptionsChangeRef.current({ localUpscaledImageUrl: result });
+        }
+      }
     } catch (error) {
       console.error('Upscale error:', error);
       // Update frame to show error state or remove it
@@ -356,6 +404,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       }
     } finally {
       setIsUpscaling(false);
+      // Persist isUpscaling state (clear loading)
+      if (onOptionsChange) {
+        onOptionsChange({ isUpscaling: false } as any);
+      }
     }
   };
 
@@ -788,7 +840,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         ref={imageAreaRef}
         data-frame-id={id ? `${id}-frame` : undefined}
         onMouseDown={(e) => {
-          // Allow dragging from the frame
+          // Allow dragging from the frame, but not from slider
           if (e.button === 0 && !e.defaultPrevented) {
             const target = e.target as HTMLElement;
             const isImage = target.tagName === 'IMG';
@@ -831,14 +883,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             src={sourceImageUrl}
             alt="Source"
             style={{
-              maxWidth: '100%',
-              maxHeight: `${350 * scale}px`,
-              width: 'auto',
-              height: 'auto',
+              width: '100%',
+              height: '100%',
               objectFit: 'contain',
               pointerEvents: 'none',
-              borderRadius: `${8 * scale}px`,
-              opacity: 1,
             }}
             draggable={false}
           />

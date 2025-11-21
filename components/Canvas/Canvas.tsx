@@ -48,7 +48,7 @@ interface CanvasProps {
   externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
-  externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
+  externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -59,8 +59,8 @@ interface CanvasProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
-  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }) => void | Promise<void>;
-  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   // Text generator (input overlay) persistence callbacks
@@ -162,7 +162,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
-  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [selectedUpscaleModalId, setSelectedUpscaleModalId] = useState<string | null>(null);
   const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
@@ -493,7 +493,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       const key = `canvas:${projectId}:upscaleModals`;
       const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
       if (raw) {
-        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number }>;
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }>;
         if (Array.isArray(parsed)) {
           setUpscaleModalStates(parsed);
         }
@@ -505,9 +505,38 @@ export const Canvas: React.FC<CanvasProps> = ({
   }, [projectId, JSON.stringify(externalUpscaleModals || [])]);
   
   // Also sync externalUpscaleModals changes to internal state (for real-time updates)
+  // Only sync if externalUpscaleModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
-    if (externalUpscaleModals) {
-      setUpscaleModalStates(externalUpscaleModals);
+    if (externalUpscaleModals && externalUpscaleModals.length > 0) {
+      setUpscaleModalStates(prev => {
+        // Only update if the external state is actually different
+        const externalIds = new Set(externalUpscaleModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        
+        if (idsMatch) {
+          // Merge: keep local position updates during drag, but update other properties from external
+          const merged = prev.map(prevModal => {
+            const externalModal = externalUpscaleModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              // During drag, keep local x, y if they're different (user is dragging)
+              // Otherwise, use external x, y (position was committed)
+              return {
+                ...prevModal,
+                ...externalModal,
+                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+          return merged;
+        } else {
+          // IDs don't match, use external state
+          return externalUpscaleModals;
+        }
+      });
     }
   }, [JSON.stringify(externalUpscaleModals || [])]);
 
@@ -2490,10 +2519,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                 x: canvasX,
                 y: canvasY,
                 upscaledImageUrl: null,
-                model: 'Real-ESRGAN',
+                sourceImageUrl: null,
+                localUpscaledImageUrl: null,
+                model: 'Crystal Upscaler',
                 scale: 2,
-                frameWidth: 600,
-                frameHeight: 600,
+                frameWidth: 400,
+                frameHeight: 500,
+                isUpscaling: false,
               };
               setUpscaleModalStates(prev => [...prev, newUpscale]);
               Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
@@ -2811,6 +2843,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistTextModalCreate={onPersistTextModalCreate}
         onPersistTextModalMove={onPersistTextModalMove}
         onPersistTextModalDelete={onPersistTextModalDelete}
+        onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
+        onPersistUpscaleModalMove={onPersistUpscaleModalMove}
+        onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
         connections={connections}
         onConnectionsChange={onConnectionsChange}
         onPersistConnectorCreate={onPersistConnectorCreate}

@@ -15,7 +15,7 @@ interface ModalOverlaysProps {
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; generatedImageUrls?: string[]; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; imageCount?: number; isGenerating?: boolean }>;
   videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
-  upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
+  upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -40,7 +40,7 @@ interface ModalOverlaysProps {
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedMusicModalId: (id: string | null) => void;
   setSelectedMusicModalIds: (ids: string[]) => void;
-  setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }>>>;
+  setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>>;
   setSelectedUpscaleModalId: (id: string | null) => void;
   setSelectedUpscaleModalIds: (ids: string[]) => void;
   setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
@@ -704,6 +704,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           if (vm) return { x: vm.x, y: vm.y, width: (vm as any).frameWidth || 600, height: (vm as any).frameHeight || 338 };
           const mm = musicModalStates.find(m => m.id === id);
           if (mm) return { x: mm.x, y: mm.y, width: (mm as any).frameWidth || 600, height: (mm as any).frameHeight || 300 };
+          const um = upscaleModalStates?.find(m => m.id === id);
+          if (um) return { x: um.x, y: um.y, width: (um as any).frameWidth || 400, height: (um as any).frameHeight || 500 };
           return null;
         };
         const modal = findModal();
@@ -765,6 +767,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             if (vm) return { x: vm.x, y: vm.y, width: (vm as any).frameWidth || 600, height: (vm as any).frameHeight || 338 };
             const mm = musicModalStates.find(m => m.id === id);
             if (mm) return { x: mm.x, y: mm.y, width: (mm as any).frameWidth || 600, height: (mm as any).frameHeight || 300 };
+            const um = upscaleModalStates?.find(m => m.id === id);
+            if (um) return { x: um.x, y: um.y, width: (um as any).frameWidth || 400, height: (um as any).frameHeight || 500 };
             return null;
           };
           const modal = findModal();
@@ -800,7 +804,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportUpdateKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, viewportUpdateKey, stageRef]);
 
   // Compute bounding rect for a node/modal to place the run icon just outside
   const computeNodeBounds = (id: string): DOMRect | null => {
@@ -1517,7 +1521,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
             setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedUpscaleModalId(null);
             if (onPersistUpscaleModalDelete) {
-              Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch(console.error);
+              Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch((err) => {
+                console.error('[ModalOverlays] Error in onPersistUpscaleModalDelete', err);
+              });
             }
           }}
           onDownload={() => {
@@ -1543,10 +1549,21 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           isSelected={selectedUpscaleModalId === modalState.id}
           initialModel={modalState.model}
           initialScale={modalState.scale}
+          initialSourceImageUrl={modalState.sourceImageUrl}
+          initialLocalUpscaledImageUrl={modalState.localUpscaledImageUrl}
           onOptionsChange={(opts) => {
-            setUpscaleModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
-            if (onPersistUpscaleModalMove) {
-              Promise.resolve(onPersistUpscaleModalMove(modalState.id, opts)).catch(console.error);
+            // Only update if values actually changed
+            const hasChanges = Object.keys(opts).some(key => {
+              const currentValue = (modalState as any)[key];
+              const newValue = (opts as any)[key];
+              return currentValue !== newValue;
+            });
+            
+            if (hasChanges) {
+              setUpscaleModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
+              if (onPersistUpscaleModalMove) {
+                Promise.resolve(onPersistUpscaleModalMove(modalState.id, opts)).catch(console.error);
+              }
             }
           }}
           onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
@@ -1576,7 +1593,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           }}
           onPositionCommit={(finalX, finalY) => {
             if (onPersistUpscaleModalMove) {
-              Promise.resolve(onPersistUpscaleModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
+              Promise.resolve(onPersistUpscaleModalMove(modalState.id, { x: finalX, y: finalY })).catch((err) => {
+                console.error('[ModalOverlays] Error in onPersistUpscaleModalMove', err);
+              });
             }
           }}
         />
@@ -1709,10 +1728,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
                         x: canvasX,
                         y: canvasY,
                         upscaledImageUrl: null,
-                        model: 'Real-ESRGAN',
+                        sourceImageUrl: null,
+                        localUpscaledImageUrl: null,
+                        model: 'Crystal Upscaler',
                         scale: 2,
-                        frameWidth: 600,
-                        frameHeight: 600,
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isUpscaling: false,
                       };
                       setUpscaleModalStates(prev => [...prev, newUpscale]);
                       Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);

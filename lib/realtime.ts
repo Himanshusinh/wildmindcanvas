@@ -1,17 +1,22 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale';
   x: number;
   y: number;
   generatedImageUrl?: string | null;
   generatedVideoUrl?: string | null;
   generatedMusicUrl?: string | null;
+  upscaledImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localUpscaledImageUrl?: string | null;
   frameWidth?: number;
   frameHeight?: number;
   model?: string;
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  scale?: number;
+  isUpscaling?: boolean;
   // text generator current value
   value?: string;
 };
