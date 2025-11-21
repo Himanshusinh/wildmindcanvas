@@ -25,7 +25,7 @@ interface CanvasProps {
   onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
   onLibraryMediaDrop?: (media: { id: string; url: string; type: 'image' | 'video' | 'music' | 'uploaded'; thumbnail?: string; prompt?: string; model?: string; createdAt?: string; storagePath?: string; mediaId?: string }, x: number, y: number) => void;
-  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library';
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin';
   onTextCreate?: (text: string, x: number, y: number) => void;
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
@@ -48,6 +48,7 @@ interface CanvasProps {
   externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -58,6 +59,10 @@ interface CanvasProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
+  onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   // Text generator (input overlay) persistence callbacks
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
@@ -67,6 +72,7 @@ interface CanvasProps {
   onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
+  onPluginSidebarOpen?: () => void;
   isUIHidden?: boolean;
 }
 
@@ -115,6 +121,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalImageModals,
   externalVideoModals,
   externalMusicModals,
+  externalUpscaleModals,
   externalTextModals,
   onPersistImageModalCreate,
   onPersistImageModalMove,
@@ -125,6 +132,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
+  onPersistUpscaleModalCreate,
+  onPersistUpscaleModalMove,
+  onPersistUpscaleModalDelete,
+  onUpscale,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -132,6 +143,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onConnectionsChange,
   onPersistConnectorCreate,
   onPersistConnectorDelete,
+  onPluginSidebarOpen,
   isUIHidden = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,6 +162,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [selectedUpscaleModalId, setSelectedUpscaleModalId] = useState<string | null>(null);
+  const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -171,7 +186,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | undefined>(undefined);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
 
@@ -195,6 +210,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedVideoModalIds([]);
     setSelectedMusicModalId(null);
     setSelectedMusicModalIds([]);
+    setSelectedUpscaleModalId(null);
+    setSelectedUpscaleModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -464,6 +481,48 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalMusicModals || [])]);
+
+  // Hydrate upscale modals from external or localStorage
+  useEffect(() => {
+    if (externalUpscaleModals && externalUpscaleModals.length > 0) {
+      setUpscaleModalStates(externalUpscaleModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:upscaleModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number }>;
+        if (Array.isArray(parsed)) {
+          setUpscaleModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted upscale modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalUpscaleModals || [])]);
+  
+  // Also sync externalUpscaleModals changes to internal state (for real-time updates)
+  useEffect(() => {
+    if (externalUpscaleModals) {
+      setUpscaleModalStates(externalUpscaleModals);
+    }
+  }, [JSON.stringify(externalUpscaleModals || [])]);
+
+  // Persist upscale modals
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:upscaleModals`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(upscaleModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist upscale modals');
+    }
+  }, [upscaleModalStates, projectId]);
 
   // Persist music modals
   useEffect(() => {
@@ -1331,24 +1390,28 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Check if click is on Konva canvas (canvas element) - let Konva handle it completely
       const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
       
-      // If click is outside all modals and NOT on Konva canvas, clear selections
-      // Note: Konva stage clicks are handled by handleStageMouseDown - we should not interfere
-      if (wasClick && !isInsideModal && !isOnKonvaCanvas && containerRef.current) {
+      // If click is outside all modals, clear selections
+      // Note: Konva stage clicks are handled by handleStageMouseDown, but we also handle container background clicks here
+      if (wasClick && !isInsideModal && containerRef.current) {
         const container = containerRef.current;
         const rect = container.getBoundingClientRect();
         const clickX = e.clientX;
         const clickY = e.clientY;
         
-        // Check if click is inside the container
-        if (
-          clickX >= rect.left &&
-          clickX <= rect.right &&
-          clickY >= rect.top &&
-          clickY <= rect.bottom
-        ) {
-          // Click is inside container but outside modals and not on canvas - clear selections including boxes
-          clearAllSelections(true);
+        // Check if click is inside the container (but not on canvas - canvas is handled by handleStageMouseDown)
+        const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
+        if (!isOnKonvaCanvas) {
+          if (
+            clickX >= rect.left &&
+            clickX <= rect.right &&
+            clickY >= rect.top &&
+            clickY <= rect.bottom
+          ) {
+            // Click is inside container but outside modals and not on canvas - clear selections including boxes
+            clearAllSelections(true);
+          }
         }
+        // If click is on canvas, handleStageMouseDown will handle it
       }
       
       mouseDownTarget = null;
@@ -1361,7 +1424,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isSelecting]);
+  }, [isSelecting, clearAllSelections]);
   
   // Handle selection box mouse move
   useEffect(() => {
@@ -2399,13 +2462,48 @@ export const Canvas: React.FC<CanvasProps> = ({
       containerRef.current.style.backgroundColor = '';
     }
 
-    // Check if this is a library media drop (has JSON data)
+    // Check if this is a library media drop or plugin drop (has JSON data)
     try {
       const mediaData = e.dataTransfer.getData('application/json');
       if (mediaData) {
-        const media = JSON.parse(mediaData);
+        const data = JSON.parse(mediaData);
+        
+        // Check if it's a plugin drop
+        if (data && data.type === 'plugin' && data.plugin) {
+          // Calculate canvas coordinates from drop position
+          if (stageRef.current && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            // Get drop position relative to container
+            const dropX = e.clientX - rect.left;
+            const dropY = e.clientY - rect.top;
+            
+            // Convert screen coordinates to canvas coordinates
+            // Account for stage position and scale
+            const canvasX = (dropX - position.x) / scale;
+            const canvasY = (dropY - position.y) / scale;
+            
+            // Create upscale modal at drop position
+            if (data.plugin.id === 'upscale' && onPersistUpscaleModalCreate) {
+              const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newUpscale = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                upscaledImageUrl: null,
+                model: 'Real-ESRGAN',
+                scale: 2,
+                frameWidth: 600,
+                frameHeight: 600,
+              };
+              setUpscaleModalStates(prev => [...prev, newUpscale]);
+              Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+            }
+            return;
+          }
+        }
+        
         // Check if it's a valid media item from library
-        if (media && media.url && (media.type === 'image' || media.type === 'video' || media.type === 'music' || media.type === 'uploaded')) {
+        if (data && data.url && (data.type === 'image' || data.type === 'video' || data.type === 'music' || data.type === 'uploaded')) {
           // Calculate canvas coordinates from drop position
           if (stageRef.current && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
@@ -2419,7 +2517,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             const canvasY = (dropY - position.y) / scale;
             
             if (onLibraryMediaDrop) {
-              onLibraryMediaDrop(media, canvasX, canvasY);
+              onLibraryMediaDrop(data, canvasX, canvasY);
             }
             return;
           }
@@ -2659,6 +2757,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         imageModalStates={imageModalStates}
         videoModalStates={videoModalStates}
         musicModalStates={musicModalStates}
+        upscaleModalStates={upscaleModalStates}
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -2667,6 +2766,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedVideoModalIds={selectedVideoModalIds}
         selectedMusicModalId={selectedMusicModalId}
         selectedMusicModalIds={selectedMusicModalIds}
+        selectedUpscaleModalId={selectedUpscaleModalId}
+        selectedUpscaleModalIds={selectedUpscaleModalIds}
         clearAllSelections={clearAllSelections}
         setTextInputStates={setTextInputStates}
         setSelectedTextInputId={setSelectedTextInputId}
@@ -2681,6 +2782,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         setMusicModalStates={setMusicModalStates}
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
+        setUpscaleModalStates={setUpscaleModalStates}
+        setSelectedUpscaleModalId={setSelectedUpscaleModalId}
+        setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
         images={images}
         onTextCreate={onTextCreate}
         onImageSelect={onImageSelect}
@@ -2711,6 +2815,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         onConnectionsChange={onConnectionsChange}
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
+        onPluginSidebarOpen={onPluginSidebarOpen}
+        onUpscale={onUpscale}
       />
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (

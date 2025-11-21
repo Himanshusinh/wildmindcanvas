@@ -8,8 +8,9 @@ import { Header } from '@/components/Header';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Profile } from '@/components/Profile/Profile';
 import LibrarySidebar from '@/components/Canvas/LibrarySidebar';
+import PluginSidebar from '@/components/Canvas/PluginSidebar';
 import { ImageUpload } from '@/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/lib/canvasApi';
 import { ProjectSelector } from '@/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
@@ -28,6 +29,7 @@ function CanvasApp({ user }: CanvasAppProps) {
   const [imageGenerators, setImageGenerators] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
@@ -1247,17 +1249,18 @@ function CanvasApp({ user }: CanvasAppProps) {
     });
   };
 
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isPluginSidebarOpen, setIsPluginSidebarOpen] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
 
-  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => {
+  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
     // Always update to trigger effect, even if tool is the same
     // Use counter to force re-render when clicking same tool again
     if (tool === selectedTool) {
@@ -1284,6 +1287,11 @@ function CanvasApp({ user }: CanvasAppProps) {
     // Open library sidebar when library tool is selected
     if (tool === 'library') {
       setIsLibraryOpen(true);
+    }
+    
+    // Open plugin sidebar when plugin tool is selected
+    if (tool === 'plugin') {
+      setIsPluginSidebarOpen(true);
     }
   };
 
@@ -1841,6 +1849,7 @@ function CanvasApp({ user }: CanvasAppProps) {
               externalImageModals={imageGenerators}
               externalVideoModals={videoGenerators}
               externalMusicModals={musicGenerators}
+              externalUpscaleModals={upscaleGenerators}
               externalTextModals={textGenerators}
               connections={connectors}
         onConnectionsChange={(connections) => {
@@ -2051,6 +2060,69 @@ function CanvasApp({ user }: CanvasAppProps) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'music-generator', x: prevItem.x, y: prevItem.y, meta: { generatedMusicUrl: (prevItem as any).generatedMusicUrl || null } } }, requestId: '', clientTs: 0 } as any : undefined as any });
                 }
               }}
+              onPersistUpscaleModalCreate={async (modal) => {
+                setUpscaleGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+                if (realtimeActive) {
+                  console.log('[Realtime] broadcast create upscale', modal.id);
+                  // Note: realtime might not support 'upscale' type yet, using 'image' as fallback
+                  realtimeRef.current?.sendCreate({ id: modal.id, type: 'image', x: modal.x, y: modal.y, generatedImageUrl: modal.upscaledImageUrl || null });
+                }
+                if (projectId && opManagerInitialized) {
+                  await appendOp({ type: 'create', elementId: modal.id, data: { element: { id: modal.id, type: 'upscale-plugin', x: modal.x, y: modal.y, meta: { upscaledImageUrl: modal.upscaledImageUrl || null, model: modal.model, scale: modal.scale } } }, inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any });
+                }
+              }}
+              onPersistUpscaleModalMove={async (id, updates) => {
+                setUpscaleGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+                if (realtimeActive) {
+                  console.log('[Realtime] broadcast update upscale', id, Object.keys(updates || {}));
+                  realtimeRef.current?.sendUpdate(id, updates as any);
+                }
+                if (projectId && opManagerInitialized) {
+                  const prev = upscaleGenerators.find(m => m.id === id);
+                  const inverseUpdates: any = {};
+                  if (prev) {
+                    for (const k of Object.keys(updates || {})) {
+                      (inverseUpdates as any)[k] = (prev as any)[k];
+                    }
+                  }
+                  await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                }
+              }}
+              onPersistUpscaleModalDelete={async (id) => {
+                const prevItem = upscaleGenerators.find(m => m.id === id);
+                setUpscaleGenerators(prev => prev.filter(m => m.id !== id));
+                if (realtimeActive) {
+                  console.log('[Realtime] broadcast delete upscale', id);
+                  realtimeRef.current?.sendDelete(id);
+                }
+                // Also remove any connectors that referenced this element
+                try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+                if (projectId && opManagerInitialized) {
+                  await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'upscale-plugin', x: prevItem.x, y: prevItem.y, meta: { upscaledImageUrl: (prevItem as any).upscaledImageUrl || null, model: prevItem.model, scale: prevItem.scale } } }, requestId: '', clientTs: 0 } as any : undefined as any });
+                }
+              }}
+              onUpscale={async (model, scale, sourceImageUrl) => {
+                if (!sourceImageUrl || !projectId) {
+                  console.error('[onUpscale] Missing sourceImageUrl or projectId');
+                  return null;
+                }
+                
+                try {
+                  console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
+                  const result = await upscaleImageForCanvas(
+                    sourceImageUrl,
+                    model || 'Crystal Upscaler',
+                    scale || 2,
+                    projectId
+                  );
+                  
+                  console.log('[onUpscale] Upscale completed:', result);
+                  return result.url || null;
+                } catch (error: any) {
+                  console.error('[onUpscale] Error:', error);
+                  throw error;
+                }
+              }}
               onPersistTextModalCreate={async (modal) => {
                 setTextGenerators(prev => prev.some(t => t.id === modal.id) ? prev : [...prev, modal]);
                 if (realtimeActive) {
@@ -2096,6 +2168,7 @@ function CanvasApp({ user }: CanvasAppProps) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
                     }
                   }}
+              onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
           </>
@@ -2111,6 +2184,57 @@ function CanvasApp({ user }: CanvasAppProps) {
         onClose={() => setIsLibraryOpen(false)}
         onSelectMedia={handleLibraryMediaSelect}
         scale={1}
+      />
+      <PluginSidebar
+        isOpen={isPluginSidebarOpen}
+        onClose={() => setIsPluginSidebarOpen(false)}
+        onSelectPlugin={(plugin, x, y) => {
+          if (plugin.id === 'upscale') {
+            const viewportCenter = viewportCenterRef.current;
+            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
+            // Otherwise use viewport center
+            let modalX: number;
+            let modalY: number;
+            
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              // Convert screen coordinates to canvas coordinates
+              // We need to get the canvas container position to do this properly
+              // For now, use viewport center as fallback
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              // Use viewport center
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+            
+            const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newUpscale = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              upscaledImageUrl: null,
+              model: 'Real-ESRGAN',
+              scale: 2,
+              frameWidth: 600,
+              frameHeight: 600,
+            };
+            console.log('[Plugin] Creating upscale modal at viewport center:', newUpscale, 'viewportCenter:', viewportCenter);
+            setUpscaleGenerators(prev => {
+              // Check if modal already exists to avoid duplicates
+              if (prev.some(m => m.id === modalId)) {
+                console.log('[Plugin] Modal already exists, skipping');
+                return prev;
+              }
+              const updated = [...prev, newUpscale];
+              console.log('[Plugin] Updated upscaleGenerators, count:', updated.length);
+              return updated;
+            });
+          }
+          setIsPluginSidebarOpen(false);
+        }}
+        scale={1}
+        viewportCenter={viewportCenterRef.current}
       />
     </main>
   );

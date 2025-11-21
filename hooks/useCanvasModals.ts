@@ -55,7 +55,7 @@ interface MusicModalState {
 }
 
 interface UseCanvasModalsOptions {
-  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music';
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin';
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
   isVideoModalOpen?: boolean;
@@ -133,7 +133,7 @@ export function useCanvasModals(options: UseCanvasModalsOptions): UseCanvasModal
   const [videoModalStates, setVideoModalStates] = React.useState<VideoModalState[]>([]);
   const [musicModalStates, setMusicModalStates] = React.useState<MusicModalState[]>([]);
   
-  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
 
   // Helper to find blank space

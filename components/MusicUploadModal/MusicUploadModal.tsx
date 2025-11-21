@@ -64,6 +64,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDimmed, setIsDimmed] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +121,24 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   }, []);
   useEffect(() => { if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel); }, [initialModel]);
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
+
+  // Listen for frame dim events (when dragging connection near disallowed frame)
+  useEffect(() => {
+    if (!id) return;
+    
+    const handleFrameDim = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { frameId, dimmed } = ce.detail || {};
+      if (frameId === id) {
+        setIsDimmed(dimmed === true);
+      }
+    };
+    
+    window.addEventListener('canvas-frame-dim', handleFrameDim as any);
+    return () => {
+      window.removeEventListener('canvas-frame-dim', handleFrameDim as any);
+    };
+  }, [id]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
 
   // Close dropdowns when clicking outside
@@ -324,6 +343,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         top: `${screenY}px`,
         zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
+        opacity: isDimmed ? 0.4 : 1,
+        transition: 'opacity 0.2s ease',
       }}
     >
       {/* Tooltip - Attached to Top, Full Width */}

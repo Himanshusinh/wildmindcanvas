@@ -38,6 +38,7 @@ interface ImageUploadModalProps {
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
+  onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -74,6 +75,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   connections = [],
   imageModalStates = [],
   images = [],
+  onPersistConnectorCreate,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -93,12 +95,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
+  const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
+  const [isDimmed, setIsDimmed] = useState(false);
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
     const [width, height] = ratio.split(':').map(Number);
     return `${width} / ${height}`;
   };
+
+  // Display aspect ratio: use the stored aspect ratio (initialAspectRatio) if image exists,
+  // otherwise use selectedAspectRatio for the empty frame
+  // selectedAspectRatio controls what aspect ratio the NEXT generation will use
+  const displayAspectRatio = generatedImageUrl && initialAspectRatio 
+    ? initialAspectRatio 
+    : selectedAspectRatio;
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -116,12 +127,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Seedream v4', 
     'Imagen 4 Ultra', 
     'Imagen 4', 
-    'Imagen 4 Fast',
+    'Imagen 4 Fast', 
     'Flux Kontext Max', 
     'Flux Kontext Pro', 
     'Flux Pro 1.1 Ultra', 
-    'Flux Pro 1.1',
-    'Seedream v4 4K'
+    'Flux Pro 1.1', 
+    'Seedream v4 4K',
+    'Upscale' // Upscale is treated as media (no controls)
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -132,8 +144,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const isUploadedImage = 
     initialModel === 'Library Image' || 
     initialModel === 'Uploaded Image' ||
+    initialModel === 'Upscale' ||
     selectedModel === 'Library Image' ||
     selectedModel === 'Uploaded Image' ||
+    selectedModel === 'Upscale' ||
     (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
 
   // Detect connected image nodes (for image-to-image generation)
@@ -222,6 +236,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // - If media image is connected but modal is empty, generate in the CURRENT frame
         // - Otherwise, use the current frame
         const modalIds: string[] = [];
+        const modalPositions = new Map<string, { x: number; y: number }>(); // Track modal positions for connection creation
         let targetModalId: string;
         let targetX = x;
         let targetY = y;
@@ -251,6 +266,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           };
           await Promise.resolve(onPersistImageModalCreate(newModal));
           modalIds.push(targetModalId);
+          modalPositions.set(targetModalId, { x: targetX, y: targetY });
         } else {
           // Use current frame
           targetModalId = id || `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -274,6 +290,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             await Promise.resolve(onPersistImageModalCreate(currentModal));
           }
           modalIds.push(targetModalId);
+          modalPositions.set(targetModalId, { x: targetX, y: targetY });
         }
         
         // Create additional frames if imageCount > 1
@@ -300,11 +317,114 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           
           await Promise.resolve(onPersistImageModalCreate(newModal));
           modalIds.push(newModalId);
+          modalPositions.set(newModalId, { x: newX, y: newY });
+        }
+        
+        // Automatically create connections to new frames immediately after creation (before image generation)
+        const isImageToImageMode = Boolean(finalSourceImageUrl);
+        if (onPersistConnectorCreate && modalIds.length > 0) {
+          // Case 1: Connect from connected image source to new frames (image-to-image from external source)
+          if (isImageToImageMode && connectedImageSource?.id) {
+            // Get source modal position for calculating connection start point
+            const sourceModal = imageModalStates.find(m => m.id === connectedImageSource.id);
+            const sourceX = sourceModal?.x ?? x;
+            const sourceY = sourceModal?.y ?? y;
+            
+            // Create connections from source image node to each new frame
+            for (const targetModalId of modalIds) {
+              // Get target modal position - check our tracked positions first, then imageModalStates, then fallback
+              const trackedPos = modalPositions.get(targetModalId);
+              const targetModal = trackedPos 
+                ? { x: trackedPos.x, y: trackedPos.y }
+                : imageModalStates.find(m => m.id === targetModalId) || 
+                  (targetModalId === id ? { x, y } : null);
+              const targetPosX = trackedPos?.x ?? targetModal?.x ?? x;
+              const targetPosY = trackedPos?.y ?? targetModal?.y ?? y;
+              
+              // Calculate node positions (right side of source, left side of target)
+              // Frame width is 600, nodes are typically at the edges
+              const fromX = sourceX + 600; // Right side of source frame
+              const fromY = sourceY + (frameHeight / 2); // Middle of source frame
+              const toX = targetPosX; // Left side of target frame
+              const toY = targetPosY + (frameHeight / 2); // Middle of target frame
+              
+              // Check if connection already exists
+              const connectionExists = connections.some(
+                conn => conn.from === connectedImageSource.id && conn.to === targetModalId
+              );
+              
+              if (!connectionExists) {
+                const newConnector = {
+                  from: connectedImageSource.id,
+                  to: targetModalId,
+                  color: '#437eb5',
+                  fromX,
+                  fromY,
+                  toX,
+                  toY,
+                  fromAnchor: 'send',
+                  toAnchor: 'receive',
+                };
+                
+                try {
+                  await Promise.resolve(onPersistConnectorCreate(newConnector));
+                  console.log(`[Image-to-Image] Auto-created connection from ${connectedImageSource.id} to ${targetModalId}`);
+                } catch (err) {
+                  console.error(`[Image-to-Image] Failed to create connection from ${connectedImageSource.id} to ${targetModalId}:`, err);
+                }
+              }
+            }
+          }
+          
+          // Case 2: Connect from current frame to new frames (when generating creates a new frame next to existing one)
+          if (id && generatedImageUrl && hasExistingImage) {
+            // Current frame has an image and we created new frames, so connect from current to new
+            for (const targetModalId of modalIds) {
+              // Get target modal position - check our tracked positions first, then imageModalStates, then fallback
+              const trackedPos = modalPositions.get(targetModalId);
+              const targetModal = trackedPos 
+                ? { x: trackedPos.x, y: trackedPos.y }
+                : imageModalStates.find(m => m.id === targetModalId);
+              const targetPosX = trackedPos?.x ?? targetModal?.x ?? x;
+              const targetPosY = trackedPos?.y ?? targetModal?.y ?? y;
+              
+              // Calculate node positions (right side of current frame, left side of target)
+              const fromX = x + 600; // Right side of current frame
+              const fromY = y + (frameHeight / 2); // Middle of current frame
+              const toX = targetPosX; // Left side of target frame
+              const toY = targetPosY + (frameHeight / 2); // Middle of target frame
+              
+              // Check if connection already exists
+              const connectionExists = connections.some(
+                conn => conn.from === id && conn.to === targetModalId
+              );
+              
+              if (!connectionExists) {
+                const newConnector = {
+                  from: id,
+                  to: targetModalId,
+                  color: '#437eb5',
+                  fromX,
+                  fromY,
+                  toX,
+                  toY,
+                  fromAnchor: 'send',
+                  toAnchor: 'receive',
+                };
+                
+                try {
+                  await Promise.resolve(onPersistConnectorCreate(newConnector));
+                  console.log(`[Image Generation] Auto-created connection from current frame ${id} to new frame ${targetModalId}`);
+                } catch (err) {
+                  console.error(`[Image Generation] Failed to create connection from ${id} to ${targetModalId}:`, err);
+                }
+              }
+            }
+          }
         }
         
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
-        const isImageToImageMode = Boolean(finalSourceImageUrl);
         console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
         const result = await onImageGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, targetModalId, imageCount, finalSourceImageUrl || undefined);
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
@@ -390,6 +510,22 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   useEffect(() => {
     if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio);
   }, [initialAspectRatio]);
+
+  // Load image and get its resolution
+  useEffect(() => {
+    if (generatedImageUrl) {
+      const img = new Image();
+      img.onload = () => {
+        setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        setImageResolution(null);
+      };
+      img.src = generatedImageUrl;
+    } else {
+      setImageResolution(null);
+    }
+  }, [generatedImageUrl]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -534,6 +670,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         top: `${screenY}px`,
         zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
+        opacity: isDimmed ? 0.4 : 1,
+        transition: 'opacity 0.2s ease',
       }}
     >
 
@@ -555,7 +693,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             fontWeight: '600',
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
             border: 'none',
-            whiteSpace: 'nowrap',
             pointerEvents: 'none',
             zIndex: 3000,
             boxShadow: 'none',
@@ -563,7 +700,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             opacity: 1,
           }}
         >
-          {isUploadedImage ? 'Media' : 'Image Generator'}
+          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <span>{isUploadedImage ? 'Media' : 'Image Generator'}</span>
+            {imageResolution && (
+              <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
+                {imageResolution.width} × {imageResolution.height}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
@@ -727,7 +871,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         style={{
           width: `${600 * scale}px`,
           maxWidth: '90vw',
-          aspectRatio: getAspectRatio(selectedAspectRatio),
+          aspectRatio: getAspectRatio(displayAspectRatio),
           minHeight: `${400 * scale}px`,
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
@@ -980,7 +1124,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const val = e.target.value;
                 setPrompt(val);
                 if (onOptionsChange) {
-                  onOptionsChange({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, imageCount } as any);
+                  // Don't update stored aspectRatio when prompt changes if image exists
+                  // The aspectRatio should only change when a new image is generated
+                  const opts: any = { prompt: val, model: selectedModel, frame: selectedFrame, imageCount };
+                  if (!generatedImageUrl) {
+                    // Only update stored aspectRatio if no image exists yet
+                    opts.aspectRatio = selectedAspectRatio;
+                  }
+                  onOptionsChange(opts);
                 }
               }}
               onKeyDown={(e) => {
@@ -1149,16 +1300,25 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                             { value: '4:5', label: '4:5' },
                           ];
                         }
-                        if (availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)) {
-                          setSelectedAspectRatio(availableRatios[0].value);
+                        const newAspectRatio = availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)
+                          ? availableRatios[0].value
+                          : selectedAspectRatio;
+                        if (newAspectRatio !== selectedAspectRatio) {
+                          setSelectedAspectRatio(newAspectRatio);
                         }
                         if (onOptionsChange) {
-                          const [w, h] = (availableRatios[0]?.value || '1:1').split(':').map(Number);
+                          const [w, h] = newAspectRatio.split(':').map(Number);
                           const frameWidth = 600;
                           const ar = w && h ? (w / h) : 1;
                           const rawHeight = Math.round(frameWidth / ar);
                           const frameHeight = Math.max(400, rawHeight);
-                          onOptionsChange({ model, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                          // Don't update stored aspectRatio if image exists - it controls next generation only
+                          const opts: any = { model, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
+                          if (!generatedImageUrl) {
+                            // Only update stored aspectRatio if no image exists yet
+                            opts.aspectRatio = newAspectRatio;
+                          }
+                          onOptionsChange(opts);
                         }
                       }}
                       style={{
@@ -1263,7 +1423,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                           const ar = w && h ? (w / h) : 1;
                           const rawHeight = Math.round(frameWidth / ar);
                           const frameHeight = Math.max(400, rawHeight);
-                          onOptionsChange({ model: selectedModel, aspectRatio: ratio.value, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount } as any);
+                          // Don't update stored aspectRatio if image exists - it controls next generation only
+                          // The stored aspectRatio (initialAspectRatio) should only change when a new image is generated
+                          const opts: any = { model: selectedModel, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
+                          if (!generatedImageUrl) {
+                            // Only update stored aspectRatio if no image exists yet
+                            opts.aspectRatio = ratio.value;
+                          }
+                          onOptionsChange(opts);
                         }
                       }}
                       style={{

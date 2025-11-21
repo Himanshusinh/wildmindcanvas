@@ -20,7 +20,7 @@ interface CanvasProps {
   onImageDownload?: (index: number) => void;
   onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
-  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music';
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin';
   onTextCreate?: (text: string, x: number, y: number) => void;
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
@@ -162,7 +162,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isDragSelection, setIsDragSelection] = useState(false);
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
-  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | undefined>(undefined);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
   // Helper to check for nearby existing modal to avoid duplicate creations

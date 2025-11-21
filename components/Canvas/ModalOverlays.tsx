@@ -6,6 +6,7 @@ import { ImageUploadModal } from '@/components/ImageUploadModal';
 import { VideoUploadModal } from '@/components/VideoUploadModal';
 import { getReplicateQueueStatus, getReplicateQueueResult, getFalQueueStatus, getFalQueueResult, getMiniMaxVideoStatus, getMiniMaxVideoFile } from '@/lib/api';
 import { MusicUploadModal } from '@/components/MusicUploadModal';
+import { UpscalePluginModal } from '@/components/UpscalePluginModal/UpscalePluginModal';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 
@@ -14,6 +15,7 @@ interface ModalOverlaysProps {
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; generatedImageUrls?: string[]; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; imageCount?: number; isGenerating?: boolean }>;
   videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   musicModalStates: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
+  upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -22,6 +24,8 @@ interface ModalOverlaysProps {
   selectedVideoModalIds: string[];
   selectedMusicModalId: string | null;
   selectedMusicModalIds: string[];
+  selectedUpscaleModalId: string | null;
+  selectedUpscaleModalIds: string[];
   clearAllSelections: () => void;
   setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>>;
   setSelectedTextInputId: (id: string | null) => void;
@@ -36,6 +40,9 @@ interface ModalOverlaysProps {
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>>;
   setSelectedMusicModalId: (id: string | null) => void;
   setSelectedMusicModalIds: (ids: string[]) => void;
+  setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }>>>;
+  setSelectedUpscaleModalId: (id: string | null) => void;
+  setSelectedUpscaleModalIds: (ids: string[]) => void;
   setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
   setIsDragSelection?: (value: boolean) => void;
   images?: ImageUpload[];
@@ -64,6 +71,11 @@ interface ModalOverlaysProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
+  // Upscale plugin persistence callbacks
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
+  onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   // Text generator persistence callbacks
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
@@ -73,6 +85,7 @@ interface ModalOverlaysProps {
   onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
+  onPluginSidebarOpen?: () => void;
 }
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
@@ -80,6 +93,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   imageModalStates,
   videoModalStates,
   musicModalStates,
+  upscaleModalStates,
   selectedTextInputId,
   selectedTextInputIds,
   selectedImageModalId,
@@ -88,6 +102,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedVideoModalIds,
   selectedMusicModalId,
   selectedMusicModalIds,
+  selectedUpscaleModalId,
+  selectedUpscaleModalIds,
   clearAllSelections,
   setTextInputStates,
   setSelectedTextInputId,
@@ -102,6 +118,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setMusicModalStates,
   setSelectedMusicModalId,
   setSelectedMusicModalIds,
+  setUpscaleModalStates,
+  setSelectedUpscaleModalId,
+  setSelectedUpscaleModalIds,
   setSelectionTightRect,
   setIsDragSelection,
   images = [],
@@ -127,6 +146,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
+  onPersistUpscaleModalCreate,
+  onPersistUpscaleModalMove,
+  onPersistUpscaleModalDelete,
+  onUpscale,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -134,6 +157,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onConnectionsChange,
   onPersistConnectorCreate,
   onPersistConnectorDelete,
+  onPluginSidebarOpen,
 }) => {
   // Connection state (supports controlled or uncontrolled usage)
   const [localConnections, setLocalConnections] = useState<Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
@@ -141,6 +165,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   const [activeDrag, setActiveDrag] = useState<null | { from: string; color: string; startX: number; startY: number; currentX: number; currentY: number }>(null);
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [dimmedFrameId, setDimmedFrameId] = useState<string | null>(null);
+  const [componentMenu, setComponentMenu] = useState<{ x: number; y: number; canvasX: number; canvasY: number } | null>(null);
+  const [componentMenuSearch, setComponentMenuSearch] = useState('');
   
   // Force recalculation when viewport changes
   useEffect(() => {
@@ -201,7 +228,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music'],
-      image: ['image', 'video'],
+      image: ['image', 'video', 'upscale'],
       video: ['video'],
       music: ['video'],
     };
@@ -271,7 +298,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       const toType = getComponentType(id);
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music'],
-        image: ['image', 'video'],
+        image: ['image', 'video', 'upscale'],
         video: ['video'],
         music: ['video'],
       };
@@ -335,6 +362,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         if (onPersistConnectorCreate) {
           try { Promise.resolve(onPersistConnectorCreate(newConn)).catch(console.error); } catch (e) { console.error('onPersistConnectorCreate failed', e); }
         }
+        
+        // Clear dimming after successful connection
+        if (dimmedFrameId === id) {
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: id, dimmed: false } }));
+          } catch (err) {}
+          setDimmedFrameId(null);
+        }
       }
       setActiveDrag(null);
       try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
@@ -376,26 +411,92 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         }
       }
       
-      // Update cursor based on nearest node validity
+      // Update cursor and dim frame based on nearest node validity
       if (nearestNode !== null) {
         const nodeId = nearestNode.id;
         const isValid = checkConnectionValidity(activeDrag.from, nodeId);
         document.body.style.cursor = isValid ? 'pointer' : 'not-allowed';
+        
+        // Dim the frame if connection is not allowed
+        if (!isValid) {
+          setDimmedFrameId(nodeId);
+          // Dispatch event for modal to listen
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: nodeId, dimmed: true } }));
+          } catch (err) {}
+        } else {
+          setDimmedFrameId(null);
+          // Dispatch event to clear dim
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: nodeId, dimmed: false } }));
+          } catch (err) {}
+        }
       } else {
         document.body.style.cursor = 'default';
+        // Clear dim when not near any node
+        if (dimmedFrameId) {
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
+          } catch (err) {}
+          setDimmedFrameId(null);
+        }
       }
     };
-    const handleUp = () => {
+    const handleUp = (e?: MouseEvent) => {
       if (activeDrag) {
+        // Check if we're releasing in empty space (not on a node)
+        // If so, show component creation menu
+        if (e) {
+          const mouseX = e.clientX;
+          const mouseY = e.clientY;
+          
+          // Check if we're near any receive node
+          const receiveNodes = Array.from(document.querySelectorAll('[data-node-side="receive"]'));
+          let nearNode = false;
+          const proximityThreshold = 60;
+          
+          for (const node of receiveNodes) {
+            const rect = node.getBoundingClientRect();
+            const nodeCenterX = rect.left + rect.width / 2;
+            const nodeCenterY = rect.top + rect.height / 2;
+            const distance = Math.sqrt(
+              Math.pow(mouseX - nodeCenterX, 2) + Math.pow(mouseY - nodeCenterY, 2)
+            );
+            if (distance < proximityThreshold) {
+              nearNode = true;
+              break;
+            }
+          }
+          
+          // If not near any node, show component creation menu
+          if (!nearNode) {
+            // Convert screen coordinates to canvas coordinates
+            const stage = stageRef.current;
+            if (stage) {
+              const stageBox = stage.container().getBoundingClientRect();
+              const canvasX = (mouseX - stageBox.left - position.x) / scale;
+              const canvasY = (mouseY - stageBox.top - position.y) / scale;
+              setComponentMenu({ x: mouseX, y: mouseY, canvasX, canvasY });
+            }
+          }
+        }
+        
         setActiveDrag(null);
         document.body.style.cursor = ''; // Reset cursor
+        // Clear dimmed frame
+        if (dimmedFrameId) {
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
+          } catch (err) {}
+          setDimmedFrameId(null);
+        }
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) {}
       }
     };
     window.addEventListener('canvas-node-start', handleStart as any);
     window.addEventListener('canvas-node-complete', handleComplete as any);
     window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('mouseup', handleUp as any);
     return () => {
       window.removeEventListener('canvas-node-start', handleStart as any);
       window.removeEventListener('canvas-node-complete', handleComplete as any);
@@ -403,7 +504,29 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       window.removeEventListener('mouseup', handleUp);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, connections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity]);
+  }, [activeDrag, connections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId]);
+
+  // Close component menu when clicking outside
+  useEffect(() => {
+    if (!componentMenu) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-component-menu]')) {
+        setComponentMenu(null);
+        setComponentMenuSearch('');
+      }
+    };
+    
+    // Use setTimeout to avoid immediate closure
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [componentMenu]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {
@@ -721,13 +844,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           
           return (
             <g key={connectionId}>
-              <path
-                d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+            <path
+              d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
                 stroke={strokeColor}
                 strokeWidth={strokeWidth}
-                fill="none"
-                strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
+              fill="none"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
                 style={{ 
                   filter: isSelected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
                   pointerEvents: 'auto', // Make path clickable
@@ -1022,6 +1145,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           connections={connections}
           imageModalStates={imageModalStates}
           images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
         />
       ))}
       {/* Video Upload Modal Overlays */}
@@ -1361,6 +1485,288 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
           position={position}
         />
       ))}
+      {/* Upscale Plugin Modal Overlays */}
+      {(upscaleModalStates || []).map((modalState) => (
+        <UpscalePluginModal
+          key={modalState.id}
+          isOpen={true}
+          id={modalState.id}
+          onClose={() => {
+            setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedUpscaleModalId(null);
+            if (onPersistUpscaleModalDelete) {
+              Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch(console.error);
+            }
+          }}
+          onUpscale={onUpscale ? async (model, scale, sourceImageUrl) => {
+            try {
+              return await onUpscale(model, scale, sourceImageUrl);
+            } catch (err) {
+              console.error('[ModalOverlays] upscale failed', err);
+              throw err;
+            }
+          } : undefined}
+          upscaledImageUrl={modalState.upscaledImageUrl}
+          isUpscaling={modalState.isUpscaling || false}
+          onSelect={() => {
+            clearAllSelections();
+            setSelectedUpscaleModalId(modalState.id);
+            setSelectedUpscaleModalIds([modalState.id]);
+          }}
+          onDelete={() => {
+            setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setSelectedUpscaleModalId(null);
+            if (onPersistUpscaleModalDelete) {
+              Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch(console.error);
+            }
+          }}
+          onDownload={() => {
+            if (modalState.upscaledImageUrl) {
+              const link = document.createElement('a');
+              link.href = modalState.upscaledImageUrl;
+              link.download = `upscaled-${modalState.id}.png`;
+              link.click();
+            }
+          }}
+          onDuplicate={() => {
+            const duplicated = {
+              ...modalState,
+              id: `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              x: modalState.x + 50,
+              y: modalState.y + 50,
+            };
+            setUpscaleModalStates(prev => [...prev, duplicated]);
+            if (onPersistUpscaleModalCreate) {
+              Promise.resolve(onPersistUpscaleModalCreate(duplicated)).catch(console.error);
+            }
+          }}
+          isSelected={selectedUpscaleModalId === modalState.id}
+          initialModel={modalState.model}
+          initialScale={modalState.scale}
+          onOptionsChange={(opts) => {
+            setUpscaleModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
+            if (onPersistUpscaleModalMove) {
+              Promise.resolve(onPersistUpscaleModalMove(modalState.id, opts)).catch(console.error);
+            }
+          }}
+          onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
+          onUpdateModalState={(modalId, updates) => {
+            setUpscaleModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+            if (onPersistUpscaleModalMove) {
+              Promise.resolve(onPersistUpscaleModalMove(modalId, updates)).catch(console.error);
+            }
+          }}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onUpdateImageModalState={(modalId, updates) => {
+            setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+            if (onPersistImageModalMove) {
+              Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+            }
+          }}
+          connections={connections}
+          imageModalStates={imageModalStates}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          x={modalState.x}
+          y={modalState.y}
+          onPositionChange={(newX, newY) => {
+            setUpscaleModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+          }}
+          onPositionCommit={(finalX, finalY) => {
+            if (onPersistUpscaleModalMove) {
+              Promise.resolve(onPersistUpscaleModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
+            }
+          }}
+        />
+      ))}
+      
+      {/* Component Creation Menu - appears when dragging connection line ends without connecting */}
+      {componentMenu && (
+        <div
+          data-component-menu
+          style={{
+            position: 'fixed',
+            left: `${componentMenu.x}px`,
+            top: `${componentMenu.y}px`,
+            width: `${280 * scale}px`,
+            maxHeight: `${400 * scale}px`,
+            backgroundColor: '#ffffff',
+            borderRadius: `${12 * scale}px`,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            zIndex: 10000,
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Search Input - Top */}
+          <div style={{ padding: `${12 * scale}px`, borderBottom: '1px solid rgba(0, 0, 0, 0.1)' }}>
+            <input
+              type="text"
+              placeholder="Search features..."
+              value={componentMenuSearch}
+              onChange={(e) => setComponentMenuSearch(e.target.value)}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: `${8 * scale}px ${12 * scale}px`,
+                fontSize: `${14 * scale}px`,
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: `${8 * scale}px`,
+                outline: 'none',
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setComponentMenu(null);
+                  setComponentMenuSearch('');
+                }
+              }}
+            />
+          </div>
+          
+          {/* Component List */}
+          <div style={{ overflowY: 'auto', maxHeight: `${320 * scale}px` }}>
+            {(() => {
+              const components = [
+                { id: 'text', label: 'Text Generation', type: 'text' },
+                { id: 'image', label: 'Image Generation', type: 'image' },
+                { id: 'video', label: 'Video Generation', type: 'video' },
+                { id: 'music', label: 'Music Generation', type: 'music' },
+                { id: 'plugin', label: 'Plugin', type: 'plugin' },
+              ];
+              
+              const filtered = components.filter(comp =>
+                comp.label.toLowerCase().includes(componentMenuSearch.toLowerCase())
+              );
+              
+              return filtered.map((comp) => (
+                <div
+                  key={comp.id}
+                  onClick={() => {
+                    // Create component at canvas position
+                    const { canvasX, canvasY } = componentMenu;
+                    
+                    if (comp.type === 'text' && onPersistTextModalCreate) {
+                      const newText = {
+                        id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        x: canvasX,
+                        y: canvasY,
+                        value: '',
+                        autoFocusInput: true,
+                      };
+                      Promise.resolve(onPersistTextModalCreate(newText)).catch(console.error);
+                    } else if (comp.type === 'image' && onPersistImageModalCreate) {
+                      const newImage = {
+                        id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        x: canvasX,
+                        y: canvasY,
+                        generatedImageUrl: null,
+                        frameWidth: 600,
+                        frameHeight: 400,
+                        model: 'Google Nano Banana',
+                        frame: 'Frame',
+                        aspectRatio: '1:1',
+                        prompt: '',
+                      };
+                      Promise.resolve(onPersistImageModalCreate(newImage)).catch(console.error);
+                    } else if (comp.type === 'video' && onPersistVideoModalCreate) {
+                      const newVideo = {
+                        id: `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        x: canvasX,
+                        y: canvasY,
+                        generatedVideoUrl: null,
+                        frameWidth: 600,
+                        frameHeight: 400,
+                        model: 'Seedance 1.0 Pro',
+                        frame: 'Frame',
+                        aspectRatio: '16:9',
+                        prompt: '',
+                        duration: 4,
+                      };
+                      Promise.resolve(onPersistVideoModalCreate(newVideo)).catch(console.error);
+                    } else if (comp.type === 'music' && onPersistMusicModalCreate) {
+                      const newMusic = {
+                        id: `music-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        x: canvasX,
+                        y: canvasY,
+                        generatedMusicUrl: null,
+                        frameWidth: 600,
+                        frameHeight: 300,
+                        model: 'MusicGen',
+                        frame: 'Frame',
+                        aspectRatio: '1:1',
+                        prompt: '',
+                      };
+                      Promise.resolve(onPersistMusicModalCreate(newMusic)).catch(console.error);
+                    } else if (comp.type === 'plugin' && onPersistUpscaleModalCreate) {
+                      // Create upscale plugin modal
+                      const newUpscale = {
+                        id: `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        x: canvasX,
+                        y: canvasY,
+                        upscaledImageUrl: null,
+                        model: 'Real-ESRGAN',
+                        scale: 2,
+                        frameWidth: 600,
+                        frameHeight: 600,
+                      };
+                      setUpscaleModalStates(prev => [...prev, newUpscale]);
+                      Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+                    }
+                    
+                    setComponentMenu(null);
+                    setComponentMenuSearch('');
+                  }}
+                  style={{
+                    padding: `${12 * scale}px ${16 * scale}px`,
+                    cursor: 'pointer',
+                    fontSize: `${14 * scale}px`,
+                    color: '#1f2937',
+                    borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {comp.label}
+                </div>
+              ));
+            })()}
+          </div>
+          
+          {/* Search Input - Bottom */}
+          <div style={{ padding: `${12 * scale}px`, borderTop: '1px solid rgba(0, 0, 0, 0.1)' }}>
+            <input
+              type="text"
+              placeholder="Search features..."
+              value={componentMenuSearch}
+              onChange={(e) => setComponentMenuSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: `${8 * scale}px ${12 * scale}px`,
+                fontSize: `${14 * scale}px`,
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: `${8 * scale}px`,
+                outline: 'none',
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setComponentMenu(null);
+                  setComponentMenuSearch('');
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 };

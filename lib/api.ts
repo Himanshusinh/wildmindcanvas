@@ -388,6 +388,87 @@ export async function generateVideoForCanvas(
 }
 
 /**
+ * Upscale image for Canvas
+ */
+export async function upscaleImageForCanvas(
+  image: string,
+  model: string,
+  scale: number,
+  projectId: string
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/upscale`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        model,
+        scale,
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to upscale image');
+    }
+    
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to upscale image');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Image upscaling is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to upscale image. Please check your connection and try again.');
+  }
+}
+
+/**
  * Poll FAL queue status
  */
 export async function getFalQueueStatus(requestId: string): Promise<any> {

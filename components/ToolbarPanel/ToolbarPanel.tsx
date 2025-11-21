@@ -3,17 +3,17 @@
 import { useState, useRef } from 'react';
 
 interface ToolbarPanelProps {
-  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => void;
+  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
   onUpload?: (files: File[]) => void;
   isHidden?: boolean;
 }
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
 
-  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library') => {
+  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
     // Debounce guard: ignore repeated clicks on same tool within 400ms
     const now = Date.now();
     if (lastToolClick.current.tool === tool && now - lastToolClick.current.time < 400) {
@@ -132,6 +132,15 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Library',
+    },
+    {
+      id: 'plugin' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M15,20 C15.5523,20 16,20.4477 16,21 C16,21.51285 15.613973,21.9355092 15.1166239,21.9932725 L15,22 L9,22 C8.44772,22 8,21.5523 8,21 C8,20.48715 8.38604429,20.0644908 8.88337975,20.0067275 L9,20 L15,20 Z M15,2 C15.51285,2 15.9355092,2.38604429 15.9932725,2.88337975 L16,3 L16,6 L18,6 C19.0543909,6 19.9181678,6.81587733 19.9945144,7.85073759 L20,8 L20,13 C20,16.2383886 17.434417,18.8775714 14.2249377,18.9958615 L14,19 L10,19 C6.76160159,19 4.12242817,16.434417 4.00413847,13.2249377 L4,13 L4,8 C4,6.94563773 4.81587733,6.08183483 5.85073759,6.00548573 L6,6 L8,6 L8,3 C8,2.44772 8.44772,2 9,2 C9.51283143,2 9.93550653,2.38604429 9.9932722,2.88337975 L10,3 L10,6 L14,6 L14,3 C14,2.44772 14.4477,2 15,2 Z M18,8 L6,8 L6,13 C6,15.1421576 7.68396753,16.8910766 9.80035957,16.9951046 L10,17 L14,17 C16.1421576,17 17.8910766,15.3159949 17.9951046,13.199637 L18,13 L18,8 Z" fill="currentColor" fillRule="evenodd" />
+        </svg>
+      ),
+      label: 'Plugin',
     },
   ];
 

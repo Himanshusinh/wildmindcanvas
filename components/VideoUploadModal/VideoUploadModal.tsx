@@ -123,6 +123,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [isResolutionDropdownOpen, setIsResolutionDropdownOpen] = useState(false);
+  const [videoResolution, setVideoResolution] = useState<{ width: number; height: number } | null>(null);
+  const [isDimmed, setIsDimmed] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const durationDropdownRef = useRef<HTMLDivElement>(null);
@@ -310,6 +312,40 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
+
+  // Load video and get its resolution
+  useEffect(() => {
+    if (generatedVideoUrl) {
+      const video = document.createElement('video');
+      video.onloadedmetadata = () => {
+        setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+      };
+      video.onerror = () => {
+        setVideoResolution(null);
+      };
+      video.src = generatedVideoUrl;
+    } else {
+      setVideoResolution(null);
+    }
+  }, [generatedVideoUrl]);
+
+  // Listen for frame dim events (when dragging connection near disallowed frame)
+  useEffect(() => {
+    if (!id) return;
+    
+    const handleFrameDim = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { frameId, dimmed } = ce.detail || {};
+      if (frameId === id) {
+        setIsDimmed(dimmed === true);
+      }
+    };
+    
+    window.addEventListener('canvas-frame-dim', handleFrameDim as any);
+    return () => {
+      window.removeEventListener('canvas-frame-dim', handleFrameDim as any);
+    };
+  }, [id]);
   useEffect(() => { if (initialResolution && initialResolution !== selectedResolution) setSelectedResolution(initialResolution); }, [initialResolution]);
 
   // Update duration, aspect ratio, and resolution when model changes
@@ -436,6 +472,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         top: `${screenY}px`,
         zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
+        opacity: isDimmed ? 0.4 : 1,
+        transition: 'opacity 0.2s ease',
       }}
     >
       {/* Tooltip - Attached to Top, Full Width */}
@@ -457,7 +495,6 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
             border: 'none',
             borderBottom: 'none',
-            whiteSpace: 'nowrap',
             pointerEvents: 'none',
             zIndex: 3000,
             boxShadow: 'none',
@@ -465,7 +502,14 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             opacity: 1,
           }}
         >
-          {isUploadedVideo ? 'Media' : 'Video Generator'}
+          <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <span>{isUploadedVideo ? 'Media' : 'Video Generator'}</span>
+            {videoResolution && (
+              <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
+                {videoResolution.width} × {videoResolution.height}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
