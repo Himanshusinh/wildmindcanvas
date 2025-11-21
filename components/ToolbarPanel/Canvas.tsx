@@ -43,6 +43,7 @@ interface CanvasProps {
   externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -53,6 +54,11 @@ interface CanvasProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
+  // Upscale plugin persistence callbacks
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
+  onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   // Text generator (input overlay) persistence callbacks
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
@@ -108,6 +114,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalImageModals,
   externalVideoModals,
   externalMusicModals,
+  externalUpscaleModals,
   externalTextModals,
   onPersistImageModalCreate,
   onPersistImageModalMove,
@@ -118,6 +125,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
+  onPersistUpscaleModalCreate,
+  onPersistUpscaleModalMove,
+  onPersistUpscaleModalDelete,
+  onUpscale,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -142,11 +153,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
   const [selectedTextInputIds, setSelectedTextInputIds] = useState<string[]>([]); // Multiple text input selection
   const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
+  const [selectedUpscaleModalId, setSelectedUpscaleModalId] = useState<string | null>(null);
+  const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
   const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
@@ -263,6 +277,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedVideoModalIds([]);
     setSelectedMusicModalId(null);
     setSelectedMusicModalIds([]);
+    setSelectedUpscaleModalId(null);
+    setSelectedUpscaleModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -2741,6 +2757,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         imageModalStates={imageModalStates}
         videoModalStates={videoModalStates}
         musicModalStates={musicModalStates}
+        upscaleModalStates={upscaleModalStates}
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -2749,6 +2766,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedVideoModalIds={selectedVideoModalIds}
         selectedMusicModalId={selectedMusicModalId}
         selectedMusicModalIds={selectedMusicModalIds}
+        selectedUpscaleModalId={selectedUpscaleModalId}
+        selectedUpscaleModalIds={selectedUpscaleModalIds}
         clearAllSelections={clearAllSelections}
         setTextInputStates={setTextInputStates}
         setSelectedTextInputId={setSelectedTextInputId}
@@ -2762,6 +2781,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         setMusicModalStates={setMusicModalStates}
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
+        setUpscaleModalStates={setUpscaleModalStates}
+        setSelectedUpscaleModalId={setSelectedUpscaleModalId}
+        setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
         setSelectedImageIndices={setSelectedImageIndices}
         onTextCreate={onTextCreate}
         onImageSelect={onImageSelect}
@@ -2788,6 +2810,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistTextModalCreate={onPersistTextModalCreate}
         onPersistTextModalMove={onPersistTextModalMove}
         onPersistTextModalDelete={onPersistTextModalDelete}
+        onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
+        onPersistUpscaleModalMove={onPersistUpscaleModalMove}
+        onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
+        onUpscale={onUpscale}
         connections={connections}
         onConnectionsChange={onConnectionsChange}
         onPersistConnectorCreate={onPersistConnectorCreate}
