@@ -1,0 +1,243 @@
+'use client';
+
+import React from 'react';
+import { ComponentMenu } from './types';
+
+interface ComponentCreationMenuProps {
+  componentMenu: ComponentMenu | null;
+  componentMenuSearch: string;
+  setComponentMenu: (menu: ComponentMenu | null) => void;
+  setComponentMenuSearch: (search: string) => void;
+  scale: number;
+  onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
+  onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  setUpscaleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+}
+
+export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
+  componentMenu,
+  componentMenuSearch,
+  setComponentMenu,
+  setComponentMenuSearch,
+  scale,
+  onPersistTextModalCreate,
+  onPersistImageModalCreate,
+  onPersistVideoModalCreate,
+  onPersistMusicModalCreate,
+  onPersistUpscaleModalCreate,
+  setUpscaleModalStates,
+}) => {
+  // Close component menu when clicking outside
+  React.useEffect(() => {
+    if (!componentMenu) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-component-menu]')) {
+        setComponentMenu(null);
+        setComponentMenuSearch('');
+      }
+    };
+    
+    // Use setTimeout to avoid immediate closure
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [componentMenu, setComponentMenu, setComponentMenuSearch]);
+
+  if (!componentMenu) return null;
+
+  const components = [
+    { id: 'text', label: 'Text Generation', type: 'text' },
+    { id: 'image', label: 'Image Generation', type: 'image' },
+    { id: 'video', label: 'Video Generation', type: 'video' },
+    { id: 'music', label: 'Music Generation', type: 'music' },
+    { id: 'plugin', label: 'Plugin', type: 'plugin' },
+  ];
+  
+  const filtered = components.filter(comp =>
+    comp.label.toLowerCase().includes(componentMenuSearch.toLowerCase())
+  );
+
+  return (
+    <div
+      data-component-menu
+      style={{
+        position: 'fixed',
+        left: `${componentMenu.x}px`,
+        top: `${componentMenu.y}px`,
+        width: `${280 * scale}px`,
+        maxHeight: `${400 * scale}px`,
+        backgroundColor: '#ffffff',
+        borderRadius: `${12 * scale}px`,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Search Input - Top */}
+      <div style={{ padding: `${12 * scale}px`, borderBottom: '1px solid rgba(0, 0, 0, 0.1)' }}>
+        <input
+          type="text"
+          placeholder="Search features..."
+          value={componentMenuSearch}
+          onChange={(e) => setComponentMenuSearch(e.target.value)}
+          autoFocus
+          style={{
+            width: '100%',
+            padding: `${8 * scale}px ${12 * scale}px`,
+            fontSize: `${14 * scale}px`,
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: `${8 * scale}px`,
+            outline: 'none',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setComponentMenu(null);
+              setComponentMenuSearch('');
+            }
+          }}
+        />
+      </div>
+      
+      {/* Component List */}
+      <div style={{ overflowY: 'auto', maxHeight: `${320 * scale}px` }}>
+        {filtered.map((comp) => (
+          <div
+            key={comp.id}
+            onClick={() => {
+              // Create component at canvas position
+              const { canvasX, canvasY } = componentMenu;
+              
+              if (comp.type === 'text' && onPersistTextModalCreate) {
+                const newText = {
+                  id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  value: '',
+                  autoFocusInput: true,
+                };
+                Promise.resolve(onPersistTextModalCreate(newText)).catch(console.error);
+              } else if (comp.type === 'image' && onPersistImageModalCreate) {
+                const newImage = {
+                  id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  generatedImageUrl: null,
+                  frameWidth: 600,
+                  frameHeight: 400,
+                  model: 'Google Nano Banana',
+                  frame: 'Frame',
+                  aspectRatio: '1:1',
+                  prompt: '',
+                };
+                Promise.resolve(onPersistImageModalCreate(newImage)).catch(console.error);
+              } else if (comp.type === 'video' && onPersistVideoModalCreate) {
+                const newVideo = {
+                  id: `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  generatedVideoUrl: null,
+                  frameWidth: 600,
+                  frameHeight: 400,
+                  model: 'Seedance 1.0 Pro',
+                  frame: 'Frame',
+                  aspectRatio: '16:9',
+                  prompt: '',
+                  duration: 4,
+                };
+                Promise.resolve(onPersistVideoModalCreate(newVideo)).catch(console.error);
+              } else if (comp.type === 'music' && onPersistMusicModalCreate) {
+                const newMusic = {
+                  id: `music-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  generatedMusicUrl: null,
+                  frameWidth: 600,
+                  frameHeight: 300,
+                  model: 'MusicGen',
+                  frame: 'Frame',
+                  aspectRatio: '1:1',
+                  prompt: '',
+                };
+                Promise.resolve(onPersistMusicModalCreate(newMusic)).catch(console.error);
+              } else if (comp.type === 'plugin' && onPersistUpscaleModalCreate && setUpscaleModalStates) {
+                // Create upscale plugin modal
+                const newUpscale = {
+                  id: `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  upscaledImageUrl: null,
+                  sourceImageUrl: null,
+                  localUpscaledImageUrl: null,
+                  model: 'Crystal Upscaler',
+                  scale: 2,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isUpscaling: false,
+                };
+                setUpscaleModalStates(prev => [...prev, newUpscale]);
+                Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+              }
+              
+              setComponentMenu(null);
+              setComponentMenuSearch('');
+            }}
+            style={{
+              padding: `${12 * scale}px ${16 * scale}px`,
+              cursor: 'pointer',
+              fontSize: `${14 * scale}px`,
+              color: '#1f2937',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            {comp.label}
+          </div>
+        ))}
+      </div>
+      
+      {/* Search Input - Bottom */}
+      <div style={{ padding: `${12 * scale}px`, borderTop: '1px solid rgba(0, 0, 0, 0.1)' }}>
+        <input
+          type="text"
+          placeholder="Search features..."
+          value={componentMenuSearch}
+          onChange={(e) => setComponentMenuSearch(e.target.value)}
+          style={{
+            width: '100%',
+            padding: `${8 * scale}px ${12 * scale}px`,
+            fontSize: `${14 * scale}px`,
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: `${8 * scale}px`,
+            outline: 'none',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setComponentMenu(null);
+              setComponentMenuSearch('');
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+

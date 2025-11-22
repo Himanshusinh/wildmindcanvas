@@ -1,9 +1,3 @@
-export interface CanvasConfig {
-  width: number;
-  height: number;
-  scale?: number;
-}
-
 export type MediaType = 'image' | 'video' | 'model3d' | 'text';
 
 export interface ImageUpload {
@@ -32,15 +26,5 @@ export interface ImageUpload {
   fill?: string;
   // For op tracking and persistence
   elementId?: string;
-}
-
-export interface Group {
-  id: string;
-  name?: string;
-  itemIndices: number[];
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
 }
 

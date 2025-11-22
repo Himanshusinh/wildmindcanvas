@@ -1,6 +1,12 @@
 import { ImageUpload } from '@/types/canvas';
 import Konva from 'konva';
 
+// Canvas constants
+export const INFINITE_CANVAS_SIZE = 1000000; // 1 million pixels - truly infinite canvas
+export const DOT_SPACING = 30; // Distance between dots in pixels
+export const DOT_SIZE = 4; // Size of each dot in pixels
+export const DOT_OPACITY = 0.10; // Dot darkness (0.0 = invisible, 1.0 = fully black)
+
 /**
  * Check if a position is near any existing positions
  */
