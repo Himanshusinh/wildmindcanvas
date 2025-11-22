@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Canvas } from '@/components/Canvas';
-import GenerationQueue, { GenerationQueueItem } from '@/components/Canvas/GenerationQueue';
-import { ToolbarPanel } from '@/components/ToolbarPanel';
-import { Header } from '@/components/Header';
-import { AuthGuard } from '@/components/AuthGuard';
-import { Profile } from '@/components/Profile/Profile';
-import LibrarySidebar from '@/components/Canvas/LibrarySidebar';
-import PluginSidebar from '@/components/Canvas/PluginSidebar';
+import { Canvas } from '@/app/components/Canvas';
+import GenerationQueue, { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
+import { ToolbarPanel } from '@/app/components/ToolbarPanel';
+import { Header } from '@/app/components/Header';
+import { AuthGuard } from '@/app/components/AuthGuard';
+import { Profile } from '@/app/components/Profile/Profile';
+import LibrarySidebar from '@/app/components/Canvas/LibrarySidebar';
+import PluginSidebar from '@/app/components/Canvas/PluginSidebar';
 import { ImageUpload } from '@/types/canvas';
 import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/lib/canvasApi';
-import { ProjectSelector } from '@/components/ProjectSelector/ProjectSelector';
+import { ProjectSelector } from '@/app/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
 import { useOpManager } from '@/hooks/useOpManager';
 import { useProject } from '@/hooks/useProject';
@@ -24,7 +24,7 @@ interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
 }
 
-function CanvasApp({ user }: CanvasAppProps) {
+export function CanvasApp({ user }: CanvasAppProps) {
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [imageGenerators, setImageGenerators] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
