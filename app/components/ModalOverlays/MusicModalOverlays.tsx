@@ -86,11 +86,25 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             setSelectedMusicModalIds([modalState.id]);
           }}
           onDelete={() => {
-            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            console.log('[MusicModalOverlays] onDelete called', {
+              timestamp: Date.now(),
+              modalId: modalState.id,
+            });
+            // Clear selection immediately
             setSelectedMusicModalId(null);
+            // Call persist delete - it updates parent state (musicGenerators) which flows down as externalMusicModals
+            // Canvas will sync musicModalStates with externalMusicModals via useEffect
             if (onPersistMusicModalDelete) {
-              Promise.resolve(onPersistMusicModalDelete(modalState.id)).catch(console.error);
+              console.log('[MusicModalOverlays] Calling onPersistMusicModalDelete', modalState.id);
+              // Call synchronously - the handler updates parent state immediately
+              const result = onPersistMusicModalDelete(modalState.id);
+              // If it returns a promise, handle it
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
             }
+            }
+            // DO NOT update local state here - let parent state flow down through props
+            // The useEffect in Canvas will sync musicModalStates with externalMusicModals
           }}
           onDuplicate={() => {
             const duplicated = {

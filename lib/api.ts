@@ -469,6 +469,135 @@ export async function upscaleImageForCanvas(
 }
 
 /**
+ * Vectorize image for Canvas
+ */
+export async function vectorizeImageForCanvas(
+  image: string,
+  projectId: string,
+  mode?: string
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/vectorize`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        mode: mode || 'simple',
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Vectorize failed: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return {
+      url: data.data?.url || data.url || '',
+      storagePath: data.data?.storagePath || '',
+      mediaId: data.data?.mediaId,
+      generationId: data.data?.generationId,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Remove background from image for Canvas
+ */
+export async function removeBgImageForCanvas(
+  image: string,
+  projectId: string,
+  model?: string,
+  backgroundType?: string,
+  scaleValue?: number
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/removebg`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        model: model || '851-labs/background-remover',
+        backgroundType: backgroundType || 'rgba (transparent)',
+        scaleValue: scaleValue !== undefined ? scaleValue : 0.5,
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to remove background');
+    }
+    
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to remove background');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Background removal is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to remove background. Please check your connection and try again.');
+  }
+}
+
+/**
  * Poll FAL queue status
  */
 export async function getFalQueueStatus(requestId: string): Promise<any> {

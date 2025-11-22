@@ -78,13 +78,27 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
             setSelectedUpscaleModalIds([modalState.id]);
           }}
           onDelete={() => {
-            setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            console.log('[UpscaleModalOverlays] onDelete called', {
+              timestamp: Date.now(),
+              modalId: modalState.id,
+            });
+            // Clear selection immediately
             setSelectedUpscaleModalId(null);
+            // Call persist delete - it updates parent state (upscaleGenerators) which flows down as externalUpscaleModals
+            // Canvas will sync upscaleModalStates with externalUpscaleModals via useEffect
             if (onPersistUpscaleModalDelete) {
-              Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch((err) => {
+              console.log('[UpscaleModalOverlays] Calling onPersistUpscaleModalDelete', modalState.id);
+              // Call synchronously - the handler updates parent state immediately
+              const result = onPersistUpscaleModalDelete(modalState.id);
+              // If it returns a promise, handle it
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch((err) => {
                 console.error('[ModalOverlays] Error in onPersistUpscaleModalDelete', err);
               });
+              }
             }
+            // DO NOT update local state here - let parent state flow down through props
+            // The useEffect in Canvas will sync upscaleModalStates with externalUpscaleModals
           }}
           onDownload={() => {
             if (modalState.upscaledImageUrl) {

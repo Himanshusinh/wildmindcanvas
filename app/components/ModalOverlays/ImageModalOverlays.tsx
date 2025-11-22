@@ -131,11 +131,25 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             setSelectedImageModalIds([modalState.id]);
           }}
           onDelete={() => {
-            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            console.log('[ImageModalOverlays] onDelete called', {
+              timestamp: Date.now(),
+              modalId: modalState.id,
+            });
+            // Clear selection immediately
             setSelectedImageModalId(null);
+            // Call persist delete - it updates parent state (imageGenerators) which flows down as externalImageModals
+            // Canvas will sync imageModalStates with externalImageModals via useEffect
             if (onPersistImageModalDelete) {
-              Promise.resolve(onPersistImageModalDelete(modalState.id)).catch(console.error);
+              console.log('[ImageModalOverlays] Calling onPersistImageModalDelete', modalState.id);
+              // Call synchronously - the handler updates parent state immediately
+              const result = onPersistImageModalDelete(modalState.id);
+              // If it returns a promise, handle it
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
             }
+            }
+            // DO NOT update local state here - let parent state flow down through props
+            // The useEffect in Canvas will sync imageModalStates with externalImageModals
           }}
           onDownload={async () => {
             // Download the generated image if available

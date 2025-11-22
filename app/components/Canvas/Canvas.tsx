@@ -49,6 +49,8 @@ interface CanvasProps {
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
+  externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
+  externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -64,6 +66,15 @@ interface CanvasProps {
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }) => void | Promise<void>;
+  onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>) => void | Promise<void>;
+  onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
+  onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
+  // Vectorize plugin persistence callbacks
+  onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
+  onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
+  onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
+  onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
   // Text generator (input overlay) persistence callbacks
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
@@ -112,6 +123,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalVideoModals,
   externalMusicModals,
   externalUpscaleModals,
+  externalRemoveBgModals,
+  externalVectorizeModals,
   externalTextModals,
   onPersistImageModalCreate,
   onPersistImageModalMove,
@@ -126,6 +139,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistUpscaleModalMove,
   onPersistUpscaleModalDelete,
   onUpscale,
+  onPersistRemoveBgModalCreate,
+  onPersistRemoveBgModalMove,
+  onPersistRemoveBgModalDelete,
+  onRemoveBg,
+  onPersistVectorizeModalCreate,
+  onPersistVectorizeModalMove,
+  onPersistVectorizeModalDelete,
+  onVectorize,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -153,6 +174,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
+  const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -160,6 +183,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
   const [selectedUpscaleModalId, setSelectedUpscaleModalId] = useState<string | null>(null);
   const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
+  const [selectedRemoveBgModalId, setSelectedRemoveBgModalId] = useState<string | null>(null);
+  const [selectedRemoveBgModalIds, setSelectedRemoveBgModalIds] = useState<string[]>([]);
+  const [selectedVectorizeModalId, setSelectedVectorizeModalId] = useState<string | null>(null);
+  const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
   const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
@@ -202,6 +229,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedMusicModalIds([]);
     setSelectedUpscaleModalId(null);
     setSelectedUpscaleModalIds([]);
+    setSelectedVectorizeModalId(null);
+    setSelectedVectorizeModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -358,8 +387,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Load persisted image modals from localStorage on mount (scoped by projectId)
   useEffect(() => {
-    if (externalImageModals && externalImageModals.length > 0) {
-      // Hydrate from external (backend) first
+    // If externalImageModals is provided (even if empty), sync to it immediately
+    if (externalImageModals !== undefined) {
+      console.log('[Canvas] Syncing imageModalStates with externalImageModals', externalImageModals.length);
       setImageModalStates(externalImageModals);
       return;
     }
@@ -396,7 +426,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Hydrate video modals from external or localStorage
   useEffect(() => {
-    if (externalVideoModals && externalVideoModals.length > 0) {
+    // If externalVideoModals is provided (even if empty), sync to it immediately
+    if (externalVideoModals !== undefined) {
+      console.log('[Canvas] Syncing videoModalStates with externalVideoModals', externalVideoModals.length);
       setVideoModalStates(externalVideoModals);
       return;
     }
@@ -418,10 +450,12 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Sync external text modals from parent (for hydration/realtime)
   useEffect(() => {
-    if (externalTextModals && externalTextModals.length > 0) {
+    // Always hydrate from external (backend) first, even if empty
+    if (externalTextModals !== undefined) {
       setTextInputStates(externalTextModals as any);
       return;
     }
+    // Treat missing projectId as a new project: do not load global/local storage
     if (!projectId) return;
     try {
       const key = `canvas:${projectId}:textModals`;
@@ -435,6 +469,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     } catch (e) {
       console.warn('Failed to load persisted text modals');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalTextModals || [])]);
 
   // Persist video modals
@@ -452,7 +487,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Hydrate music modals from external or localStorage
   useEffect(() => {
-    if (externalMusicModals && externalMusicModals.length > 0) {
+    // If externalMusicModals is provided (even if empty), sync to it immediately
+    if (externalMusicModals !== undefined) {
+      console.log('[Canvas] Syncing musicModalStates with externalMusicModals', externalMusicModals.length);
       setMusicModalStates(externalMusicModals);
       return;
     }
@@ -474,7 +511,9 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Hydrate upscale modals from external or localStorage
   useEffect(() => {
-    if (externalUpscaleModals && externalUpscaleModals.length > 0) {
+    // If externalUpscaleModals is provided (even if empty), sync to it immediately
+    if (externalUpscaleModals !== undefined) {
+      console.log('[Canvas] Syncing upscaleModalStates with externalUpscaleModals', externalUpscaleModals.length);
       setUpscaleModalStates(externalUpscaleModals);
       return;
     }
@@ -493,10 +532,106 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalUpscaleModals || [])]);
+
+  // Hydrate vectorize modals from external or localStorage
+  useEffect(() => {
+    // If externalVectorizeModals is provided (even if empty), sync to it immediately
+    if (externalVectorizeModals !== undefined) {
+      console.log('[Canvas] Syncing vectorizeModalStates with externalVectorizeModals', externalVectorizeModals.length);
+      setVectorizeModalStates(externalVectorizeModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:vectorizeModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
+        if (Array.isArray(parsed)) {
+          setVectorizeModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted vectorize modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalVectorizeModals || [])]);
+
+  // Sync external remove bg modals from parent (for hydration/realtime)
+  useEffect(() => {
+    // Always hydrate from external (backend) first, even if empty
+    if (externalRemoveBgModals !== undefined) {
+      setRemoveBgModalStates(externalRemoveBgModals);
+      return;
+    }
+    // Treat missing projectId as a new project: do not load global/local storage
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:removeBgModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setRemoveBgModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted remove bg modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalRemoveBgModals || [])]);
+  
+  // Also sync externalRemoveBgModals changes to internal state (for real-time updates)
+  // Only sync if externalRemoveBgModals is actually different to avoid overwriting local drag updates
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalRemoveBgModals !== undefined && externalRemoveBgModals.length === 0) {
+      console.log('[Canvas] Clearing removeBgModalStates (external is empty)');
+      setRemoveBgModalStates([]);
+      return;
+    }
+    if (externalRemoveBgModals && externalRemoveBgModals.length > 0) {
+      setRemoveBgModalStates(prev => {
+        // Only update if the external state is actually different
+        const externalIds = new Set(externalRemoveBgModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        
+        if (idsMatch) {
+          // Merge: keep local position updates during drag, but update other properties from external
+          const merged = prev.map(prevModal => {
+            const externalModal = externalRemoveBgModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              // During drag, keep local x, y if they're different (user is dragging)
+              // Otherwise, use external x, y (position was committed)
+              return {
+                ...prevModal,
+                ...externalModal,
+                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+          return merged;
+        } else {
+          // IDs don't match, use external state
+          return externalRemoveBgModals;
+        }
+      });
+    }
+  }, [JSON.stringify(externalRemoveBgModals || [])]);
   
   // Also sync externalUpscaleModals changes to internal state (for real-time updates)
   // Only sync if externalUpscaleModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalUpscaleModals !== undefined && externalUpscaleModals.length === 0) {
+      console.log('[Canvas] Clearing upscaleModalStates (external is empty)');
+      setUpscaleModalStates([]);
+      return;
+    }
     if (externalUpscaleModals && externalUpscaleModals.length > 0) {
       setUpscaleModalStates(prev => {
         // Only update if the external state is actually different
@@ -530,6 +665,48 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [JSON.stringify(externalUpscaleModals || [])]);
 
+  // Also sync externalVectorizeModals changes to internal state (for real-time updates)
+  // Only sync if externalVectorizeModals is actually different to avoid overwriting local drag updates
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalVectorizeModals !== undefined && externalVectorizeModals.length === 0) {
+      console.log('[Canvas] Clearing vectorizeModalStates (external is empty)');
+      setVectorizeModalStates([]);
+      return;
+    }
+    if (externalVectorizeModals && externalVectorizeModals.length > 0) {
+      setVectorizeModalStates(prev => {
+        // Only update if the external state is actually different
+        const externalIds = new Set(externalVectorizeModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        
+        if (idsMatch) {
+          // Merge: keep local position updates during drag, but update other properties from external
+          const merged = prev.map(prevModal => {
+            const externalModal = externalVectorizeModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              // During drag, keep local x, y if they're different (user is dragging)
+              // Otherwise, use external x, y (position was committed)
+              return {
+                ...prevModal,
+                ...externalModal,
+                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+          return merged;
+        } else {
+          // IDs don't match, use external state
+          return externalVectorizeModals;
+        }
+      });
+    }
+  }, [JSON.stringify(externalVectorizeModals || [])]);
+
   // Persist upscale modals
   useEffect(() => {
     if (!projectId) return;
@@ -555,6 +732,32 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.warn('Failed to persist music modals');
     }
   }, [musicModalStates, projectId]);
+
+  // Persist remove bg modals
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:removeBgModals`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(removeBgModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist remove bg modals');
+    }
+  }, [removeBgModalStates, projectId]);
+
+  // Persist vectorize modals
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:vectorizeModals`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(vectorizeModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist vectorize modals');
+    }
+  }, [vectorizeModalStates, projectId]);
 
   // Persist text input modals to localStorage whenever they change
   useEffect(() => {
@@ -2519,6 +2722,40 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setUpscaleModalStates(prev => [...prev, newUpscale]);
               Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+            } else if (data.plugin.id === 'removebg' && onPersistRemoveBgModalCreate) {
+              const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newRemoveBg = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                removedBgImageUrl: null,
+                sourceImageUrl: null,
+                localRemovedBgImageUrl: null,
+                model: '851-labs/background-remover',
+                backgroundType: 'rgba (transparent)',
+                scaleValue: 0.5,
+                frameWidth: 400,
+                frameHeight: 500,
+                isRemovingBg: false,
+              };
+              setRemoveBgModalStates(prev => [...prev, newRemoveBg]);
+              Promise.resolve(onPersistRemoveBgModalCreate(newRemoveBg)).catch(console.error);
+            } else if (data.plugin.id === 'vectorize' && onPersistVectorizeModalCreate) {
+              const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newVectorize = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                vectorizedImageUrl: null,
+                sourceImageUrl: null,
+                localVectorizedImageUrl: null,
+                mode: 'simple',
+                frameWidth: 400,
+                frameHeight: 500,
+                isVectorizing: false,
+              };
+              setVectorizeModalStates(prev => [...prev, newVectorize]);
+              Promise.resolve(onPersistVectorizeModalCreate(newVectorize)).catch(console.error);
             }
             return;
           }
@@ -2780,6 +3017,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         videoModalStates={videoModalStates}
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
+        removeBgModalStates={removeBgModalStates}
+        vectorizeModalStates={vectorizeModalStates}
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -2790,6 +3029,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedMusicModalIds={selectedMusicModalIds}
         selectedUpscaleModalId={selectedUpscaleModalId}
         selectedUpscaleModalIds={selectedUpscaleModalIds}
+        selectedRemoveBgModalId={selectedRemoveBgModalId}
+        selectedRemoveBgModalIds={selectedRemoveBgModalIds}
+        selectedVectorizeModalId={selectedVectorizeModalId}
+        selectedVectorizeModalIds={selectedVectorizeModalIds}
         clearAllSelections={clearAllSelections}
         setTextInputStates={setTextInputStates}
         setSelectedTextInputId={setSelectedTextInputId}
@@ -2807,6 +3050,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         setUpscaleModalStates={setUpscaleModalStates}
         setSelectedUpscaleModalId={setSelectedUpscaleModalId}
         setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+        setRemoveBgModalStates={setRemoveBgModalStates}
+        setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
+        setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
+        setVectorizeModalStates={setVectorizeModalStates}
+        setSelectedVectorizeModalId={setSelectedVectorizeModalId}
+        setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
         images={images}
         onTextCreate={onTextCreate}
         onImageSelect={onImageSelect}
@@ -2836,12 +3085,20 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
         onPersistUpscaleModalMove={onPersistUpscaleModalMove}
         onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
+        onUpscale={onUpscale}
+        onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
+        onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
+        onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
+        onRemoveBg={onRemoveBg}
+        onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
+        onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+        onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
+        onVectorize={onVectorize}
         connections={connections}
         onConnectionsChange={onConnectionsChange}
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
         onPluginSidebarOpen={onPluginSidebarOpen}
-        onUpscale={onUpscale}
       />
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (

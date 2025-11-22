@@ -10,6 +10,8 @@ import { ImageModalOverlays } from './ImageModalOverlays';
 import { VideoModalOverlays } from './VideoModalOverlays';
 import { MusicModalOverlays } from './MusicModalOverlays';
 import { UpscaleModalOverlays } from './UpscaleModalOverlays';
+import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
+import { VectorizeModalOverlays } from './VectorizeModalOverlays';
 import { ComponentCreationMenu } from './ComponentCreationMenu';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
@@ -18,6 +20,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   videoModalStates,
   musicModalStates,
   upscaleModalStates,
+  removeBgModalStates,
+  vectorizeModalStates,
   selectedTextInputId,
   selectedTextInputIds,
   selectedImageModalId,
@@ -28,6 +32,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedMusicModalIds,
   selectedUpscaleModalId,
   selectedUpscaleModalIds,
+  selectedRemoveBgModalId,
+  selectedRemoveBgModalIds,
+  selectedVectorizeModalId,
+  selectedVectorizeModalIds,
   clearAllSelections,
   setTextInputStates,
   setSelectedTextInputId,
@@ -45,6 +53,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setUpscaleModalStates = () => {},
   setSelectedUpscaleModalId = () => {},
   setSelectedUpscaleModalIds = () => {},
+  setRemoveBgModalStates = () => {},
+  setSelectedRemoveBgModalId = () => {},
+  setSelectedRemoveBgModalIds = () => {},
+  setVectorizeModalStates = () => {},
+  setSelectedVectorizeModalId = () => {},
+  setSelectedVectorizeModalIds = () => {},
   setSelectionTightRect,
   setIsDragSelection,
   images = [],
@@ -74,6 +88,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistUpscaleModalMove,
   onPersistUpscaleModalDelete,
   onUpscale,
+  onPersistRemoveBgModalCreate,
+  onPersistRemoveBgModalMove,
+  onPersistRemoveBgModalDelete,
+  onRemoveBg,
+  onPersistVectorizeModalCreate,
+  onPersistVectorizeModalMove,
+  onPersistVectorizeModalDelete,
+  onVectorize,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -106,6 +128,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     videoModalStates,
     musicModalStates,
     upscaleModalStates,
+    removeBgModalStates: removeBgModalStates ?? [],
+    vectorizeModalStates: vectorizeModalStates ?? [],
   });
 
   return (
@@ -123,6 +147,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         videoModalStates={videoModalStates}
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
+        removeBgModalStates={removeBgModalStates ?? []}
+        vectorizeModalStates={vectorizeModalStates ?? []}
         viewportUpdateKey={viewportUpdateKey}
       />
       
@@ -222,6 +248,50 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
       />
+      <RemoveBgModalOverlays
+        removeBgModalStates={removeBgModalStates ?? []}
+        selectedRemoveBgModalId={selectedRemoveBgModalId ?? null}
+        selectedRemoveBgModalIds={selectedRemoveBgModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setRemoveBgModalStates={setRemoveBgModalStates}
+        setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
+        setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
+        onRemoveBg={onRemoveBg}
+        onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
+        onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
+        onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        connections={externalConnections ?? []}
+        imageModalStates={imageModalStates}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
+
+      <VectorizeModalOverlays
+        vectorizeModalStates={vectorizeModalStates ?? []}
+        selectedVectorizeModalId={selectedVectorizeModalId ?? null}
+        selectedVectorizeModalIds={selectedVectorizeModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setVectorizeModalStates={setVectorizeModalStates}
+        setSelectedVectorizeModalId={setSelectedVectorizeModalId}
+        setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+        onVectorize={onVectorize}
+        onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
+        onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+        onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        connections={externalConnections ?? []}
+        imageModalStates={imageModalStates}
+        images={images}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
 
       <ComponentCreationMenu
         componentMenu={connectionManager.componentMenu}
@@ -235,6 +305,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistMusicModalCreate={onPersistMusicModalCreate}
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
         setUpscaleModalStates={setUpscaleModalStates}
+        onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
+        setRemoveBgModalStates={setRemoveBgModalStates}
       />
     </>
   );

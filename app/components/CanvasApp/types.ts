@@ -64,6 +64,34 @@ export interface UpscaleGenerator {
   isUpscaling?: boolean;
 }
 
+export interface RemoveBgGenerator {
+  id: string;
+  x: number;
+  y: number;
+  removedBgImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localRemovedBgImageUrl?: string | null;
+  model?: string;
+  backgroundType?: string;
+  scaleValue?: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  isRemovingBg?: boolean;
+}
+
+export interface VectorizeGenerator {
+  id: string;
+  x: number;
+  y: number;
+  vectorizedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localVectorizedImageUrl?: string | null;
+  mode?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isVectorizing?: boolean;
+}
+
 export interface TextGenerator {
   id: string;
   x: number;
@@ -90,6 +118,8 @@ export interface CanvasAppState {
   videoGenerators: VideoGenerator[];
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
+  removeBgGenerators: RemoveBgGenerator[];
+  vectorizeGenerators: VectorizeGenerator[];
   textGenerators: TextGenerator[];
   connectors: Connector[];
   generationQueue: GenerationQueueItem[];
@@ -101,6 +131,8 @@ export interface CanvasAppSetters {
   setVideoGenerators: React.Dispatch<React.SetStateAction<VideoGenerator[]>>;
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
+  setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
+  setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
   setTextGenerators: React.Dispatch<React.SetStateAction<TextGenerator[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;
   setGenerationQueue: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;

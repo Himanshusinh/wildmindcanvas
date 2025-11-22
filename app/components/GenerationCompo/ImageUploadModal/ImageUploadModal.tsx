@@ -137,7 +137,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1 Ultra', 
     'Flux Pro 1.1', 
     'Seedream v4 4K',
-    'Upscale' // Upscale is treated as media (no controls)
+    'Upscale', // Upscale is treated as media (no controls)
+    'Remove BG' // Remove BG is treated as media (no controls)
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -149,9 +150,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     initialModel === 'Library Image' || 
     initialModel === 'Uploaded Image' ||
     initialModel === 'Upscale' ||
+    initialModel === 'Remove BG' ||
     selectedModel === 'Library Image' ||
     selectedModel === 'Uploaded Image' ||
     selectedModel === 'Upscale' ||
+    selectedModel === 'Remove BG' ||
     (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
 
   // Detect connected image nodes (for image-to-image generation)

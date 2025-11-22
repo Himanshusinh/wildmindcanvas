@@ -18,6 +18,8 @@ interface ConnectionLinesProps {
   videoModalStates: any[];
   musicModalStates: any[];
   upscaleModalStates?: any[];
+  removeBgModalStates?: any[];
+  vectorizeModalStates?: any[];
   viewportUpdateKey: number;
 }
 
@@ -34,6 +36,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   videoModalStates,
   musicModalStates,
   upscaleModalStates,
+  removeBgModalStates,
+  vectorizeModalStates,
   viewportUpdateKey,
 }) => {
   // Memoize connection lines to recalculate when viewport changes
@@ -51,13 +55,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         }
         seen.add(uniqueKey);
         
-        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates);
-        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates);
+        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
+        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
         if (!fromCenter || !toCenter) return null;
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, viewportUpdateKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates, viewportUpdateKey, stageRef]);
 
   return (
     <svg

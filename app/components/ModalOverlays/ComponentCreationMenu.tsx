@@ -15,6 +15,8 @@ interface ComponentCreationMenuProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setUpscaleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
@@ -29,6 +31,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   onPersistMusicModalCreate,
   onPersistUpscaleModalCreate,
   setUpscaleModalStates,
+  onPersistRemoveBgModalCreate,
+  setRemoveBgModalStates,
 }) => {
   // Close component menu when clicking outside
   React.useEffect(() => {
@@ -59,7 +63,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'image', label: 'Image Generation', type: 'image' },
     { id: 'video', label: 'Video Generation', type: 'video' },
     { id: 'music', label: 'Music Generation', type: 'music' },
-    { id: 'plugin', label: 'Plugin', type: 'plugin' },
+    { id: 'upscale-plugin', label: 'Upscale Plugin', type: 'plugin' },
+    { id: 'removebg-plugin', label: 'Remove BG Plugin', type: 'plugin' },
   ];
   
   const filtered = components.filter(comp =>
@@ -172,7 +177,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   prompt: '',
                 };
                 Promise.resolve(onPersistMusicModalCreate(newMusic)).catch(console.error);
-              } else if (comp.type === 'plugin' && onPersistUpscaleModalCreate && setUpscaleModalStates) {
+              } else if (comp.id === 'upscale-plugin' && comp.type === 'plugin' && onPersistUpscaleModalCreate && setUpscaleModalStates) {
                 // Create upscale plugin modal
                 const newUpscale = {
                   id: `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -189,6 +194,24 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setUpscaleModalStates(prev => [...prev, newUpscale]);
                 Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+              } else if (comp.id === 'removebg-plugin' && comp.type === 'plugin' && onPersistRemoveBgModalCreate && setRemoveBgModalStates) {
+                // Create remove bg plugin modal
+                const newRemoveBg = {
+                  id: `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  removedBgImageUrl: null,
+                  sourceImageUrl: null,
+                  localRemovedBgImageUrl: null,
+                  model: '851-labs/background-remover',
+                  backgroundType: 'rgba (transparent)',
+                  scaleValue: 0.5,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isRemovingBg: false,
+                };
+                setRemoveBgModalStates(prev => [...prev, newRemoveBg]);
+                Promise.resolve(onPersistRemoveBgModalCreate(newRemoveBg)).catch(console.error);
               }
               
               setComponentMenu(null);

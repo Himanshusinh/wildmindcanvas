@@ -2,18 +2,18 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import '../../common/canvasCaptureGuard';
-import { UpscaleLabel } from './UpscaleLabel';
+import { RemoveBgLabel } from './RemoveBgLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
-import { UpscaleControls } from './UpscaleControls';
-import { UpscaleImageFrame } from './UpscaleImageFrame';
+import { RemoveBgControls } from './RemoveBgControls';
+import { RemoveBgImageFrame } from './RemoveBgImageFrame';
 
-interface UpscalePluginModalProps {
+interface RemoveBgPluginModalProps {
   isOpen: boolean;
   id?: string;
   onClose: () => void;
-  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
-  upscaledImageUrl?: string | null;
-  isUpscaling?: boolean;
+  onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
+  removedBgImageUrl?: string | null;
+  isRemovingBg?: boolean;
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
@@ -27,12 +27,13 @@ interface UpscalePluginModalProps {
   onDuplicate?: () => void;
   isSelected?: boolean;
   initialModel?: string;
-  initialScale?: number;
+  initialBackgroundType?: string;
+  initialScaleValue?: number;
   initialSourceImageUrl?: string | null;
-  initialLocalUpscaledImageUrl?: string | null;
-  onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean }) => void;
-  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void;
+  initialLocalRemovedBgImageUrl?: string | null;
+  onOptionsChange?: (opts: { model?: string; backgroundType?: string; scaleValue?: number; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void;
+  onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void | Promise<void>;
+  onUpdateModalState?: (modalId: string, updates: { removedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -40,13 +41,13 @@ interface UpscalePluginModalProps {
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
 }
 
-export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
+export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   isOpen,
   id,
   onClose,
-  onUpscale,
-  upscaledImageUrl,
-  isUpscaling: externalIsUpscaling,
+  onRemoveBg,
+  removedBgImageUrl,
+  isRemovingBg: externalIsRemovingBg,
   stageRef,
   scale,
   position,
@@ -60,11 +61,12 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   onDuplicate,
   isSelected,
   initialModel,
-  initialScale,
+  initialBackgroundType,
+  initialScaleValue,
   initialSourceImageUrl,
-  initialLocalUpscaledImageUrl,
+  initialLocalRemovedBgImageUrl,
   onOptionsChange,
-  onPersistUpscaleModalCreate,
+  onPersistRemoveBgModalCreate,
   onUpdateModalState,
   onPersistImageModalCreate,
   onUpdateImageModalState,
@@ -77,13 +79,14 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Crystal Upscaler');
-  const [scaleValue, setScaleValue] = useState<number>(initialScale ?? 2);
-  const [isUpscaling, setIsUpscaling] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(initialModel ?? '851-labs/background-remover');
+  const [selectedBackgroundType, setSelectedBackgroundType] = useState(initialBackgroundType ?? 'rgba (transparent)');
+  const [scaleValue, setScaleValue] = useState<number>(initialScaleValue ?? 0.5);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
-  const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
+  const [localRemovedBgImageUrl, setLocalRemovedBgImageUrl] = useState<string | null>(initialLocalRemovedBgImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
   
   // Update ref when callback changes
@@ -97,10 +100,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
 
-  // Detect if this is an upscaled image result (media-like, no controls)
-  // The plugin itself should always show controls (model is 'Crystal Upscaler' or undefined)
-  // Only result frames (with model 'Upscale') should be media-like
-  const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
+  // Detect if this is a removed bg image result (media-like, no controls)
+  const isRemovedBgImage = false; // Always show controls for the plugin
 
   // Detect connected image nodes
   const connectedImageSource = useMemo(() => {
@@ -116,31 +117,31 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     if (initialSourceImageUrl !== undefined) {
       setSourceImageUrl(initialSourceImageUrl);
     }
-    if (initialLocalUpscaledImageUrl !== undefined) {
-      setLocalUpscaledImageUrl(initialLocalUpscaledImageUrl);
+    if (initialLocalRemovedBgImageUrl !== undefined) {
+      setLocalRemovedBgImageUrl(initialLocalRemovedBgImageUrl);
     }
-  }, [initialSourceImageUrl, initialLocalUpscaledImageUrl]);
+  }, [initialSourceImageUrl, initialLocalRemovedBgImageUrl]);
 
   useEffect(() => {
     if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
       setSourceImageUrl(connectedImageSource);
       // Clear dimming when image is connected
       setIsDimmed(false);
-      // Reset upscaled image when source changes (only if not persisted)
-      if (!initialLocalUpscaledImageUrl) {
-        setLocalUpscaledImageUrl(null);
+      // Reset removed bg image when source changes (only if not persisted)
+      if (!initialLocalRemovedBgImageUrl) {
+        setLocalRemovedBgImageUrl(null);
       }
       // Persist the source image URL (only if it actually changed from initial)
       if (onOptionsChangeRef.current && connectedImageSource !== initialSourceImageUrl) {
         onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
       }
     }
-  }, [connectedImageSource, initialLocalUpscaledImageUrl, initialSourceImageUrl, sourceImageUrl]);
+  }, [connectedImageSource, initialLocalRemovedBgImageUrl, initialSourceImageUrl, sourceImageUrl]);
   
 
-  // Update image resolution when upscaled image loads
+  // Update image resolution when removed bg image loads
   useEffect(() => {
-    if (localUpscaledImageUrl || upscaledImageUrl) {
+    if (localRemovedBgImageUrl || removedBgImageUrl) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -149,11 +150,11 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       img.onerror = () => {
         setImageResolution(null);
       };
-      img.src = localUpscaledImageUrl || upscaledImageUrl || '';
+      img.src = localRemovedBgImageUrl || removedBgImageUrl || '';
     } else {
       setImageResolution(null);
     }
-  }, [localUpscaledImageUrl, upscaledImageUrl]);
+  }, [localRemovedBgImageUrl, removedBgImageUrl]);
 
   // Listen for dimming events
   useEffect(() => {
@@ -179,7 +180,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
     
-    console.log('[UpscalePluginModal] handleMouseDown', {
+    console.log('[RemoveBgPluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
       isInput,
@@ -193,7 +194,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
-      console.log('[UpscalePluginModal] Calling onSelect');
+      console.log('[RemoveBgPluginModal] Calling onSelect');
       onSelect();
     }
     
@@ -250,27 +251,25 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
 
 
-  const handleUpscale = async () => {
-    console.log('[UpscalePluginModal] handleUpscale called', {
-      hasOnUpscale: !!onUpscale,
-      isUpscaling,
-      externalIsUpscaling,
+  const handleRemoveBg = async () => {
+    console.log('[RemoveBgPluginModal] handleRemoveBg called', {
+      hasOnRemoveBg: !!onRemoveBg,
+      isRemovingBg,
+      externalIsRemovingBg,
       sourceImageUrl,
-      upscaledImageUrl,
-      selectedModel,
-      scaleValue,
+      removedBgImageUrl,
     });
     
-    if (!onUpscale) {
-      console.error('[UpscalePluginModal] onUpscale is not defined');
+    if (!onRemoveBg) {
+      console.error('[RemoveBgPluginModal] onRemoveBg is not defined');
       return;
     }
     
-    if (isUpscaling || externalIsUpscaling) {
-      console.log('[UpscalePluginModal] Already upscaling, skipping');
+    if (isRemovingBg || externalIsRemovingBg) {
+      console.log('[RemoveBgPluginModal] Already removing bg, skipping');
       return;
     }
     
@@ -279,10 +278,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       return;
     }
     
-    setIsUpscaling(true);
-    // Persist isUpscaling state
+    setIsRemovingBg(true);
+    // Persist isRemovingBg state
     if (onOptionsChange) {
-      onOptionsChange({ isUpscaling: true } as any);
+      onOptionsChange({ isRemovingBg: true } as any);
     }
     
     // Create new image generation frame immediately (before API call) to show loading state
@@ -291,7 +290,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     const offsetX = frameWidth + 50;
     const targetX = x + offsetX;
     const targetY = y;
-    const newModalId = `image-upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newModalId = `image-removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
@@ -302,7 +301,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         generatedImageUrl: null as string | null,
         frameWidth,
         frameHeight,
-        model: 'Upscale', // Label will show "Upscale" (like "Media")
+        model: 'Remove BG', // Label will show "Remove BG" (like "Media")
         frame: 'Frame',
         aspectRatio: '1:1',
         prompt: '',
@@ -312,19 +311,14 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
     
-    // Automatically create connection from upscale plugin to new frame
+    // Automatically create connection from remove bg plugin to new frame
     if (onPersistConnectorCreate && id) {
-      // Calculate node positions (right side of upscale plugin, left side of new frame)
-      // Upscale plugin structure:
-      // - Controls section: ~100px height (with padding)
-      // - Image frame section: min 150px, max 400px, typically ~300px
-      // Nodes are positioned at 50% of the image frame (not the entire modal)
-      // The image frame starts after the controls, so node Y = controlsHeight + (imageFrameHeight / 2)
-      const controlsHeight = 100; // Approximate controls section height (not scaled, as it's in canvas coordinates)
+      // Calculate node positions (right side of remove bg plugin, left side of new frame)
+      const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
       
-      const fromX = x + 400; // Right side of upscale plugin (width is 400 in canvas coordinates)
+      const fromX = x + 400; // Right side of remove bg plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
@@ -348,21 +342,21 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         };
         
         await Promise.resolve(onPersistConnectorCreate(newConnector));
-        console.log('[UpscalePluginModal] Created connection from plugin to new frame:', newConnector);
+        console.log('[RemoveBgPluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
     
     try {
       const imageUrl = sourceImageUrl;
-      console.log('[UpscalePluginModal] Calling onUpscale with:', { selectedModel, scaleValue, imageUrl });
-      const result = await onUpscale(selectedModel, scaleValue, imageUrl || undefined);
-      console.log('[UpscalePluginModal] onUpscale returned:', result);
+      console.log('[RemoveBgPluginModal] Calling onRemoveBg with:', { selectedModel, selectedBackgroundType, scaleValue, imageUrl });
+      const result = await onRemoveBg(selectedModel, selectedBackgroundType, scaleValue, imageUrl || undefined);
+      console.log('[RemoveBgPluginModal] onRemoveBg returned:', result);
       
       // Update the image generation frame with the result
       if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
           generatedImageUrl: result,
-          model: 'Upscale',
+          model: 'Remove BG',
           frame: 'Frame',
           aspectRatio: '1:1',
           prompt: '',
@@ -372,29 +366,35 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         });
       }
       
-      // Also store the upscaled image in the plugin
-      if (result && result !== localUpscaledImageUrl) {
-        setLocalUpscaledImageUrl(result);
-        // Persist the local upscaled image URL (only if it changed from initial)
-        if (onOptionsChangeRef.current && result !== initialLocalUpscaledImageUrl) {
-          onOptionsChangeRef.current({ localUpscaledImageUrl: result });
+      // Also store the removed bg image in the plugin
+      if (result) {
+        setLocalRemovedBgImageUrl(result);
+        // Update the modal state with removedBgImageUrl so it displays in the frame
+        if (onUpdateModalState && id) {
+          onUpdateModalState(id, { removedBgImageUrl: result });
+        }
+        // Persist the local removed bg image URL (only if it changed from initial)
+        if (onOptionsChangeRef.current && result !== initialLocalRemovedBgImageUrl) {
+          onOptionsChangeRef.current({ 
+            localRemovedBgImageUrl: result
+          });
         }
       }
     } catch (error) {
-      console.error('Upscale error:', error);
+      console.error('Remove BG error:', error);
       // Update frame to show error state or remove it
       if (onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
           generatedImageUrl: null,
-          model: 'Upscale',
+          model: 'Remove BG',
           isGenerating: false, // Clear loading state
         });
       }
     } finally {
-      setIsUpscaling(false);
-      // Persist isUpscaling state (clear loading)
+      setIsRemovingBg(false);
+      // Persist isRemovingBg state (clear loading)
       if (onOptionsChange) {
-        onOptionsChange({ isUpscaling: false } as any);
+        onOptionsChange({ isRemovingBg: false } as any);
       }
     }
   };
@@ -404,7 +404,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   return (
     <div
       ref={containerRef}
-      data-modal-component="upscale"
+      data-modal-component="removebg"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
@@ -419,7 +419,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <UpscaleLabel
+      <RemoveBgLabel
         isHovered={isHovered}
         scale={scale}
         imageResolution={imageResolution}
@@ -431,49 +431,56 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
-        generatedUrl={upscaledImageUrl}
+        generatedUrl={removedBgImageUrl}
       />
 
-      {!isUpscaledImage && (
-        <UpscaleControls
+      {!isRemovedBgImage && (
+        <RemoveBgControls
           scale={scale}
           selectedModel={selectedModel}
+          selectedBackgroundType={selectedBackgroundType}
           scaleValue={scaleValue}
-          isUpscaling={isUpscaling}
-          externalIsUpscaling={externalIsUpscaling}
+          isRemovingBg={isRemovingBg}
+          externalIsRemovingBg={externalIsRemovingBg}
           sourceImageUrl={sourceImageUrl}
           frameBorderColor={frameBorderColor}
           frameBorderWidth={frameBorderWidth}
           onModelChange={(model) => {
-                      setSelectedModel(model);
-                      if (onOptionsChange) {
-                        onOptionsChange({ model, scale: scaleValue });
-                      }
-                    }}
+            setSelectedModel(model);
+            if (onOptionsChange) {
+              onOptionsChange({ model, backgroundType: selectedBackgroundType, scaleValue });
+            }
+          }}
+          onBackgroundTypeChange={(backgroundType) => {
+            setSelectedBackgroundType(backgroundType);
+            if (onOptionsChange) {
+              onOptionsChange({ model: selectedModel, backgroundType, scaleValue });
+            }
+          }}
           onScaleChange={(newScale) => {
-                setScaleValue(newScale);
-                if (onOptionsChange) {
-                  onOptionsChange({ model: selectedModel, scale: newScale });
-                }
-              }}
-          onUpscale={handleUpscale}
+            setScaleValue(newScale);
+            if (onOptionsChange) {
+              onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
+            }
+          }}
+          onRemoveBg={handleRemoveBg}
           onHoverChange={setIsHovered}
         />
       )}
 
-      <UpscaleImageFrame
+      <RemoveBgImageFrame
         id={id}
         scale={scale}
         frameBorderColor={frameBorderColor}
         frameBorderWidth={frameBorderWidth}
-        isUpscaledImage={isUpscaledImage}
+        isRemovedBgImage={isRemovedBgImage}
         isDraggingContainer={isDraggingContainer}
         isHovered={isHovered}
         isSelected={isSelected || false}
         sourceImageUrl={sourceImageUrl}
         onMouseDown={handleMouseDown}
         onSelect={onSelect}
-          />
+      />
 
     </div>
   );

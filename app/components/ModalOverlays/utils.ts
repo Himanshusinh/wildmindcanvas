@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState } from './types';
+import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, VectorizeModalState } from './types';
 
 export const getComponentType = (id?: string | null): string | null => {
   if (!id) return null;
@@ -47,7 +47,9 @@ export const computeNodeCenter = (
   imageModalStates: ImageModalState[],
   videoModalStates: VideoModalState[],
   musicModalStates: MusicModalState[],
-  upscaleModalStates?: UpscaleModalState[]
+  upscaleModalStates?: UpscaleModalState[],
+  removeBgModalStates?: RemoveBgModalState[],
+  vectorizeModalStates?: VectorizeModalState[]
 ): { x: number; y: number } | null => {
   if (!id) return null;
   // Prefer frame element (set via data-frame-id on inner frame)
@@ -92,6 +94,10 @@ export const computeNodeCenter = (
         if (mm) return { x: mm.x, y: mm.y, width: mm.frameWidth || 600, height: mm.frameHeight || 300 };
         const um = upscaleModalStates?.find(m => m.id === id);
         if (um) return { x: um.x, y: um.y, width: um.frameWidth || 400, height: um.frameHeight || 500 };
+        const rm = removeBgModalStates?.find(m => m.id === id);
+        if (rm) return { x: rm.x, y: rm.y, width: rm.frameWidth || 400, height: rm.frameHeight || 500 };
+        const vzm = vectorizeModalStates?.find(m => m.id === id);
+        if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
         return null;
       };
       const modal = findModal();

@@ -84,13 +84,28 @@ export const TextInput: React.FC<TextInputProps> = ({
     const isInput = target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isControls = target.closest('.controls-overlay');
+    // Check if clicking on action icons (ModalActionIcons container or its children)
+    const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
+    
+    console.log('[TextInput] handleMouseDown', {
+      timestamp: Date.now(),
+      target: target.tagName,
+      isInput,
+      isButton,
+      isControls: !!isControls,
+      isActionIcons: !!isActionIcons,
+      buttonTitle: target.closest('button')?.getAttribute('title'),
+    });
     
     // Call onSelect when clicking on the text input container
-    if (onSelect && !isInput && !isButton && !isControls) {
+    // Don't select if clicking on buttons, controls, inputs, or action icons
+    if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
+      console.log('[TextInput] Calling onSelect');
       onSelect();
     }
     
-    if (isHeader || (!isInput && !isButton && !isControls && target === containerRef.current)) {
+    // Only allow dragging from the header or container background, not from controls, inputs, buttons, or action icons
+    if (isHeader || (!isInput && !isButton && !isControls && !isActionIcons && target === containerRef.current)) {
       setIsDragging(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {

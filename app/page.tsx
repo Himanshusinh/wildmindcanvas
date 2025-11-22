@@ -10,7 +10,7 @@ import { Profile } from '@/app/components/Profile/Profile';
 import LibrarySidebar from '@/app/components/Canvas/LibrarySidebar';
 import PluginSidebar from '@/app/components/Canvas/PluginSidebar';
 import { ImageUpload } from '@/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/lib/canvasApi';
 import { ProjectSelector } from '@/app/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
@@ -19,6 +19,10 @@ import { useProject } from '@/hooks/useProject';
 import { useUIVisibility } from '@/hooks/useUIVisibility';
 import { buildProxyDownloadUrl, buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
+import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
+import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
+import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
+import { CanvasAppState, CanvasAppSetters } from '@/app/components/CanvasApp/types';
 
 interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
@@ -30,6 +34,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
+  const [vectorizeGenerators, setVectorizeGenerators] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
@@ -199,6 +205,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setImageGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -350,7 +357,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
       }
       // Force-persist snapshot to reflect removals immediately
       try {
-        const elements = buildSnapshotElements(connectors.filter(c => !toRemove.includes(c.id)));
+        const filteredConnectors = connectors.filter(c => !toRemove.includes(c.id));
+        const elements = buildSnapshotElements({
+          images,
+          imageGenerators,
+          videoGenerators,
+          musicGenerators,
+          upscaleGenerators,
+          removeBgGenerators,
+          vectorizeGenerators,
+          textGenerators,
+          connectors: filteredConnectors,
+          generationQueue,
+        });
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
       } catch (e) {
         console.warn('Failed to persist snapshot after connector removals', e);
@@ -541,96 +560,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   }, [projectId]);
 
   // Helper: build elements map snapshot from current state
-  const buildSnapshotElements = (connectorsOverride?: Array<any>): Record<string, any> => {
-    const elements: Record<string, any> = {};
-    
-    // Build connection map keyed by source element id
-    const connectionsBySource: Record<string, Array<any>> = {};
-    const connectorsToUse = connectorsOverride ?? connectors;
-    connectorsToUse.forEach((c) => {
-      if (!c || !c.id) return;
-      const src = c.from;
-      if (!src) return;
-      connectionsBySource[src] = connectionsBySource[src] || [];
-      connectionsBySource[src].push({ id: c.id, to: c.to, color: c.color, fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-    });
-    // Uploaded media and text/models
-    images.forEach((img, idx) => {
-      const id = (img as any).elementId || `element-${idx}`;
-      if (!(img as any).elementId) {
-        // Skip persisting items without stable id to avoid churn
-        return;
-      }
-      const type = img.type === 'image' ? 'image' : img.type === 'video' ? 'video' : img.type === 'text' ? 'text' : img.type === 'model3d' ? 'model3d' : 'image';
-      const meta: any = {};
-      if (type === 'text') {
-        if (img.text) meta.text = img.text;
-        if (img.fontSize) meta.fontSize = img.fontSize;
-        if (img.fontFamily) meta.fontFamily = img.fontFamily;
-        if (img.fill) meta.fill = img.fill;
-      } else if (img.url) {
-        meta.url = img.url;
-      }
-      // Attach any connections originating from this element into its meta
-      if (connectionsBySource[id] && connectionsBySource[id].length) {
-        meta.connections = connectionsBySource[id];
-      }
-      elements[id] = { id, type, x: img.x || 0, y: img.y || 0, width: img.width, height: img.height, rotation: img.rotation || 0, meta };
-    });
-    // Generators (image/video/music)
-    imageGenerators.forEach((g) => {
-      const metaObj: any = { generatedImageUrl: g.generatedImageUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
-      if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-      elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, meta: metaObj };
-    });
-    videoGenerators.forEach((g) => {
-      const metaObj: any = { generatedVideoUrl: g.generatedVideoUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt, taskId: (g as any).taskId, generationId: (g as any).generationId, status: (g as any).status };
-      if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-      elements[g.id] = { id: g.id, type: 'video-generator', x: g.x, y: g.y, meta: metaObj };
-    });
-    musicGenerators.forEach((g) => {
-      const metaObj: any = { generatedMusicUrl: g.generatedMusicUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
-      if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-      elements[g.id] = { id: g.id, type: 'music-generator', x: g.x, y: g.y, meta: metaObj };
-    });
-    // Upscale generators
-    upscaleGenerators.forEach((modal) => {
-      if (!modal || !modal.id) return;
-      const metaObj: any = {
-        upscaledImageUrl: modal.upscaledImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localUpscaledImageUrl: modal.localUpscaledImageUrl || null,
-        model: modal.model || 'Crystal Upscaler',
-        scale: modal.scale || 2,
-        frameWidth: modal.frameWidth || 400,
-        frameHeight: modal.frameHeight || 500,
-        isUpscaling: modal.isUpscaling || false,
-      };
-      // Attach any connections originating from this element into its meta
-      if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-        metaObj.connections = connectionsBySource[modal.id];
-      }
-      elements[modal.id] = {
-        id: modal.id,
-        type: 'upscale-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: metaObj,
-      };
-    });
-    // Text input overlays (generators) - persist current value
-    textGenerators.forEach((t) => {
-      elements[t.id] = { id: t.id, type: 'text-generator', x: t.x, y: t.y, meta: { value: t.value || '' } };
-    });
-    // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
-    // Also include connector elements as top-level elements so snapshots contain explicit connector records
-    const connectorsToUseFinal = connectorsOverride ?? connectors;
-    connectorsToUseFinal.forEach(c => {
-      if (!c || !c.id) return;
-      elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
-    });
-    return elements;
-  };
+  // buildSnapshotElements is now imported from utils
 
   // Persist full snapshot on every interaction (debounced)
   useEffect(() => {
@@ -640,7 +570,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
     persistTimerRef.current = window.setTimeout(async () => {
       try {
-        const elements = buildSnapshotElements();
+        const elements = buildSnapshotElements({
+          images,
+          imageGenerators,
+          videoGenerators,
+          musicGenerators,
+          upscaleGenerators,
+          removeBgGenerators,
+          vectorizeGenerators,
+          textGenerators,
+          connectors,
+          generationQueue,
+        });
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
       } catch (e) {
@@ -652,7 +593,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, vectorizeGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -667,6 +608,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
           const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+          const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
+          const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
 
@@ -732,6 +675,44 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
+              } else if (element.type === 'removebg-plugin') {
+                newRemoveBgGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  removedBgImageUrl: element.meta?.removedBgImageUrl || null, 
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
+                  localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, 
+                  model: element.meta?.model || '851-labs/background-remover',
+                  backgroundType: element.meta?.backgroundType || 'rgba (transparent)',
+                  scaleValue: element.meta?.scaleValue || 0.5,
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isRemovingBg: element.meta?.isRemovingBg || false,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'vectorize-plugin') {
+                newVectorizeGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, 
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
+                  localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, 
+                  mode: element.meta?.mode || 'simple',
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isVectorizing: element.meta?.isVectorizing || false,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
               }
             }
           });
@@ -740,6 +721,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setVideoGenerators(newVideoGenerators);
           setMusicGenerators(newMusicGenerators);
           setUpscaleGenerators(newUpscaleGenerators);
+          setRemoveBgGenerators(newRemoveBgGenerators);
+          setVectorizeGenerators(newVectorizeGenerators);
           setTextGenerators(newTextGenerators);
           setConnectors(newConnectors);
           
@@ -785,195 +768,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
   }, [canUndo, canRedo, undo, redo]);
 
-  const handleImageUpdate = (index: number, updates: Partial<ImageUpload>) => {
-    setImages((prev) => {
-      const newImages = [...prev];
-      newImages[index] = { ...newImages[index], ...updates };
-      return newImages;
-    });
-    // (no-op) image update shouldn't directly remove connectors here
-
-    // Send move op to server if position changed
-    if (projectId && opManagerInitialized && (updates.x !== undefined || updates.y !== undefined)) {
-      const image = images[index];
-      const deltaX = updates.x !== undefined ? updates.x - (image.x || 0) : 0;
-      const deltaY = updates.y !== undefined ? updates.y - (image.y || 0) : 0;
-      
-      if (deltaX !== 0 || deltaY !== 0) {
-        const elementId = (image as any).elementId || `img-${index}`;
-        appendOp({
-          type: 'move',
-          elementId,
-          data: { delta: { x: deltaX, y: deltaY } },
-          inverse: {
-            type: 'move',
-            elementId,
-            data: { delta: { x: -deltaX, y: -deltaY } },
-            requestId: '',
-            clientTs: 0,
-          } as any,
-        } as any).catch(console.error);
-      }
-    }
-
-    // Realtime broadcast for smooth media moves/resizes
-    const current = images[index];
-    const id = (current as any)?.elementId;
-    if (realtimeActive && id) {
-      const mediaUpdate: any = {};
-      if (updates.x !== undefined) mediaUpdate.x = updates.x;
-      if (updates.y !== undefined) mediaUpdate.y = updates.y;
-      if (updates.width !== undefined) mediaUpdate.width = updates.width;
-      if (updates.height !== undefined) mediaUpdate.height = updates.height;
-      if (updates.rotation !== undefined) mediaUpdate.rotation = updates.rotation;
-      if (Object.keys(mediaUpdate).length) {
-        console.log('[Realtime] media.update', id, Object.keys(mediaUpdate));
-        realtimeRef.current?.sendMediaUpdate(id, mediaUpdate);
-      }
-    }
+  // Create state and setters objects for handlers (after all dependencies are defined, including processMediaFile)
+  // Note: handlers are created here but processMediaFile is defined later - we'll use a wrapper
+  const canvasState: CanvasAppState = {
+    images,
+    imageGenerators,
+    videoGenerators,
+    musicGenerators,
+    upscaleGenerators,
+    removeBgGenerators,
+    vectorizeGenerators,
+    textGenerators,
+    connectors,
+    generationQueue,
   };
 
-  const handleImageDelete = (index: number) => {
-    const image = images[index];
-    
-    setImages((prev) => {
-      const newImages = [...prev];
-      // Clean up blob URL if it exists
-      const item = newImages[index];
-      if (item?.url && item.url.startsWith('blob:')) {
-        URL.revokeObjectURL(item.url);
-      }
-      // Remove the item
-      newImages.splice(index, 1);
-      return newImages;
-    });
-
-    // Also remove any connectors that referenced this element
-    const elementId = (image as any)?.elementId;
-    if (elementId) {
-      // fire-and-forget; we don't block UI
-      removeAndPersistConnectorsForElement(elementId).catch(console.error);
-    }
-
-    // Realtime broadcast for delete
-    const id = (image as any)?.elementId;
-    if (realtimeActive && id) {
-      console.log('[Realtime] media.delete', id);
-      realtimeRef.current?.sendMediaDelete(id);
-    }
-
-    // Send delete op to server (with inverse create)
-    if (projectId && opManagerInitialized) {
-      const elementId = (image as any).elementId || `img-${index}`;
-      const elType = image.type === 'image' ? 'image' : image.type === 'video' ? 'video' : image.type === 'text' ? 'text' : image.type === 'model3d' ? 'model3d' : 'image';
-      const meta: any = image.type === 'text' ? { text: image.text } : { url: image.url };
-      appendOp({
-        type: 'delete',
-        elementId,
-        data: {},
-        inverse: {
-          type: 'create',
-          elementId,
-          data: {
-            element: {
-              id: elementId,
-              type: elType,
-              x: image.x || 0,
-              y: image.y || 0,
-              width: image.width || 400,
-              height: image.height || 400,
-              meta,
-            },
-          },
-          requestId: '',
-          clientTs: 0,
-        } as any,
-      } as any).catch(console.error);
-    }
+  const canvasSetters: CanvasAppSetters = {
+    setImages,
+    setImageGenerators,
+    setVideoGenerators,
+    setMusicGenerators,
+    setUpscaleGenerators,
+    setRemoveBgGenerators,
+    setVectorizeGenerators,
+    setTextGenerators,
+    setConnectors,
+    setGenerationQueue,
   };
 
-  const handleImageDownload = async (index: number) => {
-    const imageData = images[index];
-    if (!imageData?.url) return;
-
-    try {
-      let downloadUrl: string;
-      let filename: string;
-
-      if (imageData.url.startsWith('blob:')) {
-        // For blob URLs, download directly (local files)
-        const response = await fetch(imageData.url);
-        const blob = await response.blob();
-        filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png'}`;
-        
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        return;
-      } else {
-        // Use proxy download endpoint for Zata URLs and external URLs
-        downloadUrl = buildProxyDownloadUrl(imageData.url);
-        
-        // Extract filename from URL or use default
-        try {
-          const urlObj = new URL(imageData.url);
-          filename = urlObj.pathname.split('/').pop() || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        } catch {
-          filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        }
-      }
-
-      // Create download link using proxy
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      a.target = '_blank'; // Open in new tab as fallback
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Failed to download:', error);
-      alert('Failed to download. Please try again.');
-    }
-  };
-
-  const handleImageDuplicate = (index: number) => {
-    const imageData = images[index];
-    if (!imageData) return;
-
-    // Create a duplicate to the right
-    const imageWidth = imageData.width || 400;
-    const duplicated: ImageUpload = {
-      ...imageData,
-      x: (imageData.x || 0) + imageWidth + 50, // Image width + 50px spacing
-      y: imageData.y || 0, // Same Y position
-    };
-
-    // If it's a blob URL, we need to create a new blob URL
-    if (imageData.url && imageData.url.startsWith('blob:') && imageData.file) {
-      duplicated.url = URL.createObjectURL(imageData.file);
-      duplicated.file = imageData.file;
-    }
-
-    setImages((prev) => [...prev, duplicated]);
-
-    // Realtime broadcast for duplicate as create
-    const id = (duplicated as any)?.elementId;
-    if (realtimeActive && id) {
-      const kind = duplicated.type === 'image' ? 'image' : duplicated.type === 'video' ? 'video' : duplicated.type === 'text' ? 'text' : 'model3d';
-      console.log('[Realtime] media.create duplicate', id);
-      realtimeRef.current?.sendMediaCreate({ id, kind, x: duplicated.x || 0, y: duplicated.y || 0, width: duplicated.width, height: duplicated.height, url: duplicated.url });
-    }
-  };
-
-  const handleImageUpload = (file: File) => {
-    processMediaFile(file, images.length);
-  };
+  // Create handlers using factory functions
+  // Handlers will be created after processMediaFile is defined
+  // For now, declare them as let so they can be assigned later
+  let imageHandlers: ReturnType<typeof createImageHandlers>;
+  let pluginHandlers: ReturnType<typeof createPluginHandlers>;
+  
+  // Handler assignments will be done after handlers are created (after processMediaFile)
 
   const handleMultipleFilesUpload = (files: File[]) => {
     // Find the main GLTF file
@@ -1281,12 +1110,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
   };
 
-  const handleImagesDrop = (files: File[]) => {
-    // Process multiple files with slight offsets
-    files.forEach((file, index) => {
-      processMediaFile(file, images.length + index);
-    });
-  };
+  // Now that processMediaFile is defined, create the actual handlers
+  imageHandlers = createImageHandlers(
+    canvasState,
+    canvasSetters,
+    projectId,
+    opManagerInitialized,
+    appendOp,
+    realtimeActive,
+    realtimeRef,
+    viewportCenterRef,
+    processMediaFile
+  );
+
+  pluginHandlers = createPluginHandlers(
+    canvasState,
+    canvasSetters,
+    projectId,
+    opManagerInitialized,
+    appendOp,
+    realtimeActive,
+    realtimeRef,
+    removeAndPersistConnectorsForElement
+  );
+
+  // Now assign all handler functions (after handlers are created)
+  const handleImageUpdate = imageHandlers.handleImageUpdate;
+  const handleImageDelete = imageHandlers.handleImageDelete;
+  const handleImageDownload = imageHandlers.handleImageDownload;
+  const handleImageDuplicate = imageHandlers.handleImageDuplicate;
+  const handleImageUpload = imageHandlers.handleImageUpload;
+  const handleImagesDrop = imageHandlers.handleImagesDrop;
+  const handleImageSelect = imageHandlers.handleImageSelect;
+  const handleImageGenerate = imageHandlers.handleImageGenerate;
+  const handleTextCreate = imageHandlers.handleTextCreate;
+  const handleAddImageToCanvas = imageHandlers.handleAddImageToCanvas;
 
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
@@ -1334,47 +1192,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
   };
 
-  const handleTextCreate = (text: string, x: number, y: number) => {
-    const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newText: ImageUpload = {
-      type: 'text',
-      text,
-      x,
-      y,
-      fontSize: 24,
-      fontFamily: 'Arial',
-      fill: '#000000',
-      elementId,
-    };
-    setImages((prev) => [...prev, newText]);
-
-    if (realtimeActive) {
-      console.log('[Realtime] media.create text', elementId);
-      realtimeRef.current?.sendMediaCreate({ id: elementId, kind: 'text', x: newText.x || 0, y: newText.y || 0, width: newText.width, height: newText.height, url: undefined });
-    }
-
-    // Send create op to server
-    if (projectId && opManagerInitialized) {
-      appendOp({
-        type: 'create',
-        elementId,
-        data: {
-          element: {
-            id: elementId,
-            type: 'text',
-            x: newText.x,
-            y: newText.y,
-            width: newText.width,
-            height: newText.height,
-            meta: {
-              text: text,
-            },
-          },
-        },
-        inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-      }).catch(console.error);
-    }
-  };
 
   const handleToolbarUpload = (files: File[]) => {
     // Check if any file is a GLTF file (which might need dependencies)
@@ -1612,89 +1429,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   };
 
 
-  const handleImageSelect = (file: File) => {
-    // Process the selected image file
-    processMediaFile(file, images.length);
-  };
-
-  const handleImageGenerate = async (
-    prompt: string, 
-    model: string, 
-    frame: string, 
-    aspectRatio: string,
-    modalId?: string,
-    imageCount?: number,
-    sourceImageUrl?: string
-  ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
-    console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
-      
-      // Ensure we have a project ID
-      if (!projectId) {
-        throw new Error('Project not initialized. Please refresh the page.');
-      }
-
-    const queuedCount = Math.max(1, imageCount || 1);
-    const baseId = `${modalId || 'image'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const jobEntries: GenerationQueueItem[] = Array.from({ length: queuedCount }, (_, idx) => ({
-      id: `${baseId}-${idx}`,
-      prompt: (prompt || '').trim() || 'Untitled prompt',
-      model,
-      total: queuedCount,
-      index: idx + 1,
-      startedAt: Date.now(),
-    }));
-    setGenerationQueue((prev) => [...prev, ...jobEntries]);
-
-    try {
-      // Parse aspect ratio to get width/height if needed
-      const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
-      const aspectRatioValue = widthRatio / heightRatio;
-      const baseSize = 1024; // Base size for generation
-      let genWidth: number;
-      let genHeight: number;
-      
-      if (aspectRatioValue >= 1) {
-        // Landscape or square
-        genWidth = Math.round(baseSize * aspectRatioValue);
-        genHeight = baseSize;
-      } else {
-        // Portrait
-        genWidth = baseSize;
-        genHeight = Math.round(baseSize / aspectRatioValue);
-      }
-
-      // Call the Canvas-specific generation API
-      const result = await generateImageForCanvas(
-        prompt,
-        model,
-        aspectRatio,
-        projectId,
-        genWidth,
-        genHeight,
-        queuedCount,
-        sourceImageUrl
-      );
-      
-      console.log('Image generated successfully:', result);
-      // Return URL(s) for generator overlay
-      // Always return images array if present (even for single image when imageCount > 1)
-      if (result.images && Array.isArray(result.images) && result.images.length > 0) {
-        return {
-          url: result.url,
-          images: result.images.map(img => ({ url: img.url })),
-        };
-      }
-      // Fallback to single URL
-      return { url: result.url };
-    } catch (error: any) {
-      console.error('Error generating image:', error);
-      alert(error.message || 'Failed to generate image. Please try again.');
-      throw error; // Re-throw to let the modal handle the error display
-    } finally {
-      const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
-      setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
-    }
-  };
+  // handleImageSelect and handleImageGenerate are now assigned after handlers are created (above)
 
   const handleVideoSelect = (file: File) => {
     // Process the selected video file
@@ -1813,82 +1548,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onMusicSelect={handleMusicSelect}
               onMusicGenerate={handleMusicGenerate}
               generatedMusicUrl={generatedMusicUrl}
-              onAddImageToCanvas={async (url: string) => {
-                try {
-                  // Load image to compute display dimensions
-                  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                    const i = new Image();
-                    i.crossOrigin = 'anonymous';
-                    i.onload = () => resolve(i);
-                    i.onerror = reject;
-                    i.src = url;
-                  });
-
-                  // Keep original image dimensions - no scaling
-                  const displayWidth = img.naturalWidth || img.width;
-                  const displayHeight = img.naturalHeight || img.height;
-
-                  // Place at current viewport center
-                  const center = viewportCenterRef.current;
-                  const imageX = center.x - displayWidth / 2;
-                  const imageY = center.y - displayHeight / 2;
-
-                  const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                  const newImage: ImageUpload = {
-                    type: 'image',
-                    url,
-                    x: imageX,
-                    y: imageY,
-                    width: displayWidth,
-                    height: displayHeight,
-                    elementId,
-                  };
-
-                  setImages((prev) => {
-                    // avoid duplicates by elementId
-                    if (prev.some(img => (img as any).elementId === elementId)) return prev;
-                    return [...prev, newImage];
-                  });
-
-                  if (realtimeActive) {
-                    console.log('[Realtime] media.create addToCanvas', elementId);
-                    realtimeRef.current?.sendMediaCreate({ id: elementId, kind: 'image', x: imageX, y: imageY, width: displayWidth, height: displayHeight, url });
-                  }
-
-                  if (projectId && opManagerInitialized) {
-                    await appendOp({
-                      type: 'create',
-                      elementId,
-                      data: {
-                        element: {
-                          id: elementId,
-                          type: 'image',
-                          x: imageX,
-                          y: imageY,
-                          width: displayWidth,
-                          height: displayHeight,
-                          meta: { url },
-                        },
-                      },
-                      inverse: {
-                        type: 'delete',
-                        elementId,
-                        data: {},
-                        requestId: '',
-                        clientTs: 0,
-                      } as any,
-                    });
-                  }
-                } catch (e) {
-                  console.error('Failed to add image to canvas:', e);
-                  alert('Failed to add image to canvas.');
-                }
-              }}
+              onAddImageToCanvas={imageHandlers.handleAddImageToCanvas}
               projectId={projectId}
               externalImageModals={imageGenerators}
               externalVideoModals={videoGenerators}
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
+              externalRemoveBgModals={removeBgGenerators}
+              externalVectorizeModals={vectorizeGenerators}
               externalTextModals={textGenerators}
               connections={connectors}
         onConnectionsChange={(connections) => {
@@ -1928,7 +1595,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     await appendOp({ type: 'create', elementId: cid, data: { element: elementPayload }, inverse } as any);
                     // Force-persist snapshot so connector element is immediately present in saved snapshot
                     try {
-                      const elements = buildSnapshotElements([...connectors, connToAdd]);
+                      const elements = buildSnapshotElements({
+                        images,
+                        imageGenerators,
+                        videoGenerators,
+                        musicGenerators,
+                        upscaleGenerators,
+                        removeBgGenerators,
+                        vectorizeGenerators,
+                        textGenerators,
+                        connectors: [...connectors, connToAdd],
+                        generationQueue,
+                      });
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
                       console.log('[Connector] apiSetCurrentSnapshot success', { projectId, ssRes });
                     } catch (e) {
@@ -1954,7 +1632,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     await appendOp({ type: 'delete', elementId: connectorId, data: {}, inverse } as any);
                     // Force snapshot persist so connector deletion is immediately reflected
                     try {
-                      const elements = buildSnapshotElements(connectors.filter(c => c.id !== connectorId));
+                      const elements = buildSnapshotElements({
+                        images,
+                        imageGenerators,
+                        videoGenerators,
+                        musicGenerators,
+                        upscaleGenerators,
+                        removeBgGenerators,
+                        vectorizeGenerators,
+                        textGenerators,
+                        connectors: connectors.filter(c => c.id !== connectorId),
+                        generationQueue,
+                      });
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
                       console.log('[Connector] apiSetCurrentSnapshot success after delete', { projectId, ssRes });
                     } catch (e) { console.warn('[Connector] Failed to persist snapshot after connector delete', e); }
@@ -2004,10 +1693,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistImageModalDelete={async (id) => {
-                // Optimistic delete
+                console.log('[page.tsx] onPersistImageModalDelete called', id);
                 const prevItem = imageGenerators.find(m => m.id === id);
-                setImageGenerators(prev => prev.filter(m => m.id !== id));
-                // Broadcast via realtime
+                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+                setImageGenerators(prev => {
+                  const filtered = prev.filter(m => m.id !== id);
+                  console.log('[page.tsx] imageGenerators updated, remaining:', filtered.length);
+                  return filtered;
+                });
+                // Then do async operations
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast delete image', id);
                   realtimeRef.current?.sendDelete(id);
@@ -2047,8 +1741,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistVideoModalDelete={async (id) => {
+                console.log('[page.tsx] onPersistVideoModalDelete called', id);
                 const prevItem = videoGenerators.find(m => m.id === id);
-                setVideoGenerators(prev => prev.filter(m => m.id !== id));
+                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+                setVideoGenerators(prev => {
+                  const filtered = prev.filter(m => m.id !== id);
+                  console.log('[page.tsx] videoGenerators updated, remaining:', filtered.length);
+                  return filtered;
+                });
+                // Then do async operations
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast delete video', id);
                   realtimeRef.current?.sendDelete(id);
@@ -2087,8 +1788,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistMusicModalDelete={async (id) => {
+                console.log('[page.tsx] onPersistMusicModalDelete called', id);
                 const prevItem = musicGenerators.find(m => m.id === id);
-                setMusicGenerators(prev => prev.filter(m => m.id !== id));
+                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+                setMusicGenerators(prev => {
+                  const filtered = prev.filter(m => m.id !== id);
+                  console.log('[page.tsx] musicGenerators updated, remaining:', filtered.length);
+                  return filtered;
+                });
+                // Then do async operations
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast delete music', id);
                   realtimeRef.current?.sendDelete(id);
@@ -2099,203 +1807,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'music-generator', x: prevItem.x, y: prevItem.y, meta: { generatedMusicUrl: (prevItem as any).generatedMusicUrl || null } } }, requestId: '', clientTs: 0 } as any : undefined as any });
                 }
               }}
-              onPersistUpscaleModalCreate={async (modal) => {
-                // Optimistic update
-                setUpscaleGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create upscale', modal.id);
-                  realtimeRef.current?.sendCreate({
-                    id: modal.id,
-                    type: 'upscale',
-                    x: modal.x,
-                    y: modal.y,
-                    upscaledImageUrl: modal.upscaledImageUrl || null,
-                    sourceImageUrl: modal.sourceImageUrl || null,
-                    localUpscaledImageUrl: modal.localUpscaledImageUrl || null,
-                    model: modal.model,
-                    scale: modal.scale,
-                    frameWidth: modal.frameWidth,
-                    frameHeight: modal.frameHeight,
-                    isUpscaling: modal.isUpscaling,
-                  });
-                }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  await appendOp({
-                    type: 'create',
-                    elementId: modal.id,
-                    data: {
-                      element: {
-                        id: modal.id,
-                        type: 'upscale-plugin',
-                        x: modal.x,
-                        y: modal.y,
-                        meta: {
-                          upscaledImageUrl: modal.upscaledImageUrl || null,
-                          sourceImageUrl: modal.sourceImageUrl || null,
-                          localUpscaledImageUrl: modal.localUpscaledImageUrl || null,
-                          model: modal.model,
-                          scale: modal.scale,
-                          frameWidth: modal.frameWidth,
-                          frameHeight: modal.frameHeight,
-                          isUpscaling: modal.isUpscaling,
-                        },
-                      },
-                    },
-                    inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
-                  });
-                }
-              }}
-              onPersistUpscaleModalMove={async (id, updates) => {
-                // Capture previous state before update (for inverse op)
-                const prev = upscaleGenerators.find(m => m.id === id);
-                
-                // Optimistic update - this triggers the snapshot useEffect
-                setUpscaleGenerators(prevState => 
-                  prevState.map(m => m.id === id ? { ...m, ...updates } : m)
-                );
-                
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  realtimeRef.current?.sendUpdate(id, updates as any);
-                }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  // Structure updates correctly: meta fields go under meta, position fields go top-level
-                  // The backend does a shallow merge, so we need to include the full meta object
-                  const structuredUpdates: any = {};
-                  
-                  // Get existing meta from previous state (fields are stored at top level in state)
-                  const existingMeta = prev ? {
-                    upscaledImageUrl: (prev as any).upscaledImageUrl ?? null,
-                    sourceImageUrl: (prev as any).sourceImageUrl ?? null,
-                    localUpscaledImageUrl: (prev as any).localUpscaledImageUrl ?? null,
-                    model: (prev as any).model ?? 'Crystal Upscaler',
-                    scale: (prev as any).scale ?? 2,
-                    frameWidth: (prev as any).frameWidth ?? 400,
-                    frameHeight: (prev as any).frameHeight ?? 500,
-                    isUpscaling: (prev as any).isUpscaling ?? false,
-                  } : {
-                    upscaledImageUrl: null,
-                    sourceImageUrl: null,
-                    localUpscaledImageUrl: null,
-                    model: 'Crystal Upscaler',
-                    scale: 2,
-                    frameWidth: 400,
-                    frameHeight: 500,
-                    isUpscaling: false,
-                  };
-                  
-                  // Merge updates into meta
-                  const metaUpdates = { ...existingMeta };
-                  for (const k of Object.keys(updates || {})) {
-                    if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
-                      structuredUpdates[k] = (updates as any)[k];
-                    } else if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight') {
-                      metaUpdates[k] = (updates as any)[k];
-                    } else {
-                      structuredUpdates[k] = (updates as any)[k];
-                    }
-                  }
-                  
-                  // Always include meta in updates (backend does shallow merge)
-                  structuredUpdates.meta = metaUpdates;
-                  
-                  // Build inverse updates
-                  const inverseUpdates: any = {};
-                  if (prev) {
-                    if ('x' in updates) inverseUpdates.x = prev.x;
-                    if ('y' in updates) inverseUpdates.y = prev.y;
-                    if ('width' in updates) inverseUpdates.width = (prev as any).width;
-                    if ('height' in updates) inverseUpdates.height = (prev as any).height;
-                    
-                    // Inverse meta should restore previous meta
-                    const inverseMeta: any = {};
-                    for (const k of Object.keys(updates || {})) {
-                      if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight') {
-                        inverseMeta[k] = (prev as any)[k] ?? existingMeta[k];
-                      }
-                    }
-                    if (Object.keys(inverseMeta).length > 0) {
-                      inverseUpdates.meta = inverseMeta;
-                    }
-                  }
-                  
-                  await appendOp({
-                    type: 'update',
-                    elementId: id,
-                    data: { updates: structuredUpdates },
-                    inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
-                  });
-                }
-              }}
-              onPersistUpscaleModalDelete={async (id) => {
-                // Optimistic delete
-                const prevItem = upscaleGenerators.find(m => m.id === id);
-                setUpscaleGenerators(prev => prev.filter(m => m.id !== id));
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast delete upscale', id);
-                  realtimeRef.current?.sendDelete(id);
-                }
-                // Also remove any connectors that referenced this element
-                try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  await appendOp({
-                    type: 'delete',
-                    elementId: id,
-                    data: {},
-                    inverse: prevItem ? {
-                      type: 'create',
-                      elementId: id,
-                      data: {
-                        element: {
-                          id,
-                          type: 'upscale-plugin',
-                          x: prevItem.x,
-                          y: prevItem.y,
-                          meta: {
-                            upscaledImageUrl: (prevItem as any).upscaledImageUrl || null,
-                            sourceImageUrl: (prevItem as any).sourceImageUrl || null,
-                            localUpscaledImageUrl: (prevItem as any).localUpscaledImageUrl || null,
-                            model: (prevItem as any).model,
-                            scale: (prevItem as any).scale,
-                            frameWidth: (prevItem as any).frameWidth,
-                            frameHeight: (prevItem as any).frameHeight,
-                            isUpscaling: (prevItem as any).isUpscaling,
-                          },
-                        },
-                      },
-                      requestId: '',
-                      clientTs: 0,
-                    } as any : undefined as any,
-                  });
-                }
-              }}
-              onUpscale={async (model, scale, sourceImageUrl) => {
-                if (!sourceImageUrl || !projectId) {
-                  console.error('[onUpscale] Missing sourceImageUrl or projectId');
-                  return null;
-                }
-                
-                try {
-                  console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
-                  const result = await upscaleImageForCanvas(
-                    sourceImageUrl,
-                    model || 'Crystal Upscaler',
-                    scale || 2,
-                    projectId
-                  );
-                  
-                  console.log('[onUpscale] Upscale completed:', result);
-                  return result.url || null;
-                } catch (error: any) {
-                  console.error('[onUpscale] Error:', error);
-                  throw error;
-                }
-              }}
+              onPersistUpscaleModalCreate={pluginHandlers.onPersistUpscaleModalCreate}
+              onPersistUpscaleModalMove={pluginHandlers.onPersistUpscaleModalMove}
+              onPersistUpscaleModalDelete={pluginHandlers.onPersistUpscaleModalDelete}
+              onUpscale={pluginHandlers.onUpscale}
+              onPersistRemoveBgModalCreate={pluginHandlers.onPersistRemoveBgModalCreate}
+              onPersistRemoveBgModalMove={pluginHandlers.onPersistRemoveBgModalMove}
+              onPersistRemoveBgModalDelete={pluginHandlers.onPersistRemoveBgModalDelete}
+              onRemoveBg={pluginHandlers.onRemoveBg}
+              onPersistVectorizeModalCreate={pluginHandlers.onPersistVectorizeModalCreate}
+              onPersistVectorizeModalMove={pluginHandlers.onPersistVectorizeModalMove}
+              onPersistVectorizeModalDelete={pluginHandlers.onPersistVectorizeModalDelete}
+              onVectorize={pluginHandlers.onVectorize}
               onPersistTextModalCreate={async (modal) => {
                 setTextGenerators(prev => prev.some(t => t.id === modal.id) ? prev : [...prev, modal]);
                 if (realtimeActive) {
@@ -2329,14 +1852,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistTextModalDelete={async (id) => {
+                console.log('[page.tsx] onPersistTextModalDelete called', id);
                 const prevItem = textGenerators.find(t => t.id === id);
-                setTextGenerators(prev => prev.filter(t => t.id !== id));
+                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+                setTextGenerators(prev => {
+                  const filtered = prev.filter(t => t.id !== id);
+                  console.log('[page.tsx] textGenerators updated, remaining:', filtered.length);
+                  return filtered;
+                });
+                // Then do async operations
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast delete text', id);
                   realtimeRef.current?.sendDelete(id);
                 }
                 // Also remove any connectors that referenced this element
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+                // Always append op for undo/redo and persistence
                 if (projectId && opManagerInitialized) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
                     }
@@ -2448,6 +1979,184 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         frameWidth: 400,
                         frameHeight: 500,
                         isUpscaling: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+            } else if (plugin.id === 'vectorize') {
+              const viewportCenter = viewportCenterRef.current;
+              let modalX: number;
+              let modalY: number;
+              
+              if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+                modalX = viewportCenter.x;
+                modalY = viewportCenter.y;
+              } else {
+                modalX = viewportCenter.x;
+                modalY = viewportCenter.y;
+              }
+              
+              const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newVectorize = {
+                id: modalId,
+                x: modalX,
+                y: modalY,
+                vectorizedImageUrl: null,
+                sourceImageUrl: null,
+                localVectorizedImageUrl: null,
+                mode: 'Detailed',
+                frameWidth: 400,
+                frameHeight: 500,
+                isVectorizing: false,
+              };
+              console.log('[Plugin] Creating vectorize modal at viewport center:', newVectorize, 'viewportCenter:', viewportCenter);
+              // Persist via callback (this will trigger realtime + ops)
+              (async () => {
+                // Optimistic update
+                setVectorizeGenerators(prev => {
+                  if (prev.some(m => m.id === modalId)) {
+                    console.log('[Plugin] Vectorize modal already exists, skipping');
+                    return prev;
+                  }
+                  const updated = [...prev, newVectorize];
+                  console.log('[Plugin] Updated vectorizeGenerators, count:', updated.length);
+                  return updated;
+                });
+                // Broadcast via realtime
+                if (realtimeActive) {
+                  console.log('[Realtime] broadcast create vectorize', modalId);
+                  realtimeRef.current?.sendCreate({
+                    id: modalId,
+                    type: 'vectorize',
+                    x: modalX,
+                    y: modalY,
+                    vectorizedImageUrl: null,
+                    sourceImageUrl: null,
+                    localVectorizedImageUrl: null,
+                    mode: 'simple',
+                    frameWidth: 400,
+                    frameHeight: 500,
+                    isVectorizing: false,
+                  });
+                }
+                // Always append op for undo/redo and persistence
+                if (projectId && opManagerInitialized) {
+                  await appendOp({
+                    type: 'create',
+                    elementId: modalId,
+                    data: {
+                      element: {
+                        id: modalId,
+                        type: 'vectorize-plugin',
+                        x: modalX,
+                        y: modalY,
+                        meta: {
+                          vectorizedImageUrl: null,
+                          sourceImageUrl: null,
+                          localVectorizedImageUrl: null,
+                          mode: 'simple',
+                          frameWidth: 400,
+                          frameHeight: 500,
+                          isVectorizing: false,
+                        },
+                      },
+                    },
+                    inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                  });
+                }
+              })().catch(console.error);
+            } else if (plugin.id === 'removebg') {
+            const viewportCenter = viewportCenterRef.current;
+            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
+            // Otherwise use viewport center
+            let modalX: number;
+            let modalY: number;
+            
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              // Convert screen coordinates to canvas coordinates
+              // We need to get the canvas container position to do this properly
+              // For now, use viewport center as fallback
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              // Use viewport center
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+            
+            const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newRemoveBg = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              removedBgImageUrl: null,
+              sourceImageUrl: null,
+              localRemovedBgImageUrl: null,
+              model: '851-labs/background-remover',
+              backgroundType: 'rgba (transparent)',
+              scaleValue: 0.5,
+              frameWidth: 400,
+              frameHeight: 500,
+              isRemovingBg: false,
+            };
+            console.log('[Plugin] Creating removebg modal at viewport center:', newRemoveBg, 'viewportCenter:', viewportCenter);
+            // Persist via callback (this will trigger realtime + ops)
+            // Use the same callback pattern as Canvas component
+            (async () => {
+              // Optimistic update
+              setRemoveBgGenerators(prev => {
+                // Check if modal already exists to avoid duplicates
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Modal already exists, skipping');
+                  return prev;
+                }
+                const updated = [...prev, newRemoveBg];
+                console.log('[Plugin] Updated removeBgGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create removebg', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'removebg',
+                  x: modalX,
+                  y: modalY,
+                  removedBgImageUrl: null,
+                  sourceImageUrl: null,
+                  localRemovedBgImageUrl: null,
+                  model: '851-labs/background-remover',
+                  backgroundType: 'rgba (transparent)',
+                  scaleValue: 0.5,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isRemovingBg: false,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'removebg-plugin',
+                      x: modalX,
+                      y: modalY,
+                        meta: {
+                          removedBgImageUrl: null,
+                          sourceImageUrl: null,
+                          localRemovedBgImageUrl: null,
+                          model: '851-labs/background-remover',
+                          backgroundType: 'rgba (transparent)',
+                          scaleValue: 0.5,
+                          frameWidth: 400,
+                          frameHeight: 500,
+                          isRemovingBg: false,
                       },
                     },
                   },

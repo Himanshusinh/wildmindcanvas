@@ -136,6 +136,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
 
   return (
     <div
+      data-action-icons="true"
       style={{
         position: 'absolute',
         top: 0,
@@ -146,16 +147,81 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
         zIndex: 3001,
         pointerEvents: 'auto',
       }}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => {
+        console.log('[ModalActionIcons] Container onMouseDown', {
+          timestamp: Date.now(),
+          target: e.target,
+          currentTarget: e.currentTarget,
+        });
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.nativeEvent) {
+          e.nativeEvent.stopImmediatePropagation();
+        }
+      }}
+      onClick={(e) => {
+        console.log('[ModalActionIcons] Container onClick', {
+          timestamp: Date.now(),
+          target: e.target,
+          currentTarget: e.currentTarget,
+        });
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.nativeEvent) {
+          e.nativeEvent.stopImmediatePropagation();
+        }
+      }}
     >
       {/* Delete Icon */}
       {onDelete && (
         <button
           onClick={(e) => {
+            console.log('[ModalActionIcons] Delete button onClick triggered', {
+              timestamp: Date.now(),
+              target: e.target,
+              currentTarget: e.currentTarget,
+              eventPhase: e.eventPhase,
+              bubbles: e.bubbles,
+              defaultPrevented: e.defaultPrevented,
+              isTrusted: e.isTrusted,
+            });
+            // Stop all event propagation immediately
+            e.preventDefault();
             e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            
+            // Call delete immediately, don't defer
+            console.log('[ModalActionIcons] Calling onDelete callback immediately');
+            if (onDelete) {
             onDelete();
+              console.log('[ModalActionIcons] onDelete callback completed');
+            }
           }}
-          onMouseDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            console.log('[ModalActionIcons] Delete button onMouseDown triggered', {
+              timestamp: Date.now(),
+              target: e.target,
+              currentTarget: e.currentTarget,
+              button: e.button,
+            });
+            // Prevent default and stop propagation immediately
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            console.log('[ModalActionIcons] Delete button onMouseUp triggered', {
+              timestamp: Date.now(),
+              target: e.target,
+              currentTarget: e.currentTarget,
+            });
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           title="Delete"
           style={baseButtonStyle}
           onMouseEnter={handleDeleteMouseEnter}

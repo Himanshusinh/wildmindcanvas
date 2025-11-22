@@ -44,6 +44,9 @@ export function useOpManagerIntegration({
         const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }> = [];
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+        const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
+        const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
+        const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
         
         Object.values(elements).forEach((element: any) => {
           if (element && element.type) {
@@ -70,8 +73,14 @@ export function useOpManagerIntegration({
               newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null });
             } else if (element.type === 'music-generator') {
               newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
+            } else if (element.type === 'text-generator') {
+              newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' });
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+            } else if (element.type === 'removebg-plugin') {
+              newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
+            } else if (element.type === 'vectorize-plugin') {
+              newVectorizeGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' });
             }
           }
         });
@@ -83,7 +92,10 @@ export function useOpManagerIntegration({
           setters.setImageGenerators(newImageGenerators);
           setters.setVideoGenerators(newVideoGenerators);
           setters.setMusicGenerators(newMusicGenerators);
+          setters.setTextGenerators(newTextGenerators);
           setters.setUpscaleGenerators(newUpscaleGenerators);
+          setters.setRemoveBgGenerators(newRemoveBgGenerators);
+          setters.setVectorizeGenerators(newVectorizeGenerators);
         }
         snapshotLoadedRef.current = true;
       } else if (op.type === 'create' && op.data.element) {
@@ -127,6 +139,21 @@ export function useOpManagerIntegration({
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null }];
           });
+        } else if (element.type === 'text-generator') {
+          setters.setTextGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
+          });
+        } else if (element.type === 'removebg-plugin') {
+          setters.setRemoveBgGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue }];
+          });
+        } else if (element.type === 'vectorize-plugin') {
+          setters.setVectorizeGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' }];
+          });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
@@ -152,6 +179,10 @@ export function useOpManagerIntegration({
         setters.setImageGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setTextGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setters.setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -254,6 +285,57 @@ export function useOpManagerIntegration({
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
             next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
+        setters.setUpscaleGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            // Handle structured updates: x/y are top-level, everything else is in meta
+            const updates = op.data.updates as any;
+            const metaUpdates = updates.meta || {};
+            next[idx] = { 
+              ...next[idx], 
+              ...(updates.x !== undefined ? { x: updates.x } : {}),
+              ...(updates.y !== undefined ? { y: updates.y } : {}),
+              ...metaUpdates,
+            } as any;
+            return next;
+          }
+          return prev;
+        });
+        setters.setRemoveBgGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            // Handle structured updates: x/y are top-level, everything else is in meta
+            const updates = op.data.updates as any;
+            const metaUpdates = updates.meta || {};
+            next[idx] = { 
+              ...next[idx], 
+              ...(updates.x !== undefined ? { x: updates.x } : {}),
+              ...(updates.y !== undefined ? { y: updates.y } : {}),
+              ...metaUpdates,
+            } as any;
+            return next;
+          }
+          return prev;
+        });
+        setters.setVectorizeGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            // Handle structured updates: x/y are top-level, everything else is in meta
+            const updates = op.data.updates as any;
+            const metaUpdates = updates.meta || {};
+            next[idx] = { 
+              ...next[idx], 
+              ...(updates.x !== undefined ? { x: updates.x } : {}),
+              ...(updates.y !== undefined ? { y: updates.y } : {}),
+              ...metaUpdates,
+            } as any;
             return next;
           }
           return prev;

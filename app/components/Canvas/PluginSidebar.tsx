@@ -24,6 +24,16 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       name: 'Upscale',
       description: 'Enhance image resolution and quality',
     },
+    {
+      id: 'removebg',
+      name: 'Remove BG',
+      description: 'Remove background from images',
+    },
+    {
+      id: 'vectorize',
+      name: 'Vectorize',
+      description: 'Convert images to vector format',
+    },
   ]);
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {
@@ -97,6 +107,10 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              ) : item.id === 'removebg' ? (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
               ) : (
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
