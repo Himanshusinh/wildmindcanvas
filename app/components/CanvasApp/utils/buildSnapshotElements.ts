@@ -114,6 +114,80 @@ export function buildSnapshotElements(
     };
   });
   
+  // Erase generators
+  state.eraseGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      erasedImageUrl: modal.erasedImageUrl || null,
+      sourceImageUrl: modal.sourceImageUrl || null,
+      localErasedImageUrl: modal.localErasedImageUrl || null,
+      model: modal.model || 'bria/eraser',
+      frameWidth: modal.frameWidth || 400,
+      frameHeight: modal.frameHeight || 500,
+      isErasing: modal.isErasing || false,
+    };
+    // Attach any connections originating from this element into its meta
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'erase-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+  
+  // Replace generators
+  state.replaceGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      replacedImageUrl: modal.replacedImageUrl || null,
+      sourceImageUrl: modal.sourceImageUrl || null,
+      localReplacedImageUrl: modal.localReplacedImageUrl || null,
+      model: modal.model || 'bria/eraser',
+      frameWidth: modal.frameWidth || 400,
+      frameHeight: modal.frameHeight || 500,
+      isReplacing: modal.isReplacing || false,
+    };
+    // Attach any connections originating from this element into its meta
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'replace-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+
+  // Expand generators
+  state.expandGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      expandedImageUrl: modal.expandedImageUrl || null,
+      sourceImageUrl: modal.sourceImageUrl || null,
+      localExpandedImageUrl: modal.localExpandedImageUrl || null,
+      model: modal.model || 'expand/base',
+      frameWidth: modal.frameWidth || 400,
+      frameHeight: modal.frameHeight || 500,
+      isExpanding: modal.isExpanding || false,
+    };
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'expand-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+  
   // Vectorize generators
   state.vectorizeGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;

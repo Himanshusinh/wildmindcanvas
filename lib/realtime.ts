@@ -1,6 +1,6 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'vectorize';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize';
   x: number;
   y: number;
   generatedImageUrl?: string | null;
@@ -8,10 +8,16 @@ export type GeneratorOverlay = {
   generatedMusicUrl?: string | null;
   upscaledImageUrl?: string | null;
   removedBgImageUrl?: string | null;
+  erasedImageUrl?: string | null;
+  replacedImageUrl?: string | null;
+  expandedImageUrl?: string | null;
   vectorizedImageUrl?: string | null;
   sourceImageUrl?: string | null;
   localUpscaledImageUrl?: string | null;
   localRemovedBgImageUrl?: string | null;
+  localErasedImageUrl?: string | null;
+  localReplacedImageUrl?: string | null;
+  localExpandedImageUrl?: string | null;
   localVectorizedImageUrl?: string | null;
   mode?: string;
   frameWidth?: number;
@@ -25,6 +31,9 @@ export type GeneratorOverlay = {
   scale?: number;
   isUpscaling?: boolean;
   isRemovingBg?: boolean;
+  isErasing?: boolean;
+  isReplacing?: boolean;
+  isExpanding?: boolean;
   isVectorizing?: boolean;
   // text generator current value
   value?: string;

@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, VectorizeGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator } from '../types';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -7,11 +7,23 @@ export interface PluginHandlers {
   onPersistRemoveBgModalCreate: (modal: RemoveBgGenerator) => Promise<void>;
   onPersistRemoveBgModalMove: (id: string, updates: Partial<RemoveBgGenerator>) => Promise<void>;
   onPersistRemoveBgModalDelete: (id: string) => Promise<void>;
+  onPersistEraseModalCreate: (modal: EraseGenerator) => Promise<void>;
+  onPersistEraseModalMove: (id: string, updates: Partial<EraseGenerator>) => Promise<void>;
+  onPersistEraseModalDelete: (id: string) => Promise<void>;
+  onPersistReplaceModalCreate: (modal: ReplaceGenerator) => Promise<void>;
+  onPersistReplaceModalMove: (id: string, updates: Partial<ReplaceGenerator>) => Promise<void>;
+  onPersistReplaceModalDelete: (id: string) => Promise<void>;
+  onPersistExpandModalCreate: (modal: ExpandGenerator) => Promise<void>;
+  onPersistExpandModalMove: (id: string, updates: Partial<ExpandGenerator>) => Promise<void>;
+  onPersistExpandModalDelete: (id: string) => Promise<void>;
   onPersistVectorizeModalCreate: (modal: VectorizeGenerator) => Promise<void>;
   onPersistVectorizeModalMove: (id: string, updates: Partial<VectorizeGenerator>) => Promise<void>;
   onPersistVectorizeModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
+  onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
+  onReplace: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
+  onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onVectorize: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
 }
 
@@ -224,7 +236,10 @@ export function createPluginHandlers(
       );
       
       console.log('[onUpscale] Upscale completed:', result);
-      return result.url || null;
+      // Extract URL from result - result should be the data object with url property
+      const upscaledUrl = result?.url || (typeof result === 'string' ? result : null);
+      console.log('[onUpscale] Extracted URL:', upscaledUrl);
+      return upscaledUrl;
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
       throw error;
@@ -442,6 +457,556 @@ export function createPluginHandlers(
     }
   };
 
+  const onPersistEraseModalCreate = async (modal: EraseGenerator) => {
+    // Optimistic update
+    setters.setEraseGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create erase', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'erase',
+        x: modal.x,
+        y: modal.y,
+        erasedImageUrl: modal.erasedImageUrl || null,
+        sourceImageUrl: modal.sourceImageUrl || null,
+        localErasedImageUrl: modal.localErasedImageUrl || null,
+        model: modal.model,
+        frameWidth: modal.frameWidth,
+        frameHeight: modal.frameHeight,
+        isErasing: modal.isErasing,
+      });
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementType: 'erase',
+        elementId: modal.id,
+        data: {
+          id: modal.id,
+          x: modal.x,
+          y: modal.y,
+          erasedImageUrl: modal.erasedImageUrl || null,
+          sourceImageUrl: modal.sourceImageUrl || null,
+          localErasedImageUrl: modal.localErasedImageUrl || null,
+          model: modal.model,
+          frameWidth: modal.frameWidth,
+          frameHeight: modal.frameHeight,
+          isErasing: modal.isErasing,
+        },
+      });
+    }
+  };
+
+  const onPersistEraseModalMove = async (id: string, updates: Partial<EraseGenerator>) => {
+    // 1. Capture previous state (for inverse op)
+    const prev = state.eraseGenerators.find(m => m.id === id);
+    
+    // 2. Optimistic update (triggers snapshot useEffect)
+    setters.setEraseGenerators(prevState => 
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    
+    // 3. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast update erase', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    
+    // 4. Append op for undo/redo and persistence
+    if (projectId && opManagerInitialized && prev) {
+      await appendOp({
+        type: 'move',
+        elementType: 'erase',
+        elementId: id,
+        data: updates,
+        inverse: {
+          type: 'move',
+          elementType: 'erase',
+          elementId: id,
+          data: {
+            x: prev.x,
+            y: prev.y,
+            erasedImageUrl: prev.erasedImageUrl || null,
+            sourceImageUrl: prev.sourceImageUrl || null,
+            localErasedImageUrl: prev.localErasedImageUrl || null,
+            model: prev.model,
+            frameWidth: prev.frameWidth,
+            frameHeight: prev.frameHeight,
+            isErasing: prev.isErasing,
+          },
+        },
+      });
+    }
+  };
+
+  const onPersistEraseModalDelete = async (id: string) => {
+    // 1. Capture previous state (for inverse op)
+    const prevItem = state.eraseGenerators.find(m => m.id === id);
+    // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+    setters.setEraseGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      console.log('[page.tsx] eraseGenerators updated, remaining:', filtered.length);
+      return filtered;
+    });
+    // Then do async operations
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete erase', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Remove connectors for this element
+    await removeAndPersistConnectorsForElement(id);
+    // Append op for undo/redo and persistence
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementType: 'erase',
+        elementId: id,
+        data: null,
+        inverse: {
+          type: 'create',
+          elementType: 'erase',
+          elementId: id,
+          data: {
+            id: prevItem.id,
+            x: prevItem.x,
+            y: prevItem.y,
+            erasedImageUrl: prevItem.erasedImageUrl || null,
+            sourceImageUrl: prevItem.sourceImageUrl || null,
+            localErasedImageUrl: prevItem.localErasedImageUrl || null,
+            model: prevItem.model,
+            frameWidth: prevItem.frameWidth,
+            frameHeight: prevItem.frameHeight,
+            isErasing: prevItem.isErasing,
+          },
+        },
+      });
+    }
+  };
+
+  const onErase = async (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => {
+    if (!sourceImageUrl || !projectId) {
+      console.error('[onErase] Missing sourceImageUrl or projectId');
+      return null;
+    }
+    
+    // Mask is now optional - image is composited with white mask overlay
+    // The composited image already contains the mask, so mask parameter is not required
+    console.log('[onErase] Starting erase:', {
+      model,
+      sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
+      hasMask: !!mask,
+      hasCompositedImage: !!sourceImageUrl,
+      prompt: prompt || '(none)',
+      note: 'Using composited image (mask is part of the image)'
+    });
+    
+    try {
+      const { eraseImageForCanvas } = await import('@/lib/api');
+      // Pass composited image as image parameter, mask is optional (can be undefined)
+      const result = await eraseImageForCanvas(
+        sourceImageUrl, // This is the composited image (original + white mask overlay)
+        projectId,
+        model,
+        mask, // Optional - can be undefined since mask is composited into image
+        prompt
+      );
+      
+      console.log('[onErase] Erase completed:', result);
+      return result.url || null;
+    } catch (error: any) {
+      console.error('[onErase] Error:', error);
+      throw error;
+    }
+  };
+
+  const onPersistReplaceModalCreate = async (modal: ReplaceGenerator) => {
+    // Optimistic update
+    setters.setReplaceGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create replace', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'replace',
+        x: modal.x,
+        y: modal.y,
+        replacedImageUrl: modal.replacedImageUrl || null,
+        sourceImageUrl: modal.sourceImageUrl || null,
+        localReplacedImageUrl: modal.localReplacedImageUrl || null,
+        model: modal.model || 'bria/eraser',
+        frameWidth: modal.frameWidth,
+        frameHeight: modal.frameHeight,
+        isReplacing: modal.isReplacing,
+      });
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'replace-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              replacedImageUrl: modal.replacedImageUrl || null,
+              sourceImageUrl: modal.sourceImageUrl || null,
+              localReplacedImageUrl: modal.localReplacedImageUrl || null,
+              model: modal.model || 'bria/eraser',
+              frameWidth: modal.frameWidth || 400,
+              frameHeight: modal.frameHeight || 500,
+              isReplacing: modal.isReplacing || false,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistReplaceModalMove = async (id: string, updates: Partial<ReplaceGenerator>) => {
+    // 1. Capture previous state (for inverse op)
+    const prev = state.replaceGenerators.find(m => m.id === id);
+    
+    // 2. Optimistic update (triggers snapshot useEffect)
+    setters.setReplaceGenerators(prevState => 
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    
+    // 3. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move replace', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    
+    // 4. Append op for undo/redo
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      const existingMeta = {
+        replacedImageUrl: prev.replacedImageUrl || null,
+        sourceImageUrl: prev.sourceImageUrl || null,
+        localReplacedImageUrl: prev.localReplacedImageUrl || null,
+        model: prev.model || 'bria/eraser',
+        frameWidth: prev.frameWidth || 400,
+        frameHeight: prev.frameHeight || 500,
+        isReplacing: prev.isReplacing || false,
+      };
+      
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+      
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+      const inverseMeta: any = {};
+      if ('replacedImageUrl' in updates) inverseMeta.replacedImageUrl = prev.replacedImageUrl || null;
+      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+      if ('localReplacedImageUrl' in updates) inverseMeta.localReplacedImageUrl = prev.localReplacedImageUrl || null;
+      if ('model' in updates) inverseMeta.model = prev.model || 'bria/eraser';
+      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
+      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
+      if ('isReplacing' in updates) inverseMeta.isReplacing = prev.isReplacing || false;
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
+      
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistReplaceModalDelete = async (id: string) => {
+    // 1. Capture previous state (for inverse op)
+    const prevItem = state.replaceGenerators.find(m => m.id === id);
+    // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+    setters.setReplaceGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      console.log('[page.tsx] replaceGenerators updated, remaining:', filtered.length);
+      return filtered;
+    });
+    // Then do async operations
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete replace', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Remove connectors for this element
+    await removeAndPersistConnectorsForElement(id);
+    // Append op for undo/redo and persistence
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementType: 'replace',
+        elementId: id,
+        data: null,
+        inverse: {
+          type: 'create',
+          elementType: 'replace',
+          elementId: id,
+          data: {
+            id: prevItem.id,
+            x: prevItem.x,
+            y: prevItem.y,
+            replacedImageUrl: prevItem.replacedImageUrl || null,
+            sourceImageUrl: prevItem.sourceImageUrl || null,
+            localReplacedImageUrl: prevItem.localReplacedImageUrl || null,
+            model: prevItem.model,
+            frameWidth: prevItem.frameWidth,
+            frameHeight: prevItem.frameHeight,
+            isReplacing: prevItem.isReplacing,
+          },
+        },
+      });
+    }
+  };
+
+  const onReplace = async (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => {
+    if (!sourceImageUrl || !projectId) {
+      console.error('[onReplace] Missing sourceImageUrl or projectId');
+      return null;
+    }
+    
+    // Prompt is required for replace (unlike erase which has a default)
+    if (!prompt || !prompt.trim()) {
+      console.error('[onReplace] Prompt is required for replace');
+      throw new Error('Prompt is required for image replace. Please describe what you want to replace the selected area with.');
+    }
+    
+    console.log('[onReplace] Starting replace:', {
+      model,
+      sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
+      hasMask: !!mask,
+      prompt: prompt || '(MISSING - will fail)',
+      note: 'Using composited image (mask is part of the image)'
+    });
+    
+    try {
+      const { replaceImageForCanvas } = await import('@/lib/api');
+      // Pass composited image as image parameter, mask is optional (can be undefined)
+      const result = await replaceImageForCanvas(
+        sourceImageUrl, // This is the composited image (original + white mask overlay)
+        projectId,
+        model,
+        mask, // Optional - can be undefined since mask is composited into image
+        prompt // REQUIRED - what to replace the white area with
+      );
+      
+      console.log('[onReplace] Replace completed:', result);
+      return result.url || null;
+    } catch (error: any) {
+      console.error('[onReplace] Error:', error);
+      throw error;
+    }
+  };
+
+  const onPersistExpandModalCreate = async (modal: ExpandGenerator) => {
+    setters.setExpandGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create expand', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'expand',
+        x: modal.x,
+        y: modal.y,
+        expandedImageUrl: modal.expandedImageUrl || null,
+        sourceImageUrl: modal.sourceImageUrl || null,
+        localExpandedImageUrl: modal.localExpandedImageUrl || null,
+        model: modal.model || 'expand/base',
+        frameWidth: modal.frameWidth,
+        frameHeight: modal.frameHeight,
+        isExpanding: modal.isExpanding,
+      });
+    }
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'expand-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              expandedImageUrl: modal.expandedImageUrl || null,
+              sourceImageUrl: modal.sourceImageUrl || null,
+              localExpandedImageUrl: modal.localExpandedImageUrl || null,
+              model: modal.model || 'expand/base',
+              frameWidth: modal.frameWidth || 400,
+              frameHeight: modal.frameHeight || 500,
+              isExpanding: modal.isExpanding || false,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistExpandModalMove = async (id: string, updates: Partial<ExpandGenerator>) => {
+    const prev = state.expandGenerators.find(m => m.id === id);
+    setters.setExpandGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move expand', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      const existingMeta = {
+        expandedImageUrl: prev.expandedImageUrl || null,
+        sourceImageUrl: prev.sourceImageUrl || null,
+        localExpandedImageUrl: prev.localExpandedImageUrl || null,
+        model: prev.model || 'expand/base',
+        frameWidth: prev.frameWidth || 400,
+        frameHeight: prev.frameHeight || 500,
+        isExpanding: prev.isExpanding || false,
+      };
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+      const inverseMeta: any = {};
+      if ('expandedImageUrl' in updates) inverseMeta.expandedImageUrl = prev.expandedImageUrl || null;
+      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+      if ('localExpandedImageUrl' in updates) inverseMeta.localExpandedImageUrl = prev.localExpandedImageUrl || null;
+      if ('model' in updates) inverseMeta.model = prev.model || 'expand/base';
+      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
+      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
+      if ('isExpanding' in updates) inverseMeta.isExpanding = prev.isExpanding || false;
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistExpandModalDelete = async (id: string) => {
+    const prevItem = state.expandGenerators.find(m => m.id === id);
+    setters.setExpandGenerators(prev => prev.filter(m => m.id !== id));
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete expand', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    await removeAndPersistConnectorsForElement(id);
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementType: 'expand',
+        elementId: id,
+        data: null,
+        inverse: {
+          type: 'create',
+          elementType: 'expand',
+          elementId: id,
+          data: {
+            id: prevItem.id,
+            x: prevItem.x,
+            y: prevItem.y,
+            expandedImageUrl: prevItem.expandedImageUrl || null,
+            sourceImageUrl: prevItem.sourceImageUrl || null,
+            localExpandedImageUrl: prevItem.localExpandedImageUrl || null,
+            model: prevItem.model,
+            frameWidth: prevItem.frameWidth,
+            frameHeight: prevItem.frameHeight,
+            isExpanding: prevItem.isExpanding,
+          },
+        },
+      });
+    }
+  };
+
+  const onExpand = async (
+    model: string,
+    sourceImageUrl?: string,
+    prompt?: string,
+    canvasSize?: [number, number],
+    originalImageSize?: [number, number],
+    originalImageLocation?: [number, number],
+    aspectRatio?: string
+  ) => {
+    if (!sourceImageUrl || !projectId) {
+      console.error('[onExpand] Missing sourceImageUrl or projectId');
+      return null;
+    }
+
+    if (!canvasSize || !originalImageSize || !originalImageLocation) {
+      console.error('[onExpand] Missing frame information', { canvasSize, originalImageSize, originalImageLocation });
+      throw new Error('Frame information is required for expand. Please ensure the image is positioned in the frame.');
+    }
+
+    console.log('[onExpand] Starting expand:', {
+      model,
+      sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
+      prompt: prompt || '(optional)',
+      canvasSize,
+      originalImageSize,
+      originalImageLocation,
+      aspectRatio: aspectRatio || '(not set)',
+    });
+
+    try {
+      const { expandImageForCanvas } = await import('@/lib/api');
+      const result = await expandImageForCanvas(
+        sourceImageUrl,
+        projectId,
+        canvasSize,
+        originalImageSize,
+        originalImageLocation,
+        prompt,
+        aspectRatio
+      );
+      
+      console.log('[onExpand] Expand completed:', result);
+      return result.url || null;
+    } catch (error: any) {
+      console.error('[onExpand] Error:', error);
+      throw error;
+    }
+  };
+
   const onPersistVectorizeModalCreate = async (modal: VectorizeGenerator) => {
     // Optimistic update
     setters.setVectorizeGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
@@ -649,11 +1214,23 @@ export function createPluginHandlers(
     onPersistRemoveBgModalCreate,
     onPersistRemoveBgModalMove,
     onPersistRemoveBgModalDelete,
+    onPersistEraseModalCreate,
+    onPersistEraseModalMove,
+    onPersistEraseModalDelete,
     onPersistVectorizeModalCreate,
     onPersistVectorizeModalMove,
     onPersistVectorizeModalDelete,
     onUpscale,
     onRemoveBg,
+    onErase,
+    onPersistReplaceModalCreate,
+    onPersistReplaceModalMove,
+    onPersistReplaceModalDelete,
+    onPersistExpandModalCreate,
+    onPersistExpandModalMove,
+    onPersistExpandModalDelete,
+    onReplace,
+    onExpand,
     onVectorize,
   };
 }

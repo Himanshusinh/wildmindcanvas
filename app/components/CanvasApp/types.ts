@@ -79,6 +79,45 @@ export interface RemoveBgGenerator {
   isRemovingBg?: boolean;
 }
 
+export interface EraseGenerator {
+  id: string;
+  x: number;
+  y: number;
+  erasedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localErasedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isErasing?: boolean;
+}
+
+export interface ReplaceGenerator {
+  id: string;
+  x: number;
+  y: number;
+  replacedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localReplacedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isReplacing?: boolean;
+}
+
+export interface ExpandGenerator {
+  id: string;
+  x: number;
+  y: number;
+  expandedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localExpandedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isExpanding?: boolean;
+}
+
 export interface VectorizeGenerator {
   id: string;
   x: number;
@@ -119,6 +158,9 @@ export interface CanvasAppState {
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
+  eraseGenerators: EraseGenerator[];
+  replaceGenerators: ReplaceGenerator[];
+  expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
   textGenerators: TextGenerator[];
   connectors: Connector[];
@@ -132,6 +174,9 @@ export interface CanvasAppSetters {
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
+  setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
+  setReplaceGenerators: React.Dispatch<React.SetStateAction<ReplaceGenerator[]>>;
+  setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
   setTextGenerators: React.Dispatch<React.SetStateAction<TextGenerator[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;

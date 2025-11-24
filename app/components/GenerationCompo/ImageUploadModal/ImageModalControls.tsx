@@ -7,6 +7,7 @@ interface ImageModalControlsProps {
   isPinned: boolean;
   isUploadedImage: boolean;
   prompt: string;
+  isPromptDisabled?: boolean;
   selectedModel: string;
   selectedAspectRatio: string;
   selectedFrame: string;
@@ -34,6 +35,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   isPinned,
   isUploadedImage,
   prompt,
+  isPromptDisabled = false,
   selectedModel,
   selectedAspectRatio,
   selectedFrame,
@@ -64,17 +66,20 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(target)) {
         onSetIsModelDropdownOpen(false);
       }
-      if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(event.target as Node)) {
+      if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(target)) {
         onSetIsAspectRatioDropdownOpen(false);
       }
     };
 
     if (isModelDropdownOpen || isAspectRatioDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      // Use 'click' instead of 'mousedown' so it fires after dropdown item clicks
+      // This ensures the item's onMouseDown handler can stop propagation first
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [isModelDropdownOpen, isAspectRatioDropdownOpen, onSetIsModelDropdownOpen, onSetIsAspectRatioDropdownOpen]);
 
@@ -178,16 +183,19 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 onGenerate();
               }
             }}
-            placeholder="Enter prompt here..."
+            placeholder={isPromptDisabled ? "Connected to text input..." : "Enter prompt here..."}
+            disabled={isPromptDisabled}
             style={{
               flex: 1,
               padding: `${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: isPromptDisabled ? '#f3f4f6' : '#ffffff',
               border: 'none',
               borderRadius: `${10 * scale}px`,
               fontSize: controlFontSize,
-              color: '#1f2937',
+              color: isPromptDisabled ? '#6b7280' : '#1f2937',
               outline: 'none',
+              cursor: isPromptDisabled ? 'not-allowed' : 'text',
+              opacity: isPromptDisabled ? 0.7 : 1,
             }}
             onFocus={(e) => {
               e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
@@ -305,8 +313,13 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                       key={model}
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         onModelChange(model);
                         onSetIsModelDropdownOpen(false);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
                       }}
                       style={{
                         padding: `${6 * scale}px ${12 * scale}px`,
@@ -319,6 +332,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         borderRadius: `${6 * scale}px`,
                         whiteSpace: 'nowrap',
                         minWidth: 'max-content',
+                        userSelect: 'none',
                       }}
                       onMouseEnter={(e) => {
                         if (selectedModel !== model) {

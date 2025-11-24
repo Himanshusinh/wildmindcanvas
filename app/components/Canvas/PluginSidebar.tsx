@@ -30,6 +30,21 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       description: 'Remove background from images',
     },
     {
+      id: 'erase',
+      name: 'Erase',
+      description: 'Erase parts of images using AI',
+    },
+    {
+      id: 'replace',
+      name: 'Replace',
+      description: 'Replace parts of images using AI',
+    },
+    {
+      id: 'expand',
+      name: 'Expand',
+      description: 'Reserve empty frames for future edits',
+    },
+    {
       id: 'vectorize',
       name: 'Vectorize',
       description: 'Convert images to vector format',

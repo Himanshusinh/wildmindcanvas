@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '@/app/components/common/canvasCaptureGuard';
 import { VideoModalTooltip } from './VideoModalTooltip';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
@@ -66,6 +66,7 @@ interface VideoUploadModalProps {
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: ImageUpload[];
+  textInputStates?: Array<{ id: string; value?: string }>;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -98,6 +99,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   connections = [],
   imageModalStates = [],
   images = [],
+  textInputStates = [],
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -125,6 +127,49 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [isResolutionDropdownOpen, setIsResolutionDropdownOpen] = useState(false);
   const [videoResolution, setVideoResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
+
+  // Detect connected text input
+  const connectedTextInput = useMemo(() => {
+    if (!id || !connections || connections.length === 0 || !textInputStates || textInputStates.length === 0) {
+      return null;
+    }
+    // Find connection where this modal is the target (to === id)
+    const connection = connections.find(c => c.to === id);
+    if (!connection) return null;
+    
+    // Find the text input state that matches the connection source
+    const textInput = textInputStates.find(t => t.id === connection.from);
+    return textInput || null;
+  }, [id, connections, textInputStates]);
+
+  // Use connected text as prompt if connected, otherwise use local prompt state
+  const effectivePrompt = connectedTextInput?.value || prompt;
+
+  // Track previous connected text value to prevent unnecessary updates
+  const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const onOptionsChangeRef = useRef(onOptionsChange);
+  
+  // Update ref when onOptionsChange changes
+  useEffect(() => {
+    onOptionsChangeRef.current = onOptionsChange;
+  }, [onOptionsChange]);
+
+  // Update prompt when connected text changes (only when value actually changes)
+  useEffect(() => {
+    const currentValue = connectedTextInput?.value;
+    // Only update if the value actually changed
+    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentValue;
+      setPrompt(currentValue);
+      // Only call onOptionsChange if the prompt value actually changed
+      if (onOptionsChangeRef.current && currentValue !== prompt) {
+        onOptionsChangeRef.current({ prompt: currentValue });
+      }
+    } else if (currentValue === undefined) {
+      // Reset ref when disconnected
+      prevConnectedTextValueRef.current = undefined;
+    }
+  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -254,7 +299,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   }, [firstFrameUrl, lastFrameUrl]);
 
   const handleGenerate = async () => {
-    if (onGenerate && prompt.trim() && !isGenerating) {
+    // Use effective prompt (connected text or local prompt)
+    const promptToUse = effectivePrompt;
+    if (onGenerate && promptToUse.trim() && !isGenerating) {
       setIsGenerating(true);
       try {
         // Pass first_frame_url and last_frame_url if 2 images are connected
@@ -266,7 +313,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           : lastFrameUrl;
 
         await onGenerate(
-          prompt, 
+          promptToUse, 
           selectedModel, 
           selectedFrame, 
           selectedAspectRatio, 
@@ -491,7 +538,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isHovered={isHovered}
         isPinned={isPinned}
         isUploadedVideo={!!isUploadedVideo}
-        prompt={prompt}
+        prompt={effectivePrompt}
+        isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}
@@ -513,8 +561,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         frameBorderColor={frameBorderColor}
         frameBorderWidth={frameBorderWidth}
         onPromptChange={(val) => {
-          setPrompt(val);
-          onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, duration: selectedDuration, resolution: selectedResolution });
+          // Only allow prompt changes if not connected to text input
+          if (!connectedTextInput) {
+            setPrompt(val);
+            onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame, duration: selectedDuration, resolution: selectedResolution });
+          }
         }}
         onModelChange={(model) => {
           setSelectedModel(model);

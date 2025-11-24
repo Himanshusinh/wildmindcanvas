@@ -1,6 +1,7 @@
 'use client';
 import { useRef } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface ImageModalFrameProps {
   id?: string;
@@ -72,7 +73,9 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
     >
       {generatedImageUrl ? (
         <img
-          src={generatedImageUrl}
+          src={generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata') 
+            ? buildProxyResourceUrl(generatedImageUrl) 
+            : generatedImageUrl}
           alt="Generated"
           style={{
             width: '100%',

@@ -149,7 +149,13 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
           }}
           onPersistImageModalCreate={onPersistImageModalCreate}
           onUpdateImageModalState={(modalId, updates) => {
-            // This will be handled by parent component
+            // Update the image modal state via onPersistImageModalMove
+            if (onPersistImageModalMove) {
+              console.log('[UpscaleModalOverlays] Updating image modal state:', { modalId, updates });
+              Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+            } else {
+              console.warn('[UpscaleModalOverlays] onPersistImageModalMove is not defined');
+            }
           }}
           connections={connections}
           imageModalStates={imageModalStates}

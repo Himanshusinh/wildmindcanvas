@@ -23,6 +23,7 @@ interface ImageModalOverlaysProps {
   connections: Connection[];
   imageModalStatesForConnections: ImageModalState[];
   images: ImageUpload[];
+  textInputStates?: Array<{ id: string; value?: string }>;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -45,6 +46,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   connections,
   imageModalStatesForConnections,
   images,
+  textInputStates = [],
   stageRef,
   scale,
   position,
@@ -220,6 +222,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           connections={connections}
           imageModalStates={imageModalStatesForConnections}
           images={images}
+          textInputStates={textInputStates}
           onPersistConnectorCreate={onPersistConnectorCreate}
         />
       ))}

@@ -1,5 +1,6 @@
 'use client';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
+import { queryCanvasPrompt } from '@/lib/api';
 
 interface TextModalFrameProps {
   id: string;
@@ -45,6 +46,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   onMouseDown,
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   useEffect(() => {
     // Only autofocus the inner textarea when allowed. Default is to autofocus
@@ -113,52 +115,91 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         }}
       />
       <div style={{ display: 'flex', gap: `${8 * scale}px`, justifyContent: 'flex-end', alignItems: 'center' }}>
-        {/* Enhance Button (restored) */}
+        {/* Enhance Button */}
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            // Simple client-side enhancement placeholder: trim + collapse spaces
-            const enhanced = text.replace(/\s+/g, ' ').trim();
-            if (enhanced && onConfirm) {
-              onConfirm(enhanced, selectedModel + ' (enhance)');
+            if (!text.trim() || isEnhancing) return;
+
+            setIsEnhancing(true);
+            try {
+              const result = await queryCanvasPrompt(text);
+              
+              // If it's an enhanced prompt (image/video/music), update the text
+              if (result.type !== 'answer' && result.enhanced_prompt) {
+                onTextChange(result.enhanced_prompt);
+              } 
+              // If it's an answer, we could show it in a different way or append it
+              else if (result.type === 'answer' && result.response) {
+                // For answers, you might want to append or replace - for now, we'll replace
+                onTextChange(result.response);
+              }
+            } catch (error: any) {
+              console.error('[TextModalFrame] Error enhancing prompt:', error);
+              alert(`Failed to enhance prompt: ${error.message || 'Unknown error'}`);
+            } finally {
+              setIsEnhancing(false);
             }
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Enhance"
+          title={isEnhancing ? 'Enhancing...' : 'Enhance prompt'}
           style={{
             width: `${30 * scale}px`,
             height: `${30 * scale}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0.6) 100%)',
+            background: isEnhancing 
+              ? 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.4) 100%)'
+              : 'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0.6) 100%)',
             border: `${1 * scale}px solid rgba(168,85,247,0.65)`,
             borderRadius: `${12 * scale}px`,
             color: '#6d28d9',
-            cursor: 'pointer',
+            cursor: isEnhancing || !text.trim() ? 'not-allowed' : 'pointer',
             boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`,
             padding: 0,
             transition: 'none',
+            opacity: isEnhancing || !text.trim() ? 0.6 : 1,
           }}
-          disabled={!text.trim()}
+          disabled={!text.trim() || isEnhancing}
           onMouseEnter={(e) => {
-            // subtle hover effect without scaling
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(168,85,247,0.45)`;
+            if (!isEnhancing && text.trim()) {
+              (e.currentTarget as HTMLElement).style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(168,85,247,0.45)`;
+            }
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`;
           }}
         >
-          <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3v4" />
-            <path d="M12 17v4" />
-            <path d="M3 12h4" />
-            <path d="M17 12h4" />
-            <path d="M5.6 5.6l2.8 2.8" />
-            <path d="M15.6 15.6l2.8 2.8" />
-            <path d="M18.4 5.6l-2.8 2.8" />
-            <path d="M8.4 15.6l-2.8 2.8" />
-          </svg>
+          {isEnhancing ? (
+            <svg 
+              width={20 * scale} 
+              height={20 * scale} 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              style={{ 
+                animation: 'spin 1s linear infinite',
+                transformOrigin: 'center',
+              }}
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v4" />
+              <path d="M12 17v4" />
+              <path d="M3 12h4" />
+              <path d="M17 12h4" />
+              <path d="M5.6 5.6l2.8 2.8" />
+              <path d="M15.6 15.6l2.8 2.8" />
+              <path d="M18.4 5.6l-2.8 2.8" />
+              <path d="M8.4 15.6l-2.8 2.8" />
+            </svg>
+          )}
         </button>
       </div>
 

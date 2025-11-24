@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '@/app/components/common/canvasCaptureGuard';
 import { ImageModalTooltip } from './ImageModalTooltip';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
@@ -43,6 +43,7 @@ interface ImageUploadModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
+  textInputStates?: Array<{ id: string; value?: string }>;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -80,6 +81,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  textInputStates = [],
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -114,6 +116,50 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const displayAspectRatio = generatedImageUrl && initialAspectRatio 
     ? initialAspectRatio 
     : selectedAspectRatio;
+
+  // Detect connected text input
+  const connectedTextInput = useMemo(() => {
+    if (!id || !connections || connections.length === 0 || !textInputStates || textInputStates.length === 0) {
+      return null;
+    }
+    // Find connection where this modal is the target (to === id)
+    const connection = connections.find(c => c.to === id);
+    if (!connection) return null;
+    
+    // Find the text input state that matches the connection source
+    const textInput = textInputStates.find(t => t.id === connection.from);
+    return textInput || null;
+  }, [id, connections, textInputStates]);
+
+  // Use connected text as prompt if connected, otherwise use local prompt state
+  const effectivePrompt = connectedTextInput?.value || prompt;
+
+  // Track previous connected text value to prevent unnecessary updates
+  const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const onOptionsChangeRef = useRef(onOptionsChange);
+  
+  // Update ref when onOptionsChange changes
+  useEffect(() => {
+    onOptionsChangeRef.current = onOptionsChange;
+  }, [onOptionsChange]);
+
+  // Update prompt when connected text changes (only when value actually changes)
+  useEffect(() => {
+    const currentValue = connectedTextInput?.value;
+    // Only update if the value actually changed
+    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentValue;
+      setPrompt(currentValue);
+      // Only call onOptionsChange if the prompt value actually changed
+      if (onOptionsChangeRef.current && currentValue !== prompt) {
+        const opts: any = { prompt: currentValue };
+        onOptionsChangeRef.current(opts);
+      }
+    } else if (currentValue === undefined) {
+      // Reset ref when disconnected
+      prevConnectedTextValueRef.current = undefined;
+    }
+  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -190,7 +236,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Filter models: 
   // - If image is connected from another modal OR an image is already generated in this modal, only show image-to-image models
   // - Otherwise, show all models
-  const IMAGE_TO_IMAGE_MODELS = ['Google Nano Banana'];
+  const IMAGE_TO_IMAGE_MODELS = [
+    'Google Nano Banana',
+    'Flux Kontext Max',
+    'Flux Kontext Pro',
+    'Seedream v4 4K',
+    'Runway Gen4 Image',
+    'Runway Gen4 Image Turbo'
+  ];
   const ALL_MODELS = [
     'Google Nano Banana', 
     'Seedream v4', 
@@ -201,34 +254,54 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro', 
     'Flux Pro 1.1 Ultra', 
     'Flux Pro 1.1',
-    'Seedream v4 4K'
+    'Seedream v4 4K',
+    'Runway Gen4 Image',
+    'Runway Gen4 Image Turbo'
   ];
   const availableModels = (hasConnectedImage || hasExistingImage) ? IMAGE_TO_IMAGE_MODELS : ALL_MODELS;
   
-  // Determine source image URL: use connected image if available, otherwise use existing generated image
-  const finalSourceImageUrl = sourceImageUrl || (hasExistingImage ? generatedImageUrl : null);
+  // Determine source image URL: 
+  // Priority 1: If this frame has its own generated image, use that (for modifying this frame's image)
+  // Priority 2: If this frame is empty but has a connected image source, use that (for image-to-image from external source)
+  // Priority 3: No source (text-to-image)
+  const finalSourceImageUrl = hasExistingImage ? generatedImageUrl : (sourceImageUrl || null);
 
-  // Auto-set model to Google Nano Banana when image is connected or already generated
+  // Track if we've already initialized the model for image-to-image mode
+  const hasInitializedImageToImageModel = useRef(false);
+  
+  // Auto-set model to Google Nano Banana when FIRST entering image-to-image mode
   // BUT NOT if this is an uploaded image (Media) - uploaded images should keep their model
+  // AND NOT if the user has already selected a different model
   useEffect(() => {
     // Don't auto-set model for uploaded images (Media)
     if (isUploadedImage) return;
     
-    if ((hasConnectedImage || hasExistingImage) && selectedModel !== 'Google Nano Banana') {
-      setSelectedModel('Google Nano Banana');
-      onOptionsChange?.({
-        model: 'Google Nano Banana',
-        aspectRatio: selectedAspectRatio,
-        frame: selectedFrame,
-        prompt,
-        frameWidth: 600,
-        frameHeight: 400,
-      });
+    // Only auto-set on FIRST entry to image-to-image mode, not on every change
+    if ((hasConnectedImage || hasExistingImage) && !hasInitializedImageToImageModel.current) {
+      // Check if current model is NOT in the image-to-image models list
+      // If it's not, set to default. If it is, keep it.
+      if (!IMAGE_TO_IMAGE_MODELS.includes(selectedModel)) {
+        setSelectedModel('Google Nano Banana');
+        onOptionsChange?.({
+          model: 'Google Nano Banana',
+          aspectRatio: selectedAspectRatio,
+          frame: selectedFrame,
+          prompt,
+          frameWidth: 600,
+          frameHeight: 400,
+        });
+      }
+      hasInitializedImageToImageModel.current = true;
+    } else if (!hasConnectedImage && !hasExistingImage) {
+      // Reset the flag when exiting image-to-image mode
+      hasInitializedImageToImageModel.current = false;
     }
-  }, [hasConnectedImage, hasExistingImage, selectedModel, selectedAspectRatio, selectedFrame, prompt, onOptionsChange, isUploadedImage]);
+  }, [hasConnectedImage, hasExistingImage, selectedModel, selectedAspectRatio, selectedFrame, prompt, onOptionsChange, isUploadedImage, IMAGE_TO_IMAGE_MODELS]);
 
   const handleGenerate = async () => {
-    if (prompt.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
+    // Use effective prompt (connected text or local prompt)
+    const promptToUse = effectivePrompt;
+    if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
       setIsGenerating(true);
       try {
         // Calculate frame dimensions for positioning
@@ -268,7 +341,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             model: selectedModel,
             frame: selectedFrame,
             aspectRatio: selectedAspectRatio,
-            prompt,
+            prompt: promptToUse,
             imageCount: 1,
           };
           await Promise.resolve(onPersistImageModalCreate(newModal));
@@ -318,7 +391,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             model: selectedModel,
             frame: selectedFrame,
             aspectRatio: selectedAspectRatio,
-            prompt,
+            prompt: promptToUse,
             imageCount: 1,
           };
           
@@ -331,7 +404,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         const isImageToImageMode = Boolean(finalSourceImageUrl);
         if (onPersistConnectorCreate && modalIds.length > 0) {
           // Case 1: Connect from connected image source to new frames (image-to-image from external source)
-          if (isImageToImageMode && connectedImageSource?.id) {
+          // Only do this if we're NOT modifying an existing image in the current modal
+          // (If we're modifying an existing image, Case 2 will handle connecting from current modal)
+          if (isImageToImageMode && connectedImageSource?.id && !hasExistingImage) {
             // Get source modal position for calculating connection start point
             const sourceModal = imageModalStates.find(m => m.id === connectedImageSource.id);
             const sourceX = sourceModal?.x ?? x;
@@ -433,7 +508,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
         console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
-        const result = await onImageGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio, targetModalId, imageCount, finalSourceImageUrl || undefined);
+        const result = await onImageGenerate(promptToUse, selectedModel, selectedFrame, selectedAspectRatio, targetModalId, imageCount, finalSourceImageUrl || undefined);
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
         
         // Extract all generated image URLs
@@ -728,7 +803,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isHovered={isHovered}
         isPinned={isPinned}
         isUploadedImage={Boolean(isUploadedImage)}
-        prompt={prompt}
+        prompt={effectivePrompt}
+        isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}

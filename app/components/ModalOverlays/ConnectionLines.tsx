@@ -19,6 +19,9 @@ interface ConnectionLinesProps {
   musicModalStates: any[];
   upscaleModalStates?: any[];
   removeBgModalStates?: any[];
+  eraseModalStates?: any[];
+  replaceModalStates?: any[];
+  expandModalStates?: any[];
   vectorizeModalStates?: any[];
   viewportUpdateKey: number;
 }
@@ -37,6 +40,9 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   musicModalStates,
   upscaleModalStates,
   removeBgModalStates,
+  eraseModalStates,
+  replaceModalStates,
+  expandModalStates,
   vectorizeModalStates,
   viewportUpdateKey,
 }) => {
@@ -55,13 +61,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         }
         seen.add(uniqueKey);
         
-        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
-        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
+        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
+        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
         if (!fromCenter || !toCenter) return null;
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates, viewportUpdateKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, viewportUpdateKey, stageRef]);
 
   return (
     <svg

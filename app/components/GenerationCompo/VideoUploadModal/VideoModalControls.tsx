@@ -18,6 +18,7 @@ interface VideoModalControlsProps {
   isPinned: boolean;
   isUploadedVideo: boolean;
   prompt: string;
+  isPromptDisabled?: boolean;
   selectedModel: string;
   selectedAspectRatio: string;
   selectedFrame: string;
@@ -60,6 +61,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   isPinned,
   isUploadedVideo,
   prompt,
+  isPromptDisabled = false,
   selectedModel,
   selectedAspectRatio,
   selectedFrame,
@@ -175,16 +177,19 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               onGenerate();
             }
           }}
-          placeholder="Enter prompt here..."
+          placeholder={isPromptDisabled ? "Connected to text input..." : "Enter prompt here..."}
+          disabled={isPromptDisabled}
           style={{
             flex: 1,
             padding: `${10 * scale}px ${14 * scale}px`,
-            backgroundColor: '#ffffff',
+            backgroundColor: isPromptDisabled ? '#f3f4f6' : '#ffffff',
             border: `1px solid ${dropdownBorderColor}`,
             borderRadius: `${10 * scale}px`,
             fontSize: controlFontSize,
-            color: '#1f2937',
+            color: isPromptDisabled ? '#6b7280' : '#1f2937',
             outline: 'none',
+            cursor: isPromptDisabled ? 'not-allowed' : 'text',
+            opacity: isPromptDisabled ? 0.7 : 1,
           }}
           onFocus={(e) => {
             e.currentTarget.style.border = `1px solid ${frameBorderColor}`;

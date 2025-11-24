@@ -35,6 +35,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
+  const [eraseGenerators, setEraseGenerators] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
+  const [replaceGenerators, setReplaceGenerators] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
+  const [expandGenerators, setExpandGenerators] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
@@ -365,6 +368,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           musicGenerators,
           upscaleGenerators,
           removeBgGenerators,
+          eraseGenerators,
+          replaceGenerators,
+          expandGenerators,
           vectorizeGenerators,
           textGenerators,
           connectors: filteredConnectors,
@@ -577,6 +583,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           musicGenerators,
           upscaleGenerators,
           removeBgGenerators,
+          eraseGenerators,
+          replaceGenerators,
+          expandGenerators,
           vectorizeGenerators,
           textGenerators,
           connectors,
@@ -593,7 +602,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, vectorizeGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, replaceGenerators, expandGenerators, vectorizeGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -609,6 +618,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
+          const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
+          const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }> = [];
+          const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
@@ -695,6 +707,60 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
+              } else if (element.type === 'erase-plugin') {
+                newEraseGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  erasedImageUrl: element.meta?.erasedImageUrl || null, 
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
+                  localErasedImageUrl: element.meta?.localErasedImageUrl || null, 
+                  model: element.meta?.model || 'bria/eraser',
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isErasing: element.meta?.isErasing || false,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'replace-plugin') {
+                newReplaceGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  replacedImageUrl: element.meta?.replacedImageUrl || null, 
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
+                  localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, 
+                  model: element.meta?.model || 'bria/eraser',
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isReplacing: element.meta?.isReplacing || false,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'expand-plugin') {
+                newExpandGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  expandedImageUrl: element.meta?.expandedImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
+                  model: element.meta?.model || 'expand/base',
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isExpanding: element.meta?.isExpanding || false,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
               } else if (element.type === 'vectorize-plugin') {
                 newVectorizeGenerators.push({ 
                   id: element.id, 
@@ -722,6 +788,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setMusicGenerators(newMusicGenerators);
           setUpscaleGenerators(newUpscaleGenerators);
           setRemoveBgGenerators(newRemoveBgGenerators);
+          setEraseGenerators(newEraseGenerators);
+          setReplaceGenerators(newReplaceGenerators);
+          setExpandGenerators(newExpandGenerators);
           setVectorizeGenerators(newVectorizeGenerators);
           setTextGenerators(newTextGenerators);
           setConnectors(newConnectors);
@@ -777,6 +846,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     musicGenerators,
     upscaleGenerators,
     removeBgGenerators,
+    eraseGenerators,
+    replaceGenerators,
+    expandGenerators,
     vectorizeGenerators,
     textGenerators,
     connectors,
@@ -790,6 +862,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setMusicGenerators,
     setUpscaleGenerators,
     setRemoveBgGenerators,
+    setEraseGenerators,
+    setReplaceGenerators,
+    setExpandGenerators,
     setVectorizeGenerators,
     setTextGenerators,
     setConnectors,
@@ -1555,6 +1630,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
               externalRemoveBgModals={removeBgGenerators}
+              externalEraseModals={eraseGenerators}
+              externalReplaceModals={replaceGenerators}
+              externalExpandModals={expandGenerators}
               externalVectorizeModals={vectorizeGenerators}
               externalTextModals={textGenerators}
               connections={connectors}
@@ -1601,9 +1679,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoGenerators,
                         musicGenerators,
                         upscaleGenerators,
-                        removeBgGenerators,
-                        vectorizeGenerators,
-                        textGenerators,
+                      removeBgGenerators,
+                      eraseGenerators,
+                      replaceGenerators,
+                        expandGenerators,
+                      vectorizeGenerators,
+                      textGenerators,
                         connectors: [...connectors, connToAdd],
                         generationQueue,
                       });
@@ -1638,9 +1719,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoGenerators,
                         musicGenerators,
                         upscaleGenerators,
-                        removeBgGenerators,
-                        vectorizeGenerators,
-                        textGenerators,
+                      removeBgGenerators,
+                      eraseGenerators,
+                      replaceGenerators,
+                        expandGenerators,
+                      vectorizeGenerators,
+                      textGenerators,
                         connectors: connectors.filter(c => c.id !== connectorId),
                         generationQueue,
                       });
@@ -1815,6 +1899,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistRemoveBgModalMove={pluginHandlers.onPersistRemoveBgModalMove}
               onPersistRemoveBgModalDelete={pluginHandlers.onPersistRemoveBgModalDelete}
               onRemoveBg={pluginHandlers.onRemoveBg}
+              onPersistEraseModalCreate={pluginHandlers.onPersistEraseModalCreate}
+              onPersistEraseModalMove={pluginHandlers.onPersistEraseModalMove}
+              onPersistEraseModalDelete={pluginHandlers.onPersistEraseModalDelete}
+              onErase={pluginHandlers.onErase}
+              onPersistReplaceModalCreate={pluginHandlers.onPersistReplaceModalCreate}
+              onPersistReplaceModalMove={pluginHandlers.onPersistReplaceModalMove}
+              onPersistReplaceModalDelete={pluginHandlers.onPersistReplaceModalDelete}
+              onReplace={pluginHandlers.onReplace}
+              onPersistExpandModalCreate={pluginHandlers.onPersistExpandModalCreate}
+              onPersistExpandModalMove={pluginHandlers.onPersistExpandModalMove}
+              onPersistExpandModalDelete={pluginHandlers.onPersistExpandModalDelete}
+              onExpand={pluginHandlers.onExpand}
               onPersistVectorizeModalCreate={pluginHandlers.onPersistVectorizeModalCreate}
               onPersistVectorizeModalMove={pluginHandlers.onPersistVectorizeModalMove}
               onPersistVectorizeModalDelete={pluginHandlers.onPersistVectorizeModalDelete}
@@ -2157,6 +2253,254 @@ export function CanvasApp({ user }: CanvasAppProps) {
                           frameWidth: 400,
                           frameHeight: 500,
                           isRemovingBg: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'erase') {
+            const viewportCenter = viewportCenterRef.current;
+            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
+            // Otherwise use viewport center
+            let modalX: number;
+            let modalY: number;
+            
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              // Convert screen coordinates to canvas coordinates
+              // We need to get the canvas container position to do this properly
+              // For now, use viewport center as fallback
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              // Use viewport center
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+            
+            const modalId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newErase = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              erasedImageUrl: null,
+              sourceImageUrl: null,
+              localErasedImageUrl: null,
+              model: 'bria/eraser',
+              frameWidth: 400,
+              frameHeight: 500,
+              isErasing: false,
+            };
+            console.log('[Plugin] Creating erase modal at viewport center:', newErase, 'viewportCenter:', viewportCenter);
+            // Persist via callback (this will trigger realtime + ops)
+            // Use the same callback pattern as Canvas component
+            (async () => {
+              // Optimistic update
+              setEraseGenerators(prev => {
+                // Check if modal already exists to avoid duplicates
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Modal already exists, skipping');
+                  return prev;
+                }
+                const updated = [...prev, newErase];
+                console.log('[Plugin] Updated eraseGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create erase', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'erase',
+                  x: modalX,
+                  y: modalY,
+                  erasedImageUrl: null,
+                  sourceImageUrl: null,
+                  localErasedImageUrl: null,
+                  model: 'bria/eraser',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isErasing: false,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'erase-plugin',
+                      x: modalX,
+                      y: modalY,
+                        meta: {
+                          erasedImageUrl: null,
+                          sourceImageUrl: null,
+                          localErasedImageUrl: null,
+                          model: 'bria/eraser',
+                          frameWidth: 400,
+                          frameHeight: 500,
+                          isErasing: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'replace') {
+            const viewportCenter = viewportCenterRef.current;
+            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
+            // Otherwise use viewport center
+            let modalX: number;
+            let modalY: number;
+            
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              // Convert screen coordinates to canvas coordinates
+              // We need to get the canvas container position to do this properly
+              // For now, use viewport center as fallback
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              // Use viewport center
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+            
+            const modalId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newReplace = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              replacedImageUrl: null,
+              sourceImageUrl: null,
+              localReplacedImageUrl: null,
+              model: 'bria/eraser',
+              frameWidth: 400,
+              frameHeight: 500,
+              isReplacing: false,
+            };
+            console.log('[Plugin] Creating replace modal at viewport center:', newReplace, 'viewportCenter:', viewportCenter);
+            // Persist via callback (this will trigger realtime + ops)
+            // Use the same callback pattern as Canvas component
+            (async () => {
+              // Optimistic update
+              setReplaceGenerators(prev => {
+                // Check if modal already exists to avoid duplicates
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Modal already exists, skipping');
+                  return prev;
+                }
+                const updated = [...prev, newReplace];
+                console.log('[Plugin] Updated replaceGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create replace', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'replace',
+                  x: modalX,
+                  y: modalY,
+                  replacedImageUrl: null,
+                  sourceImageUrl: null,
+                  localReplacedImageUrl: null,
+                  model: 'bria/replacer',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isReplacing: false,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'replace-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        replacedImageUrl: null,
+                        sourceImageUrl: null,
+                        localReplacedImageUrl: null,
+                        model: 'bria/replacer',
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isReplacing: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'expand') {
+            const viewportCenter = viewportCenterRef.current;
+            const modalX = viewportCenter.x;
+            const modalY = viewportCenter.y;
+            const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newExpand = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              expandedImageUrl: null,
+              sourceImageUrl: null,
+              localExpandedImageUrl: null,
+              model: 'expand/base',
+              frameWidth: 400,
+              frameHeight: 500,
+              isExpanding: false,
+            };
+            console.log('[Plugin] Creating expand modal at viewport center:', newExpand);
+            (async () => {
+              setExpandGenerators(prev => {
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Expand modal already exists, skipping');
+                  return prev;
+                }
+                const updated = [...prev, newExpand];
+                console.log('[Plugin] Updated expandGenerators, count:', updated.length);
+                return updated;
+              });
+              if (realtimeActive) {
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'expand',
+                  x: modalX,
+                  y: modalY,
+                  expandedImageUrl: null,
+                  sourceImageUrl: null,
+                  localExpandedImageUrl: null,
+                  model: 'expand/base',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isExpanding: false,
+                });
+              }
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'expand-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        expandedImageUrl: null,
+                        sourceImageUrl: null,
+                        localExpandedImageUrl: null,
+                        model: 'expand/base',
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isExpanding: false,
                       },
                     },
                   },

@@ -86,6 +86,45 @@ export interface RemoveBgModalState {
   isRemovingBg?: boolean;
 }
 
+export interface EraseModalState {
+  id: string;
+  x: number;
+  y: number;
+  erasedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localErasedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isErasing?: boolean;
+}
+
+export interface ReplaceModalState {
+  id: string;
+  x: number;
+  y: number;
+  replacedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localReplacedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isReplacing?: boolean;
+}
+
+export interface ExpandModalState {
+  id: string;
+  x: number;
+  y: number;
+  expandedImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localExpandedImageUrl?: string | null;
+  model?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isExpanding?: boolean;
+}
+
 export interface VectorizeModalState {
   id: string;
   x: number;
@@ -135,6 +174,9 @@ export interface ModalOverlaysProps {
   musicModalStates: MusicModalState[];
   upscaleModalStates?: UpscaleModalState[];
   removeBgModalStates?: RemoveBgModalState[];
+  eraseModalStates?: EraseModalState[];
+  replaceModalStates?: ReplaceModalState[];
+  expandModalStates?: ExpandModalState[];
   vectorizeModalStates?: VectorizeModalState[];
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
@@ -148,6 +190,12 @@ export interface ModalOverlaysProps {
   selectedUpscaleModalIds?: string[];
   selectedRemoveBgModalId?: string | null;
   selectedRemoveBgModalIds?: string[];
+  selectedEraseModalId?: string | null;
+  selectedEraseModalIds?: string[];
+  selectedReplaceModalId?: string | null;
+  selectedReplaceModalIds?: string[];
+  selectedExpandModalId?: string | null;
+  selectedExpandModalIds?: string[];
   selectedVectorizeModalId?: string | null;
   selectedVectorizeModalIds?: string[];
   clearAllSelections: () => void;
@@ -170,6 +218,15 @@ export interface ModalOverlaysProps {
   setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
   setSelectedRemoveBgModalId?: (id: string | null) => void;
   setSelectedRemoveBgModalIds?: (ids: string[]) => void;
+  setEraseModalStates?: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
+  setSelectedEraseModalId?: (id: string | null) => void;
+  setSelectedEraseModalIds?: (ids: string[]) => void;
+  setReplaceModalStates?: React.Dispatch<React.SetStateAction<ReplaceModalState[]>>;
+  setSelectedReplaceModalId?: (id: string | null) => void;
+  setSelectedReplaceModalIds?: (ids: string[]) => void;
+  setExpandModalStates?: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
+  setSelectedExpandModalId?: (id: string | null) => void;
+  setSelectedExpandModalIds?: (ids: string[]) => void;
   setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
   setSelectedVectorizeModalId?: (id: string | null) => void;
   setSelectedVectorizeModalIds?: (ids: string[]) => void;
@@ -206,6 +263,18 @@ export interface ModalOverlaysProps {
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>) => void | Promise<void>;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
   onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
+  onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
+  onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
+  onErase?: (model: string, sourceImageUrl?: string, mask?: string) => Promise<string | null>;
+  onPersistReplaceModalCreate?: (modal: { id: string; x: number; y: number; replacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  onPersistReplaceModalMove?: (id: string, updates: Partial<{ x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; isReplacing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
+  onPersistReplaceModalDelete?: (id: string) => void | Promise<void>;
+  onReplace?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
+  onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
+  onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>) => void | Promise<void>;
+  onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
+  onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;

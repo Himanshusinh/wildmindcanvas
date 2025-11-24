@@ -17,6 +17,9 @@ interface UseConnectionManagerProps {
   musicModalStates: any[];
   upscaleModalStates?: any[];
   removeBgModalStates?: any[];
+  eraseModalStates?: any[];
+  replaceModalStates?: any[];
+  expandModalStates?: any[];
   vectorizeModalStates?: any[];
 }
 
@@ -34,6 +37,9 @@ export function useConnectionManager({
   musicModalStates,
   upscaleModalStates,
   removeBgModalStates,
+  eraseModalStates,
+  replaceModalStates,
+  expandModalStates,
   vectorizeModalStates,
 }: UseConnectionManagerProps) {
   const [localConnections, setLocalConnections] = useState<Connection[]>([]);
@@ -56,7 +62,7 @@ export function useConnectionManager({
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music'],
-      image: ['image', 'video', 'upscale', 'removebg', 'vectorize'],
+      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize'],
       video: ['video'],
       music: ['video'],
     };
@@ -126,7 +132,7 @@ export function useConnectionManager({
       const toType = getComponentType(id);
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music'],
-        image: ['image', 'video', 'upscale', 'removebg', 'vectorize'],
+        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize'],
         video: ['video'],
         music: ['video'],
       };
@@ -174,8 +180,8 @@ export function useConnectionManager({
       }
 
       // Add connection if not duplicate
-      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
-      const toCenter = computeNodeCenter(id, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, vectorizeModalStates);
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
+      const toCenter = computeNodeCenter(id, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
       const newConn: Connection = { id: connectorId, from: activeDrag.from, to: id, color: activeDrag.color, fromX: fromCenter?.x, fromY: fromCenter?.y, toX: toCenter?.x, toY: toCenter?.y };
       const exists = effectiveConnections.find((c: any) => c.from === activeDrag.from && c.to === id);
@@ -332,7 +338,7 @@ export function useConnectionManager({
       window.removeEventListener('mouseup', handleUp);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates]);
+  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, vectorizeModalStates]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {

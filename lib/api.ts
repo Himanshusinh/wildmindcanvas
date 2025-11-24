@@ -598,6 +598,540 @@ export async function removeBgImageForCanvas(
 }
 
 /**
+ * Erase parts of an image using AI
+ */
+export async function eraseImageForCanvas(
+  image: string,
+  projectId: string,
+  model?: string,
+  mask?: string,
+  prompt?: string
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    // Image should be composited with white mask overlay (mask is now part of the image)
+    // So mask parameter is optional/null now
+
+    // Analyze mask to verify it has white pixels
+    let maskAnalysis = null;
+    if (mask && mask.startsWith('data:image')) {
+      try {
+        const img = new Image();
+        img.src = mask;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(reject, 5000); // 5 second timeout
+        });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          let whitePixelCount = 0;
+          let blackPixelCount = 0;
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            if (r > 128 && g > 128 && b > 128) {
+              whitePixelCount++;
+            } else {
+              blackPixelCount++;
+            }
+          }
+          maskAnalysis = {
+            dimensions: { width: img.width, height: img.height },
+            totalPixels: imageData.data.length / 4,
+            whitePixels: whitePixelCount,
+            blackPixels: blackPixelCount,
+            whitePercentage: ((whitePixelCount / (imageData.data.length / 4)) * 100).toFixed(2) + '%',
+            hasWhitePixels: whitePixelCount > 0
+          };
+        }
+      } catch (e) {
+        console.warn('[eraseImageForCanvas] Failed to analyze mask:', e);
+      }
+    }
+
+    console.log('[eraseImageForCanvas] ========== API REQUEST ==========');
+    console.log('[eraseImageForCanvas] Image:', {
+      hasImage: !!image,
+      imageLength: image?.length || 0,
+      imagePreview: image ? image.substring(0, 100) + '...' : 'null'
+    });
+    console.log('[eraseImageForCanvas] Mask:', {
+      hasMask: !!mask,
+      maskLength: mask?.length || 0,
+      maskPreview: mask ? mask.substring(0, 100) + '...' : 'null',
+      maskAnalysis: maskAnalysis || 'N/A (not a data URI or analysis failed)'
+    });
+    console.log('[eraseImageForCanvas] User Prompt:', prompt || '(none)');
+    console.log('[eraseImageForCanvas] Project ID:', projectId);
+    console.log('[eraseImageForCanvas] Model:', model || 'default (google-nano-banana-edit)');
+    console.log('[eraseImageForCanvas] ===================================');
+
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/erase`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        mask, // Mask data URI (white = erase, black = keep)
+        prompt, // Optional user prompt (will be combined with base prompt)
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to erase image');
+    }
+    
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to erase image');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Image erasing is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to erase image. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Replace parts of an image using AI (requires prompt)
+ */
+export async function replaceImageForCanvas(
+  image: string,
+  projectId: string,
+  model?: string,
+  mask?: string,
+  prompt?: string
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    // Prompt is required for replace (unlike erase which has a default)
+    if (!prompt || !prompt.trim()) {
+      throw new Error('Prompt is required for image replace. Please describe what you want to replace the selected area with.');
+    }
+
+    // Analyze mask to verify it has white pixels
+    let maskAnalysis = null;
+    if (mask && mask.startsWith('data:image')) {
+      try {
+        const img = new Image();
+        img.src = mask;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(reject, 5000); // 5 second timeout
+        });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          let whitePixelCount = 0;
+          let blackPixelCount = 0;
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            if (r > 128 && g > 128 && b > 128) {
+              whitePixelCount++;
+            } else {
+              blackPixelCount++;
+            }
+          }
+          maskAnalysis = {
+            dimensions: { width: img.width, height: img.height },
+            totalPixels: imageData.data.length / 4,
+            whitePixels: whitePixelCount,
+            blackPixels: blackPixelCount,
+            whitePercentage: ((whitePixelCount / (imageData.data.length / 4)) * 100).toFixed(2) + '%',
+            hasWhitePixels: whitePixelCount > 0
+          };
+        }
+      } catch (e) {
+        console.warn('[replaceImageForCanvas] Failed to analyze mask:', e);
+      }
+    }
+
+    console.log('[replaceImageForCanvas] ========== API REQUEST ==========');
+    console.log('[replaceImageForCanvas] Image:', {
+      hasImage: !!image,
+      imageLength: image?.length || 0,
+      imagePreview: image ? image.substring(0, 100) + '...' : 'null'
+    });
+    console.log('[replaceImageForCanvas] Mask:', {
+      hasMask: !!mask,
+      maskLength: mask?.length || 0,
+      maskPreview: mask ? mask.substring(0, 100) + '...' : 'null',
+      maskAnalysis: maskAnalysis || 'N/A (not a data URI or analysis failed)'
+    });
+    console.log('[replaceImageForCanvas] User Prompt (REQUIRED):', prompt || '(MISSING - will fail)');
+    console.log('[replaceImageForCanvas] Project ID:', projectId);
+    console.log('[replaceImageForCanvas] Model:', model || 'default (google-nano-banana-edit)');
+    console.log('[replaceImageForCanvas] ===================================');
+
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/replace`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        mask, // Mask data URI (white = replace, black = keep)
+        prompt, // REQUIRED user prompt (what to replace the white area with)
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to replace image');
+    }
+    
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to replace image');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Image replacing is taking too long. Please try again.');
+    }
+    
+    if (error.message) {
+      throw error;
+    }
+    
+    throw new Error('Failed to replace image. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Expand image using Bria Expand API
+ * Takes frame position and size to expand the image accordingly
+ */
+export async function expandImageForCanvas(
+  image: string,
+  projectId: string,
+  canvasSize: [number, number], // [width, height] of the final canvas
+  originalImageSize: [number, number], // [width, height] of the original image
+  originalImageLocation: [number, number], // [x, y] position of original image in canvas
+  prompt?: string,
+  aspectRatio?: string
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for expand
+
+  try {
+    // Validate inputs
+    if (!canvasSize || canvasSize.length !== 2) {
+      throw new Error('canvasSize must be an array of [width, height]');
+    }
+    if (!originalImageSize || originalImageSize.length !== 2) {
+      throw new Error('originalImageSize must be an array of [width, height]');
+    }
+    if (!originalImageLocation || originalImageLocation.length !== 2) {
+      throw new Error('originalImageLocation must be an array of [x, y]');
+    }
+
+    // Validate and clamp values to API requirements
+    const canvasWidth = Math.max(1, Math.min(5000, Math.round(canvasSize[0])));
+    const canvasHeight = Math.max(1, Math.min(5000, Math.round(canvasSize[1])));
+    const origWidth = Math.max(1, Math.min(5000, Math.round(originalImageSize[0])));
+    const origHeight = Math.max(1, Math.min(5000, Math.round(originalImageSize[1])));
+    
+    // Clamp image location to ensure image fits within canvas
+    // Image must be fully contained: 0 <= x <= canvasWidth - origWidth and 0 <= y <= canvasHeight - origHeight
+    const maxX = Math.max(0, canvasWidth - origWidth);
+    const maxY = Math.max(0, canvasHeight - origHeight);
+    const origX = Math.max(0, Math.min(maxX, Math.round(originalImageLocation[0])));
+    const origY = Math.max(0, Math.min(maxY, Math.round(originalImageLocation[1])));
+    
+    // Validate that image fits within canvas
+    if (origX + origWidth > canvasWidth || origY + origHeight > canvasHeight) {
+      throw new Error(`Image does not fit within canvas. Image at [${origX}, ${origY}] with size [${origWidth}, ${origHeight}] extends beyond canvas [${canvasWidth}, ${canvasHeight}]`);
+    }
+
+    // Validate aspect ratio if provided
+    const validAspectRatios = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
+    if (aspectRatio && !validAspectRatios.includes(aspectRatio)) {
+      console.warn('[expandImageForCanvas] Invalid aspect ratio, ignoring:', aspectRatio);
+      aspectRatio = undefined;
+    }
+
+    console.log('[expandImageForCanvas] Starting expand:', {
+      hasImage: !!image,
+      canvasSize: [canvasWidth, canvasHeight],
+      originalImageSize: [origWidth, origHeight],
+      originalImageLocation: [origX, origY],
+      prompt: prompt || '(optional)',
+      aspectRatio: aspectRatio || '(not set)',
+      projectId
+    });
+
+    const payload: any = {
+      image_url: image,
+      canvas_size: [canvasWidth, canvasHeight],
+      original_image_size: [origWidth, origHeight],
+      original_image_location: [origX, origY],
+      sync_mode: true,
+    };
+
+    if (prompt && prompt.trim()) {
+      payload.prompt = prompt.trim();
+    }
+
+    if (aspectRatio) {
+      payload.aspect_ratio = aspectRatio;
+    }
+
+    const response = await fetch(`${API_GATEWAY_URL}/fal/bria/expand`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify(payload),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+    
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      // Extract detailed error message
+      let errorMessage = result?.message || result?.error || `Server error: ${response.status}`;
+      
+      // If it's a validation error, try to extract more details
+      if (response.status === 422 && result?.errors) {
+        const validationErrors = Array.isArray(result.errors) 
+          ? result.errors.map((e: any) => e.msg || e.message || String(e)).join(', ')
+          : JSON.stringify(result.errors);
+        errorMessage = `Validation error: ${validationErrors}`;
+      } else if (result?.data?.error) {
+        errorMessage = result.data.error;
+      } else if (result?.error?.message) {
+        errorMessage = result.error.message;
+      }
+      
+      console.error('[expandImageForCanvas] API error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        result,
+        payload: { ...payload, image_url: payload.image_url?.substring(0, 100) + '...' }
+      });
+      
+      throw new Error(`FAL API error: "${errorMessage}"`);
+    }
+
+    // Extract image URL from response
+    const imageUrl = result?.data?.image?.url || result?.data?.images?.[0]?.url || result?.images?.[0]?.url || result?.data?.url || result?.url;
+    
+    if (imageUrl) {
+      console.log('[expandImageForCanvas] Expand completed:', imageUrl);
+      return {
+        url: imageUrl,
+        storagePath: '', // Will be set by backend
+        mediaId: result?.data?.historyId,
+        generationId: result?.data?.historyId,
+      };
+    }
+    
+    throw new Error('Failed to expand image. No image URL in response.');
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Expand request timed out. Please try again.');
+    }
+    console.error('[expandImageForCanvas] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Query canvas prompt enhancement
+ * Calls the /canvas/query endpoint to enhance prompts or get answers
+ */
+export async function queryCanvasPrompt(
+  text: string,
+  maxNewTokens?: number
+): Promise<{ type: 'image' | 'video' | 'music' | 'answer'; enhanced_prompt: string | null; response: string | null }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/query`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        text: text.trim(),
+        max_new_tokens: maxNewTokens || 300,
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response || response.status === 0) {
+      throw new Error('Empty response from server. Please check if the API Gateway is running.');
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const textResponse = await response.text();
+
+    if (!textResponse || textResponse.trim() === '') {
+      throw new Error('Empty response body from server');
+    }
+
+    let result: any;
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(textResponse);
+      } catch (parseError: any) {
+        throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${textResponse.substring(0, 200)}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${textResponse.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to query canvas prompt');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to query canvas prompt');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. The prompt enhancement service took too long to respond.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to enhance prompt. Please check your connection and try again.');
+  }
+}
+
+/**
  * Poll FAL queue status
  */
 export async function getFalQueueStatus(requestId: string): Promise<any> {

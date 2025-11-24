@@ -50,6 +50,9 @@ interface CanvasProps {
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
+  externalEraseModals?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>;
+  externalReplaceModals?: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>;
+  externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
   externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
@@ -70,6 +73,20 @@ interface CanvasProps {
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>) => void | Promise<void>;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
   onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
+  // Erase plugin persistence callbacks
+  onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }) => void | Promise<void>;
+  onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>) => void | Promise<void>;
+  onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
+  onErase?: (model: string, sourceImageUrl?: string, mask?: string) => Promise<string | null>;
+  // Replace plugin persistence callbacks
+  onPersistReplaceModalCreate?: (modal: { id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }) => void | Promise<void>;
+  onPersistReplaceModalMove?: (id: string, updates: Partial<{ x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>) => void | Promise<void>;
+  onPersistReplaceModalDelete?: (id: string) => void | Promise<void>;
+  onReplace?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
+  onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
+  onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>) => void | Promise<void>;
+  onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
+  onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   // Vectorize plugin persistence callbacks
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
@@ -124,6 +141,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalMusicModals,
   externalUpscaleModals,
   externalRemoveBgModals,
+  externalEraseModals,
+  externalReplaceModals,
+  externalExpandModals,
   externalVectorizeModals,
   externalTextModals,
   onPersistImageModalCreate,
@@ -143,6 +163,18 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistRemoveBgModalMove,
   onPersistRemoveBgModalDelete,
   onRemoveBg,
+  onPersistEraseModalCreate,
+  onPersistEraseModalMove,
+  onPersistEraseModalDelete,
+  onErase,
+  onPersistReplaceModalCreate,
+  onPersistReplaceModalMove,
+  onPersistReplaceModalDelete,
+  onReplace,
+  onPersistExpandModalCreate,
+  onPersistExpandModalMove,
+  onPersistExpandModalDelete,
+  onExpand,
   onPersistVectorizeModalCreate,
   onPersistVectorizeModalMove,
   onPersistVectorizeModalDelete,
@@ -175,6 +207,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
+  const [eraseModalStates, setEraseModalStates] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
+  const [replaceModalStates, setReplaceModalStates] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
+  const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
@@ -185,6 +220,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
   const [selectedRemoveBgModalId, setSelectedRemoveBgModalId] = useState<string | null>(null);
   const [selectedRemoveBgModalIds, setSelectedRemoveBgModalIds] = useState<string[]>([]);
+  const [selectedEraseModalId, setSelectedEraseModalId] = useState<string | null>(null);
+  const [selectedEraseModalIds, setSelectedEraseModalIds] = useState<string[]>([]);
+  const [selectedReplaceModalId, setSelectedReplaceModalId] = useState<string | null>(null);
+  const [selectedReplaceModalIds, setSelectedReplaceModalIds] = useState<string[]>([]);
+  const [selectedExpandModalId, setSelectedExpandModalId] = useState<string | null>(null);
+  const [selectedExpandModalIds, setSelectedExpandModalIds] = useState<string[]>([]);
   const [selectedVectorizeModalId, setSelectedVectorizeModalId] = useState<string | null>(null);
   const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
@@ -229,6 +270,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedMusicModalIds([]);
     setSelectedUpscaleModalId(null);
     setSelectedUpscaleModalIds([]);
+    setSelectedRemoveBgModalId(null);
+    setSelectedRemoveBgModalIds([]);
+    setSelectedEraseModalId(null);
+    setSelectedEraseModalIds([]);
+    setSelectedReplaceModalId(null);
+    setSelectedReplaceModalIds([]);
+    setSelectedExpandModalId(null);
+    setSelectedExpandModalIds([]);
     setSelectedVectorizeModalId(null);
     setSelectedVectorizeModalIds([]);
     setContextMenuOpen(false);
@@ -622,6 +671,190 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [JSON.stringify(externalRemoveBgModals || [])]);
+  
+  // Sync external erase modals from parent (for hydration/realtime)
+  useEffect(() => {
+    // Always hydrate from external (backend) first, even if empty
+    if (externalEraseModals !== undefined) {
+      setEraseModalStates(externalEraseModals);
+      return;
+    }
+    // Treat missing projectId as a new project: do not load global/local storage
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:eraseModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setEraseModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted erase modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalEraseModals || [])]);
+  
+  // Also sync externalEraseModals changes to internal state (for real-time updates)
+  // Only sync if externalEraseModals is actually different to avoid overwriting local drag updates
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalEraseModals !== undefined && externalEraseModals.length === 0) {
+      console.log('[Canvas] Clearing eraseModalStates (external is empty)');
+      setEraseModalStates([]);
+      return;
+    }
+    if (externalEraseModals && externalEraseModals.length > 0) {
+      setEraseModalStates(prev => {
+        // Only update if the external state is actually different
+        const externalIds = new Set(externalEraseModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        
+        if (idsMatch) {
+          // Merge: keep local position updates during drag, but update other properties from external
+          const merged = prev.map(prevModal => {
+            const externalModal = externalEraseModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              // During drag, keep local x, y if they're different (user is dragging)
+              // Otherwise, use external x, y (position was committed)
+              return {
+                ...prevModal,
+                ...externalModal,
+                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+          return merged;
+        } else {
+          // IDs don't match, use external state
+          return externalEraseModals;
+        }
+      });
+    }
+  }, [JSON.stringify(externalEraseModals || [])]);
+  
+  // Sync external replace modals from parent (for hydration/realtime)
+  useEffect(() => {
+    // Always hydrate from external (backend) first, even if empty
+    if (externalReplaceModals !== undefined) {
+      setReplaceModalStates(externalReplaceModals);
+      return;
+    }
+    // Treat missing projectId as a new project: do not load global/local storage
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:replaceModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setReplaceModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted replace modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalReplaceModals || [])]);
+  
+  // Also sync externalReplaceModals changes to internal state (for real-time updates)
+  // Only sync if externalReplaceModals is actually different to avoid overwriting local drag updates
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalReplaceModals !== undefined && externalReplaceModals.length === 0) {
+      console.log('[Canvas] Clearing replaceModalStates (external is empty)');
+      setReplaceModalStates([]);
+      return;
+    }
+    if (externalReplaceModals && externalReplaceModals.length > 0) {
+      setReplaceModalStates(prev => {
+        // Only update if the external state is actually different
+        const externalIds = new Set(externalReplaceModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        
+        if (idsMatch) {
+          // Merge: keep local position updates during drag, but update other properties from external
+          const merged = prev.map(prevModal => {
+            const externalModal = externalReplaceModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              // During drag, keep local x, y if they're different (user is dragging)
+              // Otherwise, use external x, y (position was committed)
+              return {
+                ...prevModal,
+                ...externalModal,
+                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+          return merged;
+        } else {
+          // IDs don't match, use external state
+          return externalReplaceModals;
+        }
+      });
+    }
+  }, [JSON.stringify(externalReplaceModals || [])]);
+
+  // Sync external expand modals from parent (for hydration/realtime)
+  useEffect(() => {
+    if (externalExpandModals !== undefined) {
+      setExpandModalStates(externalExpandModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:expandModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setExpandModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted expand modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalExpandModals || [])]);
+
+  useEffect(() => {
+    if (externalExpandModals !== undefined && externalExpandModals.length === 0) {
+      console.log('[Canvas] Clearing expandModalStates (external is empty)');
+      setExpandModalStates([]);
+      return;
+    }
+    if (externalExpandModals && externalExpandModals.length > 0) {
+      setExpandModalStates(prev => {
+        const externalIds = new Set(externalExpandModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        if (idsMatch) {
+          return prev.map(prevModal => {
+            const externalModal = externalExpandModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              return {
+                ...prevModal,
+                ...externalModal,
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+        }
+        return externalExpandModals;
+      });
+    }
+  }, [JSON.stringify(externalExpandModals || [])]);
   
   // Also sync externalUpscaleModals changes to internal state (for real-time updates)
   // Only sync if externalUpscaleModals is actually different to avoid overwriting local drag updates
@@ -1089,7 +1322,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                                      selectedTextInputIds.length > 0 || 
                                      selectedImageModalIds.length > 0 || 
                                      selectedVideoModalIds.length > 0 || 
-                                     selectedMusicModalIds.length > 0;
+                                     selectedMusicModalIds.length > 0 ||
+                                     (selectedUpscaleModalIds?.length ?? 0) > 0 ||
+                                     (selectedRemoveBgModalIds?.length ?? 0) > 0 ||
+                                     (selectedEraseModalIds?.length ?? 0) > 0 ||
+                                     (selectedReplaceModalIds?.length ?? 0) > 0 ||
+                                     (selectedVectorizeModalIds?.length ?? 0) > 0 ||
+                                     selectedExpandModalIds.length > 0;
         
         if (hasMultipleSelections) {
           // Delete all selected components in the region
@@ -1145,6 +1384,35 @@ export const Canvas: React.FC<CanvasProps> = ({
             setMusicModalStates(prev => prev.filter(m => !selectedMusicModalIds.includes(m.id)));
           }
           
+          // Delete all selected erase modals
+          if (selectedEraseModalIds.length > 0) {
+            selectedEraseModalIds.forEach(id => {
+              if (onPersistEraseModalDelete) {
+                Promise.resolve(onPersistEraseModalDelete(id)).catch(console.error);
+              }
+            });
+            setEraseModalStates(prev => prev.filter(m => !selectedEraseModalIds.includes(m.id)));
+          }
+          
+          // Delete all selected replace modals
+          if (selectedReplaceModalIds.length > 0) {
+            selectedReplaceModalIds.forEach(id => {
+              if (onPersistReplaceModalDelete) {
+                Promise.resolve(onPersistReplaceModalDelete(id)).catch(console.error);
+              }
+            });
+            setReplaceModalStates(prev => prev.filter(m => !selectedReplaceModalIds.includes(m.id)));
+          }
+          
+          if (selectedExpandModalIds.length > 0) {
+            selectedExpandModalIds.forEach(id => {
+              if (onPersistExpandModalDelete) {
+                Promise.resolve(onPersistExpandModalDelete(id)).catch(console.error);
+              }
+            });
+            setExpandModalStates(prev => prev.filter(m => !selectedExpandModalIds.includes(m.id)));
+          }
+          
           // Clear all selections
           setSelectedImageIndices([]);
           setSelectedImageIndex(null);
@@ -1156,6 +1424,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedVideoModalId(null);
           setSelectedMusicModalIds([]);
           setSelectedMusicModalId(null);
+          setSelectedEraseModalIds([]);
+          setSelectedEraseModalId(null);
+          setSelectedReplaceModalIds([]);
+          setSelectedReplaceModalId(null);
+          setSelectedExpandModalIds([]);
+          setSelectedExpandModalId(null);
         } else {
           // Single selection deletion (backward compatibility)
           
@@ -1199,6 +1473,32 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
             setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
             setSelectedMusicModalId(null);
+          }
+          
+          // Delete selected erase modal
+          if (selectedEraseModalId !== null) {
+            if (onPersistEraseModalDelete) {
+              Promise.resolve(onPersistEraseModalDelete(selectedEraseModalId)).catch(console.error);
+            }
+            setEraseModalStates(prev => prev.filter(m => m.id !== selectedEraseModalId));
+            setSelectedEraseModalId(null);
+          }
+          
+          // Delete selected replace modal
+          if (selectedReplaceModalId !== null) {
+            if (onPersistReplaceModalDelete) {
+              Promise.resolve(onPersistReplaceModalDelete(selectedReplaceModalId)).catch(console.error);
+            }
+            setReplaceModalStates(prev => prev.filter(m => m.id !== selectedReplaceModalId));
+            setSelectedReplaceModalId(null);
+          }
+          
+          if (selectedExpandModalId !== null) {
+            if (onPersistExpandModalDelete) {
+              Promise.resolve(onPersistExpandModalDelete(selectedExpandModalId)).catch(console.error);
+            }
+            setExpandModalStates(prev => prev.filter(m => m.id !== selectedExpandModalId));
+            setSelectedExpandModalId(null);
           }
         }
         
@@ -2740,6 +3040,53 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setRemoveBgModalStates(prev => [...prev, newRemoveBg]);
               Promise.resolve(onPersistRemoveBgModalCreate(newRemoveBg)).catch(console.error);
+            } else if (data.plugin.id === 'erase' && onPersistEraseModalCreate) {
+              const newErase = {
+                id: `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: canvasX,
+                y: canvasY,
+                erasedImageUrl: null,
+                sourceImageUrl: null,
+                localErasedImageUrl: null,
+                model: 'bria/eraser',
+                frameWidth: 400,
+                frameHeight: 500,
+                isErasing: false,
+              };
+              setEraseModalStates(prev => [...prev, newErase]);
+              Promise.resolve(onPersistEraseModalCreate(newErase)).catch(console.error);
+            } else if (data.plugin.id === 'replace' && onPersistReplaceModalCreate) {
+              const modalId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newReplace = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                replacedImageUrl: null,
+                sourceImageUrl: null,
+                localReplacedImageUrl: null,
+                model: 'bria/eraser',
+                frameWidth: 400,
+                frameHeight: 500,
+                isReplacing: false,
+              };
+              setReplaceModalStates(prev => [...prev, newReplace]);
+              Promise.resolve(onPersistReplaceModalCreate(newReplace)).catch(console.error);
+            } else if (data.plugin.id === 'expand' && onPersistExpandModalCreate) {
+              const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newExpand = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                expandedImageUrl: null,
+                sourceImageUrl: null,
+                localExpandedImageUrl: null,
+                model: 'expand/base',
+                frameWidth: 400,
+                frameHeight: 500,
+                isExpanding: false,
+              };
+              setExpandModalStates(prev => [...prev, newExpand]);
+              Promise.resolve(onPersistExpandModalCreate(newExpand)).catch(console.error);
             } else if (data.plugin.id === 'vectorize' && onPersistVectorizeModalCreate) {
               const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
               const newVectorize = {
@@ -3018,6 +3365,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
         removeBgModalStates={removeBgModalStates}
+        eraseModalStates={eraseModalStates}
+        replaceModalStates={replaceModalStates}
+        expandModalStates={expandModalStates}
         vectorizeModalStates={vectorizeModalStates}
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
@@ -3031,6 +3381,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedUpscaleModalIds={selectedUpscaleModalIds}
         selectedRemoveBgModalId={selectedRemoveBgModalId}
         selectedRemoveBgModalIds={selectedRemoveBgModalIds}
+        selectedEraseModalId={selectedEraseModalId}
+        selectedEraseModalIds={selectedEraseModalIds}
+        selectedReplaceModalId={selectedReplaceModalId}
+        selectedReplaceModalIds={selectedReplaceModalIds}
+        selectedExpandModalId={selectedExpandModalId}
+        selectedExpandModalIds={selectedExpandModalIds}
         selectedVectorizeModalId={selectedVectorizeModalId}
         selectedVectorizeModalIds={selectedVectorizeModalIds}
         clearAllSelections={clearAllSelections}
@@ -3053,6 +3409,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         setRemoveBgModalStates={setRemoveBgModalStates}
         setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
         setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
+        setEraseModalStates={setEraseModalStates}
+        setSelectedEraseModalId={setSelectedEraseModalId}
+        setSelectedEraseModalIds={setSelectedEraseModalIds}
+        setReplaceModalStates={setReplaceModalStates}
+        setSelectedReplaceModalId={setSelectedReplaceModalId}
+        setSelectedReplaceModalIds={setSelectedReplaceModalIds}
+        setExpandModalStates={setExpandModalStates}
+        setSelectedExpandModalId={setSelectedExpandModalId}
+        setSelectedExpandModalIds={setSelectedExpandModalIds}
         setVectorizeModalStates={setVectorizeModalStates}
         setSelectedVectorizeModalId={setSelectedVectorizeModalId}
         setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
@@ -3090,6 +3455,18 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
         onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
         onRemoveBg={onRemoveBg}
+        onPersistEraseModalCreate={onPersistEraseModalCreate}
+        onPersistEraseModalMove={onPersistEraseModalMove}
+        onPersistEraseModalDelete={onPersistEraseModalDelete}
+        onErase={onErase}
+        onPersistReplaceModalCreate={onPersistReplaceModalCreate}
+        onPersistReplaceModalMove={onPersistReplaceModalMove}
+        onPersistReplaceModalDelete={onPersistReplaceModalDelete}
+        onReplace={onReplace}
+        onPersistExpandModalCreate={onPersistExpandModalCreate}
+        onPersistExpandModalMove={onPersistExpandModalMove}
+        onPersistExpandModalDelete={onPersistExpandModalDelete}
+        onExpand={onExpand}
         onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
         onPersistVectorizeModalMove={onPersistVectorizeModalMove}
         onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
