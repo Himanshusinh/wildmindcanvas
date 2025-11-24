@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 
 interface MediaActionIconsProps {
@@ -23,12 +24,29 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
   setSelectedImageIndex,
   setSelectedImageIndices,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const imgX = selectedImage.x || 0;
   const imgY = selectedImage.y || 0;
   const imgWidth = selectedImage.width || 100;
   const screenX = imgX * scale + position.x;
   const screenY = imgY * scale + position.y;
   const screenWidth = imgWidth * scale;
+
+  const bgColor = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const textColor = isDark ? '#cccccc' : '#4b5563';
+  const shadowColor = isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)';
 
   return (
     <div
@@ -64,15 +82,15 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           width: `${28 * scale}px`,
           height: `${28 * scale}px`,
           padding: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: bgColor,
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `1px solid rgba(0, 0, 0, 0.1)`,
+          border: `1px solid ${borderColor}`,
           borderRadius: `${8 * scale}px`,
-          color: '#4b5563',
+          color: textColor,
           cursor: 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+          transition: 'all 0.3s ease',
+          boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
@@ -80,8 +98,8 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           e.currentTarget.style.transform = 'scale(1.1)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-          e.currentTarget.style.color = '#4b5563';
+          e.currentTarget.style.backgroundColor = bgColor;
+          e.currentTarget.style.color = textColor;
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
@@ -129,24 +147,24 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
             width: `${28 * scale}px`,
             height: `${28 * scale}px`,
             padding: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backgroundColor: bgColor,
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            border: `1px solid rgba(0, 0, 0, 0.1)`,
+            border: `1px solid ${borderColor}`,
             borderRadius: `${8 * scale}px`,
-            color: '#4b5563',
+            color: textColor,
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+            transition: 'all 0.3s ease',
+            boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-            e.currentTarget.style.color = '#3b82f6';
+            e.currentTarget.style.color = isDark ? '#60a5fa' : '#3b82f6';
             e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-            e.currentTarget.style.color = '#4b5563';
+            e.currentTarget.style.backgroundColor = bgColor;
+            e.currentTarget.style.color = textColor;
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
@@ -174,15 +192,15 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           width: `${28 * scale}px`,
           height: `${28 * scale}px`,
           padding: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backgroundColor: bgColor,
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: `1px solid rgba(0, 0, 0, 0.1)`,
+          border: `1px solid ${borderColor}`,
           borderRadius: `${8 * scale}px`,
-          color: '#4b5563',
+          color: textColor,
           cursor: 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+          transition: 'all 0.3s ease',
+          boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
@@ -190,8 +208,8 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           e.currentTarget.style.transform = 'scale(1.1)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-          e.currentTarget.style.color = '#4b5563';
+          e.currentTarget.style.backgroundColor = bgColor;
+          e.currentTarget.style.color = textColor;
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >

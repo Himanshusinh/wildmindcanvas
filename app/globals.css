@@ -9,3 +9,144 @@
   }
 }
 
+/* Light Theme (Default) */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #f9fafb;
+  --bg-active: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: rgba(59, 130, 246, 0.1);
+}
+
+/* Dark Theme */
+.dark {
+  --bg-primary: #121212;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1a1a1a;
+  --bg-hover: #1a1a1a;
+  --bg-active: #2a2a2a;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-tertiary: #999999;
+  --border-color: rgba(255, 255, 255, 0.15);
+  --border-hover: rgba(255, 255, 255, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.7);
+  --accent-color: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-light: rgba(96, 165, 250, 0.2);
+  --dot-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Apply theme to body and html */
+html {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Main element background */
+main {
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+}
+
+/* Canvas background */
+.dark #canvas-container,
+.dark canvas,
+.dark [id*="canvas"],
+.dark [class*="canvas"] {
+  background-color: var(--bg-primary) !important;
+}
+
+/* Exception: Preview canvases in plugin modals should be transparent */
+.dark .erase-preview-canvas,
+.dark .replace-preview-canvas {
+  background-color: transparent !important;
+}
+
+/* Global dark theme overrides for common patterns */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark textarea,
+.dark select {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="email"]:focus,
+.dark input[type="password"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: var(--accent-color) !important;
+  outline-color: var(--accent-color) !important;
+}
+
+/* Ensure all white backgrounds become dark in dark mode */
+.dark [style*="background: #ffffff"],
+.dark [style*="background:#ffffff"],
+.dark [style*="backgroundColor: #ffffff"],
+.dark [style*="backgroundColor:#ffffff"] {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Update text colors in dark mode */
+.dark [style*="color: #111827"],
+.dark [style*="color:#111827"],
+.dark [style*="color: #1f2937"],
+.dark [style*="color:#1f2937"],
+.dark [style*="color: #374151"],
+.dark [style*="color:#374151"] {
+  color: var(--text-primary) !important;
+}
+
+.dark [style*="color: #6b7280"],
+.dark [style*="color:#6b7280"],
+.dark [style*="color: #9ca3af"],
+.dark [style*="color:#9ca3af"],
+.dark [style*="color: #4b5563"],
+.dark [style*="color:#4b5563"] {
+  color: var(--text-secondary) !important;
+}
+
+/* Update borders in dark mode */
+.dark [style*="border: 1px solid rgba(0, 0, 0, 0.1)"],
+.dark [style*="border:1px solid rgba(0, 0, 0, 0.1)"],
+.dark [style*="borderColor: rgba(0, 0, 0, 0.1)"],
+.dark [style*="borderColor:rgba(0, 0, 0, 0.1)"] {
+  border-color: var(--border-color) !important;
+}
+
+/* Update box shadows in dark mode */
+.dark [style*="boxShadow: 0"],
+.dark [style*="box-shadow: 0"] {
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Canvas container background */
+.dark #canvas-container,
+.dark canvas {
+  background-color: var(--bg-primary) !important;
+}
+

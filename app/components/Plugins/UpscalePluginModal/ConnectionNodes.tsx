@@ -27,11 +27,32 @@ export const ConnectionNodes: React.FC<ConnectionNodesProps> = ({
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
 
-  const nodeOpacity = (isHovered || isSelected || globalDragActive) ? 1 : 0;
+  // Always show nodes clearly - higher base opacity for better visibility
+  const nodeOpacity = (isHovered || isSelected || globalDragActive) ? 1 : 0.85;
+
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  // Darker, more visible nodes with better contrast
+  const nodeColor = isDark ? '#808080' : '#606060';
+  const nodeBorder = isDark ? '#2a2a2a' : '#c0c0c0';
+
+  // Node size - larger and more visible
+  const nodeSize = 18 * scale;
+  const nodeOffset = 9 * scale; // Distance from container edge - positioned at exact edge for clear connections
 
   return (
     <>
-      {/* Receive Node (Left) */}
+      {/* Receive Node (Left) - Circle */}
       <div
         data-node-id={id}
         data-node-side="receive"
@@ -58,22 +79,26 @@ export const ConnectionNodes: React.FC<ConnectionNodesProps> = ({
         }}
         style={{
           position: 'absolute',
-          left: `${-12 * scale}px`,
+          left: `${-nodeOffset}px`,
           top: '50%',
-          transform: 'translateY(-50%)',
-          width: `${20 * scale}px`,
-          height: `${20 * scale}px`,
+          transform: 'translate(-50%, -50%)',
+          width: `${nodeSize}px`,
+          height: `${nodeSize}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
+          backgroundColor: nodeColor,
           cursor: 'pointer',
-          border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+          border: `${2.5 * scale}px solid ${nodeBorder}`,
           zIndex: 5000,
           opacity: nodeOpacity,
           transition: 'opacity 0.18s ease, transform 0.12s ease',
           pointerEvents: 'auto',
+          boxSizing: 'border-box',
+          boxShadow: isDark 
+            ? `0 0 ${4 * scale}px rgba(0, 0, 0, 0.5), inset 0 0 ${2 * scale}px rgba(255, 255, 255, 0.1)`
+            : `0 0 ${4 * scale}px rgba(0, 0, 0, 0.2), inset 0 0 ${2 * scale}px rgba(255, 255, 255, 0.3)`,
         }}
       />
-      {/* Send Node (Right) */}
+      {/* Send Node (Right) - Circle */}
       <div
         data-node-id={id}
         data-node-side="send"
@@ -109,20 +134,23 @@ export const ConnectionNodes: React.FC<ConnectionNodesProps> = ({
         }}
         style={{
           position: 'absolute',
-          right: `${-12 * scale}px`,
+          right: `${-nodeOffset}px`,
           top: '50%',
-          transform: 'translateY(-50%)',
-          width: `${20 * scale}px`,
-          height: `${20 * scale}px`,
+          transform: 'translate(50%, -50%)',
+          width: `${nodeSize}px`,
+          height: `${nodeSize}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
-          boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
+          backgroundColor: nodeColor,
           cursor: 'grab',
-          border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+          border: `${2.5 * scale}px solid ${nodeBorder}`,
           zIndex: 10,
           opacity: nodeOpacity,
           transition: 'opacity 0.18s ease',
           pointerEvents: 'auto',
+          boxSizing: 'border-box',
+          boxShadow: isDark 
+            ? `0 0 ${4 * scale}px rgba(0, 0, 0, 0.5), inset 0 0 ${2 * scale}px rgba(255, 255, 255, 0.1)`
+            : `0 0 ${4 * scale}px rgba(0, 0, 0, 0.2), inset 0 0 ${2 * scale}px rgba(255, 255, 255, 0.3)`,
         }}
       />
     </>

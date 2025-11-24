@@ -14,7 +14,18 @@ interface LibrarySidebarProps {
 type MediaCategory = 'images' | 'videos' | 'music' | 'uploaded';
 
 const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSelectMedia, scale = 1 }) => {
+  const [isDark, setIsDark] = useState(false);
   const [activeCategory, setActiveCategory] = useState<MediaCategory>('images');
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
   const [mediaLibrary, setMediaLibrary] = useState<{
     images: MediaItem[];
     videos: MediaItem[];
@@ -113,12 +124,17 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   };
 
   const renderMediaGrid = (items: MediaItem[]) => {
+    const loadingTextColor = isDark ? '#cccccc' : '#6b7280';
+    const emptyTextColor = isDark ? '#999999' : '#9ca3af';
+    const cardBg = isDark ? '#1a1a1a' : '#f3f4f6';
+    const shadowColor = isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)';
+
     if (loading) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
           <div style={{ textAlign: 'center' }}>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading media...</p>
+            <p style={{ color: loadingTextColor, fontSize: '14px', transition: 'color 0.3s ease' }}>Loading media...</p>
           </div>
         </div>
       );
@@ -127,7 +143,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     if (items.length === 0) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-          <p style={{ color: '#9ca3af', fontSize: '14px' }}>No {activeCategory} found</p>
+          <p style={{ color: emptyTextColor, fontSize: '14px', transition: 'color 0.3s ease' }}>No {activeCategory} found</p>
         </div>
       );
     }
@@ -150,14 +166,14 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                 aspectRatio: '1',
                 overflow: 'hidden',
                 cursor: 'grab',
-                background: '#f3f4f6',
+                background: cardBg,
                 borderRadius: '16px', // Match canvas image generation frame border radius
-                transition: 'all 0.2s ease',
+                transition: 'all 0.3s ease',
                 position: 'relative',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                e.currentTarget.style.boxShadow = `0 4px 12px ${shadowColor}`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
@@ -204,6 +220,18 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
 
   if (!isOpen) return null;
 
+  const sidebarBg = isDark ? '#121212' : '#ffffff';
+  const sidebarBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const sidebarShadow = isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)';
+  const headerBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const headerText = isDark ? '#ffffff' : '#111827';
+  const closeIconColor = isDark ? '#cccccc' : '#6b7280';
+  const closeHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : '#ffffff';
+  const tabBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const activeTabColor = isDark ? '#60a5fa' : '#3b82f6';
+  const inactiveTabColor = isDark ? '#999999' : '#6b7280';
+  const inactiveCountColor = isDark ? '#666666' : '#9ca3af';
+
   return (
     <div
       ref={sidebarRef}
@@ -214,17 +242,17 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
         bottom: '20px', // 20px margin from bottom
         width: '400px',
         maxWidth: 'calc(90vw - 76px)',
-        background: '#ffffff',
+        background: sidebarBg,
         borderRadius: '16px', // Curved borders on all corners
-        border: '1px solid rgba(0, 0, 0, 0.1)',
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+        border: `1px solid ${sidebarBorder}`,
+        boxShadow: sidebarShadow,
         zIndex: 10002,
         display: 'flex',
         flexDirection: 'column',
         pointerEvents: 'auto',
         opacity: isOpen ? 1 : 0,
         visibility: isOpen ? 'visible' : 'hidden',
-        transition: 'opacity 0.3s ease, visibility 0.3s ease',
+        transition: 'opacity 0.3s ease, visibility 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
       }}
       onWheel={(e) => {
         e.stopPropagation();
@@ -237,8 +265,23 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       }}
     >
         {/* Header */}
-        <div style={{ paddingLeft: '20px',paddingRight: '20px', paddingTop: '-16px', borderBottom: '1px solid rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827' }}>Library</h2>
+        <div style={{ 
+          paddingLeft: '20px',
+          paddingRight: '20px', 
+          paddingTop: '-16px', 
+          borderBottom: `1px solid ${headerBorder}`, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          transition: 'border-color 0.3s ease'
+        }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '20px', 
+            fontWeight: 600, 
+            color: headerText,
+            transition: 'color 0.3s ease'
+          }}>Library</h2>
           <button
             onClick={onClose}
             style={{
@@ -246,12 +289,12 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
               border: 'none',
               cursor: 'pointer',
               fontSize: '20px',
-              color: '#6b7280',
+              color: closeIconColor,
               padding: '6px 10px',
-              transition: 'all 0.2s ease',
+              transition: 'all 0.3s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.background = closeHoverBg;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
@@ -262,7 +305,12 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
         </div>
 
         {/* Category Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(0, 0, 0, 0.1)', padding: '0 16px' }}>
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: `1px solid ${tabBorder}`, 
+          padding: '0 16px',
+          transition: 'border-color 0.3s ease'
+        }}>
           {[
             { id: 'images' as MediaCategory, label: 'Images', count: mediaLibrary.images.length },
             { id: 'videos' as MediaCategory, label: 'Videos', count: mediaLibrary.videos.length },
@@ -277,12 +325,12 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                 padding: '12px 8px',
                 border: 'none',
                 background: 'transparent',
-                borderBottom: activeCategory === category.id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: activeCategory === category.id ? '#3b82f6' : '#6b7280',
+                borderBottom: activeCategory === category.id ? `2px solid ${activeTabColor}` : '2px solid transparent',
+                color: activeCategory === category.id ? activeTabColor : inactiveTabColor,
                 fontSize: '12px',
                 fontWeight: activeCategory === category.id ? 600 : 400,
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.3s ease',
                 position: 'relative',
               }}
             >
@@ -292,7 +340,8 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                   style={{
                     marginLeft: '6px',
                     fontSize: '12px',
-                    color: activeCategory === category.id ? '#3b82f6' : '#9ca3af',
+                    color: activeCategory === category.id ? activeTabColor : inactiveCountColor,
+                    transition: 'color 0.3s ease',
                   }}
                 >
                   ({category.count})

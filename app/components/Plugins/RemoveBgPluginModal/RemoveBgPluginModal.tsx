@@ -6,6 +6,7 @@ import { RemoveBgLabel } from './RemoveBgLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { RemoveBgControls } from './RemoveBgControls';
 import { RemoveBgImageFrame } from './RemoveBgImageFrame';
+import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
@@ -87,7 +88,10 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   const [isDimmed, setIsDimmed] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localRemovedBgImageUrl, setLocalRemovedBgImageUrl] = useState<string | null>(initialLocalRemovedBgImageUrl ?? null);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
   const onOptionsChangeRef = useRef(onOptionsChange);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false);
   
   // Update ref when callback changes
   useEffect(() => {
@@ -97,7 +101,21 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Detect if this is a removed bg image result (media-like, no controls)
@@ -200,6 +218,10 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
+      // Track initial mouse position to detect drag vs click
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      hasDraggedRef.current = false;
+      
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -222,6 +244,15 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
 
+      // Check if mouse moved significantly (more than 5px) to detect drag
+      if (dragStartPosRef.current) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > 5 || dy > 5) {
+          hasDraggedRef.current = true;
+        }
+      }
+
       // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
@@ -235,13 +266,24 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     };
 
     const handleMouseUp = () => {
+      const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
+      dragStartPosRef.current = null;
+      
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging) {
+        setIsPopupOpen(prev => !prev);
+      }
+      
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
+      
+      // Reset drag flag
+      hasDraggedRef.current = false;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -419,23 +461,100 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <RemoveBgLabel
-        isHovered={isHovered}
-        scale={scale}
-        imageResolution={imageResolution}
-      />
+      {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
+      {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
-      <ModalActionIcons
-        isSelected={isSelected || false}
-        scale={scale}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        generatedUrl={removedBgImageUrl}
-      />
+      {/* Plugin node design with icon and label */}
+      <div
+        data-frame-id={id ? `${id}-frame` : undefined}
+        style={{
+          position: 'relative',
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={handleMouseDown}
+      >
+        {/* Main plugin container - Circular */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${100 * scale}px`,
+            height: `${100 * scale}px`,
+            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            borderRadius: '50%',
+            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            boxShadow: isDark 
+              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
+              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
+            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
+            overflow: 'visible', // Allow nodes to extend beyond container
+          }}
+        >
+          {/* Layer Icon */}
+          <img
+            src="/icons/layer.png"
+            alt="Remove BG"
+            style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
+              display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            onError={(e) => {
+              console.error('[RemoveBgPluginModal] Failed to load layer.png icon');
+              // Fallback: hide broken image
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          
+          <ConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
+        </div>
+        
+        {/* Label below */}
+        <div
+          style={{
+            marginTop: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Remove BG
+        </div>
 
-      {!isRemovedBgImage && (
-        <RemoveBgControls
+        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {isPopupOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: `${12 * scale}px`,
+              zIndex: 1000,
+            }}
+          >
+            <RemoveBgControls
           scale={scale}
           selectedModel={selectedModel}
           selectedBackgroundType={selectedBackgroundType}
@@ -463,24 +582,25 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
             }
           }}
-          onRemoveBg={handleRemoveBg}
-          onHoverChange={setIsHovered}
-        />
-      )}
-
-      <RemoveBgImageFrame
-        id={id}
-        scale={scale}
-        frameBorderColor={frameBorderColor}
-        frameBorderWidth={frameBorderWidth}
-        isRemovedBgImage={isRemovedBgImage}
-        isDraggingContainer={isDraggingContainer}
-        isHovered={isHovered}
-        isSelected={isSelected || false}
-        sourceImageUrl={sourceImageUrl}
-        onMouseDown={handleMouseDown}
-        onSelect={onSelect}
-      />
+              onRemoveBg={handleRemoveBg}
+              onHoverChange={setIsHovered}
+            />
+            <RemoveBgImageFrame
+          id={id}
+          scale={scale}
+          frameBorderColor={frameBorderColor}
+          frameBorderWidth={frameBorderWidth}
+          isRemovedBgImage={isRemovedBgImage}
+          isDraggingContainer={isDraggingContainer}
+          isHovered={isHovered}
+          isSelected={isSelected || false}
+          sourceImageUrl={sourceImageUrl}
+              onMouseDown={handleMouseDown}
+              onSelect={onSelect}
+            />
+          </div>
+        )}
+      </div>
 
     </div>
   );

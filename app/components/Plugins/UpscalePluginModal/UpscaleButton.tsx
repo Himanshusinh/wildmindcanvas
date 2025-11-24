@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface UpscaleButtonProps {
   scale: number;
@@ -17,8 +17,21 @@ export const UpscaleButton: React.FC<UpscaleButtonProps> = ({
   sourceImageUrl,
   onUpscale,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const isDisabled = isUpscaling || externalIsUpscaling || !sourceImageUrl;
   const isActive = !isDisabled;
+  const disabledBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
 
   return (
     <button
@@ -30,7 +43,7 @@ export const UpscaleButton: React.FC<UpscaleButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isActive ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: isActive ? '#437eb5' : disabledBg,
         border: 'none',
         borderRadius: `${10 * scale}px`,
         cursor: isActive ? 'pointer' : 'not-allowed',
@@ -38,6 +51,7 @@ export const UpscaleButton: React.FC<UpscaleButtonProps> = ({
         boxShadow: isActive ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
         padding: 0,
         opacity: (isUpscaling || externalIsUpscaling) ? 0.6 : 1,
+        transition: 'background-color 0.3s ease',
       }}
       onMouseEnter={(e) => {
         if (isActive) {

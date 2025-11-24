@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 
 interface EraseImageFrameProps {
@@ -30,6 +30,18 @@ export const EraseImageFrame: React.FC<EraseImageFrameProps> = ({
   onMouseDown,
   onSelect,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
       data-frame-id={id ? `${id}-frame` : undefined}
@@ -55,7 +67,7 @@ export const EraseImageFrame: React.FC<EraseImageFrameProps> = ({
         maxWidth: '90vw',
         minHeight: `${150 * scale}px`,
         maxHeight: `${400 * scale}px`,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: isErasedImage ? `${16 * scale}px` : `0 0 ${16 * scale}px ${16 * scale}px`,
@@ -68,7 +80,7 @@ export const EraseImageFrame: React.FC<EraseImageFrameProps> = ({
         overflow: 'visible',
         position: 'relative',
         zIndex: 1,
-        transition: 'border 0.18s ease',
+        transition: 'border 0.18s ease, background-color 0.3s ease',
         padding: `${16 * scale}px`,
       }}
     >

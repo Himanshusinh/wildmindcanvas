@@ -1078,31 +1078,47 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
-  // Create canvas pattern
+  // Create canvas pattern - updates based on theme
   useEffect(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = DOT_SPACING;
-    canvas.height = DOT_SPACING;
-    const ctx = canvas.getContext('2d');
+    const createPattern = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      const canvas = document.createElement('canvas');
+      canvas.width = DOT_SPACING;
+      canvas.height = DOT_SPACING;
+      const ctx = canvas.getContext('2d');
 
-    if (ctx) {
-      // White background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
+      if (ctx) {
+        if (isDark) {
+          // Dark theme: Black background with white dots
+          ctx.fillStyle = '#121212';
+          ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
+          ctx.fillStyle = `rgba(255, 255, 255, ${DOT_OPACITY})`;
+        } else {
+          // Light theme: White background with black dots
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
+          ctx.fillStyle = `rgba(0, 0, 0, ${DOT_OPACITY})`;
+        }
+        
+        ctx.beginPath();
+        ctx.arc(DOT_SPACING / 2, DOT_SPACING / 2, DOT_SIZE / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      // Black dots - opacity controlled by DOT_OPACITY constant
-      // Adjust DOT_OPACITY at the top of the file to make dots darker (higher value) or lighter (lower value)
-      ctx.fillStyle = `rgba(0, 0, 0, ${DOT_OPACITY})`;
-      ctx.beginPath();
-      ctx.arc(DOT_SPACING / 2, DOT_SPACING / 2, DOT_SIZE / 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const img = new Image();
-    img.onload = () => {
-      setPatternImage(img);
+      const img = new Image();
+      img.onload = () => {
+        setPatternImage(img);
+      };
+      img.src = canvas.toDataURL();
     };
-    img.src = canvas.toDataURL();
+
+    createPattern();
+
+    // Watch for theme changes
+    const observer = new MutationObserver(() => {
+      createPattern();
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
     // Enable WebGL optimization
     try {
@@ -1110,6 +1126,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     } catch (e) {
       console.warn('WebGL optimization not available');
     }
+
+    return () => observer.disconnect();
   }, []);
 
   // Handle wheel zoom

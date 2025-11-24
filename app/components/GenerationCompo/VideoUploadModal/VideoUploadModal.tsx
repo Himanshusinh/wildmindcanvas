@@ -177,10 +177,24 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     return `${width} / ${height}`;
   };
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const [isFrameOrderSwapped, setIsFrameOrderSwapped] = useState(false);
   const hasInitializedDefaultsRef = useRef(false);

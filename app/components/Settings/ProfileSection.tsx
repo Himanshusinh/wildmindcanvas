@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ProfileSectionProps {
   userData: any;
@@ -21,6 +21,26 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   handleUpgradePlan,
   handleAccountSettings,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const containerBg = isDark ? '#121212' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#111827';
+  const textSecondary = isDark ? '#cccccc' : '#6b7280';
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : '#e5e7eb';
+  const cardBg = isDark ? '#1a1a1a' : '#f8fafc';
+  const cardBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)';
+  const buttonBg = isDark ? '#1a1a1a' : '#ffffff';
+  const buttonHoverBg = isDark ? '#2a2a2a' : '#f8fafc';
   return (
     <>
       {/* Top section: Avatar, Account Status, and Credits */}
@@ -39,7 +59,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
-                border: '2px solid #e5e7eb',
+                border: `2px solid ${borderColor}`,
               }}
             >
               {!loading && userData?.photoURL && !avatarFailed ? (
@@ -65,7 +85,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
                 gap: '4px',
                 background: 'transparent',
                 border: 'none',
-                color: '#6b7280',
+                color: textSecondary,
                 cursor: 'pointer',
                 fontSize: '12px',
                 padding: 0,
@@ -81,10 +101,10 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
 
           {/* Account Status */}
           <div style={{ paddingTop: '8px' }}>
-            <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>Account Status</div>
+            <div style={{ fontSize: '14px', color: textSecondary, marginBottom: '8px' }}>Account Status</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>Active</span>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: textColor }}>Active</span>
             </div>
           </div>
         </div>
@@ -94,40 +114,55 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           style={{
             padding: '12px 16px',
             borderRadius: '12px',
-            background: '#f8fafc',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            background: cardBg,
+            border: `1px solid ${cardBorder}`,
+            boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease',
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
             <polyline points="10 9 9 9 8 9" />
           </svg>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: textColor }}>
             {creditBalance !== null ? creditBalance : '—'}
           </span>
         </div>
       </div>
 
       {/* About You Section */}
-      <section style={{ marginBottom: '24px', padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
-        <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>
+      <section style={{ 
+        marginBottom: '24px', 
+        padding: '20px', 
+        background: containerBg, 
+        borderRadius: '12px',
+        border: `1px solid ${cardBorder}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease'
+      }}>
+        <h4 style={{ 
+          margin: '0 0 16px 0', 
+          fontSize: '16px', 
+          fontWeight: 600, 
+          color: textColor, 
+          paddingBottom: '8px',
+          transition: 'color 0.3s ease'
+        }}>
           About You
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Username</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{userData?.username || '—'}</div>
+            <div style={{ fontSize: '12px', color: textSecondary, marginBottom: '4px' }}>Username</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: textColor }}>{userData?.username || '—'}</div>
           </div>
           <div>
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Email</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{userData?.email || '—'}</div>
+            <div style={{ fontSize: '12px', color: textSecondary, marginBottom: '4px' }}>Email</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: textColor }}>{userData?.email || '—'}</div>
           </div>
         </div>
       </section>
@@ -139,13 +174,26 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           padding: '20px',
-          background: '#ffffff',
+          background: containerBg,
           borderRadius: '12px',
+          border: `1px solid ${cardBorder}`,
+          transition: 'background-color 0.3s ease, border-color 0.3s ease',
         }}
       >
         <div>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>Active Plan</h4>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+          <h4 style={{ 
+            margin: '0 0 12px 0', 
+            fontSize: '16px', 
+            fontWeight: 600, 
+            color: textColor,
+            transition: 'color 0.3s ease'
+          }}>Active Plan</h4>
+          <div style={{ 
+            fontSize: '14px', 
+            fontWeight: 600, 
+            color: textColor,
+            transition: 'color 0.3s ease'
+          }}>
             {userData?.plan ? `${userData.plan} Plan` : 'Free Plan'}
           </div>
         </div>
@@ -154,22 +202,22 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           style={{
             padding: '10px 20px',
             borderRadius: '12px',
-            border: '1px solid rgba(0, 0, 0, 0.08)',
-            background: '#ffffff',
-            color: '#111827',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.08)',
+            background: buttonBg,
+            color: textColor,
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: 500,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+            boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.06)',
             transition: 'all 0.2s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f8fafc';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+            e.currentTarget.style.background = buttonHoverBg;
+            e.currentTarget.style.boxShadow = isDark ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#ffffff';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
+            e.currentTarget.style.background = buttonBg;
+            e.currentTarget.style.boxShadow = isDark ? '0 2px 8px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.06)';
           }}
         >
           Purchase Plan

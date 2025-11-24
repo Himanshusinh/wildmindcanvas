@@ -55,7 +55,18 @@ export const computeNodeCenter = (
   vectorizeModalStates?: VectorizeModalState[]
 ): { x: number; y: number } | null => {
   if (!id) return null;
-  // Prefer frame element (set via data-frame-id on inner frame)
+  
+  // First, try to use the actual node element position (most accurate for plugins with circular nodes)
+  const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    // Return exact center of the circular node
+    const centerX = Math.round(rect.left + rect.width / 2);
+    const centerY = Math.round(rect.top + rect.height / 2);
+    return { x: centerX, y: centerY };
+  }
+  
+  // Fallback: Prefer frame element (set via data-frame-id on inner frame)
   const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`);
   if (frameEl) {
     const rect = frameEl.getBoundingClientRect();
@@ -71,13 +82,6 @@ export const computeNodeCenter = (
     const centerY = rect.top + rect.height / 2;
     if (side === 'send') return { x: Math.round(rect.right), y: Math.round(centerY) };
     return { x: Math.round(rect.left), y: Math.round(centerY) };
-  }
-
-  // Fallback: use the small node element position (circle center)
-  const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
-  if (el) {
-    const rect = el.getBoundingClientRect();
-    return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
   }
 
   // If DOM elements are not present (or during transforms), try computing from stage transform

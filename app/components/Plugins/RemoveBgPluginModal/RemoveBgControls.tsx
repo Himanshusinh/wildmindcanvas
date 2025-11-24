@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModelDropdown } from './ModelDropdown';
 import { BackgroundTypeDropdown } from './BackgroundTypeDropdown';
 import { ScaleInput } from './ScaleInput';
@@ -39,6 +39,18 @@ export const RemoveBgControls: React.FC<RemoveBgControlsProps> = ({
   onRemoveBg,
   onHoverChange,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isBackgroundTypeDropdownOpen, setIsBackgroundTypeDropdownOpen] = useState(false);
 
@@ -49,7 +61,7 @@ export const RemoveBgControls: React.FC<RemoveBgControlsProps> = ({
         position: 'relative',
         width: `${400 * scale}px`,
         maxWidth: '90vw',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
@@ -62,6 +74,7 @@ export const RemoveBgControls: React.FC<RemoveBgControlsProps> = ({
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         padding: `${12 * scale}px`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}

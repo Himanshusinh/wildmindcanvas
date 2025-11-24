@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 interface CustomDimensionInputProps {
   width: number;
@@ -17,10 +17,36 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
   onHeightChange,
   onClose,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const [localWidth, setLocalWidth] = useState(width);
   const [localHeight, setLocalHeight] = useState(height);
   const minSize = 1024;
   const maxSize = 5000;
+
+  const containerBg = isDark ? '#121212' : 'white';
+  const containerBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb';
+  const labelText = isDark ? '#ffffff' : '#374151';
+  const inputBg = isDark ? '#121212' : 'white';
+  const inputText = isDark ? '#ffffff' : '#111827';
+  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#d1d5db';
+  const buttonText = isDark ? '#cccccc' : '#6b7280';
+  const helpBorder = isDark ? 'rgba(255, 255, 255, 0.3)' : '#9ca3af';
+  const helpText = isDark ? '#999999' : '#6b7280';
+  const sliderBg = isDark ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb';
+  const presetButtonBg = isDark ? '#1a1a1a' : '#f3f4f6';
+  const presetButtonText = isDark ? '#ffffff' : '#111827';
+  const presetButtonBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#d1d5db';
 
   const handleWidthChange = useCallback((newWidth: number) => {
     const clamped = Math.max(minSize, Math.min(maxSize, newWidth));
@@ -71,13 +97,14 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
         top: '100%',
         left: 0,
         marginTop: '4px',
-        backgroundColor: 'white',
+        backgroundColor: containerBg,
         borderRadius: '6px',
         padding: '12px',
         minWidth: '260px',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+        boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.5)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
         zIndex: 10004,
-        border: '1px solid #e5e7eb',
+        border: `1px solid ${containerBorder}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -85,21 +112,22 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
       <div style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>Width</span>
+            <span style={{ color: labelText, fontSize: '12px', fontWeight: 500, transition: 'color 0.3s ease' }}>Width</span>
             <div
               style={{
                 width: '14px',
                 height: '14px',
                 borderRadius: '50%',
-                border: '1px solid #9ca3af',
+                border: `1px solid ${helpBorder}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'help',
+                transition: 'border-color 0.3s ease',
               }}
               title="Set the width of the expanded image"
             >
-              <span style={{ color: '#6b7280', fontSize: '9px' }}>?</span>
+              <span style={{ color: helpText, fontSize: '9px', transition: 'color 0.3s ease' }}>?</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -113,12 +141,13 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                 width: '70px',
                 padding: '4px 6px',
                 borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
-                color: '#111827',
+                border: `1px solid ${inputBorder}`,
+                backgroundColor: inputBg,
+                color: inputText,
                 fontSize: '12px',
                 outline: 'none',
                 textAlign: 'center',
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
               }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -129,13 +158,14 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                   height: '14px',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: '#6b7280',
+                  color: buttonText,
                   cursor: 'pointer',
                   fontSize: '9px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: 0,
+                  transition: 'color 0.3s ease',
                 }}
               >
                 ▲
@@ -147,13 +177,14 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                   height: '14px',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: '#6b7280',
+                  color: buttonText,
                   cursor: 'pointer',
                   fontSize: '9px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: 0,
+                  transition: 'color 0.3s ease',
                 }}
               >
                 ▼
@@ -170,11 +201,12 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
           style={{
             width: '100%',
             height: '3px',
-            backgroundColor: '#e5e7eb',
+            backgroundColor: sliderBg,
             outline: 'none',
             cursor: 'pointer',
             WebkitAppearance: 'none',
             appearance: 'none',
+            transition: 'background-color 0.3s ease',
           }}
         />
       </div>
@@ -183,21 +215,22 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
       <div style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ color: '#374151', fontSize: '12px', fontWeight: 500 }}>Height</span>
+            <span style={{ color: labelText, fontSize: '12px', fontWeight: 500, transition: 'color 0.3s ease' }}>Height</span>
             <div
               style={{
                 width: '14px',
                 height: '14px',
                 borderRadius: '50%',
-                border: '1px solid #9ca3af',
+                border: `1px solid ${helpBorder}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'help',
+                transition: 'border-color 0.3s ease',
               }}
               title="Set the height of the expanded image"
             >
-              <span style={{ color: '#6b7280', fontSize: '9px' }}>?</span>
+              <span style={{ color: helpText, fontSize: '9px', transition: 'color 0.3s ease' }}>?</span>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -211,12 +244,13 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                 width: '70px',
                 padding: '4px 6px',
                 borderRadius: '4px',
-                border: '1px solid #d1d5db',
-                backgroundColor: 'white',
-                color: '#111827',
+                border: `1px solid ${inputBorder}`,
+                backgroundColor: inputBg,
+                color: inputText,
                 fontSize: '12px',
                 outline: 'none',
                 textAlign: 'center',
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
               }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -227,13 +261,14 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                   height: '14px',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: '#6b7280',
+                  color: buttonText,
                   cursor: 'pointer',
                   fontSize: '9px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: 0,
+                  transition: 'color 0.3s ease',
                 }}
               >
                 ▲
@@ -245,13 +280,14 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
                   height: '14px',
                   border: 'none',
                   backgroundColor: 'transparent',
-                  color: '#6b7280',
+                  color: buttonText,
                   cursor: 'pointer',
                   fontSize: '9px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: 0,
+                  transition: 'color 0.3s ease',
                 }}
               >
                 ▼
@@ -268,11 +304,12 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
           style={{
             width: '100%',
             height: '3px',
-            backgroundColor: '#e5e7eb',
+            backgroundColor: sliderBg,
             outline: 'none',
             cursor: 'pointer',
             WebkitAppearance: 'none',
             appearance: 'none',
+            transition: 'background-color 0.3s ease',
           }}
         />
       </div>
@@ -285,12 +322,13 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
             flex: 1,
             padding: '6px 12px',
             borderRadius: '4px',
-            border: '1px solid #d1d5db',
-            backgroundColor: '#f9fafb',
-            color: '#374151',
+            border: `1px solid ${presetButtonBorder}`,
+            backgroundColor: presetButtonBg,
+            color: presetButtonText,
             fontSize: '12px',
             cursor: 'pointer',
             fontWeight: 500,
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         >
           Custom

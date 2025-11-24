@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 interface TextModalTooltipProps {
   isHovered: boolean;
   scale: number;
@@ -9,7 +11,22 @@ export const TextModalTooltip: React.FC<TextModalTooltipProps> = ({
   isHovered,
   scale,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   if (!isHovered) return null;
+
+  const tooltipBg = isDark ? '#121212' : '#ffffff';
+  const tooltipText = isDark ? '#ffffff' : '#1f2937';
 
   return (
     <div
@@ -19,8 +36,8 @@ export const TextModalTooltip: React.FC<TextModalTooltipProps> = ({
         left: 0,
         width: '100%',
         padding: `${6 * scale}px ${12 * scale}px`,
-        backgroundColor: '#ffffff',
-        color: '#1f2937',
+        backgroundColor: tooltipBg,
+        color: tooltipText,
         fontSize: `${12 * scale}px`,
         fontWeight: '600',
         borderRadius: `${12 * scale}px ${12 * scale}px 0 0`,
@@ -32,6 +49,7 @@ export const TextModalTooltip: React.FC<TextModalTooltipProps> = ({
         boxShadow: 'none',
         transform: 'translateY(0)',
         opacity: 1,
+        transition: 'background-color 0.3s ease, color 0.3s ease',
       }}
     >
       AI Companion

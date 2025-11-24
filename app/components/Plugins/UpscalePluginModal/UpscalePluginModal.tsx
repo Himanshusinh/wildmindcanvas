@@ -6,6 +6,7 @@ import { UpscaleLabel } from './UpscaleLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { UpscaleControls } from './UpscaleControls';
 import { UpscaleImageFrame } from './UpscaleImageFrame';
+import { ConnectionNodes } from './ConnectionNodes';
 
 interface UpscalePluginModalProps {
   isOpen: boolean;
@@ -82,9 +83,12 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false);
   
   // Update ref when callback changes
   useEffect(() => {
@@ -94,7 +98,21 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Detect if this is an upscaled image result (media-like, no controls)
@@ -199,6 +217,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
+      // Track initial mouse position to detect drag vs click
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      hasDraggedRef.current = false;
+      
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -221,6 +243,15 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
 
+      // Check if mouse moved significantly (more than 5px) to detect drag
+      if (dragStartPosRef.current) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > 5 || dy > 5) {
+          hasDraggedRef.current = true;
+        }
+      }
+
       // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
@@ -234,13 +265,24 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     };
 
     const handleMouseUp = () => {
+      const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
+      dragStartPosRef.current = null;
+      
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging) {
+        setIsPopupOpen(prev => !prev);
+      }
+      
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
+      
+      // Reset drag flag
+      hasDraggedRef.current = false;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -430,23 +472,100 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <UpscaleLabel
-        isHovered={isHovered}
-        scale={scale}
-        imageResolution={imageResolution}
-      />
+      {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
+      {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
-      <ModalActionIcons
-        isSelected={isSelected || false}
-        scale={scale}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        generatedUrl={upscaledImageUrl}
-      />
+      {/* Plugin node design with icon and label */}
+      <div
+        data-frame-id={id ? `${id}-frame` : undefined}
+        style={{
+          position: 'relative',
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={handleMouseDown}
+      >
+        {/* Main plugin container - Circular */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${100 * scale}px`,
+            height: `${100 * scale}px`,
+            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            borderRadius: '50%',
+            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            boxShadow: isDark 
+              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
+              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
+            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
+            overflow: 'visible', // Allow nodes to extend beyond container
+          }}
+        >
+          {/* Upscale Icon */}
+          <img
+            src="/icons/layer.png"
+            alt="Upscale"
+            style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
+              display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            onError={(e) => {
+              console.error('[UpscalePluginModal] Failed to load layer.png icon');
+              // Fallback: hide broken image
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          
+          <ConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
+        </div>
+        
+        {/* Label below */}
+        <div
+          style={{
+            marginTop: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Upscale
+        </div>
 
-      {!isUpscaledImage && (
-        <UpscaleControls
+        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {isPopupOpen && !isUpscaledImage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: `${12 * scale}px`,
+              zIndex: 1000,
+            }}
+          >
+            <UpscaleControls
           scale={scale}
           selectedModel={selectedModel}
           scaleValue={scaleValue}
@@ -467,24 +586,25 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
               onOptionsChange({ model: selectedModel, scale: newScale });
             }
           }}
-          onUpscale={handleUpscale}
-          onHoverChange={setIsHovered}
-        />
-      )}
-
-      <UpscaleImageFrame
-        id={id}
-        scale={scale}
-        frameBorderColor={frameBorderColor}
-        frameBorderWidth={frameBorderWidth}
-        isUpscaledImage={isUpscaledImage}
-        isDraggingContainer={isDraggingContainer}
-        isHovered={isHovered}
-        isSelected={isSelected || false}
-        sourceImageUrl={sourceImageUrl}
-        onMouseDown={handleMouseDown}
-        onSelect={onSelect}
-      />
+              onUpscale={handleUpscale}
+              onHoverChange={setIsHovered}
+            />
+            <UpscaleImageFrame
+          id={id}
+          scale={scale}
+          frameBorderColor={frameBorderColor}
+          frameBorderWidth={frameBorderWidth}
+          isUpscaledImage={isUpscaledImage}
+          isDraggingContainer={isDraggingContainer}
+          isHovered={isHovered}
+          isSelected={isSelected || false}
+          sourceImageUrl={sourceImageUrl}
+              onMouseDown={handleMouseDown}
+              onSelect={onSelect}
+            />
+          </div>
+        )}
+      </div>
 
     </div>
   );

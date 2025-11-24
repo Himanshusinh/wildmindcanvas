@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ReplaceButtonProps {
   scale: number;
@@ -17,8 +17,21 @@ export const ReplaceButton: React.FC<ReplaceButtonProps> = ({
   sourceImageUrl,
   onReplace,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const isDisabled = isReplacing || externalIsReplacing || !sourceImageUrl;
   const isActive = !isDisabled;
+  const disabledBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
 
   return (
     <button
@@ -32,7 +45,7 @@ export const ReplaceButton: React.FC<ReplaceButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isActive ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: isActive ? '#437eb5' : disabledBg,
         border: 'none',
         borderRadius: `${10 * scale}px`,
         cursor: isActive ? 'pointer' : 'not-allowed',
@@ -41,6 +54,7 @@ export const ReplaceButton: React.FC<ReplaceButtonProps> = ({
         opacity: (isReplacing || externalIsReplacing) ? 0.6 : 1,
         fontSize: `${14 * scale}px`,
         fontWeight: 500,
+        transition: 'background-color 0.3s ease',
       }}
       onMouseEnter={(e) => {
         if (isActive) {

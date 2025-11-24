@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import '../../common/canvasCaptureGuard';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
-import { EraseButton } from './EraseButton';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
@@ -91,6 +90,8 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const [localErasedImageUrl, setLocalErasedImageUrl] = useState<string | null>(initialLocalErasedImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false);
   
   // Update ref when callback changes
   useEffect(() => {
@@ -153,7 +154,21 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Detect if this is an erased image result (media-like, no controls)
@@ -267,6 +282,10 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
+      // Track initial mouse position to detect drag vs click
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      hasDraggedRef.current = false;
+      
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -289,6 +308,15 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
 
+      // Check if mouse moved significantly (more than 5px) to detect drag
+      if (dragStartPosRef.current) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > 5 || dy > 5) {
+          hasDraggedRef.current = true;
+        }
+      }
+
       // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
@@ -302,13 +330,24 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     };
 
     const handleMouseUp = () => {
+      const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
+      dragStartPosRef.current = null;
+      
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging && sourceImageUrl) {
+        setIsPopupOpen(prev => !prev);
+      }
+      
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
+      
+      // Reset drag flag
+      hasDraggedRef.current = false;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -320,14 +359,6 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     };
   }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
 
-
-  const handleEraseClick = () => {
-    if (!sourceImageUrl) {
-      alert('Please connect an image first');
-      return;
-    }
-    setIsPopupOpen(true);
-  };
 
   const handleErase = async (): Promise<void> => {
     console.log('[ErasePluginModal] handleErase called', {
@@ -754,51 +785,86 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <ModalActionIcons
-        isSelected={isSelected || false}
-        scale={scale}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        generatedUrl={erasedImageUrl}
-      />
+      {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
+      {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
-      {/* Simple erase button container with nodes */}
+      {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}
         style={{
           position: 'relative',
-          width: `${400 * scale}px`,
-          maxWidth: '90vw',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: `${16 * scale}px`,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          padding: `${12 * scale}px`,
-          border: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          cursor: 'pointer',
           zIndex: 10,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
-        <EraseButton
-          scale={scale}
-          isErasing={isErasing}
-          externalIsErasing={externalIsErasing}
-          sourceImageUrl={sourceImageUrl}
-          onErase={handleEraseClick}
-        />
+        {/* Main plugin container - Circular */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${100 * scale}px`,
+            height: `${100 * scale}px`,
+            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            borderRadius: '50%',
+            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            boxShadow: isDark 
+              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
+              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
+            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
+            overflow: 'visible', // Allow nodes to extend beyond container
+          }}
+        >
+          {/* Erase Icon */}
+          <img
+            src="/icons/layer.png"
+            alt="Erase"
+            style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
+              display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            onError={(e) => {
+              console.error('[ErasePluginModal] Failed to load layer.png icon');
+              // Fallback: hide broken image
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          
+          <ConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
+        </div>
         
-        <ConnectionNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={isSelected || false}
-        />
+        {/* Label below */}
+        <div
+          style={{
+            marginTop: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Erase
+        </div>
       </div>
 
       {/* Image Preview Popup with Brush Tool */}
@@ -835,7 +901,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         >
           <div
             style={{
-              backgroundColor: 'white',
+              backgroundColor: isDark ? '#121212' : 'white',
               borderRadius: '16px',
               padding: '24px',
               width: '90vw',
@@ -845,8 +911,9 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
               overflow: 'hidden',
+              transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
             }}
             onClick={(e) => e.stopPropagation()}
             onWheel={(e) => {
@@ -868,7 +935,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 marginBottom: '8px',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
                 Erase Image
               </h3>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -895,13 +962,14 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: '24px',
-                    color: '#666',
+                    color: isDark ? '#cccccc' : '#666',
                     padding: 0,
                     width: '32px',
                     height: '32px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    transition: 'color 0.3s ease',
                   }}
                 >
                   ×
@@ -917,7 +985,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 gap: '8px',
               }}
             >
-              <label style={{ fontSize: '14px', fontWeight: 500 }}>
+              <label style={{ fontSize: '14px', fontWeight: 500, color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
                 What do you want to remove from the highlighted area? (optional)
               </label>
               <input
@@ -928,16 +996,19 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 style={{
                   padding: '10px 12px',
                   borderRadius: '8px',
-                  border: '1px solid #e5e7eb',
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e5e7eb',
+                  backgroundColor: isDark ? '#121212' : '#ffffff',
+                  color: isDark ? '#ffffff' : '#111827',
                   fontSize: '14px',
                   outline: 'none',
                   width: '100%',
                   boxSizing: 'border-box',
+                  transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
                 }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 500, minWidth: '80px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 500, minWidth: '80px', color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
                     Brush Size:
                   </label>
                   <input
@@ -953,11 +1024,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       outline: 'none',
                     }}
                   />
-                  <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '40px', textAlign: 'right' }}>
+                  <span style={{ fontSize: '12px', color: isDark ? '#cccccc' : '#6b7280', minWidth: '40px', textAlign: 'right', transition: 'color 0.3s ease' }}>
                     {brushSize}px
                   </span>
                 </div>
-                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>
+                <p style={{ fontSize: '12px', color: isDark ? '#cccccc' : '#6b7280', margin: 0, transition: 'color 0.3s ease' }}>
                   Draw on the image to mark the area you want to erase. Only the drawn area will be affected.
                 </p>
               </div>
@@ -973,11 +1044,12 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 maxHeight: 'calc(85vh - 200px)',
                 overflow: 'hidden',
                 borderRadius: '8px',
-                border: '2px solid #e5e7eb',
-                backgroundColor: '#f9fafb',
+                border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
+                backgroundColor: isDark ? '#000000' : '#f9fafb',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                transition: 'background-color 0.3s ease, border-color 0.3s ease',
               }}
             >
               <div
@@ -1014,6 +1086,10 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       objectFit: 'contain',
                       objectPosition: 'center',
                       flexShrink: 0,
+                      opacity: 1,
+                      filter: 'none',
+                      position: 'relative',
+                      zIndex: 0,
                     }}
                     onError={(e) => {
                       console.error('[ErasePluginModal] Failed to load image:', sourceImageUrl);
@@ -1075,8 +1151,8 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       fontSize: '14px',
                     }}
                   >
-                    <p>No image connected</p>
-                    <p style={{ fontSize: '12px', marginTop: '8px' }}>Connect an image to the erase plugin</p>
+                    <p style={{ color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>No image connected</p>
+                    <p style={{ fontSize: '12px', marginTop: '8px', color: isDark ? '#cccccc' : '#6b7280', transition: 'color 0.3s ease' }}>Connect an image to the erase plugin</p>
                   </div>
                 )}
                 <canvas
@@ -1089,7 +1165,10 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     cursor: 'crosshair',
                     touchAction: 'none',
                     pointerEvents: 'auto',
+                    backgroundColor: 'transparent !important' as any,
+                    zIndex: 1,
                   }}
+                  className="erase-preview-canvas"
                   onMouseDown={(e) => {
                     if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
                     const img = imageRef.current;

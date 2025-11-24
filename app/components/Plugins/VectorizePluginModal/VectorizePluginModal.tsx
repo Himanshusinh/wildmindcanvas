@@ -6,6 +6,7 @@ import { VectorizeLabel } from './VectorizeLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
+import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 
 interface VectorizePluginModalProps {
   isOpen: boolean;
@@ -80,10 +81,13 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [mode, setMode] = useState<string>(initialMode ?? 'simple');
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localVectorizedImageUrl, setLocalVectorizedImageUrl] = useState<string | null>(initialLocalVectorizedImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false);
   
   // Update ref when callback changes
   useEffect(() => {
@@ -93,7 +97,21 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Detect if this is a vectorized image result (media-like, no controls)
@@ -122,7 +140,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       }
     }
     
-    return null;
+    return null; 
   }, [id, connections, imageModalStates, images]);
 
   // Restore images and mode from props on mount or when props change
@@ -213,6 +231,10 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       onSelect();
     }
 
+    // Track initial mouse position to detect drag vs click
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    hasDraggedRef.current = false;
+
     setIsDraggingContainer(true);
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
@@ -233,6 +255,15 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
       
+      // Check if mouse moved significantly (more than 5px) to detect drag
+      if (dragStartPosRef.current) {
+        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
+        if (dx > 5 || dy > 5) {
+          hasDraggedRef.current = true;
+        }
+      }
+      
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
       const newCanvasX = (newScreenX - position.x) / scale;
@@ -243,10 +274,21 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     };
 
     const handleMouseUp = () => {
+      const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
+      dragStartPosRef.current = null;
+      
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging) {
+        setIsPopupOpen(prev => !prev);
+      }
+      
       if (onPositionCommit && lastCanvasPosRef.current) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
+      
+      // Reset drag flag
+      hasDraggedRef.current = false;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -428,23 +470,100 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <VectorizeLabel
-        isHovered={isHovered}
-        scale={scale}
-        imageResolution={imageResolution}
-      />
+      {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
+      {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
-      <ModalActionIcons
-        isSelected={isSelected || false}
-        scale={scale}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        generatedUrl={vectorizedImageUrl}
-      />
+      {/* Plugin node design with icon and label */}
+      <div
+        data-frame-id={id ? `${id}-frame` : undefined}
+        style={{
+          position: 'relative',
+          display: 'inline-flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={handleMouseDown}
+      >
+        {/* Main plugin container - Circular */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${100 * scale}px`,
+            height: `${100 * scale}px`,
+            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            borderRadius: '50%',
+            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            boxShadow: isDark 
+              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
+              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
+            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
+            overflow: 'visible', // Allow nodes to extend beyond container
+          }}
+        >
+          {/* Vectorize Icon */}
+          <img
+            src="/icons/layer.png"
+            alt="Vectorize"
+            style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
+              display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            onError={(e) => {
+              console.error('[VectorizePluginModal] Failed to load layer.png icon');
+              // Fallback: hide broken image
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          
+          <ConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
+        </div>
+        
+        {/* Label below */}
+        <div
+          style={{
+            marginTop: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Vectorize
+        </div>
 
-      {!isVectorizedImage && (
-        <VectorizeControls
+        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {isPopupOpen && !isVectorizedImage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: `${12 * scale}px`,
+              zIndex: 1000,
+            }}
+          >
+            <VectorizeControls
           scale={scale}
           mode={mode}
           isVectorizing={isVectorizing}
@@ -458,24 +577,25 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
               onOptionsChange({ mode: newMode } as any);
             }
           }}
-          onVectorize={handleVectorize}
-          onHoverChange={setIsHovered}
-        />
-      )}
-
-      <VectorizeImageFrame
-        id={id}
-        scale={scale}
-        frameBorderColor={frameBorderColor}
-        frameBorderWidth={frameBorderWidth}
-        isVectorizedImage={isVectorizedImage}
-        isDraggingContainer={isDraggingContainer}
-        isHovered={isHovered}
-        isSelected={isSelected || false}
-        sourceImageUrl={sourceImageUrl}
-        onMouseDown={handleMouseDown}
-        onSelect={onSelect}
-      />
+              onVectorize={handleVectorize}
+              onHoverChange={setIsHovered}
+            />
+            <VectorizeImageFrame
+          id={id}
+          scale={scale}
+          frameBorderColor={frameBorderColor}
+          frameBorderWidth={frameBorderWidth}
+          isVectorizedImage={isVectorizedImage}
+          isDraggingContainer={isDraggingContainer}
+          isHovered={isHovered}
+          isSelected={isSelected || false}
+          sourceImageUrl={sourceImageUrl}
+              onMouseDown={handleMouseDown}
+              onSelect={onSelect}
+            />
+          </div>
+        )}
+      </div>
 
     </div>
   );

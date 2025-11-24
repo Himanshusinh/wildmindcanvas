@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useEffect, Fragment } from 'react';
+import { useRef, useEffect, Fragment, useState } from 'react';
 import {
   getModelDurations,
   getModelDefaultDuration,
@@ -97,11 +97,33 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   onSetIsFrameOrderSwapped,
   onOptionsChange,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
+  const controlsBg = isDark ? '#121212' : '#ffffff';
+  const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
+  const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
+  const dropdownBg = isDark ? '#121212' : '#ffffff';
+  const dropdownText = isDark ? '#ffffff' : '#1f2937';
+  const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+  const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const iconColor = isDark ? '#cccccc' : '#4b5563';
+  const labelText = isDark ? '#ffffff' : '#1f2937';
+  const firstLastBg = isDark ? '#1a1a1a' : '#1f2937';
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const durationDropdownRef = useRef<HTMLDivElement>(null);
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
-  const dropdownBorderColor = 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
 
   // Close dropdowns when clicking outside
@@ -139,7 +161,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         width: `${600 * scale}px`,
         maxWidth: '90vw',
         padding: `${16 * scale}px`,
-        backgroundColor: '#ffffff',
+        backgroundColor: controlsBg,
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
@@ -156,6 +178,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -182,14 +205,15 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
           style={{
             flex: 1,
             padding: `${10 * scale}px ${14 * scale}px`,
-            backgroundColor: isPromptDisabled ? '#f3f4f6' : '#ffffff',
+            backgroundColor: inputBg,
             border: `1px solid ${dropdownBorderColor}`,
             borderRadius: `${10 * scale}px`,
             fontSize: controlFontSize,
-            color: isPromptDisabled ? '#6b7280' : '#1f2937',
+            color: inputText,
             outline: 'none',
             cursor: isPromptDisabled ? 'not-allowed' : 'text',
             opacity: isPromptDisabled ? 0.7 : 1,
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
           onFocus={(e) => {
             e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
@@ -264,12 +288,13 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             style={{
               width: '100%',
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '500',
-              color: '#1f2937',
+              color: dropdownText,
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
@@ -280,7 +305,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -293,10 +318,11 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 minWidth: `${400 * scale}px`,
                 width: 'max-content',
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
                 zIndex: 3003,
                 padding: `${4 * scale}px 0`,
               }}
@@ -352,25 +378,26 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     style={{
                       padding: `${6 * scale}px ${12 * scale}px`,
                       fontSize: controlFontSize,
-                      color: '#1f2937',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    color: dropdownText,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: selectedModel === model ? selectedBg : 'transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                       borderRadius: `${6 * scale}px`,
                       whiteSpace: 'nowrap',
                       minWidth: 'max-content',
                     }}
-                    onMouseEnter={(e) => {
-                      if (selectedModel !== model) {
-                        e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedModel !== model) {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
+                  onMouseEnter={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
                   >
                     {selectedModel === model && (
                       <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
@@ -398,23 +425,24 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '600',
-              color: '#1f2937',
+              color: dropdownText,
               minWidth: `${70 * scale}px`,
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             <span>{selectedAspectRatio}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -425,10 +453,11 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 top: '100%',
                 left: 0,
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
@@ -454,16 +483,17 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                   style={{
                     padding: `${8 * scale}px ${16 * scale}px`,
                     fontSize: controlFontSize,
-                    color: '#1f2937',
+                    color: dropdownText,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: selectedAspectRatio === ratio ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    backgroundColor: selectedAspectRatio === ratio ? selectedBg : 'transparent',
                     borderLeft: selectedAspectRatio === ratio ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedAspectRatio !== ratio) {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -497,23 +527,24 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '600',
-              color: '#1f2937',
+              color: dropdownText,
               minWidth: `${70 * scale}px`,
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             <span>{selectedDuration}s</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isDurationDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={isDark ? '#34d399' : '#10b981'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -524,10 +555,11 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 top: '100%',
                 left: 0,
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
@@ -553,16 +585,17 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                   style={{
                     padding: `${8 * scale}px ${16 * scale}px`,
                     fontSize: controlFontSize,
-                    color: '#1f2937',
+                    color: dropdownText,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: selectedDuration === dur ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    backgroundColor: selectedDuration === dur ? selectedBg : 'transparent',
                     borderLeft: selectedDuration === dur ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedDuration !== dur) {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -596,23 +629,24 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '600',
-              color: '#1f2937',
+              color: dropdownText,
               minWidth: `${80 * scale}px`,
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             <span>{selectedResolution}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isResolutionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={isDark ? '#a78bfa' : '#8b5cf6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -623,10 +657,11 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 top: '100%',
                 left: 0,
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
@@ -652,16 +687,17 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                   style={{
                     padding: `${8 * scale}px ${16 * scale}px`,
                     fontSize: controlFontSize,
-                    color: '#1f2937',
+                    color: dropdownText,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: selectedResolution === res ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    backgroundColor: selectedResolution === res ? selectedBg : 'transparent',
                     borderLeft: selectedResolution === res ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedResolution !== res) {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -684,7 +720,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
 
         {isVeo31Model && (hasSingleFrame || isFirstLastMode) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: `${6 * scale}px`, marginTop: `${6 * scale}px` }}>
-            <div style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: '#1f2937' }}>
+            <div style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: labelText, transition: 'color 0.3s ease' }}>
               {isFirstLastMode
                 ? 'First & Last Frame (auto-filled when two image nodes are connected)'
                 : 'First Frame (auto-filled when an image node is connected)'}
@@ -707,7 +743,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                       backgroundColor: slot.url ? 'rgba(67, 126, 181, 0.07)' : 'transparent',
                     }}
                   >
-                    <span style={{ fontSize: `${11 * scale}px`, fontWeight: 600, color: '#1f2937' }}>{slot.label}</span>
+                    <span style={{ fontSize: `${11 * scale}px`, fontWeight: 600, color: labelText, transition: 'color 0.3s ease' }}>{slot.label}</span>
                     <div
                       style={{
                         position: 'relative',
@@ -758,14 +794,14 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                         height: `${34 * scale}px`,
                         borderRadius: '50%',
                         border: 'none',
-                        backgroundColor: isFirstLastMode ? '#1f2937' : 'rgba(0,0,0,0.15)',
+                        backgroundColor: isFirstLastMode ? firstLastBg : (isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.15)'),
+                        transition: 'background-color 0.3s ease, transform 0.15s ease',
                         color: '#fff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: isFirstLastMode ? 'pointer' : 'not-allowed',
                         boxShadow: isFirstLastMode ? `0 ${3 * scale}px ${9 * scale}px rgba(0,0,0,0.25)` : 'none',
-                        transition: 'transform 0.15s ease',
                         alignSelf: 'center',
                       }}
                       title={isFirstLastMode ? 'Swap first and last frame images' : 'Connect two image nodes to enable swapping'}
@@ -779,7 +815,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 </Fragment>
               ))}
             </div>
-            <div style={{ fontSize: `${11 * scale}px`, color: '#4b5563' }}>
+            <div style={{ fontSize: `${11 * scale}px`, color: iconColor, transition: 'color 0.3s ease' }}>
               {isFirstLastMode
                 ? 'Two frames detected — Veo will run in first/last frame mode. Use the swap button to switch frame order.'
                 : hasSingleFrame

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface PluginSidebarProps {
   isOpen: boolean;
@@ -18,6 +18,18 @@ interface Plugin {
 }
 
 const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelectPlugin, scale = 1, viewportCenter }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const [plugins] = useState<Plugin[]>([
     {
       id: 'upscale',
@@ -68,10 +80,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
   };
 
   const renderPluginGrid = (items: Plugin[]) => {
+    const textColor = isDark ? '#cccccc' : '#9ca3af';
+    const cardBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+    const cardBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.3)';
+    const iconColor = isDark ? '#ffffff' : '#000000';
+    const nameColor = isDark ? '#ffffff' : '#000000';
+    const shadowColor = isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)';
+
     if (items.length === 0) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-          <p style={{ color: '#9ca3af', fontSize: '14px' }}>No plugins available</p>
+          <p style={{ color: textColor, fontSize: '14px', transition: 'color 0.3s ease' }}>No plugins available</p>
         </div>
       );
     }
@@ -88,10 +107,10 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               aspectRatio: '1',
               overflow: 'hidden',
               cursor: 'pointer',
-              background: 'rgba(255, 255, 255, 0.95)',
+              background: cardBg,
               borderRadius: '16px',
-              border: '2px solid rgba(0, 0, 0, 0.3)',
-              transition: 'all 0.2s ease',
+              border: `2px solid ${cardBorder}`,
+              transition: 'all 0.3s ease',
               position: 'relative',
               display: 'flex',
               flexDirection: 'column',
@@ -101,7 +120,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.boxShadow = `0 4px 12px ${shadowColor}`;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
@@ -118,17 +137,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               }}
             >
               {item.id === 'upscale' ? (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               ) : item.id === 'removebg' ? (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
               ) : (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
               )}
@@ -138,8 +157,9 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               style={{
                 fontSize: '12px',
                 fontWeight: 500,
-                color: '#000000',
+                color: nameColor,
                 textAlign: 'center',
+                transition: 'color 0.3s ease',
               }}
             >
               {item.name}
@@ -152,6 +172,14 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
 
   if (!isOpen) return null;
 
+  const sidebarBg = isDark ? '#121212' : '#ffffff';
+  const sidebarBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const sidebarShadow = isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)';
+  const headerBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const headerText = isDark ? '#ffffff' : '#111827';
+  const closeIconColor = isDark ? '#cccccc' : '#6b7280';
+  const closeHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : '#f3f4f6';
+
   return (
     <div
       style={{
@@ -161,17 +189,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
         bottom: '20px',
         width: '400px',
         maxWidth: 'calc(90vw - 76px)',
-        background: '#ffffff',
+        background: sidebarBg,
         borderRadius: '16px',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+        border: `1px solid ${sidebarBorder}`,
+        boxShadow: sidebarShadow,
         zIndex: 10002,
         display: 'flex',
         flexDirection: 'column',
         pointerEvents: 'auto',
         opacity: isOpen ? 1 : 0,
         visibility: isOpen ? 'visible' : 'hidden',
-        transition: 'opacity 0.3s ease, visibility 0.3s ease',
+        transition: 'opacity 0.3s ease, visibility 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
       }}
       onWheel={(e) => {
         e.stopPropagation();
@@ -184,8 +212,24 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       }}
     >
       {/* Header */}
-      <div style={{ paddingLeft: '20px', paddingRight: '20px', paddingTop: '16px', paddingBottom: '16px', borderBottom: '1px solid rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827' }}>Plugins</h2>
+      <div style={{ 
+        paddingLeft: '20px', 
+        paddingRight: '20px', 
+        paddingTop: '16px', 
+        paddingBottom: '16px', 
+        borderBottom: `1px solid ${headerBorder}`, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        transition: 'border-color 0.3s ease'
+      }}>
+        <h2 style={{ 
+          margin: 0, 
+          fontSize: '20px', 
+          fontWeight: 600, 
+          color: headerText,
+          transition: 'color 0.3s ease'
+        }}>Plugins</h2>
         <button
           onClick={onClose}
           style={{
@@ -193,12 +237,12 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
             border: 'none',
             cursor: 'pointer',
             fontSize: '20px',
-            color: '#6b7280',
+            color: closeIconColor,
             padding: '6px 10px',
-            transition: 'all 0.2s ease',
+            transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#f3f4f6';
+            e.currentTarget.style.background = closeHoverBg;
             e.currentTarget.style.borderRadius = '8px';
           }}
           onMouseLeave={(e) => {

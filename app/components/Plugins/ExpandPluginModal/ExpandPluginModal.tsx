@@ -109,6 +109,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     aspectRatio?: string;
   } | null>(null);
   const onOptionsChangeRef = useRef(onOptionsChange);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false);
   
   // Update ref when callback changes
   useEffect(() => {
@@ -180,7 +182,21 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Detect connected image nodes (from image generators or canvas images)
@@ -280,6 +296,10 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       return;
     }
 
+    // Track initial mouse position to detect drag vs click
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    hasDraggedRef.current = false;
+
     e.preventDefault();
     e.stopPropagation();
     
@@ -293,6 +313,15 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     lastCanvasPosRef.current = { x: startCanvasX, y: startCanvasY };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
+      // Check if mouse moved significantly (more than 5px) to detect drag
+      if (dragStartPosRef.current) {
+        const dx = Math.abs(moveEvent.clientX - dragStartPosRef.current.x);
+        const dy = Math.abs(moveEvent.clientY - dragStartPosRef.current.y);
+        if (dx > 5 || dy > 5) {
+          hasDraggedRef.current = true;
+        }
+      }
+
       const deltaX = (moveEvent.clientX - startX) / scale;
       const deltaY = (moveEvent.clientY - startY) / scale;
       const newX = startCanvasX + deltaX;
@@ -307,12 +336,22 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     };
 
     const handleMouseUp = (upEvent: MouseEvent) => {
+      const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       setDragOffset({ x: 0, y: 0 });
+      dragStartPosRef.current = null;
+      
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging && sourceImageUrl) {
+        setIsPopupOpen(prev => !prev);
+      }
       
       if (lastCanvasPosRef.current && onPositionCommit) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
+      
+      // Reset drag flag
+      hasDraggedRef.current = false;
       
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -322,13 +361,6 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleExpandClick = () => {
-    if (!sourceImageUrl) {
-      alert('Please connect an image first');
-      return;
-    }
-    setIsPopupOpen(true);
-  };
 
   const handleExpand = async () => {
     if (!onExpand || !sourceImageUrl) {
@@ -549,51 +581,86 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
-      <ModalActionIcons
-        isSelected={isSelected || false}
-        scale={scale}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        generatedUrl={expandedImageUrl}
-      />
+      {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
+      {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
-      {/* Simple expand button container with nodes */}
+      {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}
         style={{
           position: 'relative',
-          width: `${400 * scale}px`,
-          maxWidth: '90vw',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderRadius: `${16 * scale}px`,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          padding: `${12 * scale}px`,
-          border: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          cursor: 'pointer',
           zIndex: 10,
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
-        <ExpandButton
-          scale={scale}
-          isExpanding={isExpanding}
-          externalIsExpanding={externalIsExpanding}
-          sourceImageUrl={sourceImageUrl}
-          onExpand={handleExpandClick}
-        />
+        {/* Main plugin container - Circular */}
+        <div
+          style={{
+            position: 'relative',
+            width: `${100 * scale}px`,
+            height: `${100 * scale}px`,
+            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            borderRadius: '50%',
+            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease',
+            boxShadow: isDark 
+              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
+              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
+            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
+            overflow: 'visible', // Allow nodes to extend beyond container
+          }}
+        >
+          {/* Expand Icon */}
+          <img
+            src="/icons/layer.png"
+            alt="Expand"
+            style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
+              display: 'block',
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            onError={(e) => {
+              console.error('[ExpandPluginModal] Failed to load layer.png icon');
+              // Fallback: hide broken image
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          
+          <ConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
+        </div>
         
-        <ConnectionNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={isSelected || false}
-        />
+        {/* Label below */}
+        <div
+          style={{
+            marginTop: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Expand
+        </div>
       </div>
 
       {isPopupOpen && (
@@ -657,7 +724,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             return (
               <div
                 style={{
-                  backgroundColor: 'white',
+                  backgroundColor: isDark ? '#121212' : 'white',
                   borderRadius: '16px',
                   padding: '24px',
                   width: '90vw',
@@ -667,9 +734,10 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '16px',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                  boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
                   overflow: 'hidden',
                   pointerEvents: 'auto',
+                  transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onWheel={(e) => {
@@ -734,11 +802,12 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                     minHeight: 0,
                     overflow: 'hidden',
                     borderRadius: '8px',
-                    border: '2px solid #e5e7eb',
-                    backgroundColor: '#f9fafb',
+                    border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
+                    backgroundColor: isDark ? '#1a1a1a' : '#f9fafb',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease',
                   }}
                 >
                   <ExpandImageFrame

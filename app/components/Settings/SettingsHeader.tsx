@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActiveSection } from './types';
 
 interface SettingsHeaderProps {
@@ -9,6 +9,18 @@ interface SettingsHeaderProps {
 }
 
 export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, onClose }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const getTitle = () => {
     switch (activeSection) {
       case 'profile':
@@ -26,6 +38,12 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
     }
   };
 
+  const bgColor = isDark ? 'var(--bg-secondary)' : '#ffffff';
+  const textColor = isDark ? 'var(--text-primary)' : '#111827';
+  const borderColor = isDark ? 'var(--border-color)' : 'rgba(0, 0, 0, 0.05)';
+  const iconColor = isDark ? 'var(--text-secondary)' : '#6b7280';
+  const hoverBg = isDark ? 'var(--bg-tertiary)' : 'rgba(0, 0, 0, 0.05)';
+
   return (
     <div
       style={{
@@ -33,14 +51,21 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '40px 40px 28px 40px',
-        background: '#ffffff',
+        background: bgColor,
         position: 'sticky',
         top: 0,
         zIndex: 10,
-        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+        borderBottom: `1px solid ${borderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
     >
-      <h3 style={{ margin: 0, fontSize: '20px', color: '#111827', fontWeight: 600 }}>
+      <h3 style={{ 
+        margin: 0, 
+        fontSize: '20px', 
+        color: textColor, 
+        fontWeight: 600,
+        transition: 'color 0.3s ease'
+      }}>
         {getTitle()}
       </h3>
       <button
@@ -51,13 +76,13 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
           border: 'none',
           cursor: 'pointer',
           fontSize: '20px',
-          color: '#6b7280',
+          color: iconColor,
           padding: '6px 10px',
           borderRadius: '8px',
-          transition: 'all 0.2s ease',
+          transition: 'all 0.3s ease',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.background = hoverBg;
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';

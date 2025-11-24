@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 interface MusicModalControlsProps {
   scale: number;
@@ -50,10 +50,30 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   onSetIsAspectRatioDropdownOpen,
   onOptionsChange,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
-  const dropdownBorderColor = 'rgba(0,0,0,0.1)';
+  const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
+  const controlsBg = isDark ? '#121212' : '#ffffff';
+  const inputBg = isDark ? '#121212' : '#ffffff';
+  const inputText = isDark ? '#ffffff' : '#1f2937';
+  const dropdownBg = isDark ? '#121212' : '#ffffff';
+  const dropdownText = isDark ? '#ffffff' : '#1f2937';
+  const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+  const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const iconColor = isDark ? '#cccccc' : '#4b5563';
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -82,7 +102,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
         width: `calc(100% + ${4 * scale}px)`,
         maxWidth: '90vw',
         padding: `${12 * scale}px`,
-        backgroundColor: '#ffffff',
+        backgroundColor: controlsBg,
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
@@ -99,6 +119,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -124,12 +145,13 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
           style={{
             flex: 1,
             padding: `${10 * scale}px ${14 * scale}px`,
-            backgroundColor: '#ffffff',
+            backgroundColor: inputBg,
             border: `1px solid ${dropdownBorderColor}`,
             borderRadius: `${10 * scale}px`,
             fontSize: controlFontSize,
-            color: '#1f2937',
+            color: inputText,
             outline: 'none',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
           onFocus={(e) => {
             e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
@@ -202,23 +224,24 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
             style={{
               width: '100%',
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '500',
-              color: '#1f2937',
+              color: dropdownText,
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               textAlign: 'left',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -230,14 +253,15 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
                 left: 0,
                 right: 0,
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
                 padding: `${4 * scale}px 0`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -255,16 +279,17 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
                   style={{
                     padding: `${8 * scale}px ${16 * scale}px`,
                     fontSize: controlFontSize,
-                    color: '#1f2937',
+                    color: dropdownText,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    backgroundColor: selectedModel === model ? selectedBg : 'transparent',
                     borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -297,23 +322,24 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
-              backgroundColor: '#ffffff',
+              backgroundColor: dropdownBg,
               border: `1px solid ${dropdownBorderColor}`,
               borderRadius: `${9999 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '600',
-              color: '#1f2937',
+              color: dropdownText,
               minWidth: `${70 * scale}px`,
               outline: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             <span>{selectedAspectRatio}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           
@@ -324,15 +350,16 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
                 top: '100%',
                 left: 0,
                 marginTop: `${4 * scale}px`,
-                backgroundColor: '#ffffff',
+                backgroundColor: dropdownBg,
                 border: `1px solid ${dropdownBorderColor}`,
                 borderRadius: `${12 * scale}px`,
-                boxShadow: `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
                 padding: `${4 * scale}px 0`,
                 minWidth: `${100 * scale}px`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -350,16 +377,17 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
                   style={{
                     padding: `${8 * scale}px ${16 * scale}px`,
                     fontSize: controlFontSize,
-                    color: '#1f2937',
+                    color: dropdownText,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    backgroundColor: selectedAspectRatio === ratio ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    backgroundColor: selectedAspectRatio === ratio ? selectedBg : 'transparent',
                     borderLeft: selectedAspectRatio === ratio ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedAspectRatio !== ratio) {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {

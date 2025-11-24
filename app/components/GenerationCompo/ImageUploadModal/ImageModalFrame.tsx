@@ -1,5 +1,5 @@
 'use client';
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
@@ -34,8 +34,24 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   onSelect,
   getAspectRatio,
 }) => {
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
+  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const placeholderColor = isDark ? '#666666' : '#9ca3af';
 
   return (
     <div
@@ -51,7 +67,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         maxWidth: '90vw',
         aspectRatio: getAspectRatio(displayAspectRatio),
         minHeight: `${400 * scale}px`,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: frameBg,
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${16 * scale}px`,
@@ -68,7 +84,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         overflow: 'visible',
         position: 'relative',
         zIndex: 1,
-        transition: 'border 0.18s ease',
+        transition: 'border 0.18s ease, background-color 0.3s ease',
       }}
     >
       {generatedImageUrl ? (
@@ -87,7 +103,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
           draggable={false}
         />
       ) : (
-        <div style={{ textAlign: 'center', color: '#9ca3af' }}>
+        <div style={{ textAlign: 'center', color: placeholderColor, transition: 'color 0.3s ease' }}>
           <svg
             width={64 * scale}
             height={64 * scale}

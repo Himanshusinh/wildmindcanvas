@@ -66,6 +66,25 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const bgColor = isDark ? 'var(--bg-secondary)' : '#ffffff';
+  const textColor = isDark ? 'var(--text-primary)' : '#1f2937';
+  const borderColor = isDark ? 'var(--border-color)' : 'rgba(0, 0, 0, 0.1)';
+  const hoverBg = isDark ? 'var(--bg-tertiary)' : '#f9fafb';
+  const inputBg = isDark ? 'var(--bg-tertiary)' : '#f9fafb';
+  const iconColor = isDark ? 'var(--text-secondary)' : '#4b5563';
+
   return (
     <div
       style={{
@@ -114,10 +133,11 @@ export const Header: React.FC<HeaderProps> = ({
       <div
         style={{
           padding: '6px 10px',
-          backgroundColor: '#ffffff',
+          backgroundColor: bgColor,
           borderRadius: '8px',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+          border: `1px solid ${borderColor}`,
+          boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.3)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+          transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         {isEditing ? (
@@ -130,15 +150,16 @@ export const Header: React.FC<HeaderProps> = ({
             onKeyDown={handleNameKeyDown}
             style={{
               background: 'transparent',
-              border: '1px solid rgba(59, 130, 246, 0.5)',
+              border: `1px solid ${isDark ? 'var(--accent-color)' : 'rgba(59, 130, 246, 0.5)'}`,
               borderRadius: '4px',
               padding: '2px 6px',
-              color: '#1f2937',
+              color: textColor,
               fontSize: '14px',
               fontWeight: '500',
               outline: 'none',
               minWidth: '120px',
-              backgroundColor: '#f9fafb',
+              backgroundColor: inputBg,
+              transition: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease',
             }}
           />
         ) : (
@@ -146,16 +167,16 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={handleNameClick}
             style={{
               padding: '2px 6px',
-              color: '#1f2937',
+              color: textColor,
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'text',
               borderRadius: '4px',
-              transition: 'background-color 0.2s',
+              transition: 'background-color 0.3s ease, color 0.3s ease',
               minWidth: '120px',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f9fafb';
+              e.currentTarget.style.backgroundColor = hoverBg;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
@@ -177,18 +198,18 @@ export const Header: React.FC<HeaderProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: '8px',
-            backgroundColor: '#ffffff',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-            color: '#4b5563',
+            backgroundColor: bgColor,
+            border: `1px solid ${borderColor}`,
+            boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.3)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+            color: iconColor,
             cursor: 'pointer',
-            transition: 'all 0.2s',
+            transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#f9fafb';
+            e.currentTarget.style.backgroundColor = hoverBg;
           }}
           onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.backgroundColor = bgColor;
           }}
           title="Switch Project"
         >

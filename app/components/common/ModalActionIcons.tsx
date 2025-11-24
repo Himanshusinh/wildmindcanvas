@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ModalActionIconsProps {
   isSelected: boolean;
@@ -21,9 +21,28 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   onDuplicate,
   variant = 'default',
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   if (!isSelected) return null;
 
   const isTextVariant = variant === 'text';
+  const bgColor = isDark 
+    ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+    : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const textColor = isDark ? '#cccccc' : '#4b5563';
+  const shadowColor = isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)';
+
   const baseButtonStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -31,15 +50,16 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     width: `${28 * scale}px`,
     height: `${28 * scale}px`,
     padding: 0,
-    backgroundColor: isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: bgColor,
     backdropFilter: isTextVariant ? 'none' : 'blur(20px)',
     WebkitBackdropFilter: isTextVariant ? 'none' : 'blur(20px)',
-    border: `1px solid rgba(0, 0, 0, 0.1)`,
+    border: `1px solid ${borderColor}`,
     borderRadius: `${8 * scale}px`,
-    color: '#4b5563',
+    color: textColor,
     cursor: 'pointer',
-    transition: isTextVariant ? 'box-shadow 0.12s, background-color 0.12s' : 'all 0.2s',
-    boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+    transition: isTextVariant ? 'box-shadow 0.12s, background-color 0.12s, color 0.12s' : 'all 0.3s ease',
+    boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
+    flexShrink: 0,
   };
 
   const handleDeleteMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -55,28 +75,39 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDeleteMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const defaultBg = isDark 
+      ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+      : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+    const defaultColor = isDark ? '#cccccc' : '#4b5563';
+    const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
+    
     if (isTextVariant) {
-      e.currentTarget.style.backgroundColor = '#ffffff';
-      e.currentTarget.style.color = '#4b5563';
-      e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
+      e.currentTarget.style.backgroundColor = defaultBg;
+      e.currentTarget.style.color = defaultColor;
+      e.currentTarget.style.boxShadow = defaultShadow;
     } else {
-      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-      e.currentTarget.style.color = '#4b5563';
+      e.currentTarget.style.backgroundColor = defaultBg;
+      e.currentTarget.style.color = defaultColor;
       e.currentTarget.style.transform = 'scale(1)';
     }
   };
 
   const handleDownloadMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-    e.currentTarget.style.color = '#3b82f6';
+    e.currentTarget.style.color = isDark ? '#60a5fa' : '#3b82f6';
     if (!isTextVariant) {
       e.currentTarget.style.transform = 'scale(1.1)';
     }
   };
 
   const handleDownloadMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.backgroundColor = isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)';
-    e.currentTarget.style.color = '#4b5563';
+    const defaultBg = isDark 
+      ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+      : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+    const defaultColor = isDark ? '#cccccc' : '#4b5563';
+    
+    e.currentTarget.style.backgroundColor = defaultBg;
+    e.currentTarget.style.color = defaultColor;
     if (!isTextVariant) {
       e.currentTarget.style.transform = 'scale(1)';
     }
@@ -85,7 +116,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   const handleDuplicateMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (isTextVariant) {
       e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.12)';
-      e.currentTarget.style.color = '#1e40af';
+      e.currentTarget.style.color = isDark ? '#60a5fa' : '#1e40af';
       e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${14 * scale}px rgba(59,130,246,0.12)`;
     } else {
       e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
@@ -95,13 +126,19 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDuplicateMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const defaultBg = isDark 
+      ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+      : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+    const defaultColor = isDark ? '#cccccc' : '#4b5563';
+    const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
+    
     if (isTextVariant) {
-      e.currentTarget.style.backgroundColor = '#ffffff';
-      e.currentTarget.style.color = '#4b5563';
-      e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
+      e.currentTarget.style.backgroundColor = defaultBg;
+      e.currentTarget.style.color = defaultColor;
+      e.currentTarget.style.boxShadow = defaultShadow;
     } else {
-      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
-      e.currentTarget.style.color = '#4b5563';
+      e.currentTarget.style.backgroundColor = defaultBg;
+      e.currentTarget.style.color = defaultColor;
       e.currentTarget.style.transform = 'scale(1)';
     }
   };
@@ -140,12 +177,13 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
       style={{
         position: 'absolute',
         top: 0,
-        right: `${-40 * scale}px`,
+        right: `${-54 * scale}px`,
         display: 'flex',
         flexDirection: 'column',
-        gap: `${6 * scale}px`,
+        gap: `${8 * scale}px`,
         zIndex: 3001,
         pointerEvents: 'auto',
+        alignItems: 'flex-start',
       }}
       onMouseDown={(e) => {
         console.log('[ModalActionIcons] Container onMouseDown', {

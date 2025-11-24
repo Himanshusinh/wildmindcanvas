@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface VectorizeButtonProps {
   scale: number;
@@ -17,6 +17,18 @@ export const VectorizeButton: React.FC<VectorizeButtonProps> = ({
   sourceImageUrl,
   onVectorize,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const disabled = !sourceImageUrl || isVectorizing || externalIsVectorizing;
 
   return (
@@ -32,7 +44,7 @@ export const VectorizeButton: React.FC<VectorizeButtonProps> = ({
         border: 'none',
         borderRadius: `${8 * scale}px`,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'all 0.2s ease',
+        transition: 'all 0.3s ease',
         whiteSpace: 'nowrap',
         opacity: disabled ? 0.6 : 1,
         display: 'flex',

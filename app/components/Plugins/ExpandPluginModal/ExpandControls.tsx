@@ -36,8 +36,32 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
   onCustomWidthChange,
   onCustomHeightChange,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const [showCustomInput, setShowCustomInput] = useState(false);
   const customButtonRef = useRef<HTMLDivElement>(null);
+
+  const inputBg = isDark ? (aspectPreset === 'custom' ? '#121212' : '#1a1a1a') : (aspectPreset === 'custom' ? 'white' : '#f3f4f6');
+  const inputText = isDark ? (aspectPreset === 'custom' ? '#ffffff' : '#666666') : (aspectPreset === 'custom' ? '#111827' : '#9ca3af');
+  const selectBg = isDark ? '#121212' : 'white';
+  const selectText = isDark ? '#ffffff' : '#111827';
+  const selectBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb';
+  const buttonBg = isDark ? (aspectPreset === 'custom' ? '#437eb5' : '#1a1a1a') : (aspectPreset === 'custom' ? '#437eb5' : 'white');
+  const buttonText = isDark ? (aspectPreset === 'custom' ? 'white' : '#cccccc') : (aspectPreset === 'custom' ? 'white' : '#374151');
+  const promptInputBg = isDark ? '#121212' : 'white';
+  const promptInputText = isDark ? '#ffffff' : '#111827';
+  const closeButtonColor = isDark ? '#cccccc' : '#666';
+  const headingColor = isDark ? '#ffffff' : '#111827';
 
   // Close custom input when clicking outside
   useEffect(() => {
@@ -66,7 +90,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
         flexWrap: 'wrap',
       }}
     >
-      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, flexShrink: 0 }}>
+      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, flexShrink: 0, color: headingColor, transition: 'color 0.3s ease' }}>
         Expand Image
       </h3>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, justifyContent: 'center', minWidth: 0 }}>
@@ -77,14 +101,16 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           style={{
             padding: '6px 10px',
             borderRadius: '6px',
-            border: '1px solid #e5e7eb',
+            border: `1px solid ${selectBorder}`,
             fontSize: '12px',
             outline: 'none',
             minWidth: '120px',
             maxWidth: '140px',
             boxSizing: 'border-box',
-            backgroundColor: 'white',
+            backgroundColor: selectBg,
+            color: selectText,
             cursor: 'pointer',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         >
           {Object.entries(aspectPresets)
@@ -113,14 +139,15 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           style={{
             padding: '6px 8px',
             borderRadius: '6px',
-            border: '1px solid #e5e7eb',
+            border: `1px solid ${selectBorder}`,
             fontSize: '12px',
             outline: 'none',
             width: '80px',
             boxSizing: 'border-box',
-            backgroundColor: aspectPreset === 'custom' ? 'white' : '#f3f4f6',
-            color: aspectPreset === 'custom' ? '#111827' : '#9ca3af',
+            backgroundColor: inputBg,
+            color: inputText,
             cursor: aspectPreset === 'custom' ? 'text' : 'not-allowed',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         />
         
@@ -141,14 +168,15 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           style={{
             padding: '6px 8px',
             borderRadius: '6px',
-            border: '1px solid #e5e7eb',
+            border: `1px solid ${selectBorder}`,
             fontSize: '12px',
             outline: 'none',
             width: '80px',
             boxSizing: 'border-box',
-            backgroundColor: aspectPreset === 'custom' ? 'white' : '#f3f4f6',
-            color: aspectPreset === 'custom' ? '#111827' : '#9ca3af',
+            backgroundColor: inputBg,
+            color: inputText,
             cursor: aspectPreset === 'custom' ? 'text' : 'not-allowed',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         />
         
@@ -162,12 +190,13 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             style={{
               padding: '6px 12px',
               borderRadius: '6px',
-              border: '1px solid #e5e7eb',
-              backgroundColor: aspectPreset === 'custom' ? '#437eb5' : 'white',
-              color: aspectPreset === 'custom' ? 'white' : '#374151',
+              border: `1px solid ${selectBorder}`,
+              backgroundColor: buttonBg,
+              color: buttonText,
               fontSize: '12px',
               cursor: 'pointer',
               fontWeight: 500,
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
             }}
           >
             Custom
@@ -192,13 +221,16 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           style={{
             padding: '6px 10px',
             borderRadius: '6px',
-            border: '1px solid #e5e7eb',
+            border: `1px solid ${selectBorder}`,
+            backgroundColor: promptInputBg,
+            color: promptInputText,
             fontSize: '12px',
             outline: 'none',
             minWidth: '150px',
             maxWidth: '200px',
             flex: 1,
             boxSizing: 'border-box',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         />
       </div>
@@ -226,13 +258,14 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             border: 'none',
             cursor: 'pointer',
             fontSize: '24px',
-            color: '#666',
+            color: closeButtonColor,
             padding: 0,
             width: '32px',
             height: '32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'color 0.3s ease',
           }}
         >
           ×

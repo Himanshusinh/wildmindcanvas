@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CanvasSettings, CursorType, BackgroundType } from './types';
 
 interface CanvasSectionProps {
@@ -9,35 +9,66 @@ interface CanvasSectionProps {
 }
 
 export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, setCanvasSettings }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const containerBg = isDark ? '#121212' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#111827';
+  const textSecondary = isDark ? '#cccccc' : '#6b7280';
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+  const inputBg = isDark ? '#1a1a1a' : '#ffffff';
+  const hoverBorder = isDark ? 'rgba(96, 165, 250, 0.4)' : 'rgba(59, 130, 246, 0.3)';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ padding: '20px', background: '#ffffff', borderRadius: '12px' }}>
-        <h4 style={{ margin: '0 0 20px 0', fontSize: '16px', fontWeight: 600, color: '#111827', paddingBottom: '8px' }}>
+      <div style={{ 
+        padding: '20px', 
+        background: containerBg, 
+        borderRadius: '12px',
+        border: `1px solid ${borderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease'
+      }}>
+        <h4 style={{ 
+          margin: '0 0 20px 0', 
+          fontSize: '16px', 
+          fontWeight: 600, 
+          color: textColor, 
+          paddingBottom: '8px',
+          transition: 'color 0.3s ease'
+        }}>
           Canvas Settings
         </h4>
 
         {/* Cursor Type */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Cursor Type</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Cursor Type</div>
           <select
             value={canvasSettings.cursorType}
             onChange={(e) => setCanvasSettings((prev) => ({ ...prev, cursorType: e.target.value as CursorType }))}
             style={{
               padding: '10px 14px',
               borderRadius: '10px',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              background: '#ffffff',
+              border: `1px solid ${borderColor}`,
+              background: inputBg,
               fontSize: '14px',
-              color: '#111827',
+              color: textColor,
               cursor: 'pointer',
               minWidth: '150px',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+              e.currentTarget.style.borderColor = hoverBorder;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.borderColor = borderColor;
             }}
           >
             <option value="default">Default</option>
@@ -50,26 +81,26 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
 
         {/* Background Type */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Background Type</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Background Type</div>
           <select
             value={canvasSettings.backgroundType}
             onChange={(e) => setCanvasSettings((prev) => ({ ...prev, backgroundType: e.target.value as BackgroundType }))}
             style={{
               padding: '10px 14px',
               borderRadius: '10px',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              background: '#ffffff',
+              border: `1px solid ${borderColor}`,
+              background: inputBg,
               fontSize: '14px',
-              color: '#111827',
+              color: textColor,
               cursor: 'pointer',
               minWidth: '150px',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+              e.currentTarget.style.borderColor = hoverBorder;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.borderColor = borderColor;
             }}
           >
             <option value="dots">Dots</option>
@@ -81,7 +112,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
 
         {/* Dot Color */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Dot Color</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Dot Color</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="color"
@@ -91,7 +122,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 width: '40px',
                 height: '40px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                border: `1px solid ${borderColor}`,
                 cursor: 'pointer',
                 padding: 0,
               }}
@@ -103,11 +134,12 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                background: '#ffffff',
+                border: `1px solid ${borderColor}`,
+                background: inputBg,
                 fontSize: '14px',
-                color: '#111827',
+                color: textColor,
                 width: '100px',
+                transition: 'all 0.2s ease',
               }}
             />
           </div>
@@ -115,7 +147,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
 
         {/* Background Color */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Background Color</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Background Color</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="color"
@@ -125,7 +157,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 width: '40px',
                 height: '40px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
+                border: `1px solid ${borderColor}`,
                 cursor: 'pointer',
                 padding: 0,
               }}
@@ -137,11 +169,12 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                background: '#ffffff',
+                border: `1px solid ${borderColor}`,
+                background: inputBg,
                 fontSize: '14px',
-                color: '#111827',
+                color: textColor,
                 width: '100px',
+                transition: 'all 0.2s ease',
               }}
             />
           </div>
@@ -149,7 +182,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
 
         {/* Dot Size */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Dot Size</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Dot Size</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '200px' }}>
             <input
               type="range"
@@ -177,21 +210,22 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '8px 12px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                background: '#ffffff',
+                border: `1px solid ${borderColor}`,
+                background: inputBg,
                 fontSize: '14px',
-                color: '#111827',
+                color: textColor,
                 width: '60px',
                 textAlign: 'center',
+                transition: 'all 0.2s ease',
               }}
             />
-            <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '20px' }}>px</span>
+            <span style={{ fontSize: '12px', color: textSecondary, minWidth: '20px', transition: 'color 0.3s ease' }}>px</span>
           </div>
         </div>
 
         {/* Grid Spacing */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-          <div style={{ fontSize: '14px', color: '#111827', fontWeight: 500 }}>Grid Spacing</div>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Grid Spacing</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '200px' }}>
             <input
               type="range"
@@ -220,15 +254,16 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '8px 12px',
                 borderRadius: '10px',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                background: '#ffffff',
+                border: `1px solid ${borderColor}`,
+                background: inputBg,
                 fontSize: '14px',
-                color: '#111827',
+                color: textColor,
                 width: '60px',
                 textAlign: 'center',
+                transition: 'all 0.2s ease',
               }}
             />
-            <span style={{ fontSize: '12px', color: '#6b7280', minWidth: '20px' }}>px</span>
+            <span style={{ fontSize: '12px', color: textSecondary, minWidth: '20px', transition: 'color 0.3s ease' }}>px</span>
           </div>
         </div>
       </div>

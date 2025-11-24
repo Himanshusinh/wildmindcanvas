@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface ToolbarPanelProps {
   onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
@@ -10,8 +10,19 @@ interface ToolbarPanelProps {
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
+  const [isDark, setIsDark] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
     // Debounce guard: ignore repeated clicks on same tool within 400ms
@@ -165,13 +176,13 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           flexDirection: 'column',
           gap: '8px',
           padding: '12px 8px',
-          backgroundColor: '#ffffff',
+          backgroundColor: isDark ? '#121212' : '#ffffff',
           borderRadius: '16px',
-          border: '1px solid rgba(0, 0, 0, 0.1)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.1)',
+          boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
           opacity: isHidden ? 0 : 1,
           pointerEvents: isHidden ? 'none' : 'auto',
-          transition: 'opacity 0.3s ease, transform 0.3s ease',
+          transition: 'opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         {tools.map((tool) => (
@@ -189,12 +200,14 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               border: 'none',
               cursor: 'pointer',
               backgroundColor: selectedTool === tool.id
-                ? 'rgba(59, 130, 246, 0.3)'
-                : 'rgba(255, 255, 255, 0.1)',
-              color: selectedTool === tool.id ? '#3b82f6' : '#4b5563',
-              transition: 'all 0.2s ease',
+                ? (isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.3)')
+                : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)'),
+              color: selectedTool === tool.id 
+                ? (isDark ? '#60a5fa' : '#3b82f6') 
+                : (isDark ? '#cccccc' : '#4b5563'),
+              transition: 'all 0.3s ease',
               boxShadow: selectedTool === tool.id
-                ? '0 4px 12px rgba(59, 130, 246, 0.3)'
+                ? (isDark ? '0 4px 12px rgba(96, 165, 250, 0.3)' : '0 4px 12px rgba(59, 130, 246, 0.3)')
                 : 'none',
             }}
             onMouseEnter={(e) => {
@@ -202,16 +215,16 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               // global stage cursors (grab) leaking through.
               try { document.body.style.cursor = 'pointer'; } catch (err) {}
               if (selectedTool !== tool.id) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)';
-                e.currentTarget.style.color = '#1f2937';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
+                e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.18)';
+                e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937';
+                e.currentTarget.style.boxShadow = isDark ? '0 6px 16px rgba(255, 255, 255, 0.1)' : '0 6px 16px rgba(0,0,0,0.08)';
               }
             }}
             onMouseLeave={(e) => {
               try { document.body.style.cursor = ''; } catch (err) {}
               if (selectedTool !== tool.id) {
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.color = '#4b5563';
+                e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
                 e.currentTarget.style.boxShadow = 'none';
               }
             }}
@@ -225,8 +238,9 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           style={{
             width: '100%',
             height: '1px',
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
             margin: '4px 0',
+            transition: 'background-color 0.3s ease',
           }}
         />
         
@@ -243,9 +257,9 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             borderRadius: '10px',
             border: 'none',
             cursor: 'pointer',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#4b5563',
-            transition: 'all 0.2s ease',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+            color: isDark ? '#cccccc' : '#4b5563',
+            transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
             try { document.body.style.cursor = 'pointer'; } catch (err) {}
@@ -255,8 +269,8 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           }}
           onMouseLeave={(e) => {
             try { document.body.style.cursor = ''; } catch (err) {}
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            e.currentTarget.style.color = '#4b5563';
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+            e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 const UPSCALE_MODELS = [
   'Crystal Upscaler',
@@ -21,8 +21,25 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
   onToggle,
   onSelect,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const dropdownBorderColor = 'rgba(0,0,0,0.1)';
+  const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
+  const dropdownBg = isDark ? '#121212' : '#ffffff';
+  const dropdownText = isDark ? '#ffffff' : '#1f2937';
+  const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+  const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const selectedText = isDark ? '#60a5fa' : '#3b82f6';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -53,16 +70,17 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
         style={{
           width: '100%',
           padding: `${10 * scale}px ${16 * scale}px`,
-          backgroundColor: '#ffffff',
+          backgroundColor: dropdownBg,
           border: `1px solid ${dropdownBorderColor}`,
           borderRadius: `${8 * scale}px`,
           fontSize: `${14 * scale}px`,
-          color: '#1f2937',
+          color: dropdownText,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           whiteSpace: 'nowrap',
+          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
         }}
       >
         <span style={{ whiteSpace: 'nowrap' }}>{selectedModel}</span>
@@ -78,10 +96,10 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
             left: 0,
             right: 0,
             marginTop: `${4 * scale}px`,
-            backgroundColor: '#ffffff',
+            backgroundColor: dropdownBg,
             border: `1px solid ${dropdownBorderColor}`,
             borderRadius: `${8 * scale}px`,
-            boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
+            boxShadow: isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
             zIndex: 10001,
             maxHeight: `${300 * scale}px`,
             overflowY: 'auto',
@@ -89,6 +107,7 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
             flexDirection: 'column',
             gap: `${4 * scale}px`,
             padding: `${8 * scale}px`,
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
           {UPSCALE_MODELS.map((model) => (
@@ -102,16 +121,16 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
                 padding: `${8 * scale}px ${12 * scale}px`,
                 borderRadius: `${6 * scale}px`,
                 cursor: 'pointer',
-                backgroundColor: selectedModel === model ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                color: selectedModel === model ? '#3b82f6' : '#1f2937',
+                backgroundColor: selectedModel === model ? selectedBg : 'transparent',
+                color: selectedModel === model ? selectedText : dropdownText,
                 fontSize: `${14 * scale}px`,
                 whiteSpace: 'nowrap',
                 minWidth: 'max-content',
-                transition: 'background-color 0.2s ease',
+                transition: 'background-color 0.3s ease, color 0.3s ease',
               }}
               onMouseEnter={(e) => {
                 if (selectedModel !== model) {
-                  e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.backgroundColor = dropdownHoverBg;
                 }
               }}
               onMouseLeave={(e) => {

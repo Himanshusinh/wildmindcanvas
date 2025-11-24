@@ -35,6 +35,18 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   getAspectRatio,
   onSetIsPinned,
 }) => {
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   const musicAreaRef = useRef<HTMLDivElement>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -42,6 +54,15 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
+
+  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const placeholderColor = isDark ? '#666666' : '#9ca3af';
+  const progressBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const timeColor = isDark ? (generatedMusicUrl ? '#cccccc' : '#666666') : (generatedMusicUrl ? '#6b7280' : '#9ca3af');
+  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
+  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
+  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
+  const handleBg = isDark ? '#121212' : '#ffffff';
 
   useEffect(() => {
     if (generatedMusicUrl && audioElementRef.current) {
@@ -164,7 +185,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         aspectRatio: getAspectRatio(selectedAspectRatio),
         height: `${300 * scale}px`,
         minHeight: `${200 * scale}px`,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: frameBg,
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
@@ -172,7 +193,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'border 0.18s ease',
+        transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -200,7 +221,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         
         {/* Music Icon (when no music generated) */}
         {!generatedMusicUrl && (
-          <div style={{ textAlign: 'center', color: '#9ca3af', marginBottom: `${8 * scale}px` }}>
+          <div style={{ textAlign: 'center', color: placeholderColor, marginBottom: `${8 * scale}px`, transition: 'color 0.3s ease' }}>
             <svg
               width={64 * scale}
               height={64 * scale}
@@ -271,12 +292,13 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             style={{
               width: '100%',
               height: `${6 * scale}px`,
-              backgroundColor: 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: progressBg,
               borderRadius: `${3 * scale}px`,
               cursor: generatedMusicUrl ? 'pointer' : 'default',
               position: 'relative',
               overflow: 'visible',
               opacity: generatedMusicUrl ? 1 : 0.5,
+              transition: 'background-color 0.3s ease',
             }}
           >
             {/* Progress Fill */}
@@ -301,10 +323,11 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
                     width: `${12 * scale}px`,
                     height: `${12 * scale}px`,
                     borderRadius: '50%',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: handleBg,
                     border: `${2 * scale}px solid #437eb5`,
-                    boxShadow: `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.2)`,
+                    boxShadow: isDark ? `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.2)`,
                     cursor: 'grab',
+                    transition: 'background-color 0.3s ease',
                   }}
                 />
               )}
@@ -312,7 +335,14 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
           </div>
 
           {/* Time Display */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: `${12 * scale}px`, color: generatedMusicUrl ? '#6b7280' : '#9ca3af' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            fontSize: `${12 * scale}px`, 
+            color: timeColor,
+            transition: 'color 0.3s ease'
+          }}>
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -334,26 +364,26 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
           width: `${28 * scale}px`,
           height: `${28 * scale}px`,
           borderRadius: `${6 * scale}px`,
-          backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)',
-          border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+          backgroundColor: pinBg,
+          border: `1px solid ${pinBorder}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 20,
           opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+          transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
           pointerEvents: 'auto',
           boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
         }}
         onMouseEnter={(e) => {
           if (!isPinned) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
           }
         }}
         onMouseLeave={(e) => {
           if (!isPinned) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            e.currentTarget.style.backgroundColor = pinBg;
           }
         }}
         title={isPinned ? 'Unpin controls' : 'Pin controls'}
@@ -363,7 +393,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
           height={16 * scale}
           viewBox="0 0 24 24"
           fill={isPinned ? '#437eb5' : 'none'}
-          stroke={isPinned ? '#437eb5' : '#4b5563'}
+          stroke={pinIconColor}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

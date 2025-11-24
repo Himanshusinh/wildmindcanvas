@@ -71,15 +71,19 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
+  const [isDark, setIsDark] = useState(selectedTheme === 'dark');
+
   // Apply theme on mount and when it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (selectedTheme === 'dark') {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');
+        setIsDark(true);
       } else {
         document.documentElement.classList.add('light');
         document.documentElement.classList.remove('dark');
+        setIsDark(false);
       }
     }
   }, [selectedTheme]);
@@ -106,10 +110,11 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
           right: 0,
           bottom: 0,
           zIndex: 20000,
-          background: 'rgba(0, 0, 0, 0.4)',
+          background: isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.4)',
           backdropFilter: 'blur(12px) saturate(180%)',
           WebkitBackdropFilter: 'blur(12px) saturate(180%)',
           pointerEvents: 'auto',
+          transition: 'background-color 0.3s ease',
         }}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -154,17 +159,18 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
             maxWidth: '1200px',
             height: '85vh',
             maxHeight: '800px',
-            background: 'rgba(255, 255, 255, 0.95)',
+            background: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(20px) saturate(180%)',
             WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
             borderRadius: '20px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            boxShadow: isDark ? '0 20px 60px rgba(0, 0, 0, 0.5)' : '0 20px 60px rgba(0, 0, 0, 0.3)',
             padding: '0',
             display: 'flex',
             flexDirection: 'row',
             overflow: 'hidden',
             pointerEvents: 'auto',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
           }}
           onWheel={(e) => {
             // Allow scrolling within popup, but prevent it from reaching canvas
@@ -193,11 +199,12 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
               flex: 1,
               height: '100%',
               padding: '0',
-              background: '#ffffff',
+              background: isDark ? 'var(--bg-secondary)' : '#ffffff',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
               minHeight: 0,
+              transition: 'background-color 0.3s ease',
             }}
           >
             {/* Header with close button - Sticky at top */}

@@ -47,6 +47,17 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     // Only autofocus the inner textarea when allowed. Default is to autofocus
@@ -57,6 +68,14 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
       inputRef.current.focus();
     }
   }, [autoFocusInput]);
+
+  const inputBg = isDark ? '#121212' : '#ffffff';
+  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+  const inputText = isDark ? '#ffffff' : '#1f2937';
+  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
+  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
+  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
+  const handleBg = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)';
 
   return (
     <>
@@ -80,9 +99,10 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           style={{
             width: `${40 * scale}px`,
             height: `${4 * scale}px`,
-            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            backgroundColor: handleBg,
             borderRadius: `${2 * scale}px`,
             margin: '0 auto',
+            transition: 'background-color 0.3s ease',
           }}
         />
       </div>
@@ -100,11 +120,11 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         placeholder="Enter text here..."
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          background: '#ffffff',
-          border: `${1 * scale}px solid rgba(0, 0, 0, 0.1)`,
+          background: inputBg,
+          border: `${1 * scale}px solid ${inputBorder}`,
           borderRadius: (isHovered || isPinned) ? '0px' : `${8 * scale}px`,
           padding: `${10 * scale}px`,
-          color: '#1f2937',
+          color: inputText,
           fontSize: `${16 * scale}px`,
           fontFamily: 'Arial, sans-serif',
           outline: 'none',
@@ -112,6 +132,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           minHeight: `${80 * scale}px`,
           width: '100%',
           cursor: isTextFocused ? 'text' : 'default',
+          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
         }}
       />
       <div style={{ display: 'flex', gap: `${8 * scale}px`, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -216,26 +237,26 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           width: `${28 * scale}px`,
           height: `${28 * scale}px`,
           borderRadius: `${6 * scale}px`,
-          backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff',
-          border: `1px solid ${isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)'}`,
+          backgroundColor: pinBg,
+          border: `1px solid ${pinBorder}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 20,
           opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.18s ease, background-color 0.2s ease, border-color 0.2s ease',
+          transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
           pointerEvents: 'auto',
           boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
         }}
         onMouseEnter={(e) => {
           if (!isPinned) {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 1)';
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
           }
         }}
         onMouseLeave={(e) => {
           if (!isPinned) {
-            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.backgroundColor = pinBg;
           }
         }}
         title={isPinned ? 'Unpin controls' : 'Pin controls'}
@@ -245,7 +266,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           height={16 * scale}
           viewBox="0 0 24 24"
           fill={isPinned ? '#437eb5' : 'none'}
-          stroke={isPinned ? '#437eb5' : '#4b5563'}
+          stroke={pinIconColor}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

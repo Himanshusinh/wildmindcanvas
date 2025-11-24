@@ -70,10 +70,24 @@ export const TextInput: React.FC<TextInputProps> = ({
   }, []);
 
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderColor = isSelected 
+    ? '#437eb5' 
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
   // Handle drag start
@@ -181,13 +195,13 @@ export const TextInput: React.FC<TextInputProps> = ({
         flexDirection: 'column',
         gap: `${1 * scale}px`,
         padding: `${12 * scale}px`,
-        backgroundColor: '#ffffff',
+        backgroundColor: isDark ? '#121212' : '#ffffff',
         borderRadius: (isHovered || isPinned) ? '0px' : `${12 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'border 0.3s ease',
+        transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         minWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
