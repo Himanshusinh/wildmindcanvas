@@ -83,6 +83,37 @@ main {
   background-color: transparent !important;
 }
 
+/* Script Frame Scrollbar Styling */
+.script-frame-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.script-frame-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.script-frame-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.script-frame-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.dark .script-frame-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .script-frame-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark .script-frame-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* Global dark theme overrides for common patterns */
 .dark input[type="text"],
 .dark input[type="email"],

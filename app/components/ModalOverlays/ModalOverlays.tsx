@@ -15,6 +15,9 @@ import { EraseModalOverlays } from './EraseModalOverlays';
 import { ReplaceModalOverlays } from './ReplaceModalOverlays';
 import { ExpandModalOverlays } from './ExpandModalOverlays';
 import { VectorizeModalOverlays } from './VectorizeModalOverlays';
+import { StoryboardModalOverlays } from './StoryboardModalOverlays';
+import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
+import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
 import { ComponentCreationMenu } from './ComponentCreationMenu';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
@@ -28,6 +31,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   replaceModalStates,
   expandModalStates,
   vectorizeModalStates,
+  storyboardModalStates,
+  scriptFrameModalStates,
+  sceneFrameModalStates,
   selectedTextInputId,
   selectedTextInputIds,
   selectedImageModalId,
@@ -48,6 +54,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedExpandModalIds,
   selectedVectorizeModalId,
   selectedVectorizeModalIds,
+  selectedStoryboardModalId,
+  selectedStoryboardModalIds,
   clearAllSelections,
   setTextInputStates,
   setSelectedTextInputId,
@@ -62,28 +70,33 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setMusicModalStates,
   setSelectedMusicModalId,
   setSelectedMusicModalIds,
-  setUpscaleModalStates = () => {},
-  setSelectedUpscaleModalId = () => {},
-  setSelectedUpscaleModalIds = () => {},
-  setRemoveBgModalStates = () => {},
-  setSelectedRemoveBgModalId = () => {},
-  setSelectedRemoveBgModalIds = () => {},
-  setEraseModalStates = () => {},
-  setSelectedEraseModalId = () => {},
-  setSelectedEraseModalIds = () => {},
-  setReplaceModalStates = () => {},
-  setSelectedReplaceModalId = () => {},
-  setSelectedReplaceModalIds = () => {},
-  setExpandModalStates = () => {},
-  setSelectedExpandModalId = () => {},
-  setSelectedExpandModalIds = () => {},
-  setVectorizeModalStates = () => {},
-  setSelectedVectorizeModalId = () => {},
-  setSelectedVectorizeModalIds = () => {},
+  setUpscaleModalStates = () => { },
+  setSelectedUpscaleModalId = () => { },
+  setSelectedUpscaleModalIds = () => { },
+  setRemoveBgModalStates = () => { },
+  setSelectedRemoveBgModalId = () => { },
+  setSelectedRemoveBgModalIds = () => { },
+  setEraseModalStates = () => { },
+  setSelectedEraseModalId = () => { },
+  setSelectedEraseModalIds = () => { },
+  setReplaceModalStates = () => { },
+  setSelectedReplaceModalId = () => { },
+  setSelectedReplaceModalIds = () => { },
+  setExpandModalStates = () => { },
+  setSelectedExpandModalId = () => { },
+  setSelectedExpandModalIds = () => { },
+  setVectorizeModalStates = () => { },
+  setSelectedVectorizeModalId = () => { },
+  setSelectedVectorizeModalIds = () => { },
+  setStoryboardModalStates = () => { },
+  setScriptFrameModalStates = () => { },
+  setSelectedStoryboardModalId = () => { },
+  setSelectedStoryboardModalIds = () => { },
   setSelectionTightRect,
   setIsDragSelection,
   images = [],
   onTextCreate,
+  onTextScriptGenerated,
   onImageSelect,
   onImageGenerate,
   onVideoSelect,
@@ -129,6 +142,16 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistVectorizeModalMove,
   onPersistVectorizeModalDelete,
   onVectorize,
+  onPersistStoryboardModalCreate,
+  onPersistStoryboardModalMove,
+  onPersistStoryboardModalDelete,
+  onDeleteScriptFrame,
+  onScriptFramePositionChange,
+  onScriptFramePositionCommit,
+  onGenerateScenes,
+  onDeleteSceneFrame,
+  onSceneFramePositionChange,
+  onSceneFramePositionCommit,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
@@ -166,6 +189,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     replaceModalStates: replaceModalStates ?? [],
     expandModalStates: expandModalStates ?? [],
     vectorizeModalStates: vectorizeModalStates ?? [],
+    storyboardModalStates: storyboardModalStates ?? [],
+    sceneFrameModalStates: sceneFrameModalStates ?? [],
   });
 
   return (
@@ -188,9 +213,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         replaceModalStates={replaceModalStates ?? []}
         expandModalStates={expandModalStates ?? []}
         vectorizeModalStates={vectorizeModalStates ?? []}
+        storyboardModalStates={storyboardModalStates ?? []}
+        sceneFrameModalStates={sceneFrameModalStates ?? []}
         viewportUpdateKey={viewportUpdateKey}
       />
-      
+
       <TextInputOverlays
         textInputStates={textInputStates}
         selectedTextInputId={selectedTextInputId}
@@ -204,6 +231,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        onScriptGenerated={onTextScriptGenerated}
       />
 
       <ImageModalOverlays
@@ -227,6 +255,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        sceneFrameModalStates={sceneFrameModalStates ?? []}
       />
 
       <VideoModalOverlays
@@ -401,6 +430,43 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
+      <StoryboardModalOverlays
+        storyboardModalStates={storyboardModalStates ?? []}
+        selectedStoryboardModalId={selectedStoryboardModalId ?? null}
+        selectedStoryboardModalIds={selectedStoryboardModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setStoryboardModalStates={setStoryboardModalStates}
+        setSelectedStoryboardModalId={setSelectedStoryboardModalId}
+        setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
+        onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
+        onPersistStoryboardModalMove={onPersistStoryboardModalMove}
+        onPersistStoryboardModalDelete={onPersistStoryboardModalDelete}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+        connections={externalConnections ?? []}
+        textInputStates={textInputStates}
+      />
+      <ScriptFrameModalOverlays
+        scriptFrameModalStates={scriptFrameModalStates ?? []}
+        onDelete={onDeleteScriptFrame}
+        onPositionChange={onScriptFramePositionChange}
+        onPositionCommit={onScriptFramePositionCommit}
+        onGenerateScenes={onGenerateScenes}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
+      <SceneFrameModalOverlays
+        sceneFrameModalStates={sceneFrameModalStates ?? []}
+        onDelete={onDeleteSceneFrame}
+        onPositionChange={onSceneFramePositionChange}
+        onPositionCommit={onSceneFramePositionCommit}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
+
       <ComponentCreationMenu
         componentMenu={connectionManager.componentMenu}
         componentMenuSearch={connectionManager.componentMenuSearch}
@@ -421,6 +487,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setReplaceModalStates={setReplaceModalStates}
         onPersistExpandModalCreate={onPersistExpandModalCreate}
         setExpandModalStates={setExpandModalStates}
+        onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
+        setStoryboardModalStates={setStoryboardModalStates}
       />
     </>
   );

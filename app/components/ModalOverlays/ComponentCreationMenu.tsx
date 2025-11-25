@@ -23,6 +23,8 @@ interface ComponentCreationMenuProps {
   setReplaceModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
   setExpandModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  setStoryboardModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
@@ -45,6 +47,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setReplaceModalStates,
   onPersistExpandModalCreate,
   setExpandModalStates,
+  onPersistStoryboardModalCreate,
+  setStoryboardModalStates,
 }) => {
   // Close component menu when clicking outside
   React.useEffect(() => {
@@ -80,6 +84,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'erase-plugin', label: 'Erase Plugin', type: 'plugin' },
     { id: 'replace-plugin', label: 'Replace Plugin', type: 'plugin' },
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
+    { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
   
   const filtered = components.filter(comp =>
@@ -274,6 +279,16 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setExpandModalStates(prev => [...prev, newExpand]);
                 Promise.resolve(onPersistExpandModalCreate(newExpand)).catch(console.error);
+              } else if (comp.id === 'storyboard-plugin' && comp.type === 'plugin' && onPersistStoryboardModalCreate && setStoryboardModalStates) {
+                const newStoryboard = {
+                  id: `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  x: canvasX,
+                  y: canvasY,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                };
+                setStoryboardModalStates(prev => [...prev, newStoryboard]);
+                Promise.resolve(onPersistStoryboardModalCreate(newStoryboard)).catch(console.error);
               }
               
               setComponentMenu(null);

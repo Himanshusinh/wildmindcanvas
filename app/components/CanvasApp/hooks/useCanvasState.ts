@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -14,6 +14,9 @@ export function useCanvasState() {
   const [replaceGenerators, setReplaceGenerators] = useState<ReplaceGenerator[]>([]);
   const [expandGenerators, setExpandGenerators] = useState<ExpandGenerator[]>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<VectorizeGenerator[]>([]);
+  const [storyboardGenerators, setStoryboardGenerators] = useState<StoryboardGenerator[]>([]);
+  const [scriptFrameGenerators, setScriptFrameGenerators] = useState<ScriptFrameGenerator[]>([]);
+  const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
   const [textGenerators, setTextGenerators] = useState<TextGenerator[]>([]);
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
@@ -29,6 +32,9 @@ export function useCanvasState() {
     replaceGenerators,
     expandGenerators,
     vectorizeGenerators,
+    storyboardGenerators,
+    scriptFrameGenerators,
+    sceneFrameGenerators,
     textGenerators,
     connectors,
     generationQueue,
@@ -45,6 +51,9 @@ export function useCanvasState() {
     setReplaceGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
+    setStoryboardGenerators,
+    setScriptFrameGenerators,
+    setSceneFrameGenerators,
     setTextGenerators,
     setConnectors,
     setGenerationQueue,

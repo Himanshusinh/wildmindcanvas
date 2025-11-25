@@ -27,6 +27,7 @@ interface ImageModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
 }
 
 export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
@@ -50,6 +51,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  sceneFrameModalStates = [],
 }) => {
   return (
     <>
@@ -223,6 +225,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           imageModalStates={imageModalStatesForConnections}
           images={images}
           textInputStates={textInputStates}
+          sceneFrameModalStates={sceneFrameModalStates}
           onPersistConnectorCreate={onPersistConnectorCreate}
         />
       ))}

@@ -44,6 +44,7 @@ interface ImageUploadModalProps {
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   textInputStates?: Array<{ id: string; value?: string }>;
+  sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -82,6 +83,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   images = [],
   onPersistConnectorCreate,
   textInputStates = [],
+  sceneFrameModalStates = [],
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -119,17 +121,22 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
   // Detect connected text input
   const connectedTextInput = useMemo(() => {
-    if (!id || !connections || connections.length === 0 || !textInputStates || textInputStates.length === 0) {
-      return null;
-    }
+    if (!id || !connections || connections.length === 0) return null;
+
     // Find connection where this modal is the target (to === id)
     const connection = connections.find(c => c.to === id);
     if (!connection) return null;
-    
-    // Find the text input state that matches the connection source
-    const textInput = textInputStates.find(t => t.id === connection.from);
-    return textInput || null;
-  }, [id, connections, textInputStates]);
+
+    // First try to find a matching text input state
+    const textInput = (textInputStates || []).find(t => t.id === connection.from);
+    if (textInput) return textInput;
+
+    // Next, try to find a matching scene frame and expose its content as a text input-like object
+    const scene = (sceneFrameModalStates || []).find(s => s.id === connection.from);
+    if (scene) return { id: scene.id, value: scene.content };
+
+    return null;
+  }, [id, connections, textInputStates, sceneFrameModalStates]);
 
   // Use connected text as prompt if connected, otherwise use local prompt state
   const effectivePrompt = connectedTextInput?.value || prompt;

@@ -23,6 +23,8 @@ interface ConnectionLinesProps {
   replaceModalStates?: any[];
   expandModalStates?: any[];
   vectorizeModalStates?: any[];
+  storyboardModalStates?: any[];
+  sceneFrameModalStates?: any[];
   viewportUpdateKey: number;
 }
 
@@ -44,6 +46,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   replaceModalStates,
   expandModalStates,
   vectorizeModalStates,
+  storyboardModalStates,
+  sceneFrameModalStates,
   viewportUpdateKey,
 }) => {
   // Memoize connection lines to recalculate when viewport changes
@@ -61,17 +65,30 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         }
         seen.add(uniqueKey);
         
-        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
-        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
-        if (!fromCenter || !toCenter) return null;
+        const fromCenter = computeNodeCenter(conn.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
+        const toCenter = computeNodeCenter(conn.to, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
+        if (!fromCenter || !toCenter) {
+          // Debug: log when nodes can't be found
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[ConnectionLines] Could not compute node centers:', {
+              from: conn.from,
+              to: conn.to,
+              fromCenter,
+              toCenter,
+              fromNode: document.querySelector(`[data-node-id="${conn.from}"][data-node-side="send"]`),
+              toNode: document.querySelector(`[data-node-id="${conn.to}"][data-node-side="receive"]`),
+            });
+          }
+          return null;
+        }
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, viewportUpdateKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates, viewportUpdateKey, stageRef]);
 
   return (
     <svg
-      style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 1999 }}
+      style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', pointerEvents: 'none', zIndex: 2002 }}
     >
       {connectionLines.map((line, index) => {
         const connectionId = line.id || `conn-${line.from}-${line.to}-${index}`;

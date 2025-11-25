@@ -22,7 +22,7 @@ import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
 import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
 import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
 import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
-import { CanvasAppState, CanvasAppSetters } from '@/app/components/CanvasApp/types';
+import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator } from '@/app/components/CanvasApp/types';
 
 interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
@@ -39,6 +39,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [replaceGenerators, setReplaceGenerators] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
   const [expandGenerators, setExpandGenerators] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
+  const [storyboardGenerators, setStoryboardGenerators] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
+  const [scriptFrameGenerators, setScriptFrameGenerators] = useState<ScriptFrameGenerator[]>([]);
+  const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
@@ -89,7 +92,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           isOptimistic,
         };
         console.log('[Ops] apply', summary);
-      } catch {}
+      } catch { }
       // Handle snapshot application (snapshot contains map of elements)
       if (!snapshotLoadedRef.current && (op.data && typeof op.data === 'object' && (op.data.snapshot === true || (!op.data.element && !op.data.delta && !op.data.updates)))) {
         // This is a snapshot - op.data is the elements map
@@ -100,7 +103,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }> = [];
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
-        
+
         Object.values(elements).forEach((element: any) => {
           if (element && element.type) {
             // Use proxy URL for Zata URLs to avoid CORS
@@ -108,7 +111,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
               imageUrl = buildProxyResourceUrl(imageUrl);
             }
-            
+
             if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
               const newImage: ImageUpload = {
                 type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
@@ -131,7 +134,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             }
           }
         });
-        
+
         // Replace entire images array with snapshot (this ensures deleted elements don't reappear)
         setImages(newImages);
         // If realtime is not active, hydrate generators from snapshot; otherwise wait for realtime init
@@ -150,7 +153,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
           imageUrl = buildProxyResourceUrl(imageUrl);
         }
-        
+
         if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
           const newImage: ImageUpload = {
             type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
@@ -372,6 +375,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           replaceGenerators,
           expandGenerators,
           vectorizeGenerators,
+          storyboardGenerators,
+          scriptFrameGenerators,
+          sceneFrameGenerators,
           textGenerators,
           connectors: filteredConnectors,
           generationQueue,
@@ -449,7 +455,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   useEffect(() => {
     if (!projectId) {
       // disconnect if exists
-      try { realtimeRef.current?.disconnect(); } catch {}
+      try { realtimeRef.current?.disconnect(); } catch { }
       setRealtimeActive(false);
       return;
     }
@@ -587,6 +593,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           replaceGenerators,
           expandGenerators,
           vectorizeGenerators,
+          storyboardGenerators,
+          scriptFrameGenerators,
+          sceneFrameGenerators,
           textGenerators,
           connectors,
           generationQueue,
@@ -602,7 +611,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, replaceGenerators, expandGenerators, vectorizeGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, replaceGenerators, expandGenerators, vectorizeGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -622,6 +631,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
+          const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
+          const newScriptFrameGenerators: ScriptFrameGenerator[] = [];
+          const newSceneFrameGenerators: SceneFrameGenerator[] = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
 
@@ -646,14 +658,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // If this element had connections in meta, collect them
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'image-generator') {
                 newImageGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'connector') {
@@ -663,38 +675,38 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'music-generator') {
                 newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'text-generator') {
                 newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'upscale-plugin') {
                 newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'removebg-plugin') {
-                newRemoveBgGenerators.push({ 
-                  id: element.id, 
-                  x: element.x || 0, 
-                  y: element.y || 0, 
-                  removedBgImageUrl: element.meta?.removedBgImageUrl || null, 
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
-                  localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, 
+                newRemoveBgGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  removedBgImageUrl: element.meta?.removedBgImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
                   model: element.meta?.model || '851-labs/background-remover',
                   backgroundType: element.meta?.backgroundType || 'rgba (transparent)',
                   scaleValue: element.meta?.scaleValue || 0.5,
@@ -704,17 +716,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'erase-plugin') {
-                newEraseGenerators.push({ 
-                  id: element.id, 
-                  x: element.x || 0, 
-                  y: element.y || 0, 
-                  erasedImageUrl: element.meta?.erasedImageUrl || null, 
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
-                  localErasedImageUrl: element.meta?.localErasedImageUrl || null, 
+                newEraseGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  erasedImageUrl: element.meta?.erasedImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localErasedImageUrl: element.meta?.localErasedImageUrl || null,
                   model: element.meta?.model || 'bria/eraser',
                   frameWidth: element.meta?.frameWidth || 400,
                   frameHeight: element.meta?.frameHeight || 500,
@@ -722,17 +734,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'replace-plugin') {
-                newReplaceGenerators.push({ 
-                  id: element.id, 
-                  x: element.x || 0, 
-                  y: element.y || 0, 
-                  replacedImageUrl: element.meta?.replacedImageUrl || null, 
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
-                  localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, 
+                newReplaceGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  replacedImageUrl: element.meta?.replacedImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localReplacedImageUrl: element.meta?.localReplacedImageUrl || null,
                   model: element.meta?.model || 'bria/eraser',
                   frameWidth: element.meta?.frameWidth || 400,
                   frameHeight: element.meta?.frameHeight || 500,
@@ -740,7 +752,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'expand-plugin') {
@@ -758,17 +770,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               } else if (element.type === 'vectorize-plugin') {
-                newVectorizeGenerators.push({ 
-                  id: element.id, 
-                  x: element.x || 0, 
-                  y: element.y || 0, 
-                  vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, 
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, 
-                  localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, 
+                newVectorizeGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
                   mode: element.meta?.mode || 'simple',
                   frameWidth: element.meta?.frameWidth || 400,
                   frameHeight: element.meta?.frameHeight || 500,
@@ -776,7 +788,52 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
                 if (element.meta?.connections && Array.isArray(element.meta.connections)) {
                   element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'storyboard-plugin') {
+                newStoryboardGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  frameWidth: element.meta?.frameWidth,
+                  frameHeight: element.meta?.frameHeight,
+                  scriptText: element.meta?.scriptText,
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'script-frame') {
+                newScriptFrameGenerators.push({
+                  id: element.id,
+                  pluginId: element.meta?.pluginId || '',
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  frameWidth: element.meta?.frameWidth || 300,
+                  frameHeight: element.meta?.frameHeight || 200,
+                  text: element.meta?.text || '',
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+                  });
+                }
+              } else if (element.type === 'scene-frame') {
+                newSceneFrameGenerators.push({
+                  id: element.id,
+                  scriptFrameId: element.meta?.scriptFrameId || '',
+                  sceneNumber: element.meta?.sceneNumber || 0,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  frameWidth: element.meta?.frameWidth || 300,
+                  frameHeight: element.meta?.frameHeight || 200,
+                  content: element.meta?.content || '',
+                });
+                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
+                  element.meta.connections.forEach((c: any) => {
+                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
                   });
                 }
               }
@@ -792,9 +849,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setReplaceGenerators(newReplaceGenerators);
           setExpandGenerators(newExpandGenerators);
           setVectorizeGenerators(newVectorizeGenerators);
+          setStoryboardGenerators(newStoryboardGenerators);
+          setScriptFrameGenerators(newScriptFrameGenerators);
+          setSceneFrameGenerators(newSceneFrameGenerators);
           setTextGenerators(newTextGenerators);
           setConnectors(newConnectors);
-          
+
         }
       } catch (e) {
         console.warn('No current snapshot to hydrate or failed to fetch', e);
@@ -823,8 +883,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }
       }
       // Ctrl/Cmd + Shift + Z or Ctrl+Y for redo
-      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || 
-          (e.ctrlKey && e.key.toLowerCase() === 'y')) {
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+        (e.ctrlKey && e.key.toLowerCase() === 'y')) {
         e.preventDefault();
         console.log('[Ops] keydown redo', { canRedo });
         if (canRedo) {
@@ -850,6 +910,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     replaceGenerators,
     expandGenerators,
     vectorizeGenerators,
+    storyboardGenerators,
+    scriptFrameGenerators,
+    sceneFrameGenerators,
     textGenerators,
     connectors,
     generationQueue,
@@ -866,6 +929,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setReplaceGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
+    setStoryboardGenerators,
+    setScriptFrameGenerators,
+    setSceneFrameGenerators,
     setTextGenerators,
     setConnectors,
     setGenerationQueue,
@@ -876,7 +942,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // For now, declare them as let so they can be assigned later
   let imageHandlers: ReturnType<typeof createImageHandlers>;
   let pluginHandlers: ReturnType<typeof createPluginHandlers>;
-  
+
   // Handler assignments will be done after handlers are created (after processMediaFile)
 
   const handleMultipleFilesUpload = (files: File[]) => {
@@ -897,23 +963,23 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const fileName = file.name;
         const url = URL.createObjectURL(file);
         const fileInfo = { file, url };
-        
+
         // Store with multiple keys for flexible lookup
         // 1. Full filename
         relatedFiles.set(fileName, fileInfo);
-        
+
         // 2. Just the filename (without path)
         const pathParts = fileName.split(/[/\\]/);
         const justFileName = pathParts[pathParts.length - 1];
         if (justFileName !== fileName) {
           relatedFiles.set(justFileName, fileInfo);
         }
-        
+
         // 3. Filename with common texture paths
         // GLTF files often reference textures like "textures/image.png"
         const normalizedPath = fileName.replace(/\\/g, '/');
         relatedFiles.set(normalizedPath, fileInfo);
-        
+
         // 4. Just the base name (without extension) for partial matching
         const baseName = justFileName.split('.').slice(0, -1).join('.');
         if (baseName) {
@@ -976,7 +1042,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const processMediaFile = async (file: File, offsetIndex: number = 0) => {
     const fileType = file.type.toLowerCase();
     const fileName = file.name.toLowerCase();
-    
+
     // Convert File to data URI for uploading to Zata
     const convertFileToDataUri = (file: File): Promise<string> => {
       return new Promise((resolve, reject) => {
@@ -986,14 +1052,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
         reader.readAsDataURL(file);
       });
     };
-    
+
     // Upload to Zata first (for images and videos only)
     let zataUrl: string | null = null;
     const isImage = fileType.startsWith('image/');
-    const isVideoFile = fileType.startsWith('video/') || 
-                    ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
-                      .some(ext => fileName.endsWith(ext));
-    
+    const isVideoFile = fileType.startsWith('video/') ||
+      ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
+        .some(ext => fileName.endsWith(ext));
+
     if ((isImage || isVideoFile) && projectId) {
       try {
         const dataUri = await convertFileToDataUri(file);
@@ -1013,21 +1079,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
         console.warn('[processMediaFile] Error uploading to Zata, using blob URL:', err);
       }
     }
-    
+
     // Use Zata URL if available, otherwise fall back to blob URL
     const url = zataUrl || URL.createObjectURL(file);
-    
+
     // Check for 3D model files
     const isModel3D = ['.obj', '.gltf', '.glb', '.fbx', '.mb', '.ma']
       .some(ext => fileName.endsWith(ext));
-    
+
     // Check for video files (reuse isVideoFile)
     const isVideo = isVideoFile;
-    
+
     if (isModel3D) {
       // Get current viewport center
       const center = viewportCenterRef.current;
-      
+
       // Place 3D model at the center of current viewport with slight offset
       const offsetX = (offsetIndex % 3) * 50;
       const offsetY = Math.floor(offsetIndex / 3) * 50;
@@ -1076,26 +1142,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
       const video = document.createElement('video');
       video.src = url;
       video.preload = 'metadata';
-      
+
       video.onloadedmetadata = () => {
         // Get current viewport center
         const center = viewportCenterRef.current;
-        
+
         // Keep original video dimensions - no scaling
         const naturalWidth = video.videoWidth;
         const naturalHeight = video.videoHeight;
-        
+
         // Calculate frame dimensions (similar to VideoUploadModal)
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
         let frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        
+
         // If video is taller, adjust frame height
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
-        
+
         // Place modal at the center of current viewport with slight offset for multiple files
         const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
         const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
@@ -1122,35 +1188,35 @@ export function CanvasApp({ user }: CanvasAppProps) {
         // Add to video generators (modals)
         setVideoGenerators((prev) => {
           const updated = [...prev, newModal];
-        return updated;
-      });
+          return updated;
+        });
 
-      // File already uploaded to Zata and saved to history above
-    };
+        // File already uploaded to Zata and saved to history above
+      };
     } else {
       // For images, create an ImageUploadModal frame instead of directly adding to canvas
       const img = new Image();
-      
+
       img.onload = () => {
         // Get current viewport center
         const center = viewportCenterRef.current;
-        
+
         // Keep original image dimensions - no scaling (use naturalWidth/naturalHeight for actual dimensions)
         const naturalWidth = img.naturalWidth || img.width;
         const naturalHeight = img.naturalHeight || img.height;
-        
+
         // Calculate frame dimensions (similar to ImageUploadModal)
         // Use a reasonable frame size, maintaining aspect ratio
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
         let frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        
+
         // If image is taller, adjust frame height
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
-        
+
         // Place modal at the center of current viewport with slight offset for multiple images
         const offsetX = (offsetIndex % 3) * 50; // Stagger horizontally
         const offsetY = Math.floor(offsetIndex / 3) * 50; // Stagger vertically
@@ -1240,27 +1306,27 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
     setSelectedTool(tool);
     console.log('Selected tool:', tool);
-    
+
     // Open image modal when image tool is selected
     if (tool === 'image') {
       setIsImageModalOpen(true);
     }
-    
+
     // Open video modal when video tool is selected
     if (tool === 'video') {
       setIsVideoModalOpen(true);
     }
-    
+
     // Open music modal when music tool is selected
     if (tool === 'music') {
       setIsMusicModalOpen(true);
     }
-    
+
     // Open library sidebar when library tool is selected
     if (tool === 'library') {
       setIsLibraryOpen(true);
     }
-    
+
     // Open plugin sidebar when plugin tool is selected
     if (tool === 'plugin') {
       setIsPluginSidebarOpen(true);
@@ -1271,7 +1337,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleToolbarUpload = (files: File[]) => {
     // Check if any file is a GLTF file (which might need dependencies)
     const hasGLTF = files.some(f => f.name.toLowerCase().endsWith('.gltf'));
-    
+
     if (hasGLTF && files.length > 1) {
       // Use multiple files handler for GLTF with dependencies
       handleMultipleFilesUpload(files);
@@ -1285,7 +1351,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   const addMediaToCanvas = (media: MediaItem, x?: number, y?: number) => {
     const mediaUrl = media.url || media.thumbnail || '';
-    
+
     // Determine media type
     let mediaType: 'image' | 'video' | 'text' = 'image';
     if (media.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i)) {
@@ -1293,22 +1359,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
     } else if (media.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i)) {
       mediaType = 'video'; // Treat music as video for canvas display
     }
-    
+
     // For images, create an ImageUploadModal frame instead of directly adding to canvas
     if (mediaType === 'image') {
       // Use proxy URL if needed (for Zata URLs) - buildProxyResourceUrl is already imported
-      const imageUrl = (mediaUrl.includes('zata.ai') || mediaUrl.includes('zata')) 
-        ? buildProxyResourceUrl(mediaUrl) 
+      const imageUrl = (mediaUrl.includes('zata.ai') || mediaUrl.includes('zata'))
+        ? buildProxyResourceUrl(mediaUrl)
         : mediaUrl;
-      
+
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      
+
       const createModal = (width: number = 600, height: number = 400, aspectRatio: string = '1:1') => {
         const viewportCenter = viewportCenterRef.current;
         const modalX = x !== undefined ? x - width / 2 : viewportCenter.x - width / 2;
         const modalY = y !== undefined ? y - height / 2 : viewportCenter.y - height / 2;
-        
+
         const modalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const newModal = {
           id: modalId,
@@ -1322,43 +1388,43 @@ export function CanvasApp({ user }: CanvasAppProps) {
           aspectRatio,
           prompt: '',
         };
-        
+
         // Add to image generators (modals) - this will trigger persistence via Canvas component
         setImageGenerators((prev) => {
           // Check if modal already exists to avoid duplicates
           if (prev.some(m => m.id === modalId)) return prev;
           return [...prev, newModal];
         });
-        
+
         console.log('[Library] Created image modal:', modalId, newModal);
       };
-      
+
       img.onload = () => {
         // Get current viewport center or use provided coordinates
         const viewportCenter = viewportCenterRef.current;
         const naturalWidth = img.naturalWidth || img.width;
         const naturalHeight = img.naturalHeight || img.height;
-        
+
         // Calculate frame dimensions
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
         let frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        
+
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
-        
+
         createModal(frameWidth, frameHeight, `${Math.round(aspectRatio * 10) / 10}:1`);
       };
-      
+
       img.onerror = () => {
         // If image fails to load, still create the modal with the URL
         // The modal will handle displaying the image or error state
         console.warn('[Library] Failed to load image for modal creation, creating modal anyway:', mediaUrl);
         createModal(600, 400, '1:1');
       };
-      
+
       // Try loading the image
       img.src = imageUrl;
     } else if (mediaType === 'video') {
@@ -1366,26 +1432,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
       video.preload = 'metadata';
-      
+
       video.onloadedmetadata = () => {
         const viewportCenter = viewportCenterRef.current;
         const naturalWidth = video.videoWidth;
         const naturalHeight = video.videoHeight;
-        
+
         // Calculate frame dimensions
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
         let frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        
+
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
-    }
-    
-    // Use provided coordinates or viewport center as fallback
+        }
+
+        // Use provided coordinates or viewport center as fallback
         const modalX = x !== undefined ? x - frameWidth / 2 : viewportCenter.x - frameWidth / 2;
         const modalY = y !== undefined ? y - frameHeight / 2 : viewportCenter.y - frameHeight / 2;
-        
+
         // Create video modal with library video
         const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const newModal = {
@@ -1402,18 +1468,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
           duration: 5,
           resolution: '720p',
         };
-        
+
         // Add to video generators (modals)
         setVideoGenerators((prev) => [...prev, newModal]);
       };
-      
+
       video.onerror = () => {
         // If video fails to load, still create the modal with the URL
         console.warn('[Library] Failed to load video for modal creation, creating modal anyway:', mediaUrl);
         const viewportCenter = viewportCenterRef.current;
         const modalX = x !== undefined ? x - 300 : viewportCenter.x - 300;
         const modalY = y !== undefined ? y - 200 : viewportCenter.y - 200;
-        
+
         const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const newModal = {
           id: modalId,
@@ -1429,52 +1495,52 @@ export function CanvasApp({ user }: CanvasAppProps) {
           duration: 5,
           resolution: '720p',
         };
-        
+
         setVideoGenerators((prev) => [...prev, newModal]);
       };
-      
+
       video.src = mediaUrl;
     } else {
       // For other media types (music, etc.), add directly to canvas (existing behavior)
       const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const viewportCenter = viewportCenterRef.current;
-    const canvasX = x !== undefined ? x : viewportCenter.x - 200;
-    const canvasY = y !== undefined ? y : viewportCenter.y - 200;
-    
-    const newMedia: ImageUpload = {
-      type: mediaType,
-      url: mediaUrl,
-      x: canvasX,
-      y: canvasY,
-      width: 400,
-      height: 400,
-      elementId,
-    };
-    
-    setImages((prev) => [...prev, newMedia]);
-    
-    // Persist to backend if project exists
-    if (projectId && opManagerInitialized) {
-      appendOp({
-        type: 'create',
+      const viewportCenter = viewportCenterRef.current;
+      const canvasX = x !== undefined ? x : viewportCenter.x - 200;
+      const canvasY = y !== undefined ? y : viewportCenter.y - 200;
+
+      const newMedia: ImageUpload = {
+        type: mediaType,
+        url: mediaUrl,
+        x: canvasX,
+        y: canvasY,
+        width: 400,
+        height: 400,
         elementId,
-        data: {
-          element: {
-            id: elementId,
-            type: mediaType,
-            x: newMedia.x,
-            y: newMedia.y,
-            width: newMedia.width,
-            height: newMedia.height,
-            meta: {
-              url: mediaUrl,
-              mediaId: media.mediaId,
-              storagePath: media.storagePath,
+      };
+
+      setImages((prev) => [...prev, newMedia]);
+
+      // Persist to backend if project exists
+      if (projectId && opManagerInitialized) {
+        appendOp({
+          type: 'create',
+          elementId,
+          data: {
+            element: {
+              id: elementId,
+              type: mediaType,
+              x: newMedia.x,
+              y: newMedia.y,
+              width: newMedia.width,
+              height: newMedia.height,
+              meta: {
+                url: mediaUrl,
+                mediaId: media.mediaId,
+                storagePath: media.storagePath,
+              },
             },
           },
-        },
-        inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-      }).catch(console.error);
+          inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
+        }).catch(console.error);
       }
     }
   };
@@ -1491,7 +1557,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleProjectNameChange = async (name: string) => {
     setProjectName(name);
     localStorage.setItem('canvas-project-name', name);
-    
+
     // Update project name in backend if we have a project ID
     if (projectId) {
       try {
@@ -1519,7 +1585,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
-      
+
       // Call video generation API
       const result = await generateVideoForCanvas(
         prompt,
@@ -1535,8 +1601,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
       console.log('Video generation started:', result);
 
       // Return provider info so frontend knows which service to poll
-      return { 
-        generationId: result.generationId, 
+      return {
+        generationId: result.generationId,
         taskId: result.taskId,
         provider: result.provider, // 'fal', 'replicate', 'minimax', or 'runway'
       };
@@ -1582,7 +1648,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       )}
       <div className="w-full h-full relative">
         {projectId && (
-          <Header 
+          <Header
             projectName={projectName}
             onProjectNameChange={handleProjectNameChange}
             onSwitchProject={() => setShowProjectSelector(true)}
@@ -1595,9 +1661,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
         )}
         {projectId ? (
           <>
-            <Canvas 
+            <Canvas
               isUIHidden={isUIHidden}
-              images={images} 
+              images={images}
               onViewportChange={handleViewportChange}
               onImageUpdate={handleImageUpdate}
               onImageDelete={handleImageDelete}
@@ -1634,25 +1700,28 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalReplaceModals={replaceGenerators}
               externalExpandModals={expandGenerators}
               externalVectorizeModals={vectorizeGenerators}
+              externalStoryboardModals={storyboardGenerators}
+              externalScriptFrameModals={scriptFrameGenerators}
+              externalSceneFrameModals={sceneFrameGenerators}
               externalTextModals={textGenerators}
               connections={connectors}
-        onConnectionsChange={(connections) => {
-          setConnectors(connections.map((conn) => ({
-            id: conn.id ?? `${conn.from}-${conn.to}-${Date.now()}`,
-            from: conn.from,
-            to: conn.to,
-            color: conn.color,
-            fromX: conn.fromX,
-            fromY: conn.fromY,
-            toX: conn.toX,
-            toY: conn.toY,
-            fromAnchor: conn.fromAnchor,
-            toAnchor: conn.toAnchor,
-          })));
-        }}
+              onConnectionsChange={(connections) => {
+                setConnectors(connections.map((conn) => ({
+                  id: conn.id ?? `${conn.from}-${conn.to}-${Date.now()}`,
+                  from: conn.from,
+                  to: conn.to,
+                  color: conn.color,
+                  fromX: conn.fromX,
+                  fromY: conn.fromY,
+                  toX: conn.toX,
+                  toY: conn.toY,
+                  fromAnchor: conn.fromAnchor,
+                  toAnchor: conn.toAnchor,
+                })));
+              }}
               onPersistConnectorCreate={async (connector) => {
                 // Ensure a stable id for connector
-                const cid = connector.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2,6)}`;
+                const cid = connector.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
                 const connToAdd = { id: cid, from: connector.from, to: connector.to, color: connector.color || '#437eb5', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor };
 
                 // Optimistic update
@@ -1679,12 +1748,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoGenerators,
                         musicGenerators,
                         upscaleGenerators,
-                      removeBgGenerators,
-                      eraseGenerators,
-                      replaceGenerators,
+                        removeBgGenerators,
+                        eraseGenerators,
+                        replaceGenerators,
                         expandGenerators,
-                      vectorizeGenerators,
-                      textGenerators,
+                        vectorizeGenerators,
+                        storyboardGenerators,
+                        scriptFrameGenerators,
+                        sceneFrameGenerators,
+                        textGenerators,
                         connectors: [...connectors, connToAdd],
                         generationQueue,
                       });
@@ -1719,12 +1791,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoGenerators,
                         musicGenerators,
                         upscaleGenerators,
-                      removeBgGenerators,
-                      eraseGenerators,
-                      replaceGenerators,
+                        removeBgGenerators,
+                        eraseGenerators,
+                        replaceGenerators,
                         expandGenerators,
-                      vectorizeGenerators,
-                      textGenerators,
+                        vectorizeGenerators,
+                        storyboardGenerators,
+                        scriptFrameGenerators,
+                        sceneFrameGenerators,
+                        textGenerators,
                         connectors: connectors.filter(c => c.id !== connectorId),
                         generationQueue,
                       });
@@ -1915,6 +1990,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistVectorizeModalMove={pluginHandlers.onPersistVectorizeModalMove}
               onPersistVectorizeModalDelete={pluginHandlers.onPersistVectorizeModalDelete}
               onVectorize={pluginHandlers.onVectorize}
+              onPersistStoryboardModalCreate={pluginHandlers.onPersistStoryboardModalCreate}
+              onPersistStoryboardModalMove={pluginHandlers.onPersistStoryboardModalMove}
+              onPersistStoryboardModalDelete={pluginHandlers.onPersistStoryboardModalDelete}
+              onPersistScriptFrameModalCreate={pluginHandlers.onPersistScriptFrameModalCreate}
+              onPersistScriptFrameModalMove={pluginHandlers.onPersistScriptFrameModalMove}
+              onPersistScriptFrameModalDelete={pluginHandlers.onPersistScriptFrameModalDelete}
+              onPersistSceneFrameModalCreate={pluginHandlers.onPersistSceneFrameModalCreate}
+              onPersistSceneFrameModalMove={pluginHandlers.onPersistSceneFrameModalMove}
+              onPersistSceneFrameModalDelete={pluginHandlers.onPersistSceneFrameModalDelete}
               onPersistTextModalCreate={async (modal) => {
                 setTextGenerators(prev => prev.some(t => t.id === modal.id) ? prev : [...prev, modal]);
                 if (realtimeActive) {
@@ -1966,8 +2050,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Always append op for undo/redo and persistence
                 if (projectId && opManagerInitialized) {
                   await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
-                    }
-                  }}
+                }
+              }}
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
@@ -1995,7 +2079,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             // Otherwise use viewport center
             let modalX: number;
             let modalY: number;
-            
+
             if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
               // Convert screen coordinates to canvas coordinates
               // We need to get the canvas container position to do this properly
@@ -2007,7 +2091,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               modalX = viewportCenter.x;
               modalY = viewportCenter.y;
             }
-            
+
             const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const newUpscale = {
               id: modalId,
@@ -2082,95 +2166,163 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 });
               }
             })().catch(console.error);
-            } else if (plugin.id === 'vectorize') {
-              const viewportCenter = viewportCenterRef.current;
-              let modalX: number;
-              let modalY: number;
-              
-              if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-                modalX = viewportCenter.x;
-                modalY = viewportCenter.y;
-              } else {
-                modalX = viewportCenter.x;
-                modalY = viewportCenter.y;
-              }
-              
-              const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-              const newVectorize = {
-                id: modalId,
-                x: modalX,
-                y: modalY,
-                vectorizedImageUrl: null,
-                sourceImageUrl: null,
-                localVectorizedImageUrl: null,
-                mode: 'Detailed',
-                frameWidth: 400,
-                frameHeight: 500,
-                isVectorizing: false,
-              };
-              console.log('[Plugin] Creating vectorize modal at viewport center:', newVectorize, 'viewportCenter:', viewportCenter);
-              // Persist via callback (this will trigger realtime + ops)
-              (async () => {
-                // Optimistic update
-                setVectorizeGenerators(prev => {
-                  if (prev.some(m => m.id === modalId)) {
-                    console.log('[Plugin] Vectorize modal already exists, skipping');
-                    return prev;
-                  }
-                  const updated = [...prev, newVectorize];
-                  console.log('[Plugin] Updated vectorizeGenerators, count:', updated.length);
-                  return updated;
-                });
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create vectorize', modalId);
-                  realtimeRef.current?.sendCreate({
-                    id: modalId,
-                    type: 'vectorize',
-                    x: modalX,
-                    y: modalY,
-                    vectorizedImageUrl: null,
-                    sourceImageUrl: null,
-                    localVectorizedImageUrl: null,
-                    mode: 'simple',
-                    frameWidth: 400,
-                    frameHeight: 500,
-                    isVectorizing: false,
-                  });
+          } else if (plugin.id === 'vectorize') {
+            const viewportCenter = viewportCenterRef.current;
+            let modalX: number;
+            let modalY: number;
+
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+
+            const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newVectorize = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              vectorizedImageUrl: null,
+              sourceImageUrl: null,
+              localVectorizedImageUrl: null,
+              mode: 'Detailed',
+              frameWidth: 400,
+              frameHeight: 500,
+              isVectorizing: false,
+            };
+            console.log('[Plugin] Creating vectorize modal at viewport center:', newVectorize, 'viewportCenter:', viewportCenter);
+            // Persist via callback (this will trigger realtime + ops)
+            (async () => {
+              // Optimistic update
+              setVectorizeGenerators(prev => {
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Vectorize modal already exists, skipping');
+                  return prev;
                 }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  await appendOp({
-                    type: 'create',
-                    elementId: modalId,
-                    data: {
-                      element: {
-                        id: modalId,
-                        type: 'vectorize-plugin',
-                        x: modalX,
-                        y: modalY,
-                        meta: {
-                          vectorizedImageUrl: null,
-                          sourceImageUrl: null,
-                          localVectorizedImageUrl: null,
-                          mode: 'simple',
-                          frameWidth: 400,
-                          frameHeight: 500,
-                          isVectorizing: false,
-                        },
+                const updated = [...prev, newVectorize];
+                console.log('[Plugin] Updated vectorizeGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create vectorize', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'vectorize',
+                  x: modalX,
+                  y: modalY,
+                  vectorizedImageUrl: null,
+                  sourceImageUrl: null,
+                  localVectorizedImageUrl: null,
+                  mode: 'simple',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isVectorizing: false,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'vectorize-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        vectorizedImageUrl: null,
+                        sourceImageUrl: null,
+                        localVectorizedImageUrl: null,
+                        mode: 'simple',
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isVectorizing: false,
                       },
                     },
-                    inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                  });
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'storyboard') {
+            const viewportCenter = viewportCenterRef.current;
+            let modalX: number;
+            let modalY: number;
+
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+
+            const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newStoryboard = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              frameWidth: 400,
+              frameHeight: 500,
+              scriptText: null,
+            };
+            console.log('[Plugin] Creating storyboard modal at viewport center:', newStoryboard, 'viewportCenter:', viewportCenter);
+            (async () => {
+              // Optimistic update
+              setStoryboardGenerators(prev => {
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Storyboard modal already exists, skipping');
+                  return prev;
                 }
-              })().catch(console.error);
-            } else if (plugin.id === 'removebg') {
+                const updated = [...prev, newStoryboard];
+                console.log('[Plugin] Updated storyboardGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create storyboard', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'storyboard',
+                  x: modalX,
+                  y: modalY,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'storyboard-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        scriptText: null,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'removebg') {
             const viewportCenter = viewportCenterRef.current;
             // If x/y are provided (from click), convert screen coordinates to canvas coordinates
             // Otherwise use viewport center
             let modalX: number;
             let modalY: number;
-            
+
             if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
               // Convert screen coordinates to canvas coordinates
               // We need to get the canvas container position to do this properly
@@ -2182,7 +2334,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               modalX = viewportCenter.x;
               modalY = viewportCenter.y;
             }
-            
+
             const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const newRemoveBg = {
               id: modalId,
@@ -2243,16 +2395,16 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       type: 'removebg-plugin',
                       x: modalX,
                       y: modalY,
-                        meta: {
-                          removedBgImageUrl: null,
-                          sourceImageUrl: null,
-                          localRemovedBgImageUrl: null,
-                          model: '851-labs/background-remover',
-                          backgroundType: 'rgba (transparent)',
-                          scaleValue: 0.5,
-                          frameWidth: 400,
-                          frameHeight: 500,
-                          isRemovingBg: false,
+                      meta: {
+                        removedBgImageUrl: null,
+                        sourceImageUrl: null,
+                        localRemovedBgImageUrl: null,
+                        model: '851-labs/background-remover',
+                        backgroundType: 'rgba (transparent)',
+                        scaleValue: 0.5,
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isRemovingBg: false,
                       },
                     },
                   },
@@ -2266,7 +2418,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             // Otherwise use viewport center
             let modalX: number;
             let modalY: number;
-            
+
             if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
               // Convert screen coordinates to canvas coordinates
               // We need to get the canvas container position to do this properly
@@ -2278,7 +2430,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               modalX = viewportCenter.x;
               modalY = viewportCenter.y;
             }
-            
+
             const modalId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const newErase = {
               id: modalId,
@@ -2335,14 +2487,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       type: 'erase-plugin',
                       x: modalX,
                       y: modalY,
-                        meta: {
-                          erasedImageUrl: null,
-                          sourceImageUrl: null,
-                          localErasedImageUrl: null,
-                          model: 'bria/eraser',
-                          frameWidth: 400,
-                          frameHeight: 500,
-                          isErasing: false,
+                      meta: {
+                        erasedImageUrl: null,
+                        sourceImageUrl: null,
+                        localErasedImageUrl: null,
+                        model: 'bria/eraser',
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isErasing: false,
                       },
                     },
                   },
@@ -2356,7 +2508,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             // Otherwise use viewport center
             let modalX: number;
             let modalY: number;
-            
+
             if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
               // Convert screen coordinates to canvas coordinates
               // We need to get the canvas container position to do this properly
@@ -2368,7 +2520,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               modalX = viewportCenter.x;
               modalY = viewportCenter.y;
             }
-            
+
             const modalId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const newReplace = {
               id: modalId,

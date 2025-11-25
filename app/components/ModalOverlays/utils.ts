@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ReplaceModalState, ExpandModalState, VectorizeModalState } from './types';
+import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ReplaceModalState, ExpandModalState, VectorizeModalState, StoryboardModalState } from './types';
 
 export const getComponentType = (id?: string | null): string | null => {
   if (!id) return null;
@@ -52,7 +52,9 @@ export const computeNodeCenter = (
   eraseModalStates?: EraseModalState[],
   replaceModalStates?: ReplaceModalState[],
   expandModalStates?: ExpandModalState[],
-  vectorizeModalStates?: VectorizeModalState[]
+  vectorizeModalStates?: VectorizeModalState[],
+  storyboardModalStates?: StoryboardModalState[],
+  sceneFrameModalStates?: any[]
 ): { x: number; y: number } | null => {
   if (!id) return null;
   
@@ -111,6 +113,10 @@ export const computeNodeCenter = (
         if (ep) return { x: ep.x, y: ep.y, width: ep.frameWidth || 400, height: ep.frameHeight || 500 };
         const vzm = vectorizeModalStates?.find(m => m.id === id);
         if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
+        const sb = storyboardModalStates?.find(m => m.id === id);
+        if (sb) return { x: sb.x, y: sb.y, width: sb.frameWidth || 400, height: sb.frameHeight || 500 };
+        const sf = sceneFrameModalStates?.find(m => m.id === id);
+        if (sf) return { x: sf.x, y: sf.y, width: sf.frameWidth || 400, height: sf.frameHeight || 500 };
         return null;
       };
       const modal = findModal();

@@ -33,7 +33,7 @@ export function useOpManagerIntegration({
           isOptimistic,
         };
         console.log('[Ops] apply', summary);
-      } catch {}
+      } catch { }
       // Handle snapshot application (snapshot contains map of elements)
       if (!snapshotLoadedRef.current && (op.data && typeof op.data === 'object' && (op.data.snapshot === true || (!op.data.element && !op.data.delta && !op.data.updates)))) {
         // This is a snapshot - op.data is the elements map
@@ -45,9 +45,15 @@ export function useOpManagerIntegration({
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
         const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
+        const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
+        const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string }> = [];
+        const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
         const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
         const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
-        
+        const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
+        const newScriptFrames: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
+        const newSceneFrames: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }> = [];
+
         Object.values(elements).forEach((element: any) => {
           if (element && element.type) {
             // Use proxy URL for Zata URLs to avoid CORS
@@ -55,7 +61,7 @@ export function useOpManagerIntegration({
             if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
               imageUrl = buildProxyResourceUrl(imageUrl);
             }
-            
+
             if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
               const newImage: ImageUpload = {
                 type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
@@ -79,12 +85,24 @@ export function useOpManagerIntegration({
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
             } else if (element.type === 'removebg-plugin') {
               newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
+            } else if (element.type === 'erase-plugin') {
+              newEraseGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, erasedImageUrl: element.meta?.erasedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localErasedImageUrl: element.meta?.localErasedImageUrl || null, model: element.meta?.model });
+            } else if (element.type === 'replace-plugin') {
+              newReplaceGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, replacedImageUrl: element.meta?.replacedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, model: element.meta?.model });
+            } else if (element.type === 'expand-plugin') {
+              newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
             } else if (element.type === 'vectorize-plugin') {
               newVectorizeGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' });
+            } else if (element.type === 'storyboard-plugin') {
+              newStoryboardGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 500, scriptText: element.meta?.scriptText || null });
+            } else if (element.type === 'script-frame') {
+              newScriptFrames.push({ id: element.id, pluginId: element.meta?.pluginId || '', x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 300, text: element.meta?.text || '' });
+            } else if (element.type === 'scene-frame') {
+              newSceneFrames.push({ id: element.id, scriptFrameId: element.meta?.scriptFrameId || '', sceneNumber: element.meta?.sceneNumber || 0, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 350, frameHeight: element.meta?.frameHeight || 300, content: element.meta?.content || '' });
             }
           }
         });
-        
+
         // Replace entire images array with snapshot (this ensures deleted elements don't reappear)
         setters.setImages(newImages);
         // If realtime is not active, hydrate generators from snapshot; otherwise wait for realtime init
@@ -93,10 +111,18 @@ export function useOpManagerIntegration({
           setters.setVideoGenerators(newVideoGenerators);
           setters.setMusicGenerators(newMusicGenerators);
           setters.setTextGenerators(newTextGenerators);
-          setters.setUpscaleGenerators(newUpscaleGenerators);
-          setters.setRemoveBgGenerators(newRemoveBgGenerators);
-          setters.setVectorizeGenerators(newVectorizeGenerators);
         }
+        // Always load plugins from snapshot (realtime doesn't handle plugins)
+        setters.setUpscaleGenerators(newUpscaleGenerators);
+        setters.setRemoveBgGenerators(newRemoveBgGenerators);
+        setters.setEraseGenerators(newEraseGenerators);
+        setters.setReplaceGenerators(newReplaceGenerators);
+        setters.setExpandGenerators(newExpandGenerators);
+        setters.setVectorizeGenerators(newVectorizeGenerators);
+        console.log('[Snapshot] Loading storyboard generators:', newStoryboardGenerators.length, newStoryboardGenerators);
+        setters.setStoryboardGenerators(newStoryboardGenerators);
+        setters.setScriptFrameGenerators(newScriptFrames);
+        setters.setSceneFrameGenerators(newSceneFrames);
         snapshotLoadedRef.current = true;
       } else if (op.type === 'create' && op.data.element) {
         // Add new element from create op
@@ -106,7 +132,7 @@ export function useOpManagerIntegration({
         if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
           imageUrl = buildProxyResourceUrl(imageUrl);
         }
-        
+
         if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
           const newImage: ImageUpload = {
             type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
@@ -154,6 +180,21 @@ export function useOpManagerIntegration({
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' }];
           });
+        } else if (element.type === 'storyboard-plugin') {
+          setters.setStoryboardGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 500, scriptText: element.meta?.scriptText || null }];
+          });
+        } else if (element.type === 'script-frame') {
+          setters.setScriptFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, pluginId: element.meta?.pluginId || '', x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 300, text: element.meta?.text || '' }];
+          });
+        } else if (element.type === 'scene-frame') {
+          setters.setSceneFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, scriptFrameId: element.meta?.scriptFrameId || '', sceneNumber: element.meta?.sceneNumber || 0, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 350, frameHeight: element.meta?.frameHeight || 300, content: element.meta?.content || '' }];
+          });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
@@ -181,7 +222,13 @@ export function useOpManagerIntegration({
         setters.setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setReplaceGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setters.setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setTextGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setters.setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
@@ -296,8 +343,8 @@ export function useOpManagerIntegration({
             // Handle structured updates: x/y are top-level, everything else is in meta
             const updates = op.data.updates as any;
             const metaUpdates = updates.meta || {};
-            next[idx] = { 
-              ...next[idx], 
+            next[idx] = {
+              ...next[idx],
               ...(updates.x !== undefined ? { x: updates.x } : {}),
               ...(updates.y !== undefined ? { y: updates.y } : {}),
               ...metaUpdates,
@@ -313,8 +360,8 @@ export function useOpManagerIntegration({
             // Handle structured updates: x/y are top-level, everything else is in meta
             const updates = op.data.updates as any;
             const metaUpdates = updates.meta || {};
-            next[idx] = { 
-              ...next[idx], 
+            next[idx] = {
+              ...next[idx],
               ...(updates.x !== undefined ? { x: updates.x } : {}),
               ...(updates.y !== undefined ? { y: updates.y } : {}),
               ...metaUpdates,
@@ -330,8 +377,8 @@ export function useOpManagerIntegration({
             // Handle structured updates: x/y are top-level, everything else is in meta
             const updates = op.data.updates as any;
             const metaUpdates = updates.meta || {};
-            next[idx] = { 
-              ...next[idx], 
+            next[idx] = {
+              ...next[idx],
               ...(updates.x !== undefined ? { x: updates.x } : {}),
               ...(updates.y !== undefined ? { y: updates.y } : {}),
               ...metaUpdates,

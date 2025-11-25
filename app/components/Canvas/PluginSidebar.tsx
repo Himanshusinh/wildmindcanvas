@@ -61,6 +61,11 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       name: 'Vectorize',
       description: 'Convert images to vector format',
     },
+    {
+      id: 'storyboard',
+      name: 'Storyboard',
+      description: 'Create storyboard frames for your project',
+    },
   ]);
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {

@@ -18,6 +18,7 @@ interface TextInputOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  onScriptGenerated?: (textModalId: string, script: string) => void;
 }
 
 export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
@@ -33,6 +34,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  onScriptGenerated,
 }) => {
   return (
     <>
@@ -119,6 +121,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
           stageRef={stageRef}
           scale={scale}
           position={position}
+          onScriptGenerated={onScriptGenerated}
         />
       ))}
     </>

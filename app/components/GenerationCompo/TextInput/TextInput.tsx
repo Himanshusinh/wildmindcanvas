@@ -24,8 +24,7 @@ interface TextInputProps {
   scale: number;
   position: { x: number; y: number };
   isSelected?: boolean;
-
-  
+  onScriptGenerated?: (textModalId: string, script: string) => void;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -44,6 +43,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   scale,
   position,
   isSelected,
+  onScriptGenerated,
 }) => {
   const [text, setText] = useState('');
   const [selectedModel, setSelectedModel] = useState('GPT-4');
@@ -246,6 +246,11 @@ export const TextInput: React.FC<TextInputProps> = ({
           selectedModel={selectedModel}
           onSetIsPinned={setIsPinned}
           onMouseDown={handleMouseDown}
+          onScriptGenerated={(script) => {
+            if (onScriptGenerated) {
+              onScriptGenerated(id, script);
+            }
+          }}
         />
 
         <TextModalNodes

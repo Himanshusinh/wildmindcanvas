@@ -15,6 +15,7 @@ import AvatarButton from './AvatarButton';
 import { SettingsPopup } from '@/app/components/Settings';
 import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
 import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY } from '@/lib/canvasHelpers';
+import { generateScenesFromStory } from '@/lib/api';
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -54,6 +55,9 @@ interface CanvasProps {
   externalReplaceModals?: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>;
   externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
   externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
+  externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
+  externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
+  externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -91,6 +95,15 @@ interface CanvasProps {
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
+  onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => void | Promise<void>;
+  onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
+  onPersistScriptFrameModalCreate?: (modal: { id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }) => void | Promise<void>;
+  onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth: number; frameHeight: number; text: string }>) => void | Promise<void>;
+  onPersistScriptFrameModalDelete?: (id: string) => void | Promise<void>;
+  onPersistSceneFrameModalCreate?: (modal: { id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }) => void | Promise<void>;
+  onPersistSceneFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth: number; frameHeight: number; content: string }>) => void | Promise<void>;
+  onPersistSceneFrameModalDelete?: (id: string) => void | Promise<void>;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
   // Text generator (input overlay) persistence callbacks
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
@@ -107,9 +120,9 @@ interface CanvasProps {
 
 
 
-export const Canvas: React.FC<CanvasProps> = ({ 
-  images = [], 
-  onViewportChange, 
+export const Canvas: React.FC<CanvasProps> = ({
+  images = [],
+  onViewportChange,
   onImageUpdate,
   onImageDelete,
   onImageDownload,
@@ -145,6 +158,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalReplaceModals,
   externalExpandModals,
   externalVectorizeModals,
+  externalStoryboardModals,
+  externalScriptFrameModals,
+  externalSceneFrameModals,
   externalTextModals,
   onPersistImageModalCreate,
   onPersistImageModalMove,
@@ -179,10 +195,19 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistVectorizeModalMove,
   onPersistVectorizeModalDelete,
   onVectorize,
+  onPersistStoryboardModalCreate,
+  onPersistStoryboardModalMove,
+  onPersistStoryboardModalDelete,
+  onPersistScriptFrameModalCreate,
+  onPersistScriptFrameModalMove,
+  onPersistScriptFrameModalDelete,
+  onPersistSceneFrameModalCreate,
+  onPersistSceneFrameModalMove,
+  onPersistSceneFrameModalDelete,
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
-  connections,
+  connections = [],
   onConnectionsChange,
   onPersistConnectorCreate,
   onPersistConnectorDelete,
@@ -197,9 +222,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [viewportSize, setViewportSize] = useState({ width: 1200, height: 800 });
   const [scale, setScale] = useState(1);
   // Center the initial view on the canvas
-  const [position, setPosition] = useState({ 
-    x: 0, 
-    y: 0 
+  const [position, setPosition] = useState({
+    x: 0,
+    y: 0
   });
   const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
@@ -211,6 +236,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [replaceModalStates, setReplaceModalStates] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
   const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
+  const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
+  const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>>([]);
+  const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -228,6 +256,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedExpandModalIds, setSelectedExpandModalIds] = useState<string[]>([]);
   const [selectedVectorizeModalId, setSelectedVectorizeModalId] = useState<string | null>(null);
   const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
+  const [selectedStoryboardModalId, setSelectedStoryboardModalId] = useState<string | null>(null);
+  const [selectedStoryboardModalIds, setSelectedStoryboardModalIds] = useState<string[]>([]);
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
   const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
@@ -244,6 +274,359 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const sanitizeScriptOutput = (value?: string | null) => {
+    if (!value) return '';
+    let cleaned = value;
+    cleaned = cleaned.replace(/###\s*B[\s\S]*$/i, '').trim();
+    cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
+    cleaned = cleaned.replace(/\*\*/g, '');
+    cleaned = cleaned.replace(/^#+\s*/gm, '');
+    cleaned = cleaned.replace(/^\s*[-*]\s+/gm, '- ');
+    cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
+    cleaned = cleaned.replace(/\{\s*|\s*\}/g, '');
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    return cleaned.trim();
+  };
+
+  const ensureScriptFrameForPlugin = (pluginId: string, script: string) => {
+    const plugin = storyboardModalStates.find(modal => modal.id === pluginId);
+    if (!plugin) return;
+    const offset = (plugin.frameWidth || 400) + 60;
+    const frameWidth = plugin.frameWidth || 360;
+    const frameHeight = 260;
+    const frameId = `script-${pluginId}`;
+    const frameX = (plugin.x ?? 0) + offset;
+    const frameY = plugin.y ?? 0;
+
+    setScriptFrameModalStates(prev => {
+      const existing = prev.find(frame => frame.pluginId === pluginId);
+      if (existing) {
+        if (
+          existing.text === script &&
+          existing.x === frameX &&
+          existing.y === frameY &&
+          existing.frameWidth === frameWidth &&
+          existing.frameHeight === frameHeight
+        ) {
+          return prev;
+        }
+
+        // Move persistence call outside of updater
+        return prev.map(frame =>
+          frame.pluginId === pluginId
+            ? { ...frame, text: script, frameWidth, frameHeight }
+            : frame
+        );
+      }
+
+      const newFrame = {
+        id: frameId,
+        pluginId,
+        x: frameX,
+        y: frameY,
+        frameWidth,
+        frameHeight,
+        text: script,
+      };
+      return [...prev, newFrame];
+    });
+
+    // Handle persistence outside of state updater
+    const existingFrame = scriptFrameModalStates.find(frame => frame.pluginId === pluginId);
+    if (existingFrame) {
+      if (existingFrame.text !== script && onPersistScriptFrameModalMove) {
+        Promise.resolve(onPersistScriptFrameModalMove(existingFrame.id, { text: script })).catch(console.error);
+      }
+    } else {
+      const newFrame = {
+        id: frameId,
+        pluginId,
+        x: frameX,
+        y: frameY,
+        frameWidth,
+        frameHeight,
+        text: script,
+      };
+      if (onPersistScriptFrameModalCreate) {
+        Promise.resolve(onPersistScriptFrameModalCreate(newFrame)).catch(console.error);
+      }
+    }
+
+    const existingConnector = (connections ?? []).some(
+      connector => connector.from === pluginId && connector.to === frameId
+    );
+    if (!existingConnector && onPersistConnectorCreate) {
+      Promise.resolve(
+        onPersistConnectorCreate({
+          from: pluginId,
+          to: frameId,
+          color: '#437eb5',
+        })
+      ).catch(console.error);
+    }
+    // Return the frame details so we can use it for chaining
+    return {
+      id: frameId,
+      x: frameX,
+      y: frameY,
+      frameWidth,
+      frameHeight,
+      text: script
+    };
+  };
+
+  const handleTextScriptGenerated = async (textModalId: string, script: string) => {
+    if (!textModalId || !script || !script.trim()) return;
+    const sanitizedScript = sanitizeScriptOutput(script);
+    if (!sanitizedScript) return;
+    const storyboardTargets = (connections ?? [])
+      .filter(conn => conn.from === textModalId)
+      .map(conn => conn.to)
+      .filter(Boolean);
+    if (!storyboardTargets.length) return;
+
+    const storyboardIds = storyboardTargets.filter(targetId =>
+      storyboardModalStates.some(modal => modal.id === targetId)
+    );
+    if (!storyboardIds.length) return;
+
+    setStoryboardModalStates(prev => {
+      let changed = false;
+      const updated = prev.map(modal => {
+        if (storyboardIds.includes(modal.id)) {
+          if ((modal.scriptText || '') !== sanitizedScript) {
+            changed = true;
+            return { ...modal, scriptText: sanitizedScript };
+          }
+        }
+        return modal;
+      });
+      return changed ? updated : prev;
+    });
+
+    for (const id of storyboardIds) {
+      const scriptFrameDetails = ensureScriptFrameForPlugin(id, sanitizedScript);
+
+      if (onPersistStoryboardModalMove) {
+        Promise.resolve(onPersistStoryboardModalMove(id, { scriptText: sanitizedScript })).catch(console.error);
+      }
+
+      // Automatically generate scenes from the story
+      if (scriptFrameDetails) {
+        console.log('[Canvas] Automatically triggering scene generation for script frame:', scriptFrameDetails.id);
+        // Pass details directly to avoid stale state issues
+        handleGenerateScenes(scriptFrameDetails.id, scriptFrameDetails.text, scriptFrameDetails);
+      }
+    }
+  };
+
+  const handleDeleteScriptFrame = (frameId: string) => {
+    setSceneFrameModalStates(prev => prev.filter(frame => frame.scriptFrameId !== frameId));
+    // Note: onPersistSceneFrameModalDelete typically takes a scene frame ID, not script frame ID.
+    // If we want to delete all scenes, we should iterate.
+    // However, for now, let's just clear local state.
+    // If backend persistence is needed for cascading delete, it should be handled there or by iterating here.
+    // Let's iterate over known scene frames for this script frame to delete them properly.
+    const relatedScenes = sceneFrameModalStates.filter(f => f.scriptFrameId === frameId);
+    relatedScenes.forEach(scene => {
+      if (onPersistSceneFrameModalDelete) {
+        Promise.resolve(onPersistSceneFrameModalDelete(scene.id)).catch(console.error);
+      }
+    });
+
+    setScriptFrameModalStates(prev => prev.filter(frame => frame.id !== frameId));
+    if (onPersistScriptFrameModalDelete) {
+      Promise.resolve(onPersistScriptFrameModalDelete(frameId)).catch(console.error);
+    }
+    const frame = scriptFrameModalStates.find(f => f.id === frameId);
+    if (frame) {
+      setStoryboardModalStates(prev =>
+        prev.map(modal => (modal.id === frame.pluginId ? { ...modal, scriptText: null } : modal))
+      );
+      if (onPersistStoryboardModalMove) {
+        Promise.resolve(onPersistStoryboardModalMove(frame.pluginId, { scriptText: null })).catch(console.error);
+      }
+      const relatedConnectors = (connections ?? []).filter(
+        conn => conn.to === frameId || conn.from === frameId
+      );
+      relatedConnectors.forEach(conn => {
+        if (onPersistConnectorDelete && conn.id) {
+          Promise.resolve(onPersistConnectorDelete(conn.id)).catch(console.error);
+        }
+      });
+    }
+  };
+
+  const handleScriptFramePositionChange = (frameId: string, x: number, y: number) => {
+    setScriptFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, x, y } : frame))
+    );
+  };
+
+  const handleScriptFramePositionCommit = (frameId: string, x: number, y: number) => {
+    setScriptFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, x, y } : frame))
+    );
+    if (onPersistScriptFrameModalMove) {
+      Promise.resolve(onPersistScriptFrameModalMove(frameId, { x, y })).catch(console.error);
+    }
+  };
+
+
+
+  // Scene frame handlers
+  const handleGenerateScenes = async (
+    scriptFrameId: string,
+    overrideText?: string,
+    overrideFrame?: { x: number; y: number; frameWidth: number }
+  ) => {
+    const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
+    const textToUse = overrideText || scriptFrame?.text;
+    const frameToUse = overrideFrame || scriptFrame;
+
+    if (!frameToUse || !textToUse) {
+      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+      return;
+    }
+
+    try {
+      // Generate scenes using AI
+      const result = await generateScenesFromStory(textToUse);
+      const scenes = result.scenes || [];
+
+      if (scenes.length === 0) {
+        console.warn('[Canvas] No scenes generated from story');
+        return;
+      }
+
+      console.log(`[Canvas] Generated ${scenes.length} scenes`);
+
+      // Import scene utilities dynamically for positioning
+      const { calculateSceneFramePositions } = await import('@/app/components/Plugins/StoryboardPluginModal/sceneUtils');
+
+      // Calculate positions for scene frames (grid layout to the right of script frame)
+      const positions = calculateSceneFramePositions(
+        frameToUse.x,
+        frameToUse.y,
+        frameToUse.frameWidth,
+        scenes.length,
+        350, // scene frame width
+        300  // scene frame height
+      );
+
+      // Create scene frames
+      const newSceneFrames = scenes.map((scene: any, index: number) => ({
+        id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
+        scriptFrameId: scriptFrameId,
+        sceneNumber: scene.scene_number,
+        x: positions[index].x,
+        y: positions[index].y,
+        frameWidth: 350,
+        frameHeight: 300,
+        content: scene.content,
+      }));
+
+      // Optimistic update
+      setSceneFrameModalStates(prev => {
+        // Filter out any existing frames with same ID to avoid duplicates (though ID has timestamp)
+        const others = prev.filter(p => !newSceneFrames.some(n => n.id === p.id));
+        return [...others, ...newSceneFrames];
+      });
+
+      // Persist new scene frames
+      newSceneFrames.forEach(frame => {
+        if (onPersistSceneFrameModalCreate) {
+          Promise.resolve(onPersistSceneFrameModalCreate(frame)).catch(console.error);
+        }
+      });
+
+      // Create connections from script frame to scene frames
+      const newConnections = newSceneFrames.map(sceneFrame => ({
+        from: scriptFrameId,
+        to: sceneFrame.id,
+        color: '#437eb5', // Standard connection color
+      }));
+
+      // Update connections state and persist
+      if (onPersistConnectorCreate) {
+        newConnections.forEach(conn => {
+          Promise.resolve(onPersistConnectorCreate(conn)).catch(console.error);
+        });
+      }
+
+      // For each scene frame, also create an image modal and connect the scene -> image
+      const newImageModals = newSceneFrames.map(sceneFrame => {
+        const imgX = sceneFrame.x + (sceneFrame.frameWidth || 350) + 60;
+        const imgY = sceneFrame.y;
+        const newId = `image-${Date.now()}-${Math.random()}`;
+        return {
+          id: newId,
+          x: imgX,
+          y: imgY,
+          generatedImageUrl: null,
+          prompt: sceneFrame.content,
+          frameWidth: 600,
+          frameHeight: 400,
+        };
+      });
+
+      // Optimistically add image modals to state
+      if (newImageModals.length > 0) {
+        setImageModalStates(prev => [...prev, ...newImageModals.map(m => ({ id: m.id, x: m.x, y: m.y, generatedImageUrl: m.generatedImageUrl, frameWidth: m.frameWidth, frameHeight: m.frameHeight, prompt: m.prompt }))]);
+      }
+
+      // Persist new image modals and create scene->image connectors
+      newImageModals.forEach((imgModal, idx) => {
+        if (onPersistImageModalCreate) {
+          Promise.resolve(onPersistImageModalCreate({ id: imgModal.id, x: imgModal.x, y: imgModal.y, generatedImageUrl: imgModal.generatedImageUrl, frameWidth: imgModal.frameWidth, frameHeight: imgModal.frameHeight, prompt: imgModal.prompt })).catch(console.error);
+        }
+
+        const sceneFrame = newSceneFrames[idx];
+        if (onPersistConnectorCreate && sceneFrame) {
+          Promise.resolve(onPersistConnectorCreate({ from: sceneFrame.id, to: imgModal.id, color: '#43b56e' })).catch(console.error);
+        }
+      });
+
+      console.log(`[Canvas] Created ${newSceneFrames.length} scene frames`);
+
+    } catch (error) {
+      console.error('[Canvas] Error generating scenes:', error);
+      alert('Failed to generate scenes. Please try again.');
+    }
+  };
+
+  const handleDeleteSceneFrame = (frameId: string) => {
+    setSceneFrameModalStates(prev => prev.filter(frame => frame.id !== frameId));
+    if (onPersistSceneFrameModalDelete) {
+      Promise.resolve(onPersistSceneFrameModalDelete(frameId)).catch(console.error);
+    }
+
+    // Remove connectors related to this scene frame
+    const relatedConnectors = (connections ?? []).filter(
+      conn => conn.to === frameId || conn.from === frameId
+    );
+    relatedConnectors.forEach(conn => {
+      if (onPersistConnectorDelete && conn.id) {
+        Promise.resolve(onPersistConnectorDelete(conn.id)).catch(console.error);
+      }
+    });
+  };
+
+  const handleSceneFramePositionChange = (frameId: string, x: number, y: number) => {
+    setSceneFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, x, y } : frame))
+    );
+  };
+
+  const handleSceneFramePositionCommit = (frameId: string, x: number, y: number) => {
+    setSceneFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, x, y } : frame))
+    );
+    if (onPersistSceneFrameModalMove) {
+      Promise.resolve(onPersistSceneFrameModalMove(frameId, { x, y })).catch(console.error);
+    }
+  };
+
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
   const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
@@ -606,6 +989,173 @@ export const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalVectorizeModals || [])]);
 
+  // Hydrate storyboard modals from external or localStorage
+  useEffect(() => {
+    // If externalStoryboardModals is provided (even if empty), sync to it immediately
+    if (externalStoryboardModals !== undefined) {
+      console.log('[Canvas] Syncing storyboardModalStates with externalStoryboardModals', externalStoryboardModals.length);
+      setStoryboardModalStates(externalStoryboardModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:storyboardModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
+        if (Array.isArray(parsed)) {
+          setStoryboardModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('[Canvas] Failed to load storyboard modals from localStorage', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalStoryboardModals || [])]);
+
+  // Also sync externalStoryboardModals changes to internal state (for real-time updates)
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalStoryboardModals !== undefined && externalStoryboardModals.length === 0) {
+      console.log('[Canvas] Clearing storyboardModalStates (external is empty)');
+      setStoryboardModalStates([]);
+      return;
+    }
+    if (externalStoryboardModals && externalStoryboardModals.length > 0) {
+      setStoryboardModalStates(prev => {
+        const externalIds = new Set(externalStoryboardModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+
+        if (idsMatch) {
+          const allMatch = externalStoryboardModals.every(external => {
+            const prevItem = prev.find(p => p.id === external.id);
+            if (!prevItem) return false;
+            const coordsMatch = prevItem.x === external.x && prevItem.y === external.y;
+            const sizeMatch = (prevItem.frameWidth || 400) === (external.frameWidth || 400) &&
+              (prevItem.frameHeight || 500) === (external.frameHeight || 500);
+            const scriptMatch = (prevItem.scriptText || '') === (external.scriptText || '');
+            return coordsMatch && sizeMatch && scriptMatch;
+          });
+          if (allMatch) {
+            return prev;
+          }
+        }
+
+        return externalStoryboardModals;
+      });
+    }
+  }, [JSON.stringify(externalStoryboardModals || [])]);
+
+  // Hydrate script frame modals from external or localStorage
+  useEffect(() => {
+    if (externalScriptFrameModals !== undefined) {
+      setScriptFrameModalStates(externalScriptFrameModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:scriptFrameModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
+        if (Array.isArray(parsed)) {
+          setScriptFrameModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted script frame modals');
+    }
+  }, [projectId, JSON.stringify(externalScriptFrameModals || [])]);
+
+  // Hydrate scene frame modals from external or localStorage
+  useEffect(() => {
+    console.log('[Canvas] externalSceneFrameModals updated:', externalSceneFrameModals);
+    if (externalSceneFrameModals !== undefined) {
+      setSceneFrameModalStates(prev => {
+        // Merge external with local, preferring local updates for existing frames
+        const merged = externalSceneFrameModals.map(ext => {
+          const local = prev.find(p => p.id === ext.id);
+          return local ? { ...ext, ...local } : ext;
+        });
+        // Add any local-only frames (e.g., newly created but not yet persisted)
+        const localOnly = prev.filter(p => !externalSceneFrameModals.some(e => e.id === p.id));
+        return [...merged, ...localOnly];
+      });
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:sceneFrameModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
+        if (Array.isArray(parsed)) {
+          console.log('[Canvas] Hydrating scene frames from localStorage:', parsed);
+          setSceneFrameModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted scene frame modals');
+    }
+  }, [projectId, JSON.stringify(externalSceneFrameModals || [])]);
+
+  useEffect(() => {
+    setScriptFrameModalStates(prev => {
+      const mapped: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
+      storyboardModalStates.forEach(modal => {
+        const script = sanitizeScriptOutput(modal.scriptText);
+        if (!script) return;
+        const frameId = `script-${modal.id}`;
+        const baseX = (modal.x ?? 0) + (modal.frameWidth || 400) + 60;
+        const baseY = modal.y ?? 0;
+        const existing = prev.find(frame => frame.pluginId === modal.id);
+        if (existing) {
+          mapped.push({
+            ...existing,
+            text: script,
+            // Keep existing position to allow dragging
+            x: existing.x,
+            y: existing.y,
+            frameWidth: modal.frameWidth || existing.frameWidth,
+            frameHeight: existing.frameHeight,
+          });
+        } else {
+          // Only use base position for new frames
+          mapped.push({
+            id: frameId,
+            pluginId: modal.id,
+            x: baseX,
+            y: baseY,
+            frameWidth: modal.frameWidth || 360,
+            frameHeight: 260,
+            text: script,
+          });
+        }
+      });
+      // Also keep any script frames that might not be in the current storyboard list (though they should be deleted if storyboard is deleted)
+      // Actually, if storyboard is deleted, we probably want to delete the script frame too.
+      // The current logic only includes frames for existing storyboards.
+      return mapped;
+    });
+  }, [storyboardModalStates]);
+
+  useEffect(() => {
+    if (!onPersistConnectorCreate) return;
+    scriptFrameModalStates.forEach(frame => {
+      const exists = (connections ?? []).some(conn => conn.from === frame.pluginId && conn.to === frame.id);
+      if (!exists) {
+        Promise.resolve(
+          onPersistConnectorCreate({
+            from: frame.pluginId,
+            to: frame.id,
+            color: '#437eb5',
+          })
+        ).catch(console.error);
+      }
+    });
+  }, [scriptFrameModalStates, connections, onPersistConnectorCreate]);
+
   // Sync external remove bg modals from parent (for hydration/realtime)
   useEffect(() => {
     // Always hydrate from external (backend) first, even if empty
@@ -629,7 +1179,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalRemoveBgModals || [])]);
-  
+
   // Also sync externalRemoveBgModals changes to internal state (for real-time updates)
   // Only sync if externalRemoveBgModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -645,7 +1195,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const externalIds = new Set(externalRemoveBgModals.map(m => m.id));
         const prevIds = new Set(prev.map(m => m.id));
         const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-        
+
         if (idsMatch) {
           // Merge: keep local position updates during drag, but update other properties from external
           const merged = prev.map(prevModal => {
@@ -671,7 +1221,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [JSON.stringify(externalRemoveBgModals || [])]);
-  
+
   // Sync external erase modals from parent (for hydration/realtime)
   useEffect(() => {
     // Always hydrate from external (backend) first, even if empty
@@ -695,7 +1245,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalEraseModals || [])]);
-  
+
   // Also sync externalEraseModals changes to internal state (for real-time updates)
   // Only sync if externalEraseModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -711,7 +1261,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const externalIds = new Set(externalEraseModals.map(m => m.id));
         const prevIds = new Set(prev.map(m => m.id));
         const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-        
+
         if (idsMatch) {
           // Merge: keep local position updates during drag, but update other properties from external
           const merged = prev.map(prevModal => {
@@ -737,7 +1287,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [JSON.stringify(externalEraseModals || [])]);
-  
+
   // Sync external replace modals from parent (for hydration/realtime)
   useEffect(() => {
     // Always hydrate from external (backend) first, even if empty
@@ -761,7 +1311,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalReplaceModals || [])]);
-  
+
   // Also sync externalReplaceModals changes to internal state (for real-time updates)
   // Only sync if externalReplaceModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -777,7 +1327,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const externalIds = new Set(externalReplaceModals.map(m => m.id));
         const prevIds = new Set(prev.map(m => m.id));
         const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-        
+
         if (idsMatch) {
           // Merge: keep local position updates during drag, but update other properties from external
           const merged = prev.map(prevModal => {
@@ -855,7 +1405,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [JSON.stringify(externalExpandModals || [])]);
-  
+
   // Also sync externalUpscaleModals changes to internal state (for real-time updates)
   // Only sync if externalUpscaleModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -871,7 +1421,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const externalIds = new Set(externalUpscaleModals.map(m => m.id));
         const prevIds = new Set(prev.map(m => m.id));
         const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-        
+
         if (idsMatch) {
           // Merge: keep local position updates during drag, but update other properties from external
           const merged = prev.map(prevModal => {
@@ -913,7 +1463,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const externalIds = new Set(externalVectorizeModals.map(m => m.id));
         const prevIds = new Set(prev.map(m => m.id));
         const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-        
+
         if (idsMatch) {
           // Merge: keep local position updates during drag, but update other properties from external
           const merged = prev.map(prevModal => {
@@ -992,6 +1542,19 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [vectorizeModalStates, projectId]);
 
+  // Persist storyboard modals
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:storyboardModals`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(storyboardModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist storyboard modals');
+    }
+  }, [storyboardModalStates, projectId]);
+
   // Persist text input modals to localStorage whenever they change
   useEffect(() => {
     if (!projectId) return;
@@ -1058,7 +1621,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           height: containerRef.current.clientHeight,
         };
         setViewportSize(newSize);
-        
+
         // Center the view on the canvas initially (only once)
         if (!initializedRef.current) {
           initializedRef.current = true;
@@ -1099,7 +1662,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
           ctx.fillStyle = `rgba(0, 0, 0, ${DOT_OPACITY})`;
         }
-        
+
         ctx.beginPath();
         ctx.arc(DOT_SPACING / 2, DOT_SPACING / 2, DOT_SIZE / 2, 0, Math.PI * 2);
         ctx.fill();
@@ -1223,13 +1786,13 @@ export const Canvas: React.FC<CanvasProps> = ({
         setIsSpacePressed(true);
         applyStageCursorWrapper('grab', true);
       }
-      
+
       if (e.shiftKey) {
         setIsShiftPressed(true);
         // Force crosshair while Shift is pressed
         applyStageCursorWrapper('crosshair', true);
       }
-      
+
       // Quick-create shortcuts (keyboard): t = text, i = image, v = video, m = music
       // Only trigger when keyboard focus is not inside an input/textarea/select
       try {
@@ -1327,31 +1890,31 @@ export const Canvas: React.FC<CanvasProps> = ({
           // Don't delete if user is typing in an input field
           return;
         }
-        
+
         // Prevent deletion if editing a group name
         if (document.querySelector('input[data-editing-group="true"]') !== null) {
           return;
         }
-        
+
         e.preventDefault();
-        
+
         // Check if there's a selected region (multiple components)
-        const hasMultipleSelections = selectedImageIndices.length > 0 || 
-                                     selectedTextInputIds.length > 0 || 
-                                     selectedImageModalIds.length > 0 || 
-                                     selectedVideoModalIds.length > 0 || 
-                                     selectedMusicModalIds.length > 0 ||
-                                     (selectedUpscaleModalIds?.length ?? 0) > 0 ||
-                                     (selectedRemoveBgModalIds?.length ?? 0) > 0 ||
-                                     (selectedEraseModalIds?.length ?? 0) > 0 ||
-                                     (selectedReplaceModalIds?.length ?? 0) > 0 ||
-                                     (selectedVectorizeModalIds?.length ?? 0) > 0 ||
-                                     selectedExpandModalIds.length > 0;
-        
+        const hasMultipleSelections = selectedImageIndices.length > 0 ||
+          selectedTextInputIds.length > 0 ||
+          selectedImageModalIds.length > 0 ||
+          selectedVideoModalIds.length > 0 ||
+          selectedMusicModalIds.length > 0 ||
+          (selectedUpscaleModalIds?.length ?? 0) > 0 ||
+          (selectedRemoveBgModalIds?.length ?? 0) > 0 ||
+          (selectedEraseModalIds?.length ?? 0) > 0 ||
+          (selectedReplaceModalIds?.length ?? 0) > 0 ||
+          (selectedVectorizeModalIds?.length ?? 0) > 0 ||
+          selectedExpandModalIds.length > 0;
+
         if (hasMultipleSelections) {
           // Delete all selected components in the region
-          
-          
+
+
           // Delete all selected images
           if (selectedImageIndices.length > 0 && onImageDelete) {
             // Delete in reverse order to maintain correct indices
@@ -1360,7 +1923,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               onImageDelete(index);
             });
           }
-          
+
           // Delete all selected text inputs
           if (selectedTextInputIds.length > 0) {
             // Call persist delete for each text modal and remove locally
@@ -1371,7 +1934,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setTextInputStates(prev => prev.filter(t => !selectedTextInputIds.includes(t.id)));
           }
-          
+
           // Delete all selected image modals
           if (selectedImageModalIds.length > 0) {
             selectedImageModalIds.forEach(id => {
@@ -1381,7 +1944,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setImageModalStates(prev => prev.filter(m => !selectedImageModalIds.includes(m.id)));
           }
-          
+
           // Delete all selected video modals
           if (selectedVideoModalIds.length > 0) {
             selectedVideoModalIds.forEach(id => {
@@ -1391,7 +1954,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setVideoModalStates(prev => prev.filter(m => !selectedVideoModalIds.includes(m.id)));
           }
-          
+
           // Delete all selected music modals
           if (selectedMusicModalIds.length > 0) {
             selectedMusicModalIds.forEach(id => {
@@ -1401,7 +1964,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setMusicModalStates(prev => prev.filter(m => !selectedMusicModalIds.includes(m.id)));
           }
-          
+
           // Delete all selected erase modals
           if (selectedEraseModalIds.length > 0) {
             selectedEraseModalIds.forEach(id => {
@@ -1411,7 +1974,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setEraseModalStates(prev => prev.filter(m => !selectedEraseModalIds.includes(m.id)));
           }
-          
+
           // Delete all selected replace modals
           if (selectedReplaceModalIds.length > 0) {
             selectedReplaceModalIds.forEach(id => {
@@ -1421,7 +1984,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setReplaceModalStates(prev => prev.filter(m => !selectedReplaceModalIds.includes(m.id)));
           }
-          
+
           if (selectedExpandModalIds.length > 0) {
             selectedExpandModalIds.forEach(id => {
               if (onPersistExpandModalDelete) {
@@ -1430,7 +1993,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             });
             setExpandModalStates(prev => prev.filter(m => !selectedExpandModalIds.includes(m.id)));
           }
-          
+
           // Clear all selections
           setSelectedImageIndices([]);
           setSelectedImageIndex(null);
@@ -1450,13 +2013,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedExpandModalId(null);
         } else {
           // Single selection deletion (backward compatibility)
-          
+
           // Delete selected image/video/text element
           if (selectedImageIndex !== null && onImageDelete) {
             onImageDelete(selectedImageIndex);
             setSelectedImageIndex(null);
           }
-          
+
           // Delete selected text input overlay
           if (selectedTextInputId !== null) {
             if (onPersistTextModalDelete) {
@@ -1465,7 +2028,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setTextInputStates(prev => prev.filter(t => t.id !== selectedTextInputId));
             setSelectedTextInputId(null);
           }
-          
+
           // Delete selected image modal
           if (selectedImageModalId !== null) {
             if (onPersistImageModalDelete) {
@@ -1474,7 +2037,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setImageModalStates(prev => prev.filter(m => m.id !== selectedImageModalId));
             setSelectedImageModalId(null);
           }
-          
+
           // Delete selected video modal
           if (selectedVideoModalId !== null) {
             if (onPersistVideoModalDelete) {
@@ -1483,7 +2046,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setVideoModalStates(prev => prev.filter(m => m.id !== selectedVideoModalId));
             setSelectedVideoModalId(null);
           }
-          
+
           // Delete selected music modal
           if (selectedMusicModalId !== null) {
             if (onPersistMusicModalDelete) {
@@ -1492,7 +2055,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
             setSelectedMusicModalId(null);
           }
-          
+
           // Delete selected erase modal
           if (selectedEraseModalId !== null) {
             if (onPersistEraseModalDelete) {
@@ -1501,7 +2064,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setEraseModalStates(prev => prev.filter(m => m.id !== selectedEraseModalId));
             setSelectedEraseModalId(null);
           }
-          
+
           // Delete selected replace modal
           if (selectedReplaceModalId !== null) {
             if (onPersistReplaceModalDelete) {
@@ -1510,7 +2073,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setReplaceModalStates(prev => prev.filter(m => m.id !== selectedReplaceModalId));
             setSelectedReplaceModalId(null);
           }
-          
+
           if (selectedExpandModalId !== null) {
             if (onPersistExpandModalDelete) {
               Promise.resolve(onPersistExpandModalDelete(selectedExpandModalId)).catch(console.error);
@@ -1519,13 +2082,13 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedExpandModalId(null);
           }
         }
-        
+
         // Clear selection box and tight rect when Delete is pressed
         setSelectionBox(null);
         setSelectionTightRect(null);
         setIsDragSelection(false);
       }
-      
+
       // Handle Ctrl/Cmd + A = Select All components on canvas
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.repeat) {
         // Avoid when typing in inputs
@@ -1626,11 +2189,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (any) {
           const width = maxX - minX;
           const height = maxY - minY;
-          setSelectionTightRect({ 
-            x: minX, 
-            y: minY, 
-            width: Math.max(1, width), 
-            height: Math.max(1, height) 
+          setSelectionTightRect({
+            x: minX,
+            y: minY,
+            width: Math.max(1, width),
+            height: Math.max(1, height)
           });
           setIsDragSelection(true);
         } else {
@@ -1732,11 +2295,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           if (found) {
             const width = maxX - minX;
             const height = maxY - minY;
-            return { 
-              x: minX, 
-              y: minY, 
-              width: Math.max(1, width), 
-              height: Math.max(1, height) 
+            return {
+              x: minX,
+              y: minY,
+              width: Math.max(1, width),
+              height: Math.max(1, height)
             };
           }
 
@@ -1856,7 +2419,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         }
       }
-      
+
       if (!e.shiftKey) {
         setIsShiftPressed(false);
         const stage = stageRef.current;
@@ -1882,42 +2445,42 @@ export const Canvas: React.FC<CanvasProps> = ({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [selectedTool, isPanning, selectedImageIndex, selectedImageIndices, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete, onImageUpdate]);
-  
+
   // Handle clicks outside modal components to clear selections
   useEffect(() => {
     let mouseDownTarget: HTMLElement | null = null;
     let mouseDownTime = 0;
     let mouseDownPos: { x: number; y: number } | null = null;
-    
+
     const handleMouseDown = (e: MouseEvent) => {
       mouseDownTarget = e.target as HTMLElement;
       mouseDownTime = Date.now();
       mouseDownPos = { x: e.clientX, y: e.clientY };
     };
-    
+
     const handleMouseUp = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const timeDiff = Date.now() - mouseDownTime;
       const mouseUpPos = { x: e.clientX, y: e.clientY };
-      
+
       // Calculate if it was a drag (moved more than 5 pixels)
       const wasDrag = mouseDownPos && (
         Math.abs(mouseUpPos.x - mouseDownPos.x) > 5 ||
         Math.abs(mouseUpPos.y - mouseDownPos.y) > 5
       );
-      
+
       // Only clear if it was a click (not a drag) - check if target is same and time is short and no movement
       const wasClick = mouseDownTarget === target && timeDiff < 200 && !wasDrag;
-      
+
       // Don't clear if we're in the middle of a selection drag or if it was a drag
       if (isSelecting || wasDrag) {
         mouseDownTarget = null;
         mouseDownPos = null;
         return;
       }
-      
+
       // Check if click is inside any modal component
-      const isInsideModal = 
+      const isInsideModal =
         target.closest('[data-modal-component]') !== null ||
         target.closest('.controls-overlay') !== null ||
         target.closest('.text-input-header') !== null ||
@@ -1926,10 +2489,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         target.tagName === 'SELECT' ||
         target.tagName === 'BUTTON' ||
         target.closest('button') !== null;
-      
+
       // Check if click is on Konva canvas (canvas element) - let Konva handle it completely
       const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
-      
+
       // If click is outside all modals, clear selections
       // Note: Konva stage clicks are handled by handleStageMouseDown, but we also handle container background clicks here
       if (wasClick && !isInsideModal && containerRef.current) {
@@ -1937,7 +2500,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const rect = container.getBoundingClientRect();
         const clickX = e.clientX;
         const clickY = e.clientY;
-        
+
         // Check if click is inside the container (but not on canvas - canvas is handled by handleStageMouseDown)
         const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
         if (!isOnKonvaCanvas) {
@@ -1953,7 +2516,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
         // If click is on canvas, handleStageMouseDown will handle it
       }
-      
+
       mouseDownTarget = null;
       mouseDownPos = null;
     };
@@ -1965,7 +2528,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isSelecting, clearAllSelections]);
-  
+
   // Handle selection box mouse move
   useEffect(() => {
     if (!isSelecting || !selectionBox) return;
@@ -2007,14 +2570,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Store selection box in canvas coordinates so it stays consistent across zoom/pan
         const canvasX = (pointerPos.x - position.x) / scale;
         const canvasY = (pointerPos.y - position.y) / scale;
-        
+
         // Update ref immediately for mouse up handler
         latestCoordsRef.currentX = canvasX;
         latestCoordsRef.currentY = canvasY;
-        
+
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
-        
+
         // Schedule update using requestAnimationFrame for smooth performance
         if (rafId === null) {
           rafId = requestAnimationFrame(updateSelectionBox);
@@ -2044,7 +2607,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // Ensure stage is not draggable
       stage.draggable(false);
-      
+
       // Reset cursor to default for cursor tool or after Shift selection
       if (selectedTool === 'cursor') {
         applyStageCursorWrapper('default');
@@ -2074,12 +2637,12 @@ export const Canvas: React.FC<CanvasProps> = ({
           width: Math.abs(currentBox.currentX - currentBox.startX),
           height: Math.abs(currentBox.currentY - currentBox.startY),
         };
-        
+
         // Check if selection box was actually dragged (not just clicked)
         const boxWidth = marqueeRect.width;
         const boxHeight = marqueeRect.height;
         const wasDragged = boxWidth > 5 || boxHeight > 5;
-        
+
         if (wasDragged) {
           // Find all items that intersect with the marquee using Konva's intersection utility
           const selectedIndices: number[] = [];
@@ -2087,16 +2650,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           const selectedVideoModalIdsList: string[] = [];
           const selectedMusicModalIdsList: string[] = [];
           const selectedTextInputIdsList: string[] = [];
-          
+
           // Check images and videos (skip 3D models)
           images.forEach((img, index) => {
             if (img.type === 'model3d') return;
-            
+
             const imgX = img.x || 0;
             const imgY = img.y || 0;
             const imgWidth = img.width || 0;
             const imgHeight = img.height || 0;
-            
+
             // For text, estimate dimensions
             let width = imgWidth;
             let height = imgHeight;
@@ -2105,7 +2668,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               width = (img.text || '').length * fontSize * 0.6;
               height = fontSize * 1.2;
             }
-            
+
             // Create bounding box for the item
             const itemRect = {
               x: imgX,
@@ -2113,14 +2676,14 @@ export const Canvas: React.FC<CanvasProps> = ({
               width: width,
               height: height,
             };
-            
+
             // Check if component overlaps with selection box (even partially)
             // Select if ANY part of the component is inside the selection box
             const componentRight = itemRect.x + itemRect.width;
             const componentBottom = itemRect.y + itemRect.height;
             const marqueeRight = marqueeRect.x + marqueeRect.width;
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
-            
+
             // Check if rectangles overlap (any intersection)
             const overlaps = !(
               componentRight < marqueeRect.x ||
@@ -2128,12 +2691,12 @@ export const Canvas: React.FC<CanvasProps> = ({
               componentBottom < marqueeRect.y ||
               itemRect.y > marqueeBottom
             );
-            
+
             if (overlaps) {
               selectedIndices.push(index);
             }
           });
-          
+
           // Check image modals (600px wide, aspect ratio height, typically 400px+ min height)
           imageModalStates.forEach((modal) => {
             const modalX = modal.x;
@@ -2151,19 +2714,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             const modalBottom = modalRect.y + modalRect.height;
             const marqueeRight = marqueeRect.x + marqueeRect.width;
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
-            
+
             const overlaps = !(
               modalRight < marqueeRect.x ||
               modalRect.x > marqueeRight ||
               modalBottom < marqueeRect.y ||
               modalRect.y > marqueeBottom
             );
-            
+
             if (overlaps) {
               selectedImageModalIdsList.push(modal.id);
             }
           });
-          
+
           // Check video modals (600px wide, aspect ratio height, typically 400px+ min height)
           videoModalStates.forEach((modal) => {
             const modalX = modal.x;
@@ -2181,19 +2744,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             const modalBottom = modalRect.y + modalRect.height;
             const marqueeRight = marqueeRect.x + marqueeRect.width;
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
-            
+
             const overlaps = !(
               modalRight < marqueeRect.x ||
               modalRect.x > marqueeRight ||
               modalBottom < marqueeRect.y ||
               modalRect.y > marqueeBottom
             );
-            
+
             if (overlaps) {
               selectedVideoModalIdsList.push(modal.id);
             }
           });
-          
+
           // Check music modals (600px wide, 300px high)
           musicModalStates.forEach((modal) => {
             const modalX = modal.x;
@@ -2211,19 +2774,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             const modalBottom = modalRect.y + modalRect.height;
             const marqueeRight = marqueeRect.x + marqueeRect.width;
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
-            
+
             const overlaps = !(
               modalRight < marqueeRect.x ||
               modalRect.x > marqueeRight ||
               modalBottom < marqueeRect.y ||
               modalRect.y > marqueeBottom
             );
-            
+
             if (overlaps) {
               selectedMusicModalIdsList.push(modal.id);
             }
           });
-          
+
           // Check text input modals (400px+ wide, variable height, typically 200px+ with controls)
           textInputStates.forEach((textState) => {
             const textX = textState.x;
@@ -2241,24 +2804,24 @@ export const Canvas: React.FC<CanvasProps> = ({
             const textBottom = textRect.y + textRect.height;
             const marqueeRight = marqueeRect.x + marqueeRect.width;
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
-            
+
             const overlaps = !(
               textRight < marqueeRect.x ||
               textRect.x > marqueeRight ||
               textBottom < marqueeRect.y ||
               textRect.y > marqueeBottom
             );
-            
+
             if (overlaps) {
               selectedTextInputIdsList.push(textState.id);
             }
           });
-          
+
           // Handle selection with modifier keys (Shift/Ctrl/Cmd)
-          const isModifierPressed = (window.event as MouseEvent)?.shiftKey || 
-                                    (window.event as MouseEvent)?.ctrlKey || 
-                                    (window.event as MouseEvent)?.metaKey;
-          
+          const isModifierPressed = (window.event as MouseEvent)?.shiftKey ||
+            (window.event as MouseEvent)?.ctrlKey ||
+            (window.event as MouseEvent)?.metaKey;
+
           if (isModifierPressed) {
             // Union: add to existing selection
             setSelectedImageIndices(prev => {
@@ -2303,19 +2866,19 @@ export const Canvas: React.FC<CanvasProps> = ({
               setSelectedTextInputId(null);
             }
           }
-          
+
           // Compute tight bounding rect around selected items (remove extra area)
           // Include both canvas images and modals
-          const totalSelected = selectedIndices.length + selectedImageModalIdsList.length + 
-                               selectedVideoModalIdsList.length + selectedMusicModalIdsList.length + 
-                               selectedTextInputIdsList.length;
-          
+          const totalSelected = selectedIndices.length + selectedImageModalIdsList.length +
+            selectedVideoModalIdsList.length + selectedMusicModalIdsList.length +
+            selectedTextInputIdsList.length;
+
           if (totalSelected > 0) {
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
             let maxY = -Infinity;
-            
+
             // Include canvas images
             selectedIndices.forEach((idx) => {
               const it = images[idx];
@@ -2334,7 +2897,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               maxX = Math.max(maxX, ix + iw);
               maxY = Math.max(maxY, iy + ih);
             });
-            
+
             // Include image modals
             // Image modals: 600px wide, height = max(400px, 600px / aspectRatio)
             // The frame has minHeight: 400px, but actual height varies by aspect ratio
@@ -2360,7 +2923,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 maxY = Math.max(maxY, modal.y + modalHeight);
               }
             });
-            
+
             // Include video modals
             // Video modals: 600px wide, height = max(400px, 600px / aspectRatio)
             // Default aspect ratio is 16:9, so height = max(400px, 600/(16/9)) = max(400px, 337.5px) = 400px
@@ -2380,7 +2943,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 maxY = Math.max(maxY, modal.y + modalHeight);
               }
             });
-            
+
             // Include music modals
             // Music modals: 600px wide, 300px height (fixed) - this is the frame height
             selectedMusicModalIdsList.forEach((id) => {
@@ -2394,7 +2957,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 maxY = Math.max(maxY, modal.y + modalHeight);
               }
             });
-            
+
             // Include text input modals
             // Text inputs: min 400px width, height is variable based on content
             // Structure: drag handle (~4px) + padding top (~12px) + textarea (min 80px) + padding bottom (~12px) + buttons (~32px)
@@ -2415,13 +2978,13 @@ export const Canvas: React.FC<CanvasProps> = ({
                 maxY = Math.max(maxY, textState.y + textHeight);
               }
             });
-            
+
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
               // Calculate tight rect - ensure we're using the actual bounds
               // The calculation should already be tight
               const width = maxX - minX;
               const height = maxY - minY;
-              
+
               setSelectionTightRect({
                 x: minX,
                 y: minY,
@@ -2445,9 +3008,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         } else {
           // Just a click, clear selection if not clicking on an element and no modifier
-          const isModifierPressed = (window.event as MouseEvent)?.shiftKey || 
-                                    (window.event as MouseEvent)?.ctrlKey || 
-                                    (window.event as MouseEvent)?.metaKey;
+          const isModifierPressed = (window.event as MouseEvent)?.shiftKey ||
+            (window.event as MouseEvent)?.ctrlKey ||
+            (window.event as MouseEvent)?.metaKey;
           if (!isModifierPressed) {
             setSelectedImageIndices([]);
             setSelectedImageIndex(null);
@@ -2461,7 +3024,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         }
       }
-      
+
       setIsSelecting(false);
       // Keep selection box visible after mouse up - it will be cleared when Delete is pressed or when starting a new selection
     };
@@ -2485,29 +3048,29 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (transformerRef.current && selectedImageIndices.length > 0) {
       const stage = stageRef.current;
       if (!stage) return;
-      
+
       const layer = layerRef.current;
       if (!layer) return;
-      
+
       // Find all selected nodes by matching image indices
       const nodes: Konva.Node[] = [];
       selectedImageIndices.forEach((index) => {
         const imageData = images[index];
         if (!imageData || imageData.type === 'model3d') return;
-        
+
         // Skip uploaded images (blob URLs, Zata input URLs, or direct file uploads) - disable resize for them
         // Uploaded images should have static frame size like generation frames
-        const isUploaded = 
+        const isUploaded =
           imageData.file || // Direct file upload
           (imageData.url && (
-            imageData.url.toLowerCase().startsWith('blob:') || 
+            imageData.url.toLowerCase().startsWith('blob:') ||
             imageData.url.toLowerCase().includes('/input/') ||
             (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
           ));
         if (isUploaded) {
           return; // Skip this image - don't attach Transformer (no resize handles)
         }
-        
+
         // First try to find node by name (more reliable)
         const nodeByName = layer.findOne(`canvas-image-${index}`);
         if (nodeByName && nodeByName instanceof Konva.Group) {
@@ -2517,14 +3080,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         } else {
           // Fallback: Find the node by looking for Groups that match the image position
           // Use a larger tolerance to account for position updates after drag
-        const allNodes = layer.getChildren();
-        allNodes.forEach((node: Konva.Node) => {
-          if (node instanceof Konva.Group) {
-            const nodeX = node.x();
-            const nodeY = node.y();
-            const imgX = imageData.x || 0;
-            const imgY = imageData.y || 0;
-            
+          const allNodes = layer.getChildren();
+          allNodes.forEach((node: Konva.Node) => {
+            if (node instanceof Konva.Group) {
+              const nodeX = node.x();
+              const nodeY = node.y();
+              const imgX = imageData.x || 0;
+              const imgY = imageData.y || 0;
+
               // Match by position (with larger tolerance to handle position updates)
               const tolerance = 10; // Increased from 1 to handle position updates
               if (Math.abs(nodeX - imgX) < tolerance && Math.abs(nodeY - imgY) < tolerance) {
@@ -2537,11 +3100,11 @@ export const Canvas: React.FC<CanvasProps> = ({
                   nodes.push(node);
                 }
               }
-          }
-        });
+            }
+          });
         }
       });
-      
+
       if (nodes.length > 0) {
         transformerRef.current.nodes(nodes);
         transformerRef.current.getLayer()?.batchDraw();
@@ -2561,9 +3124,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     const target = e.target;
     const stage = target.getStage();
     // More comprehensive check for empty clicks - includes Stage, Layer, and background Rect
-    const clickedOnEmpty = target === stage || 
-      target.getClassName() === 'Stage' || 
-      target.getClassName() === 'Layer' || 
+    const clickedOnEmpty = target === stage ||
+      target.getClassName() === 'Stage' ||
+      target.getClassName() === 'Layer' ||
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
     // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool or Shift)
     const isMoveTool = selectedTool === 'move';
@@ -2573,16 +3136,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Shift + Left Click is for selection, not panning
     const isShiftSelection = e.evt.shiftKey && e.evt.button === 0;
     const clickedOnElement = !clickedOnEmpty;
-    
+
     // Check if clicking on a resize handle - if so, don't clear selection
     // Resize handles have a name attribute "resize-handle"
     const isResizeHandle = target.name() === 'resize-handle';
-    
+
     // Clear selections when clicking on empty space (but not on resize handles)
     // Don't clear if we're starting a selection box with cursor tool or Shift + Left Click
     // NOTE: Selection box is NOT cleared here - it only clears on Delete key or when starting a new selection
     const isStartingSelection = (isCursorTool || isShiftSelection) && !isPanKey && e.evt.button === 0;
-    
+
     // Check if click is inside the selection area (selectionTightRect or selectionBox)
     let isInsideSelection = false;
     if (stage) {
@@ -2593,7 +3156,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           x: (pointerPos.x - position.x) / scale,
           y: (pointerPos.y - position.y) / scale,
         };
-        
+
         // Check if click is inside selectionTightRect
         if (selectionTightRect) {
           const rect = selectionTightRect;
@@ -2606,7 +3169,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             isInsideSelection = true;
           }
         }
-        
+
         // Check if click is inside selectionBox (if no tightRect yet)
         if (!isInsideSelection && selectionBox) {
           const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
@@ -2624,10 +3187,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       }
     }
-    
+
     // Check if we're editing a group name (input is focused)
     const isEditingGroup = document.querySelector('input[data-editing-group="true"]') !== null;
-    
+
     // Clear selections when clicking on empty canvas space
     // Only skip clearing if:
     // 1. We're clicking on a resize handle
@@ -2647,13 +3210,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     }
     // If click is inside selection area, do nothing - keep selections
-    
+
     // Store mouse down position to detect drag vs click
     const pointerPos = e.target.getStage()?.getPointerPosition();
     if (pointerPos) {
       setMouseDownPos({ x: pointerPos.x, y: pointerPos.y });
     }
-    
+
     // If text tool is selected and clicking on empty space, create text input
     if (selectedTool === 'text' && clickedOnEmpty && !isPanKey) {
       const stage = e.target.getStage();
@@ -2668,17 +3231,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             const canvasX = (pointerPos.x - position.x) / scale;
             const canvasY = (pointerPos.y - position.y) / scale;
             const newId = `text-${Date.now()}-${Math.random()}`;
-              const newModal = { id: newId, x: canvasX, y: canvasY, autoFocusInput: true };
-              setTextInputStates(prev => [...prev, newModal]);
-              if (onPersistTextModalCreate) {
-                Promise.resolve(onPersistTextModalCreate(newModal)).catch(console.error);
-              }
+            const newModal = { id: newId, x: canvasX, y: canvasY, autoFocusInput: true };
+            setTextInputStates(prev => [...prev, newModal]);
+            if (onPersistTextModalCreate) {
+              Promise.resolve(onPersistTextModalCreate(newModal)).catch(console.error);
+            }
           }
         }
       }
       return;
     }
-    
+
     // If Shift + Left Click, prepare marquee selection but defer creating the
     // visible selection box until the pointer actually moves a few pixels.
     if (isShiftSelection && clickedOnEmpty) {
@@ -2691,13 +3254,13 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Clear previous selection visuals (but keep group selections)
         setSelectionBox(null);
         {
-        setSelectionTightRect(null);
-        setIsDragSelection(false);
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
         }
       }
       return;
     }
-    
+
     // If move tool is selected, always enable panning
     if (isMoveTool && clickedOnEmpty && e.evt.button === 0) {
       const stage = e.target.getStage();
@@ -2708,7 +3271,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
       return;
     }
-    
+
     // If cursor tool is selected, prepare marquee selection but defer creating
     // the visible selection box until the pointer moves beyond a small threshold.
     if (isCursorTool && e.evt.button === 0) {
@@ -2720,18 +3283,18 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectionBox(null);
           // Don't clear selection box if it's a group - groups persist
           {
-          setSelectionTightRect(null);
-          setIsDragSelection(false);
+            setSelectionTightRect(null);
+            setIsDragSelection(false);
           }
         }
         return;
       }
     }
-    
+
     // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
     // Shift should NEVER pan - only selection
     const shouldPan = isPanKey && !isShiftSelection;
-    
+
     // Default behavior: only pan when Move tool is active or a pan key/middle mouse is used.
     // For other tools (image/video/music/text), left-drag should start selection, not panning.
     if (clickedOnEmpty && e.evt.button === 0 && !isShiftSelection && (isMoveTool || isPanKey)) {
@@ -2743,7 +3306,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
       return;
     }
-    
+
     if (shouldPan) {
       const stage = e.target.getStage();
       if (stage) {
@@ -2776,7 +3339,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       const moveThreshold = 5; // pixels
       const distance = Math.sqrt(
-        Math.pow(e.clientX - mouseDownPos.x, 2) + 
+        Math.pow(e.clientX - mouseDownPos.x, 2) +
         Math.pow(e.clientY - mouseDownPos.y, 2)
       );
 
@@ -2864,34 +3427,34 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     const target = e.target;
-    
+
     // Check if this was a click on empty canvas (not a drag)
-    const clickedOnEmpty = target === stage || 
-      target.getClassName() === 'Stage' || 
-      target.getClassName() === 'Layer' || 
+    const clickedOnEmpty = target === stage ||
+      target.getClassName() === 'Stage' ||
+      target.getClassName() === 'Layer' ||
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
-    
+
     // If it was a click (not a drag) on empty space and no selection box was created, clear selections
     // This handles the case where user clicks on empty canvas to deselect
     if (clickedOnEmpty && !isSelecting && !selectionBox) {
       // Only clear if we have selections and this was just a click (not part of a drag operation)
-      const hasSelections = selectedImageIndex !== null || 
-        selectedImageModalId !== null || 
-        selectedVideoModalId !== null || 
-        selectedMusicModalId !== null || 
+      const hasSelections = selectedImageIndex !== null ||
+        selectedImageModalId !== null ||
+        selectedVideoModalId !== null ||
+        selectedMusicModalId !== null ||
         selectedTextInputId !== null ||
         selectedImageIndices.length > 0 ||
         selectedImageModalIds.length > 0 ||
         selectedVideoModalIds.length > 0 ||
         selectedMusicModalIds.length > 0 ||
         selectedTextInputIds.length > 0;
-      
+
       if (hasSelections) {
         clearAllSelections(true);
       }
     }
-    
-      if (stage) {
+
+    if (stage) {
       setIsPanning(false);
       setIsDraggingFromElement(false);
       setMouseDownPos(null);
@@ -2956,18 +3519,18 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Wrapper for onImageUpdate
   const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
-              if (onImageUpdate) {
+    if (onImageUpdate) {
       onImageUpdate(index, updates);
-              }
+    }
     // Update real-time position for action icons during drag
     if (updates.x !== undefined || updates.y !== undefined) {
       if (index === selectedImageIndex) {
         setSelectedImageRealTimePosition({
           x: updates.x !== undefined ? updates.x : (images[index]?.x || 0),
           y: updates.y !== undefined ? updates.y : (images[index]?.y || 0),
-                });
-              }
-            }
+        });
+      }
+    }
     // Force Transformer re-attachment after position updates
     if (updates.x !== undefined || updates.y !== undefined) {
       // Small delay to ensure DOM is updated
@@ -2997,7 +3560,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (containerRef.current) {
       containerRef.current.style.backgroundColor = '';
     }
@@ -3007,7 +3570,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       const mediaData = e.dataTransfer.getData('application/json');
       if (mediaData) {
         const data = JSON.parse(mediaData);
-        
+
         // Check if it's a plugin drop
         if (data && data.type === 'plugin' && data.plugin) {
           // Calculate canvas coordinates from drop position
@@ -3016,12 +3579,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             // Get drop position relative to container
             const dropX = e.clientX - rect.left;
             const dropY = e.clientY - rect.top;
-            
+
             // Convert screen coordinates to canvas coordinates
             // Account for stage position and scale
             const canvasX = (dropX - position.x) / scale;
             const canvasY = (dropY - position.y) / scale;
-            
+
             // Create upscale modal at drop position
             if (data.plugin.id === 'upscale' && onPersistUpscaleModalCreate) {
               const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -3125,7 +3688,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             return;
           }
         }
-        
+
         // Check if it's a valid media item from library
         if (data && data.url && (data.type === 'image' || data.type === 'video' || data.type === 'music' || data.type === 'uploaded')) {
           // Calculate canvas coordinates from drop position
@@ -3134,12 +3697,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             // Get drop position relative to container
             const dropX = e.clientX - rect.left;
             const dropY = e.clientY - rect.top;
-            
+
             // Convert screen coordinates to canvas coordinates
             // Account for stage position and scale
             const canvasX = (dropX - position.x) / scale;
             const canvasY = (dropY - position.y) / scale;
-            
+
             if (onLibraryMediaDrop) {
               onLibraryMediaDrop(data, canvasX, canvasY);
             }
@@ -3154,19 +3717,19 @@ export const Canvas: React.FC<CanvasProps> = ({
     const files = Array.from(e.dataTransfer.files).filter((file) => {
       const fileName = file.name.toLowerCase();
       const fileType = file.type.toLowerCase();
-      
+
       // Check by MIME type
       if (fileType.startsWith('image/') || fileType.startsWith('video/')) {
         return true;
       }
-      
+
       // Check by file extension
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tif', '.tiff'];
       const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'];
       const modelExtensions = ['.obj', '.gltf', '.glb'];
-      return imageExtensions.some(ext => fileName.endsWith(ext)) || 
-             videoExtensions.some(ext => fileName.endsWith(ext)) ||
-             modelExtensions.some(ext => fileName.endsWith(ext));
+      return imageExtensions.some(ext => fileName.endsWith(ext)) ||
+        videoExtensions.some(ext => fileName.endsWith(ext)) ||
+        modelExtensions.some(ext => fileName.endsWith(ext));
     });
 
     if (files.length > 0 && onImagesDrop) {
@@ -3195,14 +3758,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         onMouseUp={handleStageMouseUp}
         onDragMove={handleStageDragMove}
         onDragEnd={handleStageDragEnd}
-        style={{ 
-          cursor: selectedTool === 'text' 
-            ? 'text' 
+        style={{
+          cursor: selectedTool === 'text'
+            ? 'text'
             : selectedTool === 'move'
               ? (isPanning ? 'grabbing' : 'grab')
-              : selectedTool === 'cursor' 
+              : selectedTool === 'cursor'
                 ? (isSelecting ? 'crosshair' : 'crosshair')
-                : 'grab' 
+                : 'grab'
         }}
       >
         <Layer ref={layerRef}>
@@ -3223,56 +3786,56 @@ export const Canvas: React.FC<CanvasProps> = ({
             .map((imageData, index) => {
               const actualIndex = images.findIndex(img => img === imageData);
               return (
-              <CanvasImage 
-                key={`${imageData.url}-${index}`} 
-                imageData={imageData}
-                index={actualIndex}
-                stageRef={stageRef}
-                position={position}
-                scale={scale}
-                onUpdate={(updates) => {
-                  handleImageUpdateWithGroup(actualIndex, updates);
-                  // Clear real-time position when drag ends (when position is not being updated)
-                  if (updates.x === undefined && updates.y === undefined) {
-                    // Delay clearing to ensure final position is set
-                    setTimeout(() => {
-                      setSelectedImageRealTimePosition(null);
-                    }, 150);
-                  }
-                }}
-                onSelect={(e?: { ctrlKey?: boolean; metaKey?: boolean }) => {
-                  
-                  const isMultiSelect = e?.ctrlKey || e?.metaKey;
-                  if (isMultiSelect) {
-                    // Add to selection if not already selected, remove if selected
-                    setSelectedImageIndices(prev => {
-                      if (prev.includes(actualIndex)) {
-                        const newIndices = prev.filter(i => i !== actualIndex);
-                        setSelectedImageIndex(newIndices.length > 0 ? newIndices[0] : null);
-                        return newIndices;
-                      } else {
-                        const newIndices = [...prev, actualIndex];
-                        setSelectedImageIndex(actualIndex);
-                        return newIndices;
-                      }
-                    });
-                  } else {
-                    // Single select - clear all other selections first
-                    clearAllSelections();
-                    // Then set this image as selected
-                    setSelectedImageIndices([actualIndex]);
-                    setSelectedImageIndex(actualIndex);
-                  }
-                }}
-                isSelected={selectedImageIndices.includes(actualIndex)}
-                onDelete={() => {
-                  if (onImageDelete) {
-                    onImageDelete(actualIndex);
-                  }
-                  setSelectedImageIndex(null);
-                  setSelectedImageIndices([]);
-                }}
-              />
+                <CanvasImage
+                  key={`${imageData.url}-${index}`}
+                  imageData={imageData}
+                  index={actualIndex}
+                  stageRef={stageRef}
+                  position={position}
+                  scale={scale}
+                  onUpdate={(updates) => {
+                    handleImageUpdateWithGroup(actualIndex, updates);
+                    // Clear real-time position when drag ends (when position is not being updated)
+                    if (updates.x === undefined && updates.y === undefined) {
+                      // Delay clearing to ensure final position is set
+                      setTimeout(() => {
+                        setSelectedImageRealTimePosition(null);
+                      }, 150);
+                    }
+                  }}
+                  onSelect={(e?: { ctrlKey?: boolean; metaKey?: boolean }) => {
+
+                    const isMultiSelect = e?.ctrlKey || e?.metaKey;
+                    if (isMultiSelect) {
+                      // Add to selection if not already selected, remove if selected
+                      setSelectedImageIndices(prev => {
+                        if (prev.includes(actualIndex)) {
+                          const newIndices = prev.filter(i => i !== actualIndex);
+                          setSelectedImageIndex(newIndices.length > 0 ? newIndices[0] : null);
+                          return newIndices;
+                        } else {
+                          const newIndices = [...prev, actualIndex];
+                          setSelectedImageIndex(actualIndex);
+                          return newIndices;
+                        }
+                      });
+                    } else {
+                      // Single select - clear all other selections first
+                      clearAllSelections();
+                      // Then set this image as selected
+                      setSelectedImageIndices([actualIndex]);
+                      setSelectedImageIndex(actualIndex);
+                    }
+                  }}
+                  isSelected={selectedImageIndices.includes(actualIndex)}
+                  onDelete={() => {
+                    if (onImageDelete) {
+                      onImageDelete(actualIndex);
+                    }
+                    setSelectedImageIndex(null);
+                    setSelectedImageIndices([]);
+                  }}
+                />
               );
             })}
           {/* Text Elements */}
@@ -3325,20 +3888,20 @@ export const Canvas: React.FC<CanvasProps> = ({
             const hasResizableImage = selectedImageIndices.some(idx => {
               const img = images[idx];
               if (!img || img.type === 'model3d') return false;
-              
+
               // Check if it's an uploaded image - if so, disable resize
-              const isUploaded = 
+              const isUploaded =
                 img.file || // Direct file upload
                 (img.url && (
-                  img.url.toLowerCase().startsWith('blob:') || 
+                  img.url.toLowerCase().startsWith('blob:') ||
                   img.url.toLowerCase().includes('/input/') ||
                   (img.url.toLowerCase().includes('upload-') && img.url.toLowerCase().includes('zata.ai'))
                 ));
-              
+
               // Only allow resize for non-uploaded images
               return !isUploaded;
             });
-            
+
             // Only show Transformer if there are resizable images selected
             return hasResizableImage ? (
               <Transformer
@@ -3387,6 +3950,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         replaceModalStates={replaceModalStates}
         expandModalStates={expandModalStates}
         vectorizeModalStates={vectorizeModalStates}
+        storyboardModalStates={storyboardModalStates}
+        scriptFrameModalStates={scriptFrameModalStates}
+        sceneFrameModalStates={sceneFrameModalStates}
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -3407,6 +3973,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedExpandModalIds={selectedExpandModalIds}
         selectedVectorizeModalId={selectedVectorizeModalId}
         selectedVectorizeModalIds={selectedVectorizeModalIds}
+        selectedStoryboardModalId={selectedStoryboardModalId}
+        selectedStoryboardModalIds={selectedStoryboardModalIds}
         clearAllSelections={clearAllSelections}
         setTextInputStates={setTextInputStates}
         setSelectedTextInputId={setSelectedTextInputId}
@@ -3439,8 +4007,15 @@ export const Canvas: React.FC<CanvasProps> = ({
         setVectorizeModalStates={setVectorizeModalStates}
         setSelectedVectorizeModalId={setSelectedVectorizeModalId}
         setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+        setStoryboardModalStates={setStoryboardModalStates}
+        setScriptFrameModalStates={setScriptFrameModalStates}
+        onScriptFramePositionChange={handleScriptFramePositionChange}
+        onScriptFramePositionCommit={handleScriptFramePositionCommit}
+        setSelectedStoryboardModalId={setSelectedStoryboardModalId}
+        setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
         images={images}
         onTextCreate={onTextCreate}
+        onTextScriptGenerated={handleTextScriptGenerated}
         onImageSelect={onImageSelect}
         onImageGenerate={onImageGenerate}
         onVideoSelect={onVideoSelect}
@@ -3489,6 +4064,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistVectorizeModalMove={onPersistVectorizeModalMove}
         onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
         onVectorize={onVectorize}
+        onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
+        onPersistStoryboardModalMove={onPersistStoryboardModalMove}
+        onPersistStoryboardModalDelete={onPersistStoryboardModalDelete}
+        onDeleteScriptFrame={handleDeleteScriptFrame}
         connections={connections}
         onConnectionsChange={onConnectionsChange}
         onPersistConnectorCreate={onPersistConnectorCreate}
@@ -3574,16 +4153,16 @@ export const Canvas: React.FC<CanvasProps> = ({
               const modal = musicModalStates.find(m => m.id === contextMenuModalId);
               urlToDownload = modal?.generatedMusicUrl || null;
             }
-            
+
             if (urlToDownload) {
               // Download the file
               const link = document.createElement('a');
               link.href = urlToDownload;
-              link.download = contextMenuModalType === 'image' 
-                ? `image-${Date.now()}.png` 
+              link.download = contextMenuModalType === 'image'
+                ? `image-${Date.now()}.png`
                 : contextMenuModalType === 'video'
-                ? `video-${Date.now()}.mp4`
-                : `music-${Date.now()}.mp3`;
+                  ? `video-${Date.now()}.mp4`
+                  : `music-${Date.now()}.mp3`;
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);

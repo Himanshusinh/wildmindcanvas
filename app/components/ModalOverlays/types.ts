@@ -138,6 +138,36 @@ export interface VectorizeModalState {
   isVectorizing?: boolean;
 }
 
+export interface StoryboardModalState {
+  id: string;
+  x: number;
+  y: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  scriptText?: string | null;
+}
+
+export interface ScriptFrameModalState {
+  id: string;
+  pluginId: string;
+  x: number;
+  y: number;
+  frameWidth: number;
+  frameHeight: number;
+  text: string;
+}
+
+export interface SceneFrameModalState {
+  id: string;
+  scriptFrameId: string;
+  sceneNumber: number;
+  x: number;
+  y: number;
+  frameWidth: number;
+  frameHeight: number;
+  content: string;
+}
+
 export interface Connection {
   id?: string;
   from: string;
@@ -178,6 +208,9 @@ export interface ModalOverlaysProps {
   replaceModalStates?: ReplaceModalState[];
   expandModalStates?: ExpandModalState[];
   vectorizeModalStates?: VectorizeModalState[];
+  storyboardModalStates?: StoryboardModalState[];
+  scriptFrameModalStates?: ScriptFrameModalState[];
+  sceneFrameModalStates?: SceneFrameModalState[];
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -198,6 +231,8 @@ export interface ModalOverlaysProps {
   selectedExpandModalIds?: string[];
   selectedVectorizeModalId?: string | null;
   selectedVectorizeModalIds?: string[];
+  selectedStoryboardModalId?: string | null;
+  selectedStoryboardModalIds?: string[];
   clearAllSelections: () => void;
   setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
   setSelectedTextInputId: (id: string | null) => void;
@@ -230,10 +265,15 @@ export interface ModalOverlaysProps {
   setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
   setSelectedVectorizeModalId?: (id: string | null) => void;
   setSelectedVectorizeModalIds?: (ids: string[]) => void;
+  setStoryboardModalStates?: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
+  setScriptFrameModalStates?: React.Dispatch<React.SetStateAction<ScriptFrameModalState[]>>;
+  setSelectedStoryboardModalId?: (id: string | null) => void;
+  setSelectedStoryboardModalIds?: (ids: string[]) => void;
   setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
   setIsDragSelection?: (value: boolean) => void;
   images?: ImageUpload[];
   onTextCreate?: (text: string, x: number, y: number) => void;
+  onTextScriptGenerated?: (textModalId: string, script: string) => void;
   onImageSelect?: (file: File) => void;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
@@ -279,6 +319,16 @@ export interface ModalOverlaysProps {
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
+  onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
+  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => void | Promise<void>;
+  onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
+  onDeleteScriptFrame?: (id: string) => void;
+  onScriptFramePositionChange?: (frameId: string, x: number, y: number) => void;
+  onScriptFramePositionCommit?: (frameId: string, x: number, y: number) => void;
+  onGenerateScenes?: (scriptFrameId: string) => void;
+  onDeleteSceneFrame?: (frameId: string) => void;
+  onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
+  onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;

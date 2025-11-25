@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator } from '../types';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -19,6 +19,15 @@ export interface PluginHandlers {
   onPersistVectorizeModalCreate: (modal: VectorizeGenerator) => Promise<void>;
   onPersistVectorizeModalMove: (id: string, updates: Partial<VectorizeGenerator>) => Promise<void>;
   onPersistVectorizeModalDelete: (id: string) => Promise<void>;
+  onPersistStoryboardModalCreate: (modal: StoryboardGenerator) => Promise<void>;
+  onPersistStoryboardModalMove: (id: string, updates: Partial<StoryboardGenerator>) => Promise<void>;
+  onPersistStoryboardModalDelete: (id: string) => Promise<void>;
+  onPersistScriptFrameModalCreate: (modal: ScriptFrameGenerator) => Promise<void>;
+  onPersistScriptFrameModalMove: (id: string, updates: Partial<ScriptFrameGenerator>) => Promise<void>;
+  onPersistScriptFrameModalDelete: (id: string) => Promise<void>;
+  onPersistSceneFrameModalCreate: (modal: SceneFrameGenerator) => Promise<void>;
+  onPersistSceneFrameModalMove: (id: string, updates: Partial<SceneFrameGenerator>) => Promise<void>;
+  onPersistSceneFrameModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
@@ -89,12 +98,12 @@ export function createPluginHandlers(
   const onPersistUpscaleModalMove = async (id: string, updates: Partial<UpscaleGenerator>) => {
     // Capture previous state before update (for inverse op)
     const prev = state.upscaleGenerators.find(m => m.id === id);
-    
+
     // Optimistic update - this triggers the snapshot useEffect
-    setters.setUpscaleGenerators(prevState => 
+    setters.setUpscaleGenerators(prevState =>
       prevState.map(m => m.id === id ? { ...m, ...updates } : m)
     );
-    
+
     // Broadcast via realtime
     if (realtimeActive) {
       realtimeRef.current?.sendUpdate(id, updates as any);
@@ -103,7 +112,7 @@ export function createPluginHandlers(
     if (projectId && opManagerInitialized) {
       // Structure updates correctly: meta fields go under meta, position fields go top-level
       const structuredUpdates: any = {};
-      
+
       // Get existing meta from previous state (fields are stored at top level in state)
       const existingMeta = prev ? {
         upscaledImageUrl: (prev as any).upscaledImageUrl ?? null,
@@ -124,7 +133,7 @@ export function createPluginHandlers(
         frameHeight: 500,
         isUpscaling: false,
       };
-      
+
       // Merge updates into meta
       const metaUpdates = { ...existingMeta };
       for (const k of Object.keys(updates || {})) {
@@ -136,10 +145,10 @@ export function createPluginHandlers(
           structuredUpdates[k] = (updates as any)[k];
         }
       }
-      
+
       // Always include meta in updates (backend does shallow merge)
       structuredUpdates.meta = metaUpdates;
-      
+
       // Build inverse updates
       const inverseUpdates: any = {};
       if (prev) {
@@ -147,7 +156,7 @@ export function createPluginHandlers(
         if ('y' in updates) inverseUpdates.y = prev.y;
         if ('width' in updates) inverseUpdates.width = (prev as any).width;
         if ('height' in updates) inverseUpdates.height = (prev as any).height;
-        
+
         // Inverse meta should restore previous meta
         const inverseMeta: any = {};
         for (const k of Object.keys(updates || {})) {
@@ -159,7 +168,7 @@ export function createPluginHandlers(
           inverseUpdates.meta = inverseMeta;
         }
       }
-      
+
       await appendOp({
         type: 'update',
         elementId: id,
@@ -224,7 +233,7 @@ export function createPluginHandlers(
       console.error('[onUpscale] Missing sourceImageUrl or projectId');
       return null;
     }
-    
+
     try {
       console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
       const { upscaleImageForCanvas } = await import('@/lib/api');
@@ -234,7 +243,7 @@ export function createPluginHandlers(
         scale || 2,
         projectId
       );
-      
+
       console.log('[onUpscale] Upscale completed:', result);
       // Extract URL from result - result should be the data object with url property
       const upscaledUrl = result?.url || (typeof result === 'string' ? result : null);
@@ -300,18 +309,18 @@ export function createPluginHandlers(
   const onPersistRemoveBgModalMove = async (id: string, updates: Partial<RemoveBgGenerator>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.removeBgGenerators.find(m => m.id === id);
-    
+
     // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setRemoveBgGenerators(prevState => 
+    setters.setRemoveBgGenerators(prevState =>
       prevState.map(m => m.id === id ? { ...m, ...updates } : m)
     );
-    
+
     // 3. Broadcast via realtime
     if (realtimeActive) {
       console.log('[Realtime] broadcast move removebg', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    
+
     // 4. Append op for undo/redo
     if (projectId && opManagerInitialized) {
       // Structure updates: meta fields go under meta, position fields top-level
@@ -337,7 +346,7 @@ export function createPluginHandlers(
         frameHeight: 500,
         isRemovingBg: false,
       };
-      
+
       const metaUpdates = { ...existingMeta };
       for (const k of Object.keys(updates || {})) {
         if (k === 'x' || k === 'y') {
@@ -348,7 +357,7 @@ export function createPluginHandlers(
         }
       }
       structuredUpdates.meta = metaUpdates;
-      
+
       // Build inverse updates
       const inverseUpdates: any = {};
       if (prev) {
@@ -368,7 +377,7 @@ export function createPluginHandlers(
           inverseUpdates.meta = inverseMeta;
         }
       }
-      
+
       await appendOp({
         type: 'update',
         elementId: id,
@@ -437,7 +446,7 @@ export function createPluginHandlers(
       console.error('[onRemoveBg] Missing sourceImageUrl or projectId');
       return null;
     }
-    
+
     try {
       console.log('[onRemoveBg] Starting remove bg:', { model, backgroundType, scaleValue, sourceImageUrl });
       const { removeBgImageForCanvas } = await import('@/lib/api');
@@ -448,7 +457,7 @@ export function createPluginHandlers(
         backgroundType,
         scaleValue
       );
-      
+
       console.log('[onRemoveBg] Remove bg completed:', result);
       return result.url || null;
     } catch (error: any) {
@@ -502,18 +511,18 @@ export function createPluginHandlers(
   const onPersistEraseModalMove = async (id: string, updates: Partial<EraseGenerator>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.eraseGenerators.find(m => m.id === id);
-    
+
     // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setEraseGenerators(prevState => 
+    setters.setEraseGenerators(prevState =>
       prevState.map(m => m.id === id ? { ...m, ...updates } : m)
     );
-    
+
     // 3. Broadcast via realtime
     if (realtimeActive) {
       console.log('[Realtime] broadcast update erase', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    
+
     // 4. Append op for undo/redo and persistence
     if (projectId && opManagerInitialized && prev) {
       await appendOp({
@@ -590,7 +599,7 @@ export function createPluginHandlers(
       console.error('[onErase] Missing sourceImageUrl or projectId');
       return null;
     }
-    
+
     // Mask is now optional - image is composited with white mask overlay
     // The composited image already contains the mask, so mask parameter is not required
     console.log('[onErase] Starting erase:', {
@@ -601,7 +610,7 @@ export function createPluginHandlers(
       prompt: prompt || '(none)',
       note: 'Using composited image (mask is part of the image)'
     });
-    
+
     try {
       const { eraseImageForCanvas } = await import('@/lib/api');
       // Pass composited image as image parameter, mask is optional (can be undefined)
@@ -612,7 +621,7 @@ export function createPluginHandlers(
         mask, // Optional - can be undefined since mask is composited into image
         prompt
       );
-      
+
       console.log('[onErase] Erase completed:', result);
       return result.url || null;
     } catch (error: any) {
@@ -671,18 +680,18 @@ export function createPluginHandlers(
   const onPersistReplaceModalMove = async (id: string, updates: Partial<ReplaceGenerator>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.replaceGenerators.find(m => m.id === id);
-    
+
     // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setReplaceGenerators(prevState => 
+    setters.setReplaceGenerators(prevState =>
       prevState.map(m => m.id === id ? { ...m, ...updates } : m)
     );
-    
+
     // 3. Broadcast via realtime
     if (realtimeActive) {
       console.log('[Realtime] broadcast move replace', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    
+
     // 4. Append op for undo/redo
     if (projectId && opManagerInitialized && prev) {
       const structuredUpdates: any = {};
@@ -695,7 +704,7 @@ export function createPluginHandlers(
         frameHeight: prev.frameHeight || 500,
         isReplacing: prev.isReplacing || false,
       };
-      
+
       const metaUpdates = { ...existingMeta };
       for (const k of Object.keys(updates || {})) {
         if (k === 'x' || k === 'y') {
@@ -705,7 +714,7 @@ export function createPluginHandlers(
         }
       }
       structuredUpdates.meta = metaUpdates;
-      
+
       const inverseUpdates: any = {};
       if ('x' in updates) inverseUpdates.x = prev.x;
       if ('y' in updates) inverseUpdates.y = prev.y;
@@ -720,7 +729,7 @@ export function createPluginHandlers(
       if (Object.keys(inverseMeta).length > 0) {
         inverseUpdates.meta = inverseMeta;
       }
-      
+
       await appendOp({
         type: 'update',
         elementId: id,
@@ -785,13 +794,13 @@ export function createPluginHandlers(
       console.error('[onReplace] Missing sourceImageUrl or projectId');
       return null;
     }
-    
+
     // Prompt is required for replace (unlike erase which has a default)
     if (!prompt || !prompt.trim()) {
       console.error('[onReplace] Prompt is required for replace');
       throw new Error('Prompt is required for image replace. Please describe what you want to replace the selected area with.');
     }
-    
+
     console.log('[onReplace] Starting replace:', {
       model,
       sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
@@ -799,7 +808,7 @@ export function createPluginHandlers(
       prompt: prompt || '(MISSING - will fail)',
       note: 'Using composited image (mask is part of the image)'
     });
-    
+
     try {
       const { replaceImageForCanvas } = await import('@/lib/api');
       // Pass composited image as image parameter, mask is optional (can be undefined)
@@ -810,7 +819,7 @@ export function createPluginHandlers(
         mask, // Optional - can be undefined since mask is composited into image
         prompt // REQUIRED - what to replace the white area with
       );
-      
+
       console.log('[onReplace] Replace completed:', result);
       return result.url || null;
     } catch (error: any) {
@@ -998,7 +1007,7 @@ export function createPluginHandlers(
         prompt,
         aspectRatio
       );
-      
+
       console.log('[onExpand] Expand completed:', result);
       return result.url || null;
     } catch (error: any) {
@@ -1057,18 +1066,18 @@ export function createPluginHandlers(
   const onPersistVectorizeModalMove = async (id: string, updates: Partial<VectorizeGenerator>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.vectorizeGenerators.find(m => m.id === id);
-    
+
     // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setVectorizeGenerators(prevState => 
+    setters.setVectorizeGenerators(prevState =>
       prevState.map(m => m.id === id ? { ...m, ...updates } : m)
     );
-    
+
     // 3. Broadcast via realtime
     if (realtimeActive) {
       console.log('[Realtime] broadcast move vectorize', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    
+
     // 4. Append op for undo/redo
     if (projectId && opManagerInitialized) {
       // Structure updates: meta fields go under meta, position fields top-level
@@ -1090,7 +1099,7 @@ export function createPluginHandlers(
         frameHeight: 500,
         isVectorizing: false,
       };
-      
+
       const metaUpdates = { ...existingMeta };
       for (const k of Object.keys(updates || {})) {
         if (k === 'x' || k === 'y') {
@@ -1101,7 +1110,7 @@ export function createPluginHandlers(
         }
       }
       structuredUpdates.meta = metaUpdates;
-      
+
       // Build inverse updates
       const inverseUpdates: any = {};
       if (prev) {
@@ -1119,7 +1128,7 @@ export function createPluginHandlers(
           inverseUpdates.meta = inverseMeta;
         }
       }
-      
+
       await appendOp({
         type: 'update',
         elementId: id,
@@ -1189,7 +1198,7 @@ export function createPluginHandlers(
       console.error('[onVectorize] Missing sourceImageUrl or projectId');
       return null;
     }
-    
+
     try {
       console.log('[onVectorize] Starting vectorize:', { sourceImageUrl, mode });
       const { vectorizeImageForCanvas } = await import('@/lib/api');
@@ -1198,12 +1207,494 @@ export function createPluginHandlers(
         projectId,
         mode
       );
-      
+
       console.log('[onVectorize] Vectorize completed:', result);
       return result.url || null;
     } catch (error: any) {
       console.error('[onVectorize] Error:', error);
       throw error;
+    }
+  };
+
+  // Storyboard plugin handlers
+  const onPersistStoryboardModalCreate = async (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => {
+    // 1. Optimistic update (triggers snapshot useEffect)
+    setters.setStoryboardGenerators(prev => {
+      if (prev.some(m => m.id === modal.id)) return prev;
+      return [...prev, modal];
+    });
+
+    // 2. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create storyboard', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'storyboard-plugin',
+        x: modal.x,
+        y: modal.y,
+        meta: {
+          frameWidth: modal.frameWidth || 400,
+          frameHeight: modal.frameHeight || 500,
+        },
+      });
+    }
+
+    // 3. Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'storyboard-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              frameWidth: modal.frameWidth || 400,
+              frameHeight: modal.frameHeight || 500,
+              scriptText: (modal as StoryboardGenerator).scriptText || null,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => {
+    // 1. Capture previous state (for inverse op)
+    const prev = state.storyboardGenerators.find(m => m.id === id);
+
+    // 2. Optimistic update (triggers snapshot useEffect)
+    setters.setStoryboardGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+
+    // 3. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move storyboard', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+
+    // 4. Append op for undo/redo
+    if (projectId && opManagerInitialized) {
+      const structuredUpdates: any = {};
+      const existingMeta = prev ? {
+        frameWidth: prev.frameWidth || 400,
+        frameHeight: prev.frameHeight || 500,
+        scriptText: (prev as StoryboardGenerator).scriptText || null,
+      } : {
+        frameWidth: 400,
+        frameHeight: 500,
+        scriptText: null,
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      // Build inverse updates
+      const inverseUpdates: any = {};
+      if (prev) {
+        if ('x' in updates) inverseUpdates.x = prev.x;
+        if ('y' in updates) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
+        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
+        if ('scriptText' in updates) inverseMeta.scriptText = (prev as StoryboardGenerator).scriptText || null;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistStoryboardModalDelete = async (id: string) => {
+    console.log('[page.tsx] onPersistStoryboardModalDelete called', id);
+    const prevItem = state.storyboardGenerators.find(m => m.id === id);
+    // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
+    setters.setStoryboardGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      console.log('[page.tsx] storyboardGenerators updated, remaining:', filtered.length);
+      return filtered;
+    });
+    // Then do async operations
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete storyboard', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Also remove any connectors that referenced this element
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'storyboard-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                frameWidth: prevItem.frameWidth || 400,
+                frameHeight: prevItem.frameHeight || 500,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
+    }
+  };
+
+  // ScriptFrame plugin handlers
+  const onPersistScriptFrameModalCreate = async (modal: ScriptFrameGenerator) => {
+    // 1. Optimistic update
+    setters.setScriptFrameGenerators(prev => {
+      if (prev.some(m => m.id === modal.id)) return prev;
+      return [...prev, modal];
+    });
+
+    // 2. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create script-frame', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'script-frame',
+        x: modal.x,
+        y: modal.y,
+        meta: {
+          pluginId: modal.pluginId,
+          frameWidth: modal.frameWidth,
+          frameHeight: modal.frameHeight,
+          text: modal.text,
+        },
+      });
+    }
+
+    // 3. Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'script-frame',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              pluginId: modal.pluginId,
+              frameWidth: modal.frameWidth,
+              frameHeight: modal.frameHeight,
+              text: modal.text,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistScriptFrameModalMove = async (id: string, updates: Partial<ScriptFrameGenerator>) => {
+    // 1. Capture previous state
+    const prev = state.scriptFrameGenerators.find(m => m.id === id);
+
+    // 2. Optimistic update
+    setters.setScriptFrameGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+
+    // 3. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move script-frame', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+
+    // 4. Append op
+    if (projectId && opManagerInitialized) {
+      const structuredUpdates: any = {};
+      const existingMeta = prev ? {
+        pluginId: prev.pluginId,
+        frameWidth: prev.frameWidth,
+        frameHeight: prev.frameHeight,
+        text: prev.text,
+      } : {
+        pluginId: '',
+        frameWidth: 300,
+        frameHeight: 200,
+        text: '',
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if (prev) {
+        if ('x' in updates) inverseUpdates.x = prev.x;
+        if ('y' in updates) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('pluginId' in updates) inverseMeta.pluginId = prev.pluginId;
+        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
+        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
+        if ('text' in updates) inverseMeta.text = prev.text;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistScriptFrameModalDelete = async (id: string) => {
+    console.log('[page.tsx] onPersistScriptFrameModalDelete called', id);
+    const prevItem = state.scriptFrameGenerators.find(m => m.id === id);
+
+    setters.setScriptFrameGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      return filtered;
+    });
+
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete script-frame', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'script-frame',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                pluginId: prevItem.pluginId,
+                frameWidth: prevItem.frameWidth,
+                frameHeight: prevItem.frameHeight,
+                text: prevItem.text,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
+    }
+  };
+
+  // SceneFrame plugin handlers
+  const onPersistSceneFrameModalCreate = async (modal: SceneFrameGenerator) => {
+    setters.setSceneFrameGenerators(prev => {
+      if (prev.some(m => m.id === modal.id)) return prev;
+      return [...prev, modal];
+    });
+
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create scene-frame', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'scene-frame',
+        x: modal.x,
+        y: modal.y,
+        meta: {
+          scriptFrameId: modal.scriptFrameId,
+          sceneNumber: modal.sceneNumber,
+          frameWidth: modal.frameWidth,
+          frameHeight: modal.frameHeight,
+          content: modal.content,
+        },
+      });
+    }
+
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'scene-frame',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              scriptFrameId: modal.scriptFrameId,
+              sceneNumber: modal.sceneNumber,
+              frameWidth: modal.frameWidth,
+              frameHeight: modal.frameHeight,
+              content: modal.content,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistSceneFrameModalMove = async (id: string, updates: Partial<SceneFrameGenerator>) => {
+    const prev = state.sceneFrameGenerators.find(m => m.id === id);
+
+    setters.setSceneFrameGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move scene-frame', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+
+    if (projectId && opManagerInitialized) {
+      const structuredUpdates: any = {};
+      const existingMeta = prev ? {
+        scriptFrameId: prev.scriptFrameId,
+        sceneNumber: prev.sceneNumber,
+        frameWidth: prev.frameWidth,
+        frameHeight: prev.frameHeight,
+        content: prev.content,
+      } : {
+        scriptFrameId: '',
+        sceneNumber: 0,
+        frameWidth: 300,
+        frameHeight: 200,
+        content: '',
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if (prev) {
+        if ('x' in updates) inverseUpdates.x = prev.x;
+        if ('y' in updates) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('scriptFrameId' in updates) inverseMeta.scriptFrameId = prev.scriptFrameId;
+        if ('sceneNumber' in updates) inverseMeta.sceneNumber = prev.sceneNumber;
+        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
+        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
+        if ('content' in updates) inverseMeta.content = prev.content;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistSceneFrameModalDelete = async (id: string) => {
+    console.log('[page.tsx] onPersistSceneFrameModalDelete called', id);
+    const prevItem = state.sceneFrameGenerators.find(m => m.id === id);
+
+    setters.setSceneFrameGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      return filtered;
+    });
+
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete scene-frame', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'scene-frame',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                scriptFrameId: prevItem.scriptFrameId,
+                sceneNumber: prevItem.sceneNumber,
+                frameWidth: prevItem.frameWidth,
+                frameHeight: prevItem.frameHeight,
+                content: prevItem.content,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
     }
   };
 
@@ -1232,6 +1723,15 @@ export function createPluginHandlers(
     onReplace,
     onExpand,
     onVectorize,
+    onPersistStoryboardModalCreate,
+    onPersistStoryboardModalMove,
+    onPersistStoryboardModalDelete,
+    onPersistScriptFrameModalCreate,
+    onPersistScriptFrameModalMove,
+    onPersistScriptFrameModalDelete,
+    onPersistSceneFrameModalCreate,
+    onPersistSceneFrameModalMove,
+    onPersistSceneFrameModalDelete,
   };
 }
 

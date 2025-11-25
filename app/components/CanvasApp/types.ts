@@ -131,6 +131,36 @@ export interface VectorizeGenerator {
   isVectorizing?: boolean;
 }
 
+export interface StoryboardGenerator {
+  id: string;
+  x: number;
+  y: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  scriptText?: string | null;
+}
+
+export interface ScriptFrameGenerator {
+  id: string;
+  pluginId: string;
+  x: number;
+  y: number;
+  frameWidth: number;
+  frameHeight: number;
+  text: string;
+}
+
+export interface SceneFrameGenerator {
+  id: string;
+  scriptFrameId: string;
+  sceneNumber: number;
+  x: number;
+  y: number;
+  frameWidth: number;
+  frameHeight: number;
+  content: string;
+}
+
 export interface TextGenerator {
   id: string;
   x: number;
@@ -162,6 +192,9 @@ export interface CanvasAppState {
   replaceGenerators: ReplaceGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
+  storyboardGenerators: StoryboardGenerator[];
+  scriptFrameGenerators: ScriptFrameGenerator[];
+  sceneFrameGenerators: SceneFrameGenerator[];
   textGenerators: TextGenerator[];
   connectors: Connector[];
   generationQueue: GenerationQueueItem[];
@@ -178,6 +211,9 @@ export interface CanvasAppSetters {
   setReplaceGenerators: React.Dispatch<React.SetStateAction<ReplaceGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
+  setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;
+  setScriptFrameGenerators: React.Dispatch<React.SetStateAction<ScriptFrameGenerator[]>>;
+  setSceneFrameGenerators: React.Dispatch<React.SetStateAction<SceneFrameGenerator[]>>;
   setTextGenerators: React.Dispatch<React.SetStateAction<TextGenerator[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;
   setGenerationQueue: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;

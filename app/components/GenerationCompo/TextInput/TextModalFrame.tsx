@@ -22,6 +22,7 @@ interface TextModalFrameProps {
   selectedModel: string;
   onSetIsPinned: (pinned: boolean) => void;
   onMouseDown: (e: React.MouseEvent) => void;
+  onScriptGenerated?: (script: string) => void;
 }
 
 export const TextModalFrame: React.FC<TextModalFrameProps> = ({
@@ -44,9 +45,11 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   selectedModel,
   onSetIsPinned,
   onMouseDown,
+  onScriptGenerated,
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceStatus, setEnhanceStatus] = useState('');
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -143,27 +146,39 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             if (!text.trim() || isEnhancing) return;
 
             setIsEnhancing(true);
+            setEnhanceStatus('Preparing storyboard script...');
             try {
-              const result = await queryCanvasPrompt(text);
-              
-              // If it's an enhanced prompt (image/video/music), update the text
-              if (result.type !== 'answer' && result.enhanced_prompt) {
-                onTextChange(result.enhanced_prompt);
-              } 
-              // If it's an answer, we could show it in a different way or append it
-              else if (result.type === 'answer' && result.response) {
-                // For answers, you might want to append or replace - for now, we'll replace
-                onTextChange(result.response);
+              const result = await queryCanvasPrompt(text, undefined, {
+                onAttempt: (attempt, maxAttempts) => {
+                  if (attempt === 1) {
+                    setEnhanceStatus('Generating storyboard scenes...');
+                  } else {
+                    setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+                  }
+                },
+              });
+              const enhancedText =
+                (typeof result?.enhanced_prompt === 'string' && result.enhanced_prompt.trim()) ||
+                (typeof result?.response === 'string' && result.response.trim());
+
+              if (enhancedText) {
+                if (onScriptGenerated) {
+                  onScriptGenerated(enhancedText);
+                }
+              } else {
+                console.warn('[TextModalFrame] No enhanced text returned from queryCanvasPrompt response:', result);
+                alert('Gemini did not return any text. Please try again with a different prompt.');
               }
             } catch (error: any) {
               console.error('[TextModalFrame] Error enhancing prompt:', error);
               alert(`Failed to enhance prompt: ${error.message || 'Unknown error'}`);
             } finally {
               setIsEnhancing(false);
+              setEnhanceStatus('');
             }
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          title={isEnhancing ? 'Enhancing...' : 'Enhance prompt'}
+          title={isEnhancing ? enhanceStatus || 'Enhancing...' : 'Enhance prompt'}
           style={{
             width: `${30 * scale}px`,
             height: `${30 * scale}px`,
@@ -222,6 +237,16 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             </svg>
           )}
         </button>
+        {enhanceStatus && (
+          <span
+            style={{
+              fontSize: `${11 * scale}px`,
+              color: isDark ? '#9CA3AF' : '#4B5563',
+            }}
+          >
+            {enhanceStatus}
+          </span>
+        )}
       </div>
 
       {/* Pin Icon Button - Bottom Right */}

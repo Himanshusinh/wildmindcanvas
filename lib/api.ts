@@ -166,10 +166,10 @@ export async function generateImage(
   token?: string
 ): Promise<string> {
   const modelLower = model.toLowerCase();
-  
+
   // Determine which API to use based on model
   let response: ImageGenerationResponse;
-  
+
   if (modelLower.includes('flux')) {
     // Use BFL API for Flux models
     response = await generateImageBFL(prompt, model, aspectRatio, token);
@@ -248,11 +248,11 @@ export async function generateImageForCanvas(
     let result;
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
-    
+
     if (!text || text.trim() === '') {
       throw new Error('Empty response body from server');
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -272,7 +272,7 @@ export async function generateImageForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to generate image');
     }
-    
+
     // Handle API Gateway response format
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to generate image');
@@ -282,15 +282,15 @@ export async function generateImageForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Image generation is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to generate image. Please check your connection and try again.');
   }
 }
@@ -344,11 +344,11 @@ export async function generateVideoForCanvas(
     let result;
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
-    
+
     if (!text || text.trim() === '') {
       throw new Error('Empty response body from server');
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -366,7 +366,7 @@ export async function generateVideoForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to generate video');
     }
-    
+
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to generate video');
     }
@@ -374,15 +374,15 @@ export async function generateVideoForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Video generation is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to generate video. Please check your connection and try again.');
   }
 }
@@ -429,7 +429,7 @@ export async function upscaleImageForCanvas(
     } catch (readError: any) {
       throw new Error(`Failed to read response: ${readError.message}`);
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -447,7 +447,7 @@ export async function upscaleImageForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to upscale image');
     }
-    
+
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to upscale image');
     }
@@ -455,15 +455,15 @@ export async function upscaleImageForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Image upscaling is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to upscale image. Please check your connection and try again.');
   }
 }
@@ -558,7 +558,7 @@ export async function removeBgImageForCanvas(
     } catch (readError: any) {
       throw new Error(`Failed to read response: ${readError.message}`);
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -576,7 +576,7 @@ export async function removeBgImageForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to remove background');
     }
-    
+
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to remove background');
     }
@@ -584,15 +584,15 @@ export async function removeBgImageForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Background removal is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to remove background. Please check your connection and try again.');
   }
 }
@@ -625,7 +625,7 @@ export async function eraseImageForCanvas(
           img.onerror = reject;
           setTimeout(reject, 5000); // 5 second timeout
         });
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -705,7 +705,7 @@ export async function eraseImageForCanvas(
     } catch (readError: any) {
       throw new Error(`Failed to read response: ${readError.message}`);
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -723,7 +723,7 @@ export async function eraseImageForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to erase image');
     }
-    
+
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to erase image');
     }
@@ -731,15 +731,15 @@ export async function eraseImageForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Image erasing is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to erase image. Please check your connection and try again.');
   }
 }
@@ -774,7 +774,7 @@ export async function replaceImageForCanvas(
           img.onerror = reject;
           setTimeout(reject, 5000); // 5 second timeout
         });
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -854,7 +854,7 @@ export async function replaceImageForCanvas(
     } catch (readError: any) {
       throw new Error(`Failed to read response: ${readError.message}`);
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -872,7 +872,7 @@ export async function replaceImageForCanvas(
       const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
       throw new Error(errorMessage || 'Failed to replace image');
     }
-    
+
     if (result.responseStatus === 'error') {
       throw new Error(result.message || 'Failed to replace image');
     }
@@ -880,15 +880,15 @@ export async function replaceImageForCanvas(
     return result.data || result;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout. Image replacing is taking too long. Please try again.');
     }
-    
+
     if (error.message) {
       throw error;
     }
-    
+
     throw new Error('Failed to replace image. Please check your connection and try again.');
   }
 }
@@ -926,14 +926,14 @@ export async function expandImageForCanvas(
     const canvasHeight = Math.max(1, Math.min(5000, Math.round(canvasSize[1])));
     const origWidth = Math.max(1, Math.min(5000, Math.round(originalImageSize[0])));
     const origHeight = Math.max(1, Math.min(5000, Math.round(originalImageSize[1])));
-    
+
     // Clamp image location to ensure image fits within canvas
     // Image must be fully contained: 0 <= x <= canvasWidth - origWidth and 0 <= y <= canvasHeight - origHeight
     const maxX = Math.max(0, canvasWidth - origWidth);
     const maxY = Math.max(0, canvasHeight - origHeight);
     const origX = Math.max(0, Math.min(maxX, Math.round(originalImageLocation[0])));
     const origY = Math.max(0, Math.min(maxY, Math.round(originalImageLocation[1])));
-    
+
     // Validate that image fits within canvas
     if (origX + origWidth > canvasWidth || origY + origHeight > canvasHeight) {
       throw new Error(`Image does not fit within canvas. Image at [${origX}, ${origY}] with size [${origWidth}, ${origHeight}] extends beyond canvas [${canvasWidth}, ${canvasHeight}]`);
@@ -993,7 +993,7 @@ export async function expandImageForCanvas(
     } catch (readError: any) {
       throw new Error(`Failed to read response: ${readError.message}`);
     }
-    
+
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
@@ -1010,10 +1010,10 @@ export async function expandImageForCanvas(
     if (!response.ok) {
       // Extract detailed error message
       let errorMessage = result?.message || result?.error || `Server error: ${response.status}`;
-      
+
       // If it's a validation error, try to extract more details
       if (response.status === 422 && result?.errors) {
-        const validationErrors = Array.isArray(result.errors) 
+        const validationErrors = Array.isArray(result.errors)
           ? result.errors.map((e: any) => e.msg || e.message || String(e)).join(', ')
           : JSON.stringify(result.errors);
         errorMessage = `Validation error: ${validationErrors}`;
@@ -1022,20 +1022,20 @@ export async function expandImageForCanvas(
       } else if (result?.error?.message) {
         errorMessage = result.error.message;
       }
-      
+
       console.error('[expandImageForCanvas] API error details:', {
         status: response.status,
         statusText: response.statusText,
         result,
         payload: { ...payload, image_url: payload.image_url?.substring(0, 100) + '...' }
       });
-      
+
       throw new Error(`FAL API error: "${errorMessage}"`);
     }
 
     // Extract image URL from response
     const imageUrl = result?.data?.image?.url || result?.data?.images?.[0]?.url || result?.images?.[0]?.url || result?.data?.url || result?.url;
-    
+
     if (imageUrl) {
       console.log('[expandImageForCanvas] Expand completed:', imageUrl);
       return {
@@ -1045,7 +1045,7 @@ export async function expandImageForCanvas(
         generationId: result?.data?.historyId,
       };
     }
-    
+
     throw new Error('Failed to expand image. No image URL in response.');
   } catch (error: any) {
     clearTimeout(timeoutId);
@@ -1061,73 +1061,143 @@ export async function expandImageForCanvas(
  * Query canvas prompt enhancement
  * Calls the /canvas/query endpoint to enhance prompts or get answers
  */
+interface QueryCanvasPromptOptions {
+  onAttempt?: (attempt: number, maxAttempts: number) => void;
+}
+
 export async function queryCanvasPrompt(
   text: string,
-  maxNewTokens?: number
+  maxNewTokens?: number,
+  options?: QueryCanvasPromptOptions
 ): Promise<{ type: 'image' | 'video' | 'music' | 'answer'; enhanced_prompt: string | null; response: string | null }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const MAX_ATTEMPTS = 4;
+  const ATTEMPT_TIMEOUT_MS = 45000; // 45 seconds per attempt
+  const RETRY_DELAY_MS = 3500;
 
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    options?.onAttempt?.(attempt, MAX_ATTEMPTS);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${API_GATEWAY_URL}/canvas/query`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          text: text.trim(),
+          max_new_tokens: maxNewTokens || 300,
+        }),
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response || response.status === 0) {
+        throw new Error('Empty response from server. Please check if the API Gateway is running.');
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      const textResponse = await response.text();
+
+      if (!textResponse || textResponse.trim() === '') {
+        throw new Error('Empty response body from server');
+      }
+
+      let result: any;
+      if (contentType.includes('application/json')) {
+        try {
+          result = JSON.parse(textResponse);
+        } catch (parseError: any) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${textResponse.substring(0, 200)}`);
+        }
+      } else {
+        throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${textResponse.substring(0, 200)}`);
+      }
+
+      if (!response.ok) {
+        const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage || 'Failed to query canvas prompt');
+      }
+
+      if (result.responseStatus === 'error') {
+        throw new Error(result.message || 'Failed to query canvas prompt');
+      }
+
+      return result.data || result;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+
+      const isAbort = error?.name === 'AbortError';
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        error?.message === 'Failed to fetch' ||
+        error?.message === 'NetworkError when attempting to fetch resource.';
+
+      lastError = error instanceof Error ? error : new Error(error?.message || 'Failed to enhance prompt');
+
+      if ((isAbort || isNetworkFailure) && attempt < MAX_ATTEMPTS) {
+        await delay(RETRY_DELAY_MS);
+        continue;
+      }
+
+      if (isAbort) {
+        throw new Error('Request timeout. The prompt enhancement service took too long to respond.');
+      }
+
+      if (isNetworkFailure) {
+        throw new Error('Network error while contacting the prompt enhancement service. Please ensure the API Gateway is running and try again.');
+      }
+
+      if (error?.message) {
+        throw error;
+      }
+
+      throw new Error('Failed to enhance prompt. Please check your connection and try again.');
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('Prompt enhancement failed after multiple attempts. Please try again with a shorter prompt.');
+}
+
+/**
+ * Generate scenes from story text
+ */
+export async function generateScenesFromStory(story: string): Promise<{ scenes: Array<{ scene_number: number; heading: string; content: string }> }> {
   try {
-    const response = await fetch(`${API_GATEWAY_URL}/canvas/query`, {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-scenes`, {
       method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      signal: controller.signal,
-      body: JSON.stringify({
-        text: text.trim(),
-        max_new_tokens: maxNewTokens || 300,
-      }),
+      body: JSON.stringify({ story }),
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response || response.status === 0) {
-      throw new Error('Empty response from server. Please check if the API Gateway is running.');
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    const textResponse = await response.text();
-
-    if (!textResponse || textResponse.trim() === '') {
-      throw new Error('Empty response body from server');
-    }
-
-    let result: any;
-    if (contentType.includes('application/json')) {
-      try {
-        result = JSON.parse(textResponse);
-      } catch (parseError: any) {
-        throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${textResponse.substring(0, 200)}`);
-      }
-    } else {
-      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${textResponse.substring(0, 200)}`);
-    }
-
     if (!response.ok) {
-      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(errorMessage || 'Failed to query canvas prompt');
+      const error = await response.json().catch(() => ({ message: 'Failed to generate scenes' }));
+      throw new Error(error.message || 'Failed to generate scenes');
     }
 
+    const result = await response.json();
     if (result.responseStatus === 'error') {
-      throw new Error(result.message || 'Failed to query canvas prompt');
+      throw new Error(result.message || 'Failed to generate scenes');
     }
 
     return result.data || result;
   } catch (error: any) {
-    clearTimeout(timeoutId);
-
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout. The prompt enhancement service took too long to respond.');
-    }
-
-    if (error.message) {
-      throw error;
-    }
-
-    throw new Error('Failed to enhance prompt. Please check your connection and try again.');
+    console.error('[generateScenesFromStory] Error:', error);
+    throw error;
   }
 }
 
@@ -1242,7 +1312,7 @@ export async function getReplicateQueueResult(requestId: string): Promise<any> {
  */
 export async function getCurrentUser(): Promise<{ uid: string; username: string; email: string; credits?: number } | null> {
   const cacheKey = 'getCurrentUser';
-  
+
   // Check cache first
   const cached = getCachedRequest<{ uid: string; username: string; email: string; credits?: number } | null>(cacheKey);
   if (cached) {

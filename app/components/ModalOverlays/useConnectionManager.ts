@@ -21,6 +21,8 @@ interface UseConnectionManagerProps {
   replaceModalStates?: any[];
   expandModalStates?: any[];
   vectorizeModalStates?: any[];
+  storyboardModalStates?: any[];
+  sceneFrameModalStates?: any[];
 }
 
 export function useConnectionManager({
@@ -41,6 +43,8 @@ export function useConnectionManager({
   replaceModalStates,
   expandModalStates,
   vectorizeModalStates,
+  storyboardModalStates,
+  sceneFrameModalStates,
 }: UseConnectionManagerProps) {
   const [localConnections, setLocalConnections] = useState<Connection[]>([]);
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -61,7 +65,7 @@ export function useConnectionManager({
 
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
-      text: ['image', 'video', 'music'],
+      text: ['image', 'video', 'music', 'storyboard'],
       image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize'],
       video: ['video'],
       music: ['video'],
@@ -131,7 +135,7 @@ export function useConnectionManager({
       const fromType = getComponentType(activeDrag.from);
       const toType = getComponentType(id);
       const allowedMap: Record<string, string[]> = {
-        text: ['image', 'video', 'music'],
+        text: ['image', 'video', 'music', 'storyboard'],
         image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize'],
         video: ['video'],
         music: ['video'],
@@ -180,8 +184,8 @@ export function useConnectionManager({
       }
 
       // Add connection if not duplicate
-      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
-      const toCenter = computeNodeCenter(id, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates);
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
+      const toCenter = computeNodeCenter(id, 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
       const newConn: Connection = { id: connectorId, from: activeDrag.from, to: id, color: activeDrag.color, fromX: fromCenter?.x, fromY: fromCenter?.y, toX: toCenter?.x, toY: toCenter?.y };
       const exists = effectiveConnections.find((c: any) => c.from === activeDrag.from && c.to === id);
@@ -338,7 +342,7 @@ export function useConnectionManager({
       window.removeEventListener('mouseup', handleUp);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, vectorizeModalStates]);
+  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {
