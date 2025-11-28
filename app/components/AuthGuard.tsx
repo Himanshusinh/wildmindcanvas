@@ -65,15 +65,43 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           hostname: window.location.hostname,
           href: window.location.href,
           isDev,
-          apiBase: process.env.NEXT_PUBLIC_API_BASE_URL || 'NOT SET'
+          apiBase: process.env.NEXT_PUBLIC_API_BASE_URL || 'NOT SET',
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent.substring(0, 100),
+          cookieEnabled: navigator.cookieEnabled
         });
 
-        // Log all cookies
+        // Log all cookies with detailed analysis
         if (typeof document !== 'undefined') {
           const allCookies = document.cookie;
-          logDebug('[AuthGuard] All cookies', { cookies: allCookies });
           const cookieArray = document.cookie.split(';').map(c => c.trim());
-          logDebug('[AuthGuard] Parsed cookies', { cookieArray });
+          const cookieDetails = cookieArray.map(c => {
+            const parts = c.split('=');
+            return {
+              name: parts[0],
+              hasValue: parts.length > 1 && parts[1].length > 0,
+              valueLength: parts[1]?.length || 0,
+              valuePreview: parts[1] ? (parts[1].length > 30 ? parts[1].substring(0, 30) + '...' : parts[1]) : '(empty)'
+            };
+          });
+          
+          logDebug('[AuthGuard] All cookies', { 
+            cookies: allCookies,
+            cookieCount: cookieArray.length,
+            cookieDetails,
+            hasAppSession: cookieArray.some(c => c.startsWith('app_session=')),
+            note: 'httpOnly cookies (like app_session) are NOT visible in document.cookie - this is normal and secure'
+          });
+          
+          logDebug('[AuthGuard] Parsed cookies', { 
+            cookieArray,
+            analysis: {
+              totalCookies: cookieArray.length,
+              appSessionVisible: cookieArray.some(c => c.startsWith('app_session=')),
+              googleAnalyticsCookies: cookieArray.filter(c => c.startsWith('_ga')).length,
+              note: 'If app_session is not visible, it might be httpOnly (normal) or not set. Check DevTools → Application → Cookies instead.'
+            }
+          });
         }
 
         // In development, cookies from localhost:3000 won't be accessible on localhost:3001
@@ -142,10 +170,25 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           
           // Also check for cookie locally (for logging)
           const hasCookie = isAuthenticated();
+          
+          // Try to check cookies from parent domain (www.wildmindai.com)
+          // This won't work due to same-origin policy, but we can log the attempt
           logDebug('[AuthGuard] Prod mode: Local cookie check', {
             hasCookie,
             cookieString: typeof document !== 'undefined' ? document.cookie : 'n/a',
-            cookieLength: typeof document !== 'undefined' ? document.cookie.length : 0
+            cookieLength: typeof document !== 'undefined' ? document.cookie.length : 0,
+            cookieAnalysis: {
+              visibleCookies: typeof document !== 'undefined' ? document.cookie.split(';').filter(c => c.trim()).length : 0,
+              appSessionInDocumentCookie: typeof document !== 'undefined' ? document.cookie.includes('app_session=') : false,
+              note: 'httpOnly cookies are NOT in document.cookie. Check DevTools → Application → Cookies for actual cookies.'
+            },
+            nextSteps: [
+              '1. Open DevTools → Application → Cookies → https://studio.wildmindai.com',
+              '2. Check if app_session cookie exists',
+              '3. If not, check https://www.wildmindai.com cookies',
+              '4. Verify cookie has Domain: .wildmindai.com (with leading dot)',
+              '5. If domain is www.wildmindai.com (no dot), COOKIE_DOMAIN env var is not set'
+            ]
           });
           
           if (!hasCookie) {

@@ -151,11 +151,21 @@ export async function checkAuthStatus(): Promise<boolean> {
 
       clearTimeout(timeoutId);
 
+      // Check if Set-Cookie header is present (might indicate cookie refresh)
+      const setCookieHeader = response.headers.get('set-cookie');
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      
       logDebug('Received response', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: responseHeaders,
+        hasSetCookieHeader: !!setCookieHeader,
+        setCookieHeader: setCookieHeader ? (setCookieHeader.length > 100 ? setCookieHeader.substring(0, 100) + '...' : setCookieHeader) : null,
+        note: setCookieHeader ? 'Backend sent Set-Cookie header - cookie might have been refreshed' : 'No Set-Cookie header - cookie was not set/refreshed'
       });
 
       if (response.ok) {
@@ -166,10 +176,35 @@ export async function checkAuthStatus(): Promise<boolean> {
 
       // 401 or other error means not authenticated
       const errorText = await response.text().catch(() => '');
+      let errorData: { raw?: string; responseStatus?: string; message?: string; data?: unknown } | null = null;
+      try {
+        errorData = JSON.parse(errorText) as { responseStatus?: string; message?: string; data?: unknown };
+      } catch {
+        errorData = { raw: errorText.substring(0, 200) };
+      }
+      
       logDebug('Response not OK', { 
         status: response.status, 
         errorText: errorText.substring(0, 200),
-        note: isProd ? 'Cookie may not be shared across subdomains - check COOKIE_DOMAIN env var' : ''
+        errorData,
+        note: isProd ? 'Cookie may not be shared across subdomains - check COOKIE_DOMAIN env var' : '',
+        diagnosis: response.status === 401 ? {
+          possibleCauses: [
+            '1. COOKIE_DOMAIN env var is NOT set in backend (most likely)',
+            '2. Cookie was set without Domain attribute (old cookie before env var was set)',
+            '3. User is not logged in on www.wildmindai.com',
+            '4. Cookie domain mismatch (cookie set for www.wildmindai.com instead of .wildmindai.com)'
+          ],
+          howToFix: [
+            '1. Go to Render.com → API Gateway service → Environment tab',
+            '2. Add: COOKIE_DOMAIN=.wildmindai.com',
+            '3. Restart backend service',
+            '4. Log in again on www.wildmindai.com (old cookies won\'t have domain)',
+            '5. Check DevTools → Application → Cookies → verify Domain: .wildmindai.com',
+            '6. Then try studio.wildmindai.com again'
+          ],
+          testEndpoint: 'https://api-gateway-services-wildmind.onrender.com/api/auth/debug/cookie-config'
+        } : 'Unknown error'
       });
       
       // CRITICAL FIX: If 401, clear any invalid/expired cookies
