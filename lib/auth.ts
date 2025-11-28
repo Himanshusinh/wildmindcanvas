@@ -67,7 +67,7 @@ export function isAuthenticated(): boolean {
  */
 export async function checkAuthStatus(): Promise<boolean> {
   try {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api-gateway-services-wildmind.onrender.com';
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wildmindai.com';
     const apiUrl = `${apiBase}/api/auth/me`;
     
     // Log to localStorage for debugging
@@ -210,8 +210,11 @@ export async function checkAuthStatus(): Promise<boolean> {
       // CRITICAL FIX: If 401, clear any invalid/expired cookies
       if (response.status === 401 && typeof document !== 'undefined') {
         // Check if error is due to cookie not being sent (domain issue)
-        const isDomainIssue = errorData?.message?.includes('Cookie not sent') || 
-                              errorData?.message?.includes('No session token');
+        // Check both errorData object and raw errorText to be safe
+        const errorMessage = errorData?.message || errorText || '';
+        const isDomainIssue = errorMessage.includes('Cookie not sent') || 
+                              errorMessage.includes('No session token') ||
+                              errorMessage.includes('cookie domain');
         
         if (isDomainIssue) {
           logDebug('401 due to cookie domain issue - NOT clearing cookies', { error: errorData?.message });
