@@ -98,7 +98,15 @@ export async function checkAuthStatus(): Promise<boolean> {
       hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
       isProd,
       cookies: typeof document !== 'undefined' ? document.cookie : 'n/a',
-      cookieCount: typeof document !== 'undefined' ? document.cookie.split(';').filter(c => c.trim()).length : 0
+      cookieCount: typeof document !== 'undefined' ? document.cookie.split(';').filter(c => c.trim()).length : 0,
+      allCookiesDetailed: typeof document !== 'undefined' ? document.cookie.split(';').map(c => {
+        const parts = c.trim().split('=');
+        return {
+          name: parts[0],
+          value: parts[1] ? (parts[1].length > 20 ? parts[1].substring(0, 20) + '...' : parts[1]) : '(empty)',
+          fullLength: parts[1]?.length || 0
+        };
+      }) : []
     });
     
     // In production, check if cookie exists (might be httpOnly and not visible)
@@ -107,10 +115,21 @@ export async function checkAuthStatus(): Promise<boolean> {
       // Check for app_session cookie (might not be visible if httpOnly, but that's OK)
       const cookies = typeof document !== 'undefined' ? document.cookie.split(';').map(c => c.trim()) : [];
       const hasAppSessionCookie = cookies.some(c => c.startsWith('app_session='));
+      
+      // CRITICAL: Check if user is logged in on main site
+      // Try to check cookies from www.wildmindai.com domain
       logDebug('Production cookie check', { 
         hasAppSessionCookie,
         allCookies: cookies,
-        note: 'httpOnly cookies may not be visible in document.cookie - this is normal'
+        note: 'httpOnly cookies may not be visible in document.cookie - this is normal',
+        important: 'If cookie is httpOnly, it exists but JavaScript cannot read it. The API call will tell us if it\'s being sent.',
+        troubleshooting: [
+          '1. Check if you are logged in on www.wildmindai.com',
+          '2. Check DevTools → Application → Cookies → https://www.wildmindai.com',
+          '3. Look for app_session cookie with Domain: .wildmindai.com',
+          '4. If domain is www.wildmindai.com (no leading dot), COOKIE_DOMAIN env var is not set',
+          '5. If domain is .wildmindai.com (with dot), cookie should work but might need to log in again'
+        ]
       });
     }
     
