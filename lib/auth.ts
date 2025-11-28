@@ -61,6 +61,9 @@ export function isAuthenticated(): boolean {
 /**
  * Check authentication status with the API gateway
  * Verifies that the session cookie is still valid
+ * 
+ * CRITICAL FIX: In production, cookies should be shared across subdomains
+ * (www.wildmindai.com <-> studio.wildmindai.com) if cookie domain is set to .wildmindai.com
  */
 export async function checkAuthStatus(): Promise<boolean> {
   try {
@@ -83,7 +86,33 @@ export async function checkAuthStatus(): Promise<boolean> {
       }
     };
     
-    logDebug('Starting auth check', { apiUrl, apiBase, cookies: document.cookie });
+    // Check if we're in production (cross-subdomain scenario)
+    const isProd = typeof window !== 'undefined' && 
+      (window.location.hostname === 'studio.wildmindai.com' || 
+       window.location.hostname === 'wildmindai.com' ||
+       window.location.hostname === 'www.wildmindai.com');
+    
+    logDebug('Starting auth check', { 
+      apiUrl, 
+      apiBase, 
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+      isProd,
+      cookies: typeof document !== 'undefined' ? document.cookie : 'n/a',
+      cookieCount: typeof document !== 'undefined' ? document.cookie.split(';').filter(c => c.trim()).length : 0
+    });
+    
+    // In production, check if cookie exists (might be httpOnly and not visible)
+    // But we can still try the API call - if cookie domain is set correctly, it will be sent
+    if (isProd) {
+      // Check for app_session cookie (might not be visible if httpOnly, but that's OK)
+      const cookies = typeof document !== 'undefined' ? document.cookie.split(';').map(c => c.trim()) : [];
+      const hasAppSessionCookie = cookies.some(c => c.startsWith('app_session='));
+      logDebug('Production cookie check', { 
+        hasAppSessionCookie,
+        allCookies: cookies,
+        note: 'httpOnly cookies may not be visible in document.cookie - this is normal'
+      });
+    }
     
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
@@ -94,7 +123,7 @@ export async function checkAuthStatus(): Promise<boolean> {
       
       const response = await fetch(apiUrl, {
         method: 'GET',
-        credentials: 'include', // Include cookies (app_session)
+        credentials: 'include', // CRITICAL: Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
         headers: {
           'Content-Type': 'application/json',
         },
@@ -118,7 +147,11 @@ export async function checkAuthStatus(): Promise<boolean> {
 
       // 401 or other error means not authenticated
       const errorText = await response.text().catch(() => '');
-      logDebug('Response not OK', { status: response.status, errorText: errorText.substring(0, 200) });
+      logDebug('Response not OK', { 
+        status: response.status, 
+        errorText: errorText.substring(0, 200),
+        note: isProd ? 'Cookie may not be shared across subdomains - check COOKIE_DOMAIN env var' : ''
+      });
       return false;
     } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
