@@ -66,6 +66,11 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       name: 'Storyboard',
       description: 'Create storyboard frames for your project',
     },
+    {
+      id: 'video-editor',
+      name: 'Video Editor',
+      description: 'Edit and assemble videos',
+    },
   ]);
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {
@@ -151,6 +156,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
+              ) : item.id === 'video-editor' ? (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                  <line x1="7" y1="2" x2="7" y2="22" />
+                  <line x1="17" y1="2" x2="17" y2="22" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <line x1="2" y1="7" x2="7" y2="7" />
+                  <line x1="2" y1="17" x2="7" y2="17" />
+                  <line x1="17" y1="17" x2="22" y2="17" />
+                  <line x1="17" y1="7" x2="22" y2="7" />
+                </svg>
               ) : (
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
@@ -217,21 +233,21 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       }}
     >
       {/* Header */}
-      <div style={{ 
-        paddingLeft: '20px', 
-        paddingRight: '20px', 
-        paddingTop: '16px', 
-        paddingBottom: '16px', 
-        borderBottom: `1px solid ${headerBorder}`, 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        paddingLeft: '20px',
+        paddingRight: '20px',
+        paddingTop: '16px',
+        paddingBottom: '16px',
+        borderBottom: `1px solid ${headerBorder}`,
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         transition: 'border-color 0.3s ease'
       }}>
-        <h2 style={{ 
-          margin: 0, 
-          fontSize: '20px', 
-          fontWeight: 600, 
+        <h2 style={{
+          margin: 0,
+          fontSize: '20px',
+          fontWeight: 600,
           color: headerText,
           transition: 'color 0.3s ease'
         }}>Plugins</h2>

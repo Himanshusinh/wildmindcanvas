@@ -1173,7 +1173,7 @@ export async function queryCanvasPrompt(
 /**
  * Generate scenes from story text
  */
-export async function generateScenesFromStory(story: string): Promise<{ scenes: Array<{ scene_number: number; heading: string; content: string }> }> {
+export async function generateScenesFromStory(story: string): Promise<import('@/types/storyWorld').GenerateScenesResponse> {
   try {
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-scenes`, {
       method: 'POST',
@@ -1194,7 +1194,22 @@ export async function generateScenesFromStory(story: string): Promise<{ scenes: 
       throw new Error(result.message || 'Failed to generate scenes');
     }
 
-    return result.data || result;
+    // result.data should be { storyWorld, scenes }
+    const data = result.data || result;
+
+    // Validate response structure
+    if (!data.storyWorld || !data.scenes) {
+      console.warn('[generateScenesFromStory] Missing storyWorld or scenes in response', data);
+      throw new Error('Invalid response format from server');
+    }
+
+    console.log('[generateScenesFromStory] Received story world', {
+      characters: data.storyWorld.characters?.length || 0,
+      locations: data.storyWorld.locations?.length || 0,
+      scenes: data.scenes?.length || 0,
+    });
+
+    return data;
   } catch (error: any) {
     console.error('[generateScenesFromStory] Error:', error);
     throw error;

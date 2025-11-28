@@ -166,6 +166,10 @@ export interface SceneFrameModalState {
   frameWidth: number;
   frameHeight: number;
   content: string;
+  // Story World metadata for visual consistency
+  characterIds?: string[];       // IDs of characters present in this scene
+  locationId?: string;           // ID of the location where scene takes place
+  mood?: string;                 // Emotional tone of the scene
 }
 
 export interface Connection {

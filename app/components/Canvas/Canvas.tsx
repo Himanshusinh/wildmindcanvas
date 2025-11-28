@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Stage, Layer, Rect, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
@@ -32,7 +32,7 @@ interface CanvasProps {
   isImageModalOpen?: boolean;
   onImageModalClose?: () => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
@@ -216,6 +216,75 @@ export const Canvas: React.FC<CanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
+
+  // Helper function to check if a scene can be generated (sequential generation)
+  const canGenerateScene = (sceneNumber: number, scriptFrameId: string): boolean => {
+    if (sceneNumber === 1) return true; // Scene 1 is always unlocked
+
+    // Find all scenes for this script frame, sorted by scene number
+    const scriptScenes = sceneFrameModalStates
+      .filter(s => s.scriptFrameId === scriptFrameId)
+      .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+    // Check if all previous scenes have generated images
+    for (let i = 0; i < sceneNumber - 1; i++) {
+      const prevScene = scriptScenes[i];
+      if (!prevScene) return false;
+
+      // Check if this scene has a generated image
+      // Look for image modals that are connected to this scene
+      const hasImage = imageModalStates.some(img => {
+        // Check if image modal ID contains the scene ID (scene-generated images)
+        const isSceneImage = img.id.includes(prevScene.id);
+        // Must have a generated image URL
+        return isSceneImage && img.generatedImageUrl;
+      });
+
+      if (!hasImage) return false;
+    }
+
+    return true;
+  };
+
+  // Helper function to get the previous scene's generated image URL for reference chaining
+  const getPreviousSceneImageUrl = (currentSceneId: string, scriptFrameId: string): string | null => {
+    // Find the current scene
+    const currentScene = sceneFrameModalStates.find(s => s.id === currentSceneId);
+    if (!currentScene || currentScene.sceneNumber <= 1) {
+      console.log('[Auto-Reference] Scene 1: No reference needed (first scene)');
+      return null; // Scene 1 has no previous scene
+    }
+
+    // Find all scenes for this script, sorted by scene number
+    const scriptScenes = sceneFrameModalStates
+      .filter(s => s.scriptFrameId === scriptFrameId)
+      .sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+    // Find the previous scene (Scene N-1)
+    const previousScene = scriptScenes.find(
+      s => s.sceneNumber === currentScene.sceneNumber - 1
+    );
+
+    if (!previousScene) {
+      console.log(`[Auto-Reference] Scene ${currentScene.sceneNumber}: No previous scene found`);
+      return null;
+    }
+
+    // Find the image modal associated with the previous scene
+    const previousSceneImage = imageModalStates.find(img =>
+      img.id.includes(previousScene.id) && img.generatedImageUrl
+    );
+
+    if (previousSceneImage?.generatedImageUrl) {
+      console.log(
+        `[Auto-Reference] Scene ${currentScene.sceneNumber}: Using Scene ${previousScene.sceneNumber}'s image as reference`
+      );
+      return previousSceneImage.generatedImageUrl;
+    }
+
+    console.log(`[Auto-Reference] Scene ${currentScene.sceneNumber}: Previous scene has no image yet`);
+    return null;
+  };
   const layerRef = useRef<Konva.Layer>(null);
   const initializedRef = useRef(false);
   const [patternImage, setPatternImage] = useState<HTMLImageElement | null>(null);
@@ -238,7 +307,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
   const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>>([]);
-  const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>>([]);
+  const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string; characterIds?: string[]; locationId?: string; mood?: string }>>([]);
+  // Story World state - stores character/location/style data per storyboard
+  const [storyWorldStates, setStoryWorldStates] = useState<Array<{ storyboardId: string; storyWorld: import('@/types/storyWorld').StoryWorld }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -258,6 +329,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
   const [selectedStoryboardModalId, setSelectedStoryboardModalId] = useState<string | null>(null);
   const [selectedStoryboardModalIds, setSelectedStoryboardModalIds] = useState<string[]>([]);
+  const [selectedScriptFrameModalId, setSelectedScriptFrameModalId] = useState<string | null>(null);
+  const [selectedScriptFrameModalIds, setSelectedScriptFrameModalIds] = useState<string[]>([]);
+  const [selectedSceneFrameModalId, setSelectedSceneFrameModalId] = useState<string | null>(null);
+  const [selectedSceneFrameModalIds, setSelectedSceneFrameModalIds] = useState<string[]>([]);
+
+  // Track which script frames have already had scenes generated to prevent duplicates
+  const processedScriptFramesRef = useRef<Set<string>>(new Set());
+
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
   const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
@@ -489,17 +568,36 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
 
-    try {
-      // Generate scenes using AI
-      const result = await generateScenesFromStory(textToUse);
-      const scenes = result.scenes || [];
+    // Get the storyboard ID (parent of script frame)
+    const storyboardId = scriptFrame?.pluginId;
+    if (!storyboardId) {
+      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+      return;
+    }
 
-      if (scenes.length === 0) {
+    try {
+      // Generate scenes using AI - now returns { storyWorld, scenes }
+      const result = await generateScenesFromStory(textToUse);
+      const { storyWorld, scenes } = result;
+
+      if (!scenes || scenes.length === 0) {
         console.warn('[Canvas] No scenes generated from story');
         return;
       }
 
-      console.log(`[Canvas] Generated ${scenes.length} scenes`);
+      console.log(`[Canvas] Generated ${scenes.length} scenes with Story World`, {
+        characters: storyWorld.characters.length,
+        locations: storyWorld.locations.length,
+      });
+
+      // Store Story World for this storyboard
+      upsertStoryWorld(storyboardId, storyWorld);
+
+      // Map scene_outline by scene_number for metadata lookup
+      const outlineByNumber: Record<number, import('@/types/storyWorld').StorySceneOutline> = {};
+      storyWorld.scene_outline.forEach(s => {
+        outlineByNumber[s.scene_number] = s;
+      });
 
       // Import scene utilities dynamically for positioning
       const { calculateSceneFramePositions } = await import('@/app/components/Plugins/StoryboardPluginModal/sceneUtils');
@@ -514,17 +612,24 @@ export const Canvas: React.FC<CanvasProps> = ({
         300  // scene frame height
       );
 
-      // Create scene frames
-      const newSceneFrames = scenes.map((scene: any, index: number) => ({
-        id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
-        scriptFrameId: scriptFrameId,
-        sceneNumber: scene.scene_number,
-        x: positions[index].x,
-        y: positions[index].y,
-        frameWidth: 350,
-        frameHeight: 300,
-        content: scene.content,
-      }));
+      // Create scene frames with Story World metadata
+      const newSceneFrames = scenes.map((scene: any, index: number) => {
+        const outline = outlineByNumber[scene.scene_number];
+        return {
+          id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
+          scriptFrameId: scriptFrameId,
+          sceneNumber: scene.scene_number,
+          x: positions[index].x,
+          y: positions[index].y,
+          frameWidth: 350,
+          frameHeight: 300,
+          content: scene.content,
+          // Story World metadata
+          characterIds: outline?.character_ids,
+          locationId: outline?.location_id,
+          mood: outline?.mood,
+        };
+      });
 
       // Optimistic update
       setSceneFrameModalStates(prev => {
@@ -544,7 +649,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       const newConnections = newSceneFrames.map(sceneFrame => ({
         from: scriptFrameId,
         to: sceneFrame.id,
-        color: '#437eb5', // Standard connection color
+        color: '#437eb5', // Blue connection for script → scene
       }));
 
       // Update connections state and persist
@@ -554,40 +659,58 @@ export const Canvas: React.FC<CanvasProps> = ({
         });
       }
 
-      // For each scene frame, also create an image modal and connect the scene -> image
+      // Import image prompt builder
+      const { buildImagePromptForScene } = await import('@/app/components/Plugins/StoryboardPluginModal/imagePromptUtils');
+
+      // For each scene frame, create an image modal with enhanced prompt
       const newImageModals = newSceneFrames.map(sceneFrame => {
         const imgX = sceneFrame.x + (sceneFrame.frameWidth || 350) + 60;
         const imgY = sceneFrame.y;
         const newId = `image-${Date.now()}-${Math.random()}`;
+
+        // Build rich, context-aware prompt using Story World
+        const { prompt, negativePrompt, aspectRatio, seedKey } = buildImagePromptForScene({
+          storyWorld,
+          scene: sceneFrame,
+        });
+
         return {
           id: newId,
           x: imgX,
           y: imgY,
           generatedImageUrl: null,
-          prompt: sceneFrame.content,
+          prompt, // Rich prompt with character/location consistency
           frameWidth: 600,
           frameHeight: 400,
+          aspectRatio,
+          // Use Google Nano Banana Pro 2K for scene-generated images
+          model: 'Google nano banana pro 2K',
+          frame: 'default',
         };
       });
 
       // Optimistically add image modals to state
       if (newImageModals.length > 0) {
-        setImageModalStates(prev => [...prev, ...newImageModals.map(m => ({ id: m.id, x: m.x, y: m.y, generatedImageUrl: m.generatedImageUrl, frameWidth: m.frameWidth, frameHeight: m.frameHeight, prompt: m.prompt }))]);
+        setImageModalStates(prev => [...prev, ...newImageModals]);
       }
 
-      // Persist new image modals and create scene->image connectors
+      // Persist new image modals and create scene→image connectors
       newImageModals.forEach((imgModal, idx) => {
         if (onPersistImageModalCreate) {
-          Promise.resolve(onPersistImageModalCreate({ id: imgModal.id, x: imgModal.x, y: imgModal.y, generatedImageUrl: imgModal.generatedImageUrl, frameWidth: imgModal.frameWidth, frameHeight: imgModal.frameHeight, prompt: imgModal.prompt })).catch(console.error);
+          Promise.resolve(onPersistImageModalCreate(imgModal)).catch(console.error);
         }
 
         const sceneFrame = newSceneFrames[idx];
         if (onPersistConnectorCreate && sceneFrame) {
-          Promise.resolve(onPersistConnectorCreate({ from: sceneFrame.id, to: imgModal.id, color: '#43b56e' })).catch(console.error);
+          Promise.resolve(onPersistConnectorCreate({
+            from: sceneFrame.id,
+            to: imgModal.id,
+            color: '#43b56e' // Green connection for scene → image
+          })).catch(console.error);
         }
       });
 
-      console.log(`[Canvas] Created ${newSceneFrames.length} scene frames`);
+      console.log(`[Canvas] Created ${newSceneFrames.length} scene frames with Story World consistency`);
 
     } catch (error) {
       console.error('[Canvas] Error generating scenes:', error);
@@ -625,6 +748,23 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (onPersistSceneFrameModalMove) {
       Promise.resolve(onPersistSceneFrameModalMove(frameId, { x, y })).catch(console.error);
     }
+  };
+
+  // Story World helper functions
+  const upsertStoryWorld = (storyboardId: string, storyWorld: import('@/types/storyWorld').StoryWorld) => {
+    setStoryWorldStates(prev => {
+      const existingIndex = prev.findIndex(sw => sw.storyboardId === storyboardId);
+      if (existingIndex === -1) {
+        return [...prev, { storyboardId, storyWorld }];
+      }
+      const updated = [...prev];
+      updated[existingIndex] = { storyboardId, storyWorld };
+      return updated;
+    });
+  };
+
+  const getStoryWorld = (storyboardId: string): import('@/types/storyWorld').StoryWorld | undefined => {
+    return storyWorldStates.find(sw => sw.storyboardId === storyboardId)?.storyWorld;
   };
 
   const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
@@ -677,12 +817,122 @@ export const Canvas: React.FC<CanvasProps> = ({
   const canvasSize = { width: INFINITE_CANVAS_SIZE, height: INFINITE_CANVAS_SIZE };
 
   // Wrapper functions for helpers that need component state
+
+  console.log('[Canvas] Defining handleImageGenerateWithAutoReference wrapper');
+
+  // Wrapper for onImageGenerate to handle auto-reference for sequential scenes
+  const handleImageGenerateWithAutoReference = useCallback(async (
+    prompt: string,
+    model: string,
+    frame: string,
+    aspectRatio: string,
+    modalId?: string,
+    imageCount?: number,
+    sourceImageUrl?: string
+  ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
+    console.log('[handleImageGenerateWithAutoReference] Called with:', {
+      modalId,
+      hasSourceImageUrl: !!sourceImageUrl,
+      sceneFrameModalStatesCount: sceneFrameModalStates.length,
+      connectionsCount: connections.length,
+    });
+
+    let finalSourceImageUrl = sourceImageUrl;
+
+    // Check if this is a scene-generated image modal
+    if (modalId && !sourceImageUrl) {
+      // 1. Find the scene frame connected to this image modal
+      // The connection goes FROM scene TO image modal
+      const connection = connections.find(c => c.to === modalId);
+
+      if (connection) {
+        const relatedScene = sceneFrameModalStates.find(s => s.id === connection.from);
+
+        if (relatedScene) {
+          console.log(`[Auto-Reference] Found related scene for modal ${modalId}: Scene ${relatedScene.sceneNumber}`);
+
+          // 2. Found the scene! Now find previous scene
+          const previousSceneNumber = relatedScene.sceneNumber - 1;
+
+          if (previousSceneNumber > 0) {
+            // Find the previous scene in the same storyboard (same scriptFrameId)
+            const previousScene = sceneFrameModalStates.find(s =>
+              s.scriptFrameId === relatedScene.scriptFrameId &&
+              s.sceneNumber === previousSceneNumber
+            );
+
+            if (previousScene) {
+              // 3. Find image modal connected to previous scene
+              const prevConnection = connections.find(c => c.from === previousScene.id);
+
+              if (prevConnection) {
+                const prevImageModal = imageModalStates.find(m => m.id === prevConnection.to);
+
+                if (prevImageModal && prevImageModal.generatedImageUrl) {
+                  finalSourceImageUrl = prevImageModal.generatedImageUrl;
+                  console.log(
+                    `[Auto-Reference] ✅ Scene ${relatedScene.sceneNumber}: Automatically using Scene ${previousSceneNumber}'s image for consistency`,
+                    { imageUrl: finalSourceImageUrl.substring(0, 50) + '...' }
+                  );
+                } else {
+                  console.log(`[Auto-Reference] Previous scene ${previousSceneNumber} found but has no generated image`);
+                }
+              } else {
+                console.log(`[Auto-Reference] Previous scene ${previousSceneNumber} found but has no connected image modal`);
+              }
+            } else {
+              console.log(`[Auto-Reference] No previous scene found (Scene ${previousSceneNumber})`);
+            }
+          } else {
+            console.log(`[Auto-Reference] This is Scene 1, no previous scene to reference`);
+          }
+        } else {
+          console.log(`[Auto-Reference] Connection found but no related scene frame (ID: ${connection.from})`);
+        }
+      } else {
+        console.log(`[Auto-Reference] No connection found for modal ${modalId}`);
+      }
+    }
+
+    console.log('[handleImageGenerateWithAutoReference] Final call:', {
+      hasFinalSourceImageUrl: !!finalSourceImageUrl,
+      willUseI2I: !!finalSourceImageUrl,
+    });
+
+    // Call the original onImageGenerate with the auto-populated reference
+    if (onImageGenerate) {
+      return await onImageGenerate(
+        prompt,
+        model,
+        frame,
+        aspectRatio,
+        modalId,
+        imageCount,
+        finalSourceImageUrl
+      );
+    }
+
+    return null;
+  }, [sceneFrameModalStates, imageModalStates, connections, onImageGenerate]); // Dependencies: scene states, connections, and original handler
+
+  const handleCreateImageModal = (x: number, y: number) => {
+    const newId = `image-${Date.now()}-${Math.random()}`;
+    const modal = { id: newId, x, y, generatedImageUrl: null as string | null };
+    setImageModalStates(prev => [...prev, modal]);
+    if (onPersistImageModalCreate) {
+      Promise.resolve(onPersistImageModalCreate(modal)).catch(console.error);
+    }
+    // Auto-focus on new component
+    setTimeout(() => focusOnComponentWrapper(x, y, 600, 400), 100);
+  };
+
   const checkOverlapWrapper = (x: number, y: number, width: number = 600, height: number = 400, padding: number = 100): boolean => {
     return checkOverlap(x, y, width, height, images, textInputStates, imageModalStates, videoModalStates, musicModalStates, padding);
   };
 
   const findBlankSpaceWrapper = (componentWidth: number = 600, componentHeight: number = 400): { x: number; y: number } => {
     return findBlankSpace(componentWidth, componentHeight, images, textInputStates, imageModalStates, videoModalStates, musicModalStates, viewportSize, position, scale);
+
   };
 
   const focusOnComponentWrapper = (canvasX: number, canvasY: number, componentWidth: number = 600, componentHeight: number = 400) => {
@@ -1105,7 +1355,20 @@ export const Canvas: React.FC<CanvasProps> = ({
       const mapped: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
       storyboardModalStates.forEach(modal => {
         const script = sanitizeScriptOutput(modal.scriptText);
-        if (!script) return;
+
+        // Only create script frame if script is valid and complete
+        // Check for minimum length and ensure it's not a loading state
+        const isValidScript = script &&
+          script.trim().length > 50 &&
+          !script.includes('...') &&
+          !script.toLowerCase().includes('generating') &&
+          !script.toLowerCase().includes('loading');
+
+        if (!isValidScript) {
+          console.log('[Canvas] Skipping script frame creation - script not ready for storyboard:', modal.id);
+          return;
+        }
+
         const frameId = `script-${modal.id}`;
         const baseX = (modal.x ?? 0) + (modal.frameWidth || 400) + 60;
         const baseY = modal.y ?? 0;
@@ -1122,6 +1385,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
         } else {
           // Only use base position for new frames
+          console.log('[Canvas] Creating new script frame for storyboard:', modal.id);
           mapped.push({
             id: frameId,
             pluginId: modal.id,
@@ -1139,6 +1403,45 @@ export const Canvas: React.FC<CanvasProps> = ({
       return mapped;
     });
   }, [storyboardModalStates]);
+
+  // Automatically generate scenes when new script frames are created
+  useEffect(() => {
+    scriptFrameModalStates.forEach(frame => {
+      // Check if this frame has already been processed for scene generation
+      const hasScenes = sceneFrameModalStates.some(scene => scene.scriptFrameId === frame.id);
+      const alreadyProcessed = processedScriptFramesRef.current.has(frame.id);
+
+      // Validate that the script text is complete and meaningful
+      const hasValidScript = frame.text &&
+        frame.text.trim().length > 50 && // At least 50 characters
+        !frame.text.includes('...') && // Not a loading indicator
+        !frame.text.toLowerCase().includes('generating'); // Not still generating
+
+      // Check if the parent storyboard exists and has completed script generation
+      const parentStoryboard = storyboardModalStates.find(s => s.id === frame.pluginId);
+      const storyboardHasScript = parentStoryboard && parentStoryboard.scriptText && parentStoryboard.scriptText.trim().length > 0;
+
+      // Only generate scenes for new frames that:
+      // 1. Don't have scenes yet
+      // 2. Have valid, complete script text
+      // 3. Haven't been processed before
+      // 4. Have a parent storyboard with a complete script
+      if (!hasScenes && hasValidScript && !alreadyProcessed && storyboardHasScript) {
+        processedScriptFramesRef.current.add(frame.id);
+
+        console.log('[Canvas] Auto-generating scenes for script frame:', frame.id, 'Script length:', frame.text.length);
+
+        // Add a small delay to ensure the script frame is fully rendered and stable
+        setTimeout(() => {
+          handleGenerateScenes(frame.id).catch(err => {
+            console.error('[Canvas] Auto scene generation failed:', err);
+            // Remove from processed set on failure so it can be retried
+            processedScriptFramesRef.current.delete(frame.id);
+          });
+        }, 1000); // 1 second delay to ensure stability
+      }
+    });
+  }, [scriptFrameModalStates.length, scriptFrameModalStates.map(f => f.id).join(','), scriptFrameModalStates.map(f => f.text).join('|'), sceneFrameModalStates.length, storyboardModalStates.length]);
 
   useEffect(() => {
     if (!onPersistConnectorCreate) return;
@@ -4011,13 +4314,17 @@ export const Canvas: React.FC<CanvasProps> = ({
         setScriptFrameModalStates={setScriptFrameModalStates}
         onScriptFramePositionChange={handleScriptFramePositionChange}
         onScriptFramePositionCommit={handleScriptFramePositionCommit}
+        onGenerateScenes={handleGenerateScenes}
+        onDeleteSceneFrame={handleDeleteSceneFrame}
+        onSceneFramePositionChange={handleSceneFramePositionChange}
+        onSceneFramePositionCommit={handleSceneFramePositionCommit}
         setSelectedStoryboardModalId={setSelectedStoryboardModalId}
         setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
         images={images}
         onTextCreate={onTextCreate}
         onTextScriptGenerated={handleTextScriptGenerated}
         onImageSelect={onImageSelect}
-        onImageGenerate={onImageGenerate}
+        onImageGenerate={handleImageGenerateWithAutoReference}
         onVideoSelect={onVideoSelect}
         onVideoGenerate={onVideoGenerate}
         onMusicSelect={onMusicSelect}

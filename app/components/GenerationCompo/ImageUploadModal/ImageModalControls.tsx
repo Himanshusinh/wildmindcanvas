@@ -11,15 +11,21 @@ interface ImageModalControlsProps {
   selectedModel: string;
   selectedAspectRatio: string;
   selectedFrame: string;
+  selectedResolution: string;
   imageCount: number;
   generatedImageUrl?: string | null;
   availableModels: string[];
+  availableResolutions: Array<{ value: string; label: string }>;
   isGenerating: boolean;
+  isLocked: boolean;
+  lockReason: string;
   isModelDropdownOpen: boolean;
   isAspectRatioDropdownOpen: boolean;
+  isResolutionDropdownOpen: boolean;
   onPromptChange: (value: string) => void;
   onModelChange: (model: string) => void;
   onAspectRatioChange: (ratio: string) => void;
+  onResolutionChange: (resolution: string) => void;
   onImageCountChange: (count: number) => void;
   onGenerate: () => void;
   getAvailableAspectRatios: () => Array<{ value: string; label: string }>;
@@ -27,6 +33,7 @@ interface ImageModalControlsProps {
   onSetIsPinned: (pinned: boolean) => void;
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsAspectRatioDropdownOpen: (open: boolean) => void;
+  onSetIsResolutionDropdownOpen: (open: boolean) => void;
 }
 
 export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
@@ -39,15 +46,21 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   selectedModel,
   selectedAspectRatio,
   selectedFrame,
+  selectedResolution,
   imageCount,
   generatedImageUrl,
   availableModels,
+  availableResolutions,
   isGenerating,
+  isLocked,
+  lockReason,
   isModelDropdownOpen,
   isAspectRatioDropdownOpen,
+  isResolutionDropdownOpen,
   onPromptChange,
   onModelChange,
   onAspectRatioChange,
+  onResolutionChange,
   onImageCountChange,
   onGenerate,
   getAvailableAspectRatios,
@@ -55,6 +68,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   onSetIsPinned,
   onSetIsModelDropdownOpen,
   onSetIsAspectRatioDropdownOpen,
+  onSetIsResolutionDropdownOpen,
 }) => {
   const [isDark, setIsDark] = useState(false);
 
@@ -70,6 +84,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
+  const resolutionDropdownRef = useRef<HTMLDivElement>(null);
   const frameBorderColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
@@ -96,15 +111,18 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
       if (aspectRatioDropdownRef.current && !aspectRatioDropdownRef.current.contains(target)) {
         onSetIsAspectRatioDropdownOpen(false);
       }
+      if (resolutionDropdownRef.current && !resolutionDropdownRef.current.contains(target)) {
+        onSetIsResolutionDropdownOpen(false);
+      }
     };
 
-    if (isModelDropdownOpen || isAspectRatioDropdownOpen) {
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isResolutionDropdownOpen) {
       // Use 'click' instead of 'mousedown' so it fires after dropdown item clicks
       // This ensures the item's onMouseDown handler can stop propagation first
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [isModelDropdownOpen, isAspectRatioDropdownOpen, onSetIsModelDropdownOpen, onSetIsAspectRatioDropdownOpen]);
+  }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isResolutionDropdownOpen, onSetIsModelDropdownOpen, onSetIsAspectRatioDropdownOpen, onSetIsResolutionDropdownOpen]);
 
   if (isUploadedImage) return null;
 
@@ -234,35 +252,41 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           />
           <button
             onClick={onGenerate}
-            disabled={!prompt.trim() || isGenerating}
+            disabled={!prompt.trim() || isGenerating || isLocked}
+            title={isLocked ? lockReason : undefined}
             style={{
               width: `${40 * scale}px`,
               height: `${40 * scale}px`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: (prompt.trim() && !isGenerating && !isLocked) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
               border: 'none',
               borderRadius: `${10 * scale}px`,
-              cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
+              cursor: (prompt.trim() && !isGenerating && !isLocked) ? 'pointer' : 'not-allowed',
               color: 'white',
-              boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+              boxShadow: (prompt.trim() && !isGenerating && !isLocked) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
               padding: 0,
-              opacity: isGenerating ? 0.6 : 1,
+              opacity: (isGenerating || isLocked) ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (prompt.trim()) {
+              if (prompt.trim() && !isLocked) {
                 e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
-              if (prompt.trim()) {
+              if (prompt.trim() && !isLocked) {
                 e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {isGenerating ? (
+            {isLocked ? (
+              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            ) : isGenerating ? (
               <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
                 <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeDasharray="31.416" strokeDashoffset="31.416">
@@ -314,7 +338,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 <path d="M2 4L6 8L10 4" stroke={isDark ? '#cccccc' : '#4b5563'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            
+
             {isModelDropdownOpen && (
               <div
                 style={{
@@ -418,7 +442,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            
+
             {isAspectRatioDropdownOpen && (
               <div
                 style={{
@@ -481,6 +505,104 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
             )}
           </div>
 
+          {/* Resolution Selector - Only show for models that support it */}
+          {availableResolutions.length > 0 && (
+            <div ref={resolutionDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3000 }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSetIsResolutionDropdownOpen(!isResolutionDropdownOpen);
+                  onSetIsModelDropdownOpen(false);
+                  onSetIsAspectRatioDropdownOpen(false);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
+                  backgroundColor: dropdownBg,
+                  border: `1px solid ${dropdownBorderColor}`,
+                  borderRadius: `${9999 * scale}px`,
+                  fontSize: controlFontSize,
+                  fontWeight: '600',
+                  color: dropdownText,
+                  minWidth: `${100 * scale}px`,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+                }}
+              >
+                <span>{selectedResolution}</span>
+                <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isResolutionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                  <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {isResolutionDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: `${4 * scale}px`,
+                    backgroundColor: dropdownBg,
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: `${12 * scale}px`,
+                    boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                    maxHeight: `${200 * scale}px`,
+                    overflowY: 'auto',
+                    zIndex: 3003,
+                    padding: `${4 * scale}px 0`,
+                    minWidth: `${120 * scale}px`,
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {availableResolutions.map((resolution) => (
+                    <div
+                      key={resolution.value}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onResolutionChange(resolution.value);
+                        onSetIsResolutionDropdownOpen(false);
+                      }}
+                      style={{
+                        padding: `${8 * scale}px ${16 * scale}px`,
+                        fontSize: controlFontSize,
+                        color: dropdownText,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: selectedResolution === resolution.value ? selectedBg : 'transparent',
+                        borderLeft: selectedResolution === resolution.value ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                        transition: 'background-color 0.3s ease, color 0.3s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedResolution !== resolution.value) {
+                          e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedResolution !== resolution.value) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {selectedResolution === resolution.value && (
+                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      <span>{resolution.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Image count +/- control (1..4) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: `${8 * scale}px` }}>
             <button
@@ -503,11 +625,11 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
             >
               -
             </button>
-            <div style={{ 
-              minWidth: `${28 * scale}px`, 
-              textAlign: 'center', 
-              fontWeight: 600, 
-              fontSize: `${13 * scale}px`, 
+            <div style={{
+              minWidth: `${28 * scale}px`,
+              textAlign: 'center',
+              fontWeight: 600,
+              fontSize: `${13 * scale}px`,
               color: countText,
               transition: 'color 0.3s ease'
             }}>{imageCount}</div>
