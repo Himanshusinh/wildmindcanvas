@@ -209,17 +209,26 @@ export async function checkAuthStatus(): Promise<boolean> {
       
       // CRITICAL FIX: If 401, clear any invalid/expired cookies
       if (response.status === 401 && typeof document !== 'undefined') {
-        logDebug('401 Unauthorized - clearing invalid/expired cookies');
-        try {
-          const expired = 'Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/';
-          // Clear all cookie variants
-          document.cookie = `app_session=; ${expired}; SameSite=None; Secure`;
-          document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=None; Secure`;
-          document.cookie = `app_session=; ${expired}; SameSite=Lax`;
-          document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=Lax`;
-          logDebug('Cleared invalid/expired cookies');
-        } catch (e) {
-          logDebug('Failed to clear cookies', { error: String(e) });
+        // Check if error is due to cookie not being sent (domain issue)
+        const isDomainIssue = errorData?.message?.includes('Cookie not sent') || 
+                              errorData?.message?.includes('No session token');
+        
+        if (isDomainIssue) {
+          logDebug('401 due to cookie domain issue - NOT clearing cookies', { error: errorData?.message });
+          // Don't clear cookies - let user know they need to log in again or fix domain
+        } else {
+          logDebug('401 Unauthorized - clearing invalid/expired cookies');
+          try {
+            const expired = 'Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/';
+            // Clear all cookie variants
+            document.cookie = `app_session=; ${expired}; SameSite=None; Secure`;
+            document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=None; Secure`;
+            document.cookie = `app_session=; ${expired}; SameSite=Lax`;
+            document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=Lax`;
+            logDebug('Cleared invalid/expired cookies');
+          } catch (e) {
+            logDebug('Failed to clear cookies', { error: String(e) });
+          }
         }
       }
       
