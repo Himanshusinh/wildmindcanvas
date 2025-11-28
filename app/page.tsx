@@ -23,6 +23,7 @@ import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSna
 import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
 import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator } from '@/app/components/CanvasApp/types';
+import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
 
 interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
@@ -73,6 +74,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Use UI visibility hook
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
+  const [isVideoEditorOpen, setIsVideoEditorOpen] = useState(false);
 
 
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
@@ -2073,6 +2075,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         isOpen={isPluginSidebarOpen}
         onClose={() => setIsPluginSidebarOpen(false)}
         onSelectPlugin={(plugin, x, y) => {
+          if (plugin.id === 'video-editor') {
+            setIsVideoEditorOpen(true);
+            return;
+          }
           if (plugin.id === 'upscale') {
             const viewportCenter = viewportCenterRef.current;
             // If x/y are provided (from click), convert screen coordinates to canvas coordinates
@@ -2665,6 +2671,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }}
         scale={1}
         viewportCenter={viewportCenterRef.current}
+      />
+      {/* Video Editor Modal */}
+      <VideoEditorPluginModal
+        isOpen={isVideoEditorOpen}
+        onClose={() => setIsVideoEditorOpen(false)}
       />
     </main>
   );
