@@ -278,6 +278,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         scale={scale}
         isHovered={isHovered}
         isPinned={isPinned}
+        isSelected={Boolean(isSelected)}
         prompt={prompt}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}

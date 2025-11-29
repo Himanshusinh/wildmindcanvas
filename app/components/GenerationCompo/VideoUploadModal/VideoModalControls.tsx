@@ -17,6 +17,7 @@ interface VideoModalControlsProps {
   isHovered: boolean;
   isPinned: boolean;
   isUploadedVideo: boolean;
+  isSelected?: boolean;
   prompt: string;
   isPromptDisabled?: boolean;
   selectedModel: string;
@@ -60,6 +61,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   isHovered,
   isPinned,
   isUploadedVideo,
+  isSelected = false,
   prompt,
   isPromptDisabled = false,
   selectedModel,
@@ -111,6 +113,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
+  const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
   const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
@@ -162,8 +165,6 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         maxWidth: '90vw',
         padding: `${16 * scale}px`,
         backgroundColor: controlsBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
         boxShadow: 'none',
         transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
@@ -175,9 +176,9 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
         overflow: 'visible',
         zIndex: 3,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}

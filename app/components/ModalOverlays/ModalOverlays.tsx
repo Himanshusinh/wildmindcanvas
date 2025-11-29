@@ -148,6 +148,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onDeleteScriptFrame,
   onScriptFramePositionChange,
   onScriptFramePositionCommit,
+  onTextUpdate,
   onGenerateScenes,
   onDeleteSceneFrame,
   onSceneFramePositionChange,
@@ -160,6 +161,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistConnectorCreate,
   onPersistConnectorDelete,
   onPluginSidebarOpen,
+  onGenerateStoryboard,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
 
@@ -200,6 +202,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         activeDrag={connectionManager.activeDrag}
         selectedConnectionId={connectionManager.selectedConnectionId}
         onSelectConnection={connectionManager.setSelectedConnectionId}
+        onDeleteConnection={connectionManager.handleDeleteConnection}
         stageRef={stageRef}
         position={position}
         scale={scale}
@@ -232,6 +235,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
         onScriptGenerated={onTextScriptGenerated}
+        connections={externalConnections ?? []}
+        storyboardModalStates={storyboardModalStates}
       />
 
       <ImageModalOverlays
@@ -256,6 +261,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
         sceneFrameModalStates={sceneFrameModalStates ?? []}
+        scriptFrameModalStates={scriptFrameModalStates ?? []}
+        storyboardModalStates={storyboardModalStates ?? []}
       />
 
       <VideoModalOverlays
@@ -446,12 +453,16 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
         connections={externalConnections ?? []}
         textInputStates={textInputStates}
+        imageModalStates={imageModalStates}
+        images={images}
+        onGenerateStoryboard={onGenerateStoryboard}
       />
       <ScriptFrameModalOverlays
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         onDelete={onDeleteScriptFrame}
         onPositionChange={onScriptFramePositionChange}
         onPositionCommit={onScriptFramePositionCommit}
+        onTextUpdate={onTextUpdate}
         onGenerateScenes={onGenerateScenes}
         stageRef={stageRef}
         scale={scale}
@@ -489,6 +500,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setExpandModalStates={setExpandModalStates}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
         setStoryboardModalStates={setStoryboardModalStates}
+        onPersistConnectorCreate={onPersistConnectorCreate}
       />
     </>
   );

@@ -43,11 +43,11 @@ export const TextModalNodes: React.FC<TextModalNodesProps> = ({
         }}
         style={{
           position: 'absolute',
-          left: `${-12 * scale}px`,
+          left: `${-25 * scale}px`,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: `${18 * scale}px`,
-          height: `${18 * scale}px`,
+          width: `${20 * scale}px`,
+          height: `${20 * scale}px`,
           borderRadius: '50%',
           backgroundColor: '#437eb5',
           cursor: 'pointer',
@@ -93,13 +93,14 @@ export const TextModalNodes: React.FC<TextModalNodesProps> = ({
         }}
         style={{
           position: 'absolute',
-          right: `${-12 * scale}px`,
+          right: `${-25 * scale}px`,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: `${18 * scale}px`,
-          height: `${18 * scale}px`,
+          width: `${20 * scale}px`,
+          height: `${20 * scale}px`,
           borderRadius: '50%',
           backgroundColor: '#437eb5',
+          boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
           cursor: 'grab',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,

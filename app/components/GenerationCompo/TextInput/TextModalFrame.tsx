@@ -1,6 +1,5 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
-import { queryCanvasPrompt } from '@/lib/api';
 
 interface TextModalFrameProps {
   id: string;
@@ -23,6 +22,8 @@ interface TextModalFrameProps {
   onSetIsPinned: (pinned: boolean) => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onScriptGenerated?: (script: string) => void;
+  connections?: Array<{ from: string; to: string }>;
+  storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
 }
 
 export const TextModalFrame: React.FC<TextModalFrameProps> = ({
@@ -46,11 +47,20 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   onSetIsPinned,
   onMouseDown,
   onScriptGenerated,
+  connections = [],
+  storyboardModalStates = [],
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [enhanceStatus, setEnhanceStatus] = useState('');
+  const isSettingHeightRef = useRef(false); // Flag to prevent ResizeObserver from firing during programmatic changes
   const [isDark, setIsDark] = useState(false);
+  const [textareaHeight, setTextareaHeight] = useState<number | null>(null); // Store height in canvas coordinates (will be scaled)
+
+  // Autocomplete state
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [mentionQuery, setMentionQuery] = useState('');
 
   useEffect(() => {
     const checkTheme = () => {
@@ -71,6 +81,64 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
       inputRef.current.focus();
     }
   }, [autoFocusInput]);
+
+  // Initialize textarea height on mount (in canvas coordinates, not scaled)
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea || textareaHeight !== null) return;
+
+    // Set initial height in canvas coordinates (80 canvas units, will be scaled)
+    const initialHeight = 80; // Canvas coordinates, not pixels
+    setTextareaHeight(initialHeight);
+    isSettingHeightRef.current = true;
+    textarea.style.height = `${initialHeight * scale}px`; // Scale for display
+    // Reset flag after a brief delay to allow ResizeObserver to settle
+    setTimeout(() => {
+      isSettingHeightRef.current = false;
+    }, 100);
+  }, []); // Only run once on mount
+
+  // Track textarea height changes (when user manually resizes)
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea) return;
+
+    // Use ResizeObserver to track when user manually resizes
+    const resizeObserver = new ResizeObserver((entries) => {
+      // Ignore if we're programmatically setting the height
+      if (isSettingHeightRef.current) return;
+
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        // Convert screen pixels to canvas coordinates by dividing by scale
+        const canvasHeight = height / scale;
+        // Only update if height changed significantly (user manually resized)
+        if (canvasHeight > 0 && (textareaHeight === null || Math.abs(canvasHeight - textareaHeight) > 2 / scale)) {
+          setTextareaHeight(canvasHeight); // Store in canvas coordinates
+        }
+      }
+    });
+
+    resizeObserver.observe(textarea);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [textareaHeight, scale]);
+
+  // Apply stored height when scale changes (scale the canvas height to screen pixels)
+  useEffect(() => {
+    const textarea = inputRef.current;
+    if (!textarea || textareaHeight === null) return;
+
+    // When scale changes, convert canvas height to screen pixels
+    isSettingHeightRef.current = true;
+    textarea.style.height = `${textareaHeight * scale}px`; // Scale canvas height to screen
+    // Reset flag after a brief delay
+    setTimeout(() => {
+      isSettingHeightRef.current = false;
+    }, 50);
+  }, [scale, textareaHeight]);
 
   const inputBg = isDark ? '#121212' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
@@ -116,16 +184,107 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         onChange={(e) => {
           const v = e.target.value;
           onTextChange(v);
+
+          // Check for mention trigger
+          const cursor = e.target.selectionStart;
+          setCursorPosition(cursor);
+
+          const textBeforeCursor = v.slice(0, cursor);
+          const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+          if (lastAtSymbol !== -1) {
+            const query = textBeforeCursor.slice(lastAtSymbol + 1);
+            // Only show suggestions if there's no space after @ (or typing a name)
+            if (!query.includes(' ')) {
+              setMentionQuery(query);
+
+              // Find connected storyboards
+              const connectedStoryboardIds = connections
+                .filter(c => c.from === id || c.to === id)
+                .map(c => c.from === id ? c.to : c.from);
+
+              const relevantStoryboards = storyboardModalStates.filter(s => connectedStoryboardIds.includes(s.id));
+
+              // Collect all names
+              const allNames: string[] = [];
+              relevantStoryboards.forEach(s => {
+                if (s.characterNamesMap) {
+                  Object.values(s.characterNamesMap).forEach(name => {
+                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                      allNames.push(name);
+                    }
+                  });
+                }
+                if (s.propsNamesMap) {
+                  Object.values(s.propsNamesMap).forEach(name => {
+                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                      allNames.push(name);
+                    }
+                  });
+                }
+                if (s.backgroundNamesMap) {
+                  Object.values(s.backgroundNamesMap).forEach(name => {
+                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                      allNames.push(name);
+                    }
+                  });
+                }
+              });
+
+              const uniqueNames = Array.from(new Set(allNames));
+
+              if (uniqueNames.length > 0) {
+                setSuggestions(uniqueNames);
+                setShowSuggestions(true);
+                setSuggestionIndex(0);
+              } else {
+                setShowSuggestions(false);
+              }
+            } else {
+              setShowSuggestions(false);
+            }
+          } else {
+            setShowSuggestions(false);
+          }
         }}
         onFocus={onTextFocus}
-        onBlur={onTextBlur}
-        onKeyDown={onKeyDown}
+        onBlur={() => {
+          onTextBlur();
+          // Delay hiding suggestions to allow click event
+          setTimeout(() => setShowSuggestions(false), 200);
+        }}
+        onKeyDown={(e) => {
+          if (showSuggestions) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setSuggestionIndex(prev => (prev + 1) % suggestions.length);
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              const selectedName = suggestions[suggestionIndex];
+              if (selectedName) {
+                const textBeforeCursor = text.slice(0, cursorPosition);
+                const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+                const newText = text.slice(0, lastAtSymbol) + '@' + selectedName + ' ' + text.slice(cursorPosition);
+                onTextChange(newText);
+                setShowSuggestions(false);
+                // Need to update cursor position manually if possible, but React state update might make it tricky
+              }
+            } else if (e.key === 'Escape') {
+              setShowSuggestions(false);
+            }
+          } else {
+            onKeyDown(e);
+          }
+        }}
         placeholder="Enter text here..."
         onMouseDown={(e) => e.stopPropagation()}
         style={{
           background: inputBg,
           border: `${1 * scale}px solid ${inputBorder}`,
-          borderRadius: (isHovered || isPinned) ? '0px' : `${8 * scale}px`,
+          borderRadius: `${8 * scale}px`,
           padding: `${10 * scale}px`,
           color: inputText,
           fontSize: `${16 * scale}px`,
@@ -133,172 +292,57 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           outline: 'none',
           resize: 'vertical',
           minHeight: `${80 * scale}px`,
+          height: textareaHeight !== null ? `${textareaHeight * scale}px` : `${80 * scale}px`,
           width: '100%',
+          boxSizing: 'border-box',
           cursor: isTextFocused ? 'text' : 'default',
-          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
         }}
       />
-      <div style={{ display: 'flex', gap: `${8 * scale}px`, justifyContent: 'flex-end', alignItems: 'center' }}>
-        {/* Enhance Button */}
-        <button
-          onClick={async (e) => {
-            e.stopPropagation();
-            if (!text.trim() || isEnhancing) return;
 
-            setIsEnhancing(true);
-            setEnhanceStatus('Preparing storyboard script...');
-            try {
-              const result = await queryCanvasPrompt(text, undefined, {
-                onAttempt: (attempt, maxAttempts) => {
-                  if (attempt === 1) {
-                    setEnhanceStatus('Generating storyboard scenes...');
-                  } else {
-                    setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
-                  }
-                },
-              });
-              const enhancedText =
-                (typeof result?.enhanced_prompt === 'string' && result.enhanced_prompt.trim()) ||
-                (typeof result?.response === 'string' && result.response.trim());
-
-              if (enhancedText) {
-                if (onScriptGenerated) {
-                  onScriptGenerated(enhancedText);
-                }
-              } else {
-                console.warn('[TextModalFrame] No enhanced text returned from queryCanvasPrompt response:', result);
-                alert('Gemini did not return any text. Please try again with a different prompt.');
-              }
-            } catch (error: any) {
-              console.error('[TextModalFrame] Error enhancing prompt:', error);
-              alert(`Failed to enhance prompt: ${error.message || 'Unknown error'}`);
-            } finally {
-              setIsEnhancing(false);
-              setEnhanceStatus('');
-            }
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          title={isEnhancing ? enhanceStatus || 'Enhancing...' : 'Enhance prompt'}
+      {/* Suggestions Dropdown */}
+      {showSuggestions && (
+        <div
           style={{
-            width: `${30 * scale}px`,
-            height: `${30 * scale}px`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: isEnhancing 
-              ? 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.4) 100%)'
-              : 'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0.6) 100%)',
-            border: `${1 * scale}px solid rgba(168,85,247,0.65)`,
-            borderRadius: `${12 * scale}px`,
-            color: '#6d28d9',
-            cursor: isEnhancing || !text.trim() ? 'not-allowed' : 'pointer',
-            boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`,
-            padding: 0,
-            transition: 'none',
-            opacity: isEnhancing || !text.trim() ? 0.6 : 1,
-          }}
-          disabled={!text.trim() || isEnhancing}
-          onMouseEnter={(e) => {
-            if (!isEnhancing && text.trim()) {
-              (e.currentTarget as HTMLElement).style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(168,85,247,0.45)`;
-            }
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`;
+            position: 'absolute',
+            top: `${cursorPosition > 0 ? 40 * scale : 0}px`, // Rough positioning, could be improved with textarea-caret library
+            left: `${12 * scale}px`,
+            zIndex: 3000,
+            backgroundColor: isDark ? '#1f2937' : '#ffffff',
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+            borderRadius: `${8 * scale}px`,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+            maxHeight: `${150 * scale}px`,
+            overflowY: 'auto',
+            minWidth: `${120 * scale}px`,
           }}
         >
-          {isEnhancing ? (
-            <svg 
-              width={20 * scale} 
-              height={20 * scale} 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              style={{ 
-                animation: 'spin 1s linear infinite',
-                transformOrigin: 'center',
+          {suggestions.map((suggestion, index) => (
+            <div
+              key={index}
+              onClick={() => {
+                const textBeforeCursor = text.slice(0, cursorPosition);
+                const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+                const newText = text.slice(0, lastAtSymbol) + '@' + suggestion + ' ' + text.slice(cursorPosition);
+                onTextChange(newText);
+                setShowSuggestions(false);
               }}
+              style={{
+                padding: `${6 * scale}px ${12 * scale}px`,
+                cursor: 'pointer',
+                backgroundColor: index === suggestionIndex ? (isDark ? '#374151' : '#f3f4f6') : 'transparent',
+                color: isDark ? '#e5e7eb' : '#374151',
+                fontSize: `${14 * scale}px`,
+              }}
+              onMouseEnter={() => setSuggestionIndex(index)}
             >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-          ) : (
-            <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v4" />
-              <path d="M12 17v4" />
-              <path d="M3 12h4" />
-              <path d="M17 12h4" />
-              <path d="M5.6 5.6l2.8 2.8" />
-              <path d="M15.6 15.6l2.8 2.8" />
-              <path d="M18.4 5.6l-2.8 2.8" />
-              <path d="M8.4 15.6l-2.8 2.8" />
-            </svg>
-          )}
-        </button>
-        {enhanceStatus && (
-          <span
-            style={{
-              fontSize: `${11 * scale}px`,
-              color: isDark ? '#9CA3AF' : '#4B5563',
-            }}
-          >
-            {enhanceStatus}
-          </span>
-        )}
-      </div>
+              {suggestion}
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Pin Icon Button - Bottom Right */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onSetIsPinned(!isPinned);
-        }}
-        style={{
-          position: 'absolute',
-          bottom: `${8 * scale}px`,
-          right: `${8 * scale}px`,
-          width: `${28 * scale}px`,
-          height: `${28 * scale}px`,
-          borderRadius: `${6 * scale}px`,
-          backgroundColor: pinBg,
-          border: `1px solid ${pinBorder}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 20,
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
-          pointerEvents: 'auto',
-          boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-        }}
-        onMouseEnter={(e) => {
-          if (!isPinned) {
-            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isPinned) {
-            e.currentTarget.style.backgroundColor = pinBg;
-          }
-        }}
-        title={isPinned ? 'Unpin controls' : 'Pin controls'}
-      >
-        <svg
-          width={16 * scale}
-          height={16 * scale}
-          viewBox="0 0 24 24"
-          fill={isPinned ? '#437eb5' : 'none'}
-          stroke={pinIconColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-        </svg>
-      </button>
+
     </>
   );
 };

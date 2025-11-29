@@ -92,7 +92,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -115,7 +115,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     ctx.beginPath();
     ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // If there's a last point, draw a line to connect strokes smoothly
     if (lastX !== null && lastY !== null) {
       ctx.beginPath();
@@ -126,17 +126,17 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
       ctx.stroke();
     }
-    
+
     // Draw on mask canvas (pure white, scaled to natural image size)
     const naturalX = x * scaleX;
     const naturalY = y * scaleY;
     const naturalBrushSize = brushSize * Math.max(scaleX, scaleY);
-    
+
     maskCtx.fillStyle = 'rgb(255, 255, 255)'; // Pure white
     maskCtx.beginPath();
     maskCtx.arc(naturalX, naturalY, naturalBrushSize / 2, 0, Math.PI * 2);
     maskCtx.fill();
-    
+
     // Connect strokes on mask canvas too
     if (lastX !== null && lastY !== null) {
       const naturalLastX = lastX * scaleX;
@@ -166,8 +166,8 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -179,7 +179,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    
+
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
@@ -190,7 +190,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       }
       return url;
     }
-    
+
     // Then check if it's from a canvas image (uploaded image)
     if (images && images.length > 0) {
       const canvasImage = images.find(img => {
@@ -206,7 +206,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         return url;
       }
     }
-    
+
     return null;
   }, [id, connections, imageModalStates, images]);
 
@@ -235,7 +235,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       }
     }
   }, [connectedImageSource, initialLocalErasedImageUrl, initialSourceImageUrl, sourceImageUrl]);
-  
+
 
 
   // Listen for dimming events
@@ -261,7 +261,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[ErasePluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -272,20 +272,20 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       isActionIcons: !!isActionIcons,
       buttonTitle: target.closest('button')?.getAttribute('title'),
     });
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       console.log('[ErasePluginModal] Calling onSelect');
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
       // Track initial mouse position to detect drag vs click
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
       hasDraggedRef.current = false;
-      
+
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -333,19 +333,19 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging && sourceImageUrl) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
     };
@@ -383,13 +383,13 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       alert('Please connect an image first');
       return;
     }
-    
+
     // Check if mask canvas has been drawn on (white area from brush)
     if (!maskCanvasRef.current) {
       alert('Please draw on the image to mark the area to erase before clicking Erase.');
       return;
     }
-    
+
     // Verify mask has white pixels (brush strokes)
     const maskCtx = maskCanvasRef.current.getContext('2d');
     if (!maskCtx) {
@@ -397,7 +397,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       alert('An internal error occurred: mask canvas context not found.');
       return;
     }
-    
+
     // Sample mask to verify it has white pixels
     const imageData = maskCtx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
     let whitePixelCount = 0;
@@ -409,22 +409,22 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         whitePixelCount++;
       }
     }
-    
+
     if (whitePixelCount === 0) {
       alert('Please draw on the image to mark the area to erase before clicking Erase.');
       return;
     }
-    
+
     // Create composited image: original image + white mask overlay
     const maskCanvas = maskCanvasRef.current;
     const image = imageRef.current;
-    
+
     if (!maskCanvas || !image) {
       console.error('[ErasePluginModal] ❌ Mask canvas or image ref is null');
       alert('An internal error occurred: mask canvas or image not found.');
       return;
     }
-    
+
     // Log mask analysis
     console.log('[ErasePluginModal] 🔍 Mask analysis before capture:', {
       maskDimensions: { width: maskCanvas.width, height: maskCanvas.height },
@@ -433,11 +433,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       whitePercentage: ((whitePixelCount / (maskCanvas.width * maskCanvas.height)) * 100).toFixed(2) + '%',
       hasWhitePixels: whitePixelCount > 0
     });
-    
+
     // Get mask as data URL (pure white mask) - send separately to preserve original image quality
     // The backend will create a proper composited image using sharp without affecting the original colors
     const maskDataUrl = maskCanvas.toDataURL('image/png');
-    
+
     console.log('[ErasePluginModal] ✅ Mask extracted:', {
       hasMask: !!maskDataUrl,
       maskLength: maskDataUrl.length,
@@ -445,13 +445,13 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       maskDimensions: { width: maskCanvas.width, height: maskCanvas.height },
       whiteAreaPercentage: ((whitePixelCount / (maskCanvas.width * maskCanvas.height)) * 100).toFixed(2) + '%'
     });
-    
+
     setIsErasing(true);
     // Persist isErasing state
     if (onOptionsChange) {
       onOptionsChange({ isErasing: true } as any);
     }
-    
+
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
     const frameHeight = 600;
@@ -459,7 +459,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
       const newModal = {
@@ -475,27 +475,27 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from erase plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of erase plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of erase plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -508,18 +508,18 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[ErasePluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
-    
+
     try {
       const imageUrl = sourceImageUrl;
-      
+
       // Close popup after capturing mask
       setIsPopupOpen(false);
-      
+
       console.log('[ErasePluginModal] ========== ERASE REQUEST SUMMARY ==========');
       console.log('[ErasePluginModal] User Input Prompt:', erasePrompt || '(none)');
       console.log('[ErasePluginModal] Original Image URL:', imageUrl ? imageUrl.substring(0, 100) + '...' : 'null');
@@ -527,16 +527,16 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       console.log('[ErasePluginModal] Model:', selectedModel);
       console.log('[ErasePluginModal] Calling onErase with original image and separate mask...');
       console.log('[ErasePluginModal] ===========================================');
-      
+
       // Send original image URL and mask separately to preserve image quality
       // The backend will create a proper composited image using sharp without affecting the original colors
       const result = await onErase(selectedModel, imageUrl || undefined, maskDataUrl, erasePrompt || undefined);
-      
+
       console.log('[ErasePluginModal] ✅ onErase completed:', {
         hasResult: !!result,
         resultUrl: result ? result.substring(0, 100) + '...' : 'null'
       });
-      
+
       // Clear isErasing state now that the result is received
       setIsErasing(false);
       if (onOptionsChange) {
@@ -546,7 +546,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       if (onUpdateModalState && id) {
         onUpdateModalState(id, { isErasing: false });
       }
-      
+
       // Update the image generation frame with the result
       if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
@@ -560,7 +560,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           isGenerating: false, // Clear loading state
         });
       }
-      
+
       // Also store the erased image in the plugin
       if (result) {
         setLocalErasedImageUrl(result);
@@ -570,7 +570,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         }
         // Persist the local erased image URL (only if it changed from initial)
         if (onOptionsChangeRef.current && result !== initialLocalErasedImageUrl) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localErasedImageUrl: result,
             isErasing: false
           });
@@ -596,7 +596,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         });
       }
     }
-    
+
     /* Removed old code - kept for reference
     console.log('[ErasePluginModal] handleErase called', {
       hasOnErase: !!onErase,
@@ -815,8 +815,8 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -841,7 +841,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -849,7 +849,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
+
         {/* Label below */}
         <div
           style={{
@@ -1033,7 +1033,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 </p>
               </div>
             </div>
-            
+
             {/* Image with Drawing Canvas Overlay - Fixed Frame */}
             <div
               style={{
@@ -1103,7 +1103,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                         const img = imageRef.current;
                         const canvas = canvasRef.current;
                         const maskCanvas = maskCanvasRef.current;
-                        
+
                         // Wait for next frame to ensure image is fully rendered and fits
                         requestAnimationFrame(() => {
                           // Preview canvas matches displayed size (actual rendered size after objectFit: contain)
@@ -1111,15 +1111,15 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                           const displayedHeight = img.clientHeight || img.offsetHeight;
                           canvas.width = displayedWidth;
                           canvas.height = displayedHeight;
-                          
+
                           // Update canvas style to match image size exactly
                           canvas.style.width = `${displayedWidth}px`;
                           canvas.style.height = `${displayedHeight}px`;
-                          
+
                           // Mask canvas matches natural image size (for API)
                           maskCanvas.width = img.naturalWidth;
                           maskCanvas.height = img.naturalHeight;
-                          
+
                           // Clear both canvases
                           const maskCtx = maskCanvas.getContext('2d');
                           const previewCtx = canvas.getContext('2d');
@@ -1131,7 +1131,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                           if (previewCtx) {
                             previewCtx.clearRect(0, 0, canvas.width, canvas.height);
                           }
-                          
+
                           // Reset brush drawing when image loads
                           setLastPoint(null);
                           setIsDrawing(false);
@@ -1173,25 +1173,25 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     // Get coordinates relative to image
                     const relativeX = e.clientX - imgRectBounds.left;
                     const relativeY = e.clientY - imgRectBounds.top;
-                    
+
                     // Check if click is within image bounds
                     if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
                       return;
                     }
-                    
+
                     setIsDrawing(true);
                     setLastPoint({ x: relativeX, y: relativeY });
-                    
+
                     // Draw initial brush stroke
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1202,21 +1202,21 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     // Get coordinates relative to image
                     const relativeX = e.clientX - imgRectBounds.left;
                     const relativeY = e.clientY - imgRectBounds.top;
-                    
+
                     // Clamp to image bounds
                     const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
                     const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
-                    
+
                     // Draw brush stroke
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1242,22 +1242,22 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     const touch = e.touches[0];
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     const relativeX = touch.clientX - imgRectBounds.left;
                     const relativeY = touch.clientY - imgRectBounds.top;
-                    
+
                     if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
                       return;
                     }
-                    
+
                     setIsDrawing(true);
                     setLastPoint({ x: relativeX, y: relativeY });
-                    
+
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1270,18 +1270,18 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     const touch = e.touches[0];
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     const relativeX = touch.clientX - imgRectBounds.left;
                     const relativeY = touch.clientY - imgRectBounds.top;
-                    
+
                     const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
                     const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
-                    
+
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1297,11 +1297,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     }
                   }}
                 />
-              {/* Hidden mask canvas for API */}
-              <canvas
-                ref={maskCanvasRef}
-                style={{ display: 'none' }}
-              />
+                {/* Hidden mask canvas for API */}
+                <canvas
+                  ref={maskCanvasRef}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
           </div>

@@ -54,7 +54,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [wasJustPlayed, setWasJustPlayed] = useState(false);
 
-  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const frameBg = isDark ? '#121212' : '#ffffff';
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
   const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
   const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
@@ -83,8 +83,6 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         aspectRatio: getAspectRatio(selectedAspectRatio),
         minHeight: `${400 * scale}px`,
         backgroundColor: frameBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: (isHovered || isPinned) && !isUploadedVideo ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,

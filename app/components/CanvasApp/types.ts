@@ -138,6 +138,15 @@ export interface StoryboardGenerator {
   frameWidth?: number;
   frameHeight?: number;
   scriptText?: string | null;
+  characterNamesMap?: Record<number, string>;
+  propsNamesMap?: Record<number, string>;
+  backgroundNamesMap?: Record<number, string>;
+  // Direct name -> image URL mappings (auto-updated from names maps + connections)
+  namedImages?: {
+    characters?: Record<string, string>; // "Aryan" -> imageUrl
+    backgrounds?: Record<string, string>; // "Restaurant" -> imageUrl
+    props?: Record<string, string>; // "Rose" -> imageUrl
+  };
 }
 
 export interface ScriptFrameGenerator {
@@ -159,6 +168,13 @@ export interface SceneFrameGenerator {
   frameWidth: number;
   frameHeight: number;
   content: string;
+  // Story World metadata for visual consistency
+  characterIds?: string[];       // IDs of characters present in this scene
+  locationId?: string;           // ID of the location where scene takes place
+  mood?: string;                 // Emotional tone of the scene
+  // Human-readable names (for display and prompts)
+  characterNames?: string[];     // Actual character names (e.g., ["Aryan", "Diya"])
+  locationName?: string;         // Actual location name (e.g., "Restaurant")
 }
 
 export interface TextGenerator {

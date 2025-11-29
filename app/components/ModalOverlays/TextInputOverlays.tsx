@@ -3,7 +3,7 @@
 import React from 'react';
 import { TextInput } from '@/app/components/GenerationCompo/TextInput';
 import Konva from 'konva';
-import { TextModalState } from './types';
+import { TextModalState, StoryboardModalState, Connection } from './types';
 
 interface TextInputOverlaysProps {
   textInputStates: TextModalState[];
@@ -19,6 +19,8 @@ interface TextInputOverlaysProps {
   scale: number;
   position: { x: number; y: number };
   onScriptGenerated?: (textModalId: string, script: string) => void;
+  connections?: Connection[];
+  storyboardModalStates?: StoryboardModalState[];
 }
 
 export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
@@ -35,6 +37,8 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
   scale,
   position,
   onScriptGenerated,
+  connections = [],
+  storyboardModalStates = [],
 }) => {
   return (
     <>
@@ -64,7 +68,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             setSelectedTextInputId(null);
           }}
           onPositionChange={(newX, newY) => {
-            setTextInputStates(prev => prev.map(t => 
+            setTextInputStates(prev => prev.map(t =>
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
             if (onPersistTextModalMove) {
@@ -122,6 +126,8 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
           scale={scale}
           position={position}
           onScriptGenerated={onScriptGenerated}
+          connections={connections}
+          storyboardModalStates={storyboardModalStates}
         />
       ))}
     </>

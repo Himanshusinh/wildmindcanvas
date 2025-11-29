@@ -25,6 +25,8 @@ interface TextInputProps {
   position: { x: number; y: number };
   isSelected?: boolean;
   onScriptGenerated?: (textModalId: string, script: string) => void;
+  connections?: Array<{ from: string; to: string }>;
+  storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -44,6 +46,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   position,
   isSelected,
   onScriptGenerated,
+  connections = [],
+  storyboardModalStates = [],
 }) => {
   const [text, setText] = useState('');
   const [selectedModel, setSelectedModel] = useState('GPT-4');
@@ -56,6 +60,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceStatus, setEnhanceStatus] = useState('');
 
 
   // Listen for global node-drag active state so nodes stay visible during drag
@@ -85,8 +91,8 @@ export const TextInput: React.FC<TextInputProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -100,7 +106,7 @@ export const TextInput: React.FC<TextInputProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[TextInput] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -110,14 +116,14 @@ export const TextInput: React.FC<TextInputProps> = ({
       isActionIcons: !!isActionIcons,
       buttonTitle: target.closest('button')?.getAttribute('title'),
     });
-    
+
     // Call onSelect when clicking on the text input container
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       console.log('[TextInput] Calling onSelect');
       onSelect();
     }
-    
+
     // Only allow dragging from the header or container background, not from controls, inputs, buttons, or action icons
     if (isHeader || (!isInput && !isButton && !isControls && !isActionIcons && target === containerRef.current)) {
       setIsDragging(true);
@@ -178,6 +184,43 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const handleEnhance = async () => {
+    if (!text.trim() || isEnhancing) return;
+
+    setIsEnhancing(true);
+    setEnhanceStatus('Preparing storyboard script...');
+    try {
+      const { queryCanvasPrompt } = await import('@/lib/api');
+      const result = await queryCanvasPrompt(text, undefined, {
+        onAttempt: (attempt, maxAttempts) => {
+          if (attempt === 1) {
+            setEnhanceStatus('Generating storyboard scenes...');
+          } else {
+            setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+          }
+        },
+      });
+      const enhancedText =
+        (typeof result?.enhanced_prompt === 'string' && result.enhanced_prompt.trim()) ||
+        (typeof result?.response === 'string' && result.response.trim());
+
+      if (enhancedText) {
+        if (onScriptGenerated) {
+          onScriptGenerated(id, enhancedText);
+        }
+      } else {
+        console.warn('[TextInput] No enhanced text returned from queryCanvasPrompt response:', result);
+        alert('Gemini did not return any text. Please try again with a different prompt.');
+      }
+    } catch (error: any) {
+      console.error('[TextInput] Error enhancing prompt:', error);
+      alert(`Failed to enhance prompt: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsEnhancing(false);
+      setEnhanceStatus('');
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -203,7 +246,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
-        minWidth: `${400 * scale}px`,
+        width: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
         overflow: 'visible',
@@ -219,7 +262,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         scale={scale}
         onDelete={onDelete}
         onDuplicate={onDuplicate}
-        variant="text"
+        variant="default"
       />
 
       <div style={{ position: 'relative' }}>
@@ -251,7 +294,61 @@ export const TextInput: React.FC<TextInputProps> = ({
               onScriptGenerated(id, script);
             }
           }}
+          connections={connections}
+          storyboardModalStates={storyboardModalStates}
         />
+
+        {/* Pin Icon Button - Below Input Box */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsPinned(!isPinned);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: `${-32 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            borderRadius: `${6 * scale}px`,
+            backgroundColor: isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff'),
+            border: `1px solid ${isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)')}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 20,
+            opacity: isHovered ? 1 : 0,
+            transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
+            pointerEvents: 'auto',
+            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+          }}
+          onMouseEnter={(e) => {
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
+            if (!isPinned) {
+              e.currentTarget.style.backgroundColor = pinBg;
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+        >
+          <svg
+            width={16 * scale}
+            height={16 * scale}
+            viewBox="0 0 24 24"
+            fill={isPinned ? '#437eb5' : 'none'}
+            stroke={isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563')}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+          </svg>
+        </button>
 
         <TextModalNodes
           id={id}
@@ -271,6 +368,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         isModelHovered={isModelHovered}
         frameBorderColor={frameBorderColor}
         frameBorderWidth={frameBorderWidth}
+        text={text}
+        isEnhancing={isEnhancing}
+        enhanceStatus={enhanceStatus}
         onModelChange={(model) => {
           setSelectedModel(model);
         }}
@@ -278,6 +378,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         onSetIsPinned={setIsPinned}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}
+        onEnhance={handleEnhance}
       />
     </div>
   );

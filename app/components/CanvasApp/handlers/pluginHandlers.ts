@@ -1254,15 +1254,112 @@ export function createPluginHandlers(
               frameWidth: modal.frameWidth || 400,
               frameHeight: modal.frameHeight || 500,
               scriptText: (modal as StoryboardGenerator).scriptText || null,
+              characterNamesMap: (modal as any).characterNamesMap || {},
+              propsNamesMap: (modal as any).propsNamesMap || {},
+              backgroundNamesMap: (modal as any).backgroundNamesMap || {},
             },
           },
         },
         inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
       });
     }
+
+    // 4. Auto-create input nodes (Character, Background, Prompt)
+    // Only do this for new creations (not hydration), which is implied since this handler is called on drop
+    const createInputNode = async (label: string, yOffset: number, color: string, toAnchor: string) => {
+      const nodeId = `${label.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const nodeX = modal.x - 350; // Position to the left
+      const nodeY = modal.y + yOffset;
+
+      const textNode = {
+        id: nodeId,
+        x: nodeX,
+        y: nodeY,
+        value: label, // Pre-fill with label
+      };
+
+      // Optimistic update for text node
+      setters.setTextGenerators(prev => [...prev, textNode]);
+
+      // Broadcast text node
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({
+          id: nodeId,
+          type: 'text',
+          x: nodeX,
+          y: nodeY,
+          value: label,
+        });
+      }
+
+      // Persist text node
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create',
+          elementId: nodeId,
+          data: {
+            element: {
+              id: nodeId,
+              type: 'text-generator',
+              x: nodeX,
+              y: nodeY,
+              meta: { value: label },
+            },
+          },
+          inverse: { type: 'delete', elementId: nodeId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+
+      // Create connector
+      const connectorId = `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const connector = {
+        id: connectorId,
+        from: nodeId,
+        to: modal.id,
+        color: color,
+        fromAnchor: 'right',
+        toAnchor: toAnchor,
+      };
+
+      // Optimistic update for connector
+      setters.setConnectors(prev => [...prev, connector]);
+
+      // Persist connector (connectors are persisted as elements in this system)
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create',
+          elementId: connectorId,
+          data: {
+            element: {
+              id: connectorId,
+              type: 'connector',
+              from: nodeId,
+              to: modal.id,
+              meta: {
+                color: color,
+                fromAnchor: 'right',
+                toAnchor: toAnchor,
+              },
+            },
+          },
+          inverse: { type: 'delete', elementId: connectorId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    };
+
+    // Create the three nodes with slight delays to ensure unique IDs/timestamps if needed, 
+    // though Math.random should handle it.
+    // Character Node (Top)
+    await createInputNode('Character', 50, '#FF5733', 'receive-character');
+
+    // Background Node (Middle)
+    await createInputNode('Background', 200, '#33FF57', 'receive-background');
+
+    // Prompt Node (Bottom)
+    await createInputNode('Props', 350, '#3357FF', 'receive-props');
   };
 
-  const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => {
+  const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; stitchedImageUrl?: string }>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.storyboardGenerators.find(m => m.id === id);
 
@@ -1284,10 +1381,17 @@ export function createPluginHandlers(
         frameWidth: prev.frameWidth || 400,
         frameHeight: prev.frameHeight || 500,
         scriptText: (prev as StoryboardGenerator).scriptText || null,
+        characterNamesMap: (prev as any).characterNamesMap || {},
+        propsNamesMap: (prev as any).propsNamesMap || {},
+        backgroundNamesMap: (prev as any).backgroundNamesMap || {},
       } : {
         frameWidth: 400,
         frameHeight: 500,
         scriptText: null,
+        characterNamesMap: {},
+        propsNamesMap: {},
+        backgroundNamesMap: {},
+        stitchedImageUrl: undefined,
       };
 
       const metaUpdates = { ...existingMeta };
@@ -1309,6 +1413,9 @@ export function createPluginHandlers(
         if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
         if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
         if ('scriptText' in updates) inverseMeta.scriptText = (prev as StoryboardGenerator).scriptText || null;
+        if ('characterNamesMap' in updates) inverseMeta.characterNamesMap = (prev as any).characterNamesMap || {};
+        if ('propsNamesMap' in updates) inverseMeta.propsNamesMap = (prev as any).propsNamesMap || {};
+        if ('backgroundNamesMap' in updates) inverseMeta.backgroundNamesMap = (prev as any).backgroundNamesMap || {};
         if (Object.keys(inverseMeta).length > 0) {
           inverseUpdates.meta = inverseMeta;
         }
@@ -1556,6 +1663,11 @@ export function createPluginHandlers(
           frameWidth: modal.frameWidth,
           frameHeight: modal.frameHeight,
           content: modal.content,
+          characterIds: modal.characterIds,
+          locationId: modal.locationId,
+          mood: modal.mood,
+          characterNames: (modal as any).characterNames,
+          locationName: (modal as any).locationName,
         },
       });
     }
@@ -1576,6 +1688,9 @@ export function createPluginHandlers(
               frameWidth: modal.frameWidth,
               frameHeight: modal.frameHeight,
               content: modal.content,
+              characterIds: modal.characterIds,
+              locationId: modal.locationId,
+              mood: modal.mood,
             },
           },
         },
@@ -1632,6 +1747,9 @@ export function createPluginHandlers(
         if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
         if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
         if ('content' in updates) inverseMeta.content = prev.content;
+        if ('characterIds' in updates) inverseMeta.characterIds = (prev as any).characterIds;
+        if ('locationId' in updates) inverseMeta.locationId = (prev as any).locationId;
+        if ('mood' in updates) inverseMeta.mood = (prev as any).mood;
         if (Object.keys(inverseMeta).length > 0) {
           inverseUpdates.meta = inverseMeta;
         }

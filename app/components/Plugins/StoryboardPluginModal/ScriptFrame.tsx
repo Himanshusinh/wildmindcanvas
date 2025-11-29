@@ -6,14 +6,18 @@ interface ScriptFrameProps {
   scale: number;
   text?: string;
   isDark?: boolean;
+  onTextChange?: (newText: string) => void;
 }
 
 export const ScriptFrame: React.FC<ScriptFrameProps> = ({
   scale,
   text,
   isDark: externalIsDark,
+  onTextChange,
 }) => {
   const [isDark, setIsDark] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(text || '');
 
   useEffect(() => {
     const checkTheme = () => {
@@ -25,6 +29,13 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  // Sync editText with incoming text prop
+  useEffect(() => {
+    if (!isEditing && text !== undefined) {
+      setEditText(text);
+    }
+  }, [text, isEditing]);
+
   // Use external isDark if provided, otherwise use internal state
   const themeIsDark = externalIsDark !== undefined ? externalIsDark : isDark;
 
@@ -34,6 +45,20 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
   const borderColor = themeIsDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const placeholderColor = themeIsDark ? '#6b7280' : '#9ca3af';
   const secondaryTextColor = themeIsDark ? '#cccccc' : '#6b7280';
+  const buttonBgColor = themeIsDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const buttonHoverBgColor = themeIsDark ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)';
+
+  const handleSave = () => {
+    if (onTextChange) {
+      onTextChange(editText);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditText(text || '');
+    setIsEditing(false);
+  };
 
   return (
     <div
@@ -51,12 +76,15 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
     >
-      {/* Header */}
+      {/* Header with Edit button */}
       <div
         style={{
           marginBottom: `${12 * scale}px`,
           paddingBottom: `${8 * scale}px`,
           borderBottom: `${1 * scale}px solid ${borderColor}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
         <h4
@@ -70,6 +98,59 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
         >
           Script
         </h4>
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            style={{
+              padding: `${4 * scale}px ${8 * scale}px`,
+              fontSize: `${11 * scale}px`,
+              fontWeight: 500,
+              color: '#3b82f6',
+              backgroundColor: buttonBgColor,
+              border: 'none',
+              borderRadius: `${4 * scale}px`,
+              cursor: 'pointer',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = buttonHoverBgColor}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = buttonBgColor}
+          >
+            ✏️ Edit
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: `${8 * scale}px` }}>
+            <button
+              onClick={handleSave}
+              style={{
+                padding: `${4 * scale}px ${8 * scale}px`,
+                fontSize: `${11 * scale}px`,
+                fontWeight: 500,
+                color: '#ffffff',
+                backgroundColor: '#3b82f6',
+                border: 'none',
+                borderRadius: `${4 * scale}px`,
+                cursor: 'pointer',
+              }}
+            >
+              ✓ Save
+            </button>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: `${4 * scale}px ${8 * scale}px`,
+                fontSize: `${11 * scale}px`,
+                fontWeight: 500,
+                color: textColor,
+                backgroundColor: themeIsDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                border: 'none',
+                borderRadius: `${4 * scale}px`,
+                cursor: 'pointer',
+              }}
+            >
+              ✕ Cancel
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content Area */}
@@ -80,14 +161,34 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
           overflowY: 'auto',
           overflowX: 'hidden',
           padding: `${8 * scale}px 0`,
-          // Custom scrollbar styling
           scrollbarWidth: 'thin',
-          scrollbarColor: themeIsDark 
-            ? 'rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05)' 
+          scrollbarColor: themeIsDark
+            ? 'rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05)'
             : 'rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.05)',
         }}
       >
-        {text ? (
+        {isEditing ? (
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            placeholder="Type your script here with @mentions (e.g., @Aryan, @restaurant)..."
+            style={{
+              width: '100%',
+              minHeight: `${150 * scale}px`,
+              fontSize: `${13 * scale}px`,
+              lineHeight: `${20 * scale}px`,
+              color: textColor,
+              backgroundColor: 'transparent',
+              border: 'none',
+              outline: 'none',
+              resize: 'vertical',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+            }}
+            autoFocus
+          />
+        ) : text ? (
           <div
             style={{
               fontSize: `${13 * scale}px`,
@@ -121,7 +222,7 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
                 display: 'block',
               }}
             >
-              Connect a text input to see the script here.
+              Click "Edit" to manually type a script with @mentions, or connect a text input.
             </span>
           </div>
         )}

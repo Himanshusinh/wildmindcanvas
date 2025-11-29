@@ -15,6 +15,7 @@ export interface ImageModalState {
   y: number;
   generatedImageUrl?: string | null;
   generatedImageUrls?: string[];
+  sourceImageUrl?: string | null;
   frameWidth?: number;
   frameHeight?: number;
   model?: string;
@@ -145,6 +146,9 @@ export interface StoryboardModalState {
   frameWidth?: number;
   frameHeight?: number;
   scriptText?: string | null;
+  characterNamesMap?: Record<number, string>;
+  propsNamesMap?: Record<number, string>;
+  backgroundNamesMap?: Record<number, string>;
 }
 
 export interface ScriptFrameModalState {
@@ -199,6 +203,8 @@ export interface ComponentMenu {
   y: number;
   canvasX: number;
   canvasY: number;
+  sourceNodeId?: string;
+  connectionColor?: string;
 }
 
 export interface ModalOverlaysProps {
@@ -279,7 +285,18 @@ export interface ModalOverlaysProps {
   onTextCreate?: (text: string, x: number, y: number) => void;
   onTextScriptGenerated?: (textModalId: string, script: string) => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (
+    prompt: string,
+    model: string,
+    frame: string,
+    aspectRatio: string,
+    modalId?: string,
+    imageCount?: number,
+    sourceImageUrl?: string,
+    sceneNumber?: number,
+    previousSceneImageUrl?: string,
+    storyboardMetadata?: Record<string, string>
+  ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onVideoSelect?: (file: File) => void;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onMusicSelect?: (file: File) => void;
@@ -290,8 +307,8 @@ export interface ModalOverlaysProps {
   scale: number;
   position: { x: number; y: number };
   onAddImageToCanvas?: (url: string) => void;
-  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }>) => void | Promise<void>;
@@ -324,11 +341,18 @@ export interface ModalOverlaysProps {
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => void | Promise<void>;
+  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
+  onGenerateStoryboard?: (storyboardId: string, inputs: {
+    characterInput?: string;
+    characterNames?: string;
+    backgroundDescription?: string;
+    specialRequest?: string;
+  }) => void;
   onDeleteScriptFrame?: (id: string) => void;
   onScriptFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onScriptFramePositionCommit?: (frameId: string, x: number, y: number) => void;
+  onTextUpdate?: (id: string, text: string) => void;
   onGenerateScenes?: (scriptFrameId: string) => void;
   onDeleteSceneFrame?: (frameId: string) => void;
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;

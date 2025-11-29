@@ -91,7 +91,7 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, onAddItem }) =
                         key={style.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, 'text', '', { name: style.preview, fontSize: style.fontSize, fontWeight: style.fontWeight })}
-                        onClick={() => onAddItem({ type: 'text', name: style.preview, src: '', duration: 5, width: 60, height: 15, fontSize: style.fontSize, fontWeight: style.fontWeight, color: '#000000' })}
+                        onClick={() => onAddItem({ type: 'text', name: style.preview, src: '', duration: 5, width: 60, height: 15, fontSize: style.fontSize, fontWeight: style.fontWeight as any, color: '#000000' })}
                         className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-transparent hover:border-gray-200 transition-all"
                     >
                         <p style={{ fontSize: Math.max(12, style.fontSize / 3), fontWeight: style.fontWeight as any }} className="text-gray-800 truncate">

@@ -88,7 +88,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -109,8 +109,8 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -122,13 +122,13 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    
+
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
       return sourceModal.generatedImageUrl;
     }
-    
+
     // Then check if it's from a canvas image (uploaded image)
     if (images && images.length > 0) {
       const canvasImage = images.find(img => {
@@ -139,8 +139,8 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         return canvasImage.url;
       }
     }
-    
-    return null; 
+
+    return null;
   }, [id, connections, imageModalStates, images]);
 
   // Restore images and mode from props on mount or when props change
@@ -212,7 +212,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[VectorizePluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -254,7 +254,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
-      
+
       // Check if mouse moved significantly (more than 5px) to detect drag
       if (dragStartPosRef.current) {
         const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
@@ -263,12 +263,12 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
           hasDraggedRef.current = true;
         }
       }
-      
+
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
       const newCanvasX = (newScreenX - position.x) / scale;
       const newCanvasY = (newScreenY - position.y) / scale;
-      
+
       onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
     };
@@ -277,16 +277,16 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (onPositionCommit && lastCanvasPosRef.current) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
     };
@@ -309,28 +309,28 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       sourceImageUrl,
       vectorizedImageUrl,
     });
-    
+
     if (!onVectorize) {
       console.error('[VectorizePluginModal] onVectorize is not defined');
       return;
     }
-    
+
     if (isVectorizing || externalIsVectorizing) {
       console.log('[VectorizePluginModal] Already vectorizing, skipping');
       return;
     }
-    
+
     if (!sourceImageUrl) {
       alert('Please connect an image first');
       return;
     }
-    
+
     setIsVectorizing(true);
     // Persist isVectorizing state
     if (onOptionsChange) {
       onOptionsChange({ isVectorizing: true } as any);
     }
-    
+
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
     const frameHeight = 600;
@@ -338,7 +338,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
       const newModal = {
@@ -354,27 +354,27 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from vectorize plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of vectorize plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of vectorize plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -387,18 +387,18 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[VectorizePluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
-    
+
     try {
       const imageUrl = sourceImageUrl;
       console.log('[VectorizePluginModal] Calling onVectorize with:', { imageUrl, mode });
       const result = await onVectorize(imageUrl || undefined, mode);
       console.log('[VectorizePluginModal] onVectorize returned:', result);
-      
+
       // Update the image generation frame with the result
       if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
@@ -412,7 +412,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
           isGenerating: false, // Clear loading state
         });
       }
-      
+
       // Also store the vectorized image in the plugin
       if (result) {
         setLocalVectorizedImageUrl(result);
@@ -422,7 +422,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         }
         // Persist the local vectorized image URL (only if it changed from initial)
         if (onOptionsChangeRef.current && result !== initialLocalVectorizedImageUrl) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localVectorizedImageUrl: result
           });
           // Also update vectorizedImageUrl in modal state via onUpdateModalState
@@ -500,8 +500,8 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -526,7 +526,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -534,7 +534,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
+
         {/* Label below */}
         <div
           style={{
@@ -564,32 +564,32 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             }}
           >
             <VectorizeControls
-          scale={scale}
-          mode={mode}
-          isVectorizing={isVectorizing}
-          externalIsVectorizing={externalIsVectorizing}
-          sourceImageUrl={sourceImageUrl}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          onModeChange={(newMode) => {
-            setMode(newMode);
-            if (onOptionsChange) {
-              onOptionsChange({ mode: newMode } as any);
-            }
-          }}
+              scale={scale}
+              mode={mode}
+              isVectorizing={isVectorizing}
+              externalIsVectorizing={externalIsVectorizing}
+              sourceImageUrl={sourceImageUrl}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              onModeChange={(newMode) => {
+                setMode(newMode);
+                if (onOptionsChange) {
+                  onOptionsChange({ mode: newMode } as any);
+                }
+              }}
               onVectorize={handleVectorize}
               onHoverChange={setIsHovered}
             />
             <VectorizeImageFrame
-          id={id}
-          scale={scale}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          isVectorizedImage={isVectorizedImage}
-          isDraggingContainer={isDraggingContainer}
-          isHovered={isHovered}
-          isSelected={isSelected || false}
-          sourceImageUrl={sourceImageUrl}
+              id={id}
+              scale={scale}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              isVectorizedImage={isVectorizedImage}
+              isDraggingContainer={isDraggingContainer}
+              isHovered={isHovered}
+              isSelected={isSelected || false}
+              sourceImageUrl={sourceImageUrl}
               onMouseDown={handleMouseDown}
               onSelect={onSelect}
             />

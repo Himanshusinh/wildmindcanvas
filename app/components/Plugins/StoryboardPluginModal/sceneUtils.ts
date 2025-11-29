@@ -1,4 +1,11 @@
 
+export const STORYBOARD_UTILS_BUILD_TAG = 'sceneUtils@2025-11-29T15:46Z';
+if (typeof window !== 'undefined') {
+    // Visible once per client load to confirm fresh code
+    // eslint-disable-next-line no-console
+    console.info('[WM Canvas] Loaded', STORYBOARD_UTILS_BUILD_TAG);
+}
+
 
 export interface ParsedScene {
     sceneNumber: number;
@@ -73,8 +80,8 @@ export function parseScriptIntoScenes(scriptText: string): ParsedScene[] {
 }
 
 /**
- * Calculate grid positions for scene frames
- * Arranges them in a grid to the right of the script frame
+ * Calculate positions for scene frames
+ * Arranges ALL scenes in a single column to the right of the script frame
  */
 export function calculateSceneFramePositions(
     scriptFrameX: number,
@@ -91,16 +98,11 @@ export function calculateSceneFramePositions(
     const startX = scriptFrameX + scriptFrameWidth + gap * 2;
     const startY = scriptFrameY;
 
-    // Arrange in a grid (2 columns)
-    const columns = 2;
-
+    // Arrange in a single vertical column
     for (let i = 0; i < numScenes; i++) {
-        const col = i % columns;
-        const row = Math.floor(i / columns);
-
         positions.push({
-            x: startX + col * (sceneFrameWidth + gap),
-            y: startY + row * (sceneFrameHeight + gap),
+            x: startX,
+            y: startY + i * (sceneFrameHeight + gap),
         });
     }
 

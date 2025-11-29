@@ -92,7 +92,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -113,8 +113,8 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -155,7 +155,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       }
     }
   }, [connectedImageSource, initialLocalRemovedBgImageUrl, initialSourceImageUrl, sourceImageUrl]);
-  
+
 
   // Update image resolution when removed bg image loads
   useEffect(() => {
@@ -197,7 +197,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[RemoveBgPluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -208,20 +208,20 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       isActionIcons: !!isActionIcons,
       buttonTitle: target.closest('button')?.getAttribute('title'),
     });
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       console.log('[RemoveBgPluginModal] Calling onSelect');
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
       // Track initial mouse position to detect drag vs click
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
       hasDraggedRef.current = false;
-      
+
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -269,19 +269,19 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
     };
@@ -304,28 +304,28 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       sourceImageUrl,
       removedBgImageUrl,
     });
-    
+
     if (!onRemoveBg) {
       console.error('[RemoveBgPluginModal] onRemoveBg is not defined');
       return;
     }
-    
+
     if (isRemovingBg || externalIsRemovingBg) {
       console.log('[RemoveBgPluginModal] Already removing bg, skipping');
       return;
     }
-    
+
     if (!sourceImageUrl) {
       alert('Please connect an image first');
       return;
     }
-    
+
     setIsRemovingBg(true);
     // Persist isRemovingBg state
     if (onOptionsChange) {
       onOptionsChange({ isRemovingBg: true } as any);
     }
-    
+
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
     const frameHeight = 600;
@@ -333,7 +333,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
       const newModal = {
@@ -349,27 +349,27 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from remove bg plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of remove bg plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of remove bg plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -382,18 +382,18 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[RemoveBgPluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
-    
+
     try {
       const imageUrl = sourceImageUrl;
       console.log('[RemoveBgPluginModal] Calling onRemoveBg with:', { selectedModel, selectedBackgroundType, scaleValue, imageUrl });
       const result = await onRemoveBg(selectedModel, selectedBackgroundType, scaleValue, imageUrl || undefined);
       console.log('[RemoveBgPluginModal] onRemoveBg returned:', result);
-      
+
       // Update the image generation frame with the result
       if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
@@ -407,7 +407,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
           isGenerating: false, // Clear loading state
         });
       }
-      
+
       // Also store the removed bg image in the plugin
       if (result) {
         setLocalRemovedBgImageUrl(result);
@@ -417,7 +417,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         }
         // Persist the local removed bg image URL (only if it changed from initial)
         if (onOptionsChangeRef.current && result !== initialLocalRemovedBgImageUrl) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localRemovedBgImageUrl: result
           });
         }
@@ -491,8 +491,8 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -517,7 +517,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -525,7 +525,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
+
         {/* Label below */}
         <div
           style={{
@@ -555,46 +555,46 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             }}
           >
             <RemoveBgControls
-          scale={scale}
-          selectedModel={selectedModel}
-          selectedBackgroundType={selectedBackgroundType}
-          scaleValue={scaleValue}
-          isRemovingBg={isRemovingBg}
-          externalIsRemovingBg={externalIsRemovingBg}
-          sourceImageUrl={sourceImageUrl}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          onModelChange={(model) => {
-            setSelectedModel(model);
-            if (onOptionsChange) {
-              onOptionsChange({ model, backgroundType: selectedBackgroundType, scaleValue });
-            }
-          }}
-          onBackgroundTypeChange={(backgroundType) => {
-            setSelectedBackgroundType(backgroundType);
-            if (onOptionsChange) {
-              onOptionsChange({ model: selectedModel, backgroundType, scaleValue });
-            }
-          }}
-          onScaleChange={(newScale) => {
-            setScaleValue(newScale);
-            if (onOptionsChange) {
-              onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
-            }
-          }}
+              scale={scale}
+              selectedModel={selectedModel}
+              selectedBackgroundType={selectedBackgroundType}
+              scaleValue={scaleValue}
+              isRemovingBg={isRemovingBg}
+              externalIsRemovingBg={externalIsRemovingBg}
+              sourceImageUrl={sourceImageUrl}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              onModelChange={(model) => {
+                setSelectedModel(model);
+                if (onOptionsChange) {
+                  onOptionsChange({ model, backgroundType: selectedBackgroundType, scaleValue });
+                }
+              }}
+              onBackgroundTypeChange={(backgroundType) => {
+                setSelectedBackgroundType(backgroundType);
+                if (onOptionsChange) {
+                  onOptionsChange({ model: selectedModel, backgroundType, scaleValue });
+                }
+              }}
+              onScaleChange={(newScale) => {
+                setScaleValue(newScale);
+                if (onOptionsChange) {
+                  onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
+                }
+              }}
               onRemoveBg={handleRemoveBg}
               onHoverChange={setIsHovered}
             />
             <RemoveBgImageFrame
-          id={id}
-          scale={scale}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          isRemovedBgImage={isRemovedBgImage}
-          isDraggingContainer={isDraggingContainer}
-          isHovered={isHovered}
-          isSelected={isSelected || false}
-          sourceImageUrl={sourceImageUrl}
+              id={id}
+              scale={scale}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              isRemovedBgImage={isRemovedBgImage}
+              isDraggingContainer={isDraggingContainer}
+              isHovered={isHovered}
+              isSelected={isSelected || false}
+              sourceImageUrl={sourceImageUrl}
               onMouseDown={handleMouseDown}
               onSelect={onSelect}
             />

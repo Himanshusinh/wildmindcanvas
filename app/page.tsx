@@ -46,6 +46,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
+  // Global reference images map - stores character/background/prop names to image URLs
+  // This is simpler and more reliable than storing sourceImageUrl in each scene modal
+  const [refImages, setRefImages] = useState<Record<string, string>>({});
   // Connectors (node-to-node links)
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
   const snapshotLoadedRef = useRef(false);
@@ -55,8 +58,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const persistTimerRef = useRef<number | null>(null);
   const currentUser = user;
   const viewportCenterRef = useRef<{ x: number; y: number; scale: number }>({
-    x: 5000000, // Center of 1,000,000 x 1,000,000 infinite canvas
-    y: 5000000,
+    x: 500000, // Center of 1,000,000 x 1,000,000 infinite canvas (where dots are visible)
+    y: 500000,
     scale: 1,
   });
 
@@ -126,7 +129,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
               };
               newImages.push(newImage);
             } else if (element.type === 'image-generator') {
-              newImageGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null });
+              newImageGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                generatedImageUrl: element.meta?.generatedImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl
+              } as any);
             } else if (element.type === 'video-generator') {
               newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null });
             } else if (element.type === 'music-generator') {
@@ -176,7 +185,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
         } else if (element.type === 'image-generator') {
           setImageGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null }];
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedImageUrl: element.meta?.generatedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl
+            } as any];
           });
         } else if (element.type === 'video-generator') {
           setVideoGenerators((prev) => {
@@ -624,7 +639,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
           const newImages: ImageUpload[] = [];
-          const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
+          const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
           const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
@@ -638,7 +653,29 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newSceneFrameGenerators: SceneFrameGenerator[] = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
+          // Track connector signatures to prevent duplicates: "from|to|toAnchor"
+          const connectorSignatures = new Set<string>();
 
+          // FIRST PASS: Process connector elements first (they are the source of truth)
+          Object.values(elements).forEach((element: any) => {
+            if (element && element.type === 'connector') {
+              const connector = {
+                id: element.id,
+                from: element.from || element.meta?.from,
+                to: element.to || element.meta?.to,
+                color: element.meta?.color || '#437eb5',
+                fromAnchor: element.meta?.fromAnchor,
+                toAnchor: element.meta?.toAnchor
+              };
+              const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
+              if (!connectorSignatures.has(signature)) {
+                connectorSignatures.add(signature);
+                newConnectors.push(connector);
+              }
+            }
+          });
+
+          // SECOND PASS: Process all other elements (skip restoring from meta.connections to prevent duplicates)
           Object.values(elements).forEach((element: any) => {
             if (element && element.type) {
               let imageUrl = element.meta?.url || element.meta?.mediaId || '';
@@ -658,49 +695,48 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 };
                 newImages.push(newImage);
                 // If this element had connections in meta, collect them
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'image-generator') {
-                newImageGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                newImageGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  generatedImageUrl: element.meta?.generatedImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl from snapshot
+                  frameWidth: element.meta?.frameWidth,
+                  frameHeight: element.meta?.frameHeight,
+                  model: element.meta?.model,
+                  frame: element.meta?.frame,
+                  aspectRatio: element.meta?.aspectRatio,
+                  prompt: element.meta?.prompt
+                } as any);
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'connector') {
-                // Top-level connector element
-                newConnectors.push({ id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor });
+                // Skip - already processed in first pass
               } else if (element.type === 'video-generator') {
                 newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'music-generator') {
                 newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'text-generator') {
                 newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'upscale-plugin') {
                 newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'removebg-plugin') {
                 newRemoveBgGenerators.push({
                   id: element.id,
@@ -716,11 +752,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 500,
                   isRemovingBg: element.meta?.isRemovingBg || false,
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'erase-plugin') {
                 newEraseGenerators.push({
                   id: element.id,
@@ -734,11 +768,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 500,
                   isErasing: element.meta?.isErasing || false,
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'replace-plugin') {
                 newReplaceGenerators.push({
                   id: element.id,
@@ -752,11 +784,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 500,
                   isReplacing: element.meta?.isReplacing || false,
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'expand-plugin') {
                 newExpandGenerators.push({
                   id: element.id,
@@ -770,11 +800,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 500,
                   isExpanding: element.meta?.isExpanding || false,
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'vectorize-plugin') {
                 newVectorizeGenerators.push({
                   id: element.id,
@@ -788,25 +816,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 500,
                   isVectorizing: element.meta?.isVectorizing || false,
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'storyboard-plugin') {
                 newStoryboardGenerators.push({
                   id: element.id,
                   x: element.x || 0,
                   y: element.y || 0,
+                  characterNamesMap: element.meta?.characterNamesMap || {},
+                  propsNamesMap: element.meta?.propsNamesMap || {},
+                  backgroundNamesMap: element.meta?.backgroundNamesMap || {},
+                  namedImages: element.meta?.namedImages || undefined,
                   frameWidth: element.meta?.frameWidth,
                   frameHeight: element.meta?.frameHeight,
                   scriptText: element.meta?.scriptText,
-                });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                } as any); // Type assertion needed due to optional fields
+                // NOTE: Storyboard connections are NOT stored in storyboard.meta.connections
+                // They are stored in the image elements' meta.connections (as outgoing connections)
+                // OR as top-level connector elements. We'll restore them from connector elements below.
+                // Do NOT restore connections from storyboard.meta.connections as that would create duplicates.
               } else if (element.type === 'script-frame') {
                 newScriptFrameGenerators.push({
                   id: element.id,
@@ -817,11 +846,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameHeight: element.meta?.frameHeight || 200,
                   text: element.meta?.text || '',
                 });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'scene-frame') {
                 newSceneFrameGenerators.push({
                   id: element.id,
@@ -832,12 +859,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   frameWidth: element.meta?.frameWidth || 300,
                   frameHeight: element.meta?.frameHeight || 200,
                   content: element.meta?.content || '',
-                });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                  characterIds: element.meta?.characterIds || undefined,
+                  locationId: element.meta?.locationId || undefined,
+                  mood: element.meta?.mood || undefined,
+                  characterNames: element.meta?.characterNames || undefined,
+                  locationName: element.meta?.locationName || undefined,
+                } as any); // Type assertion needed due to optional fields
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               }
             }
           });
@@ -1827,7 +1857,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     type: 'create',
                     elementId: modal.id,
                     data: {
-                      element: { id: modal.id, type: 'image-generator', x: modal.x, y: modal.y, meta: { generatedImageUrl: modal.generatedImageUrl || null } },
+                      element: {
+                        id: modal.id,
+                        type: 'image-generator',
+                        x: modal.x,
+                        y: modal.y,
+                        meta: {
+                          generatedImageUrl: modal.generatedImageUrl || null,
+                          sourceImageUrl: (modal as any).sourceImageUrl || null, // CRITICAL: Persist sourceImageUrl
+                          prompt: (modal as any).prompt || null,
+                          model: (modal as any).model || null,
+                          frame: (modal as any).frame || null,
+                          aspectRatio: (modal as any).aspectRatio || null,
+                          frameWidth: (modal as any).frameWidth || null,
+                          frameHeight: (modal as any).frameHeight || null,
+                        }
+                      },
                     },
                     inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
                   });

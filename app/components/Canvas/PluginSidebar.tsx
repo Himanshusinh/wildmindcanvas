@@ -30,7 +30,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
     return () => observer.disconnect();
   }, []);
 
-  const [plugins] = useState<Plugin[]>([
+  const [plugins, setPlugins] = useState<Plugin[]>([
     {
       id: 'upscale',
       name: 'Upscale',
@@ -72,6 +72,40 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       description: 'Edit and assemble videos',
     },
   ]);
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pluginId: string } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, pluginId: string) => {
+    e.preventDefault();
+    e.nativeEvent.preventDefault();
+    e.stopPropagation();
+    console.log('Context menu triggered for:', pluginId);
+    setContextMenu({ x: e.clientX, y: e.clientY, pluginId });
+  };
+
+  const handleDeletePlugin = (id: string) => {
+    setPlugins(prev => prev.filter(p => p.id !== id));
+    setContextMenu(null);
+  };
+
+  const handleDuplicatePlugin = (id: string) => {
+    const plugin = plugins.find(p => p.id === id);
+    if (plugin) {
+      const newPlugin = {
+        ...plugin,
+        id: `${plugin.id}-${Date.now()}`,
+        name: `${plugin.name} (Copy)`,
+      };
+      setPlugins(prev => [...prev, newPlugin]);
+    }
+    setContextMenu(null);
+  };
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {
     if (onSelectPlugin) {

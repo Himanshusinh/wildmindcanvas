@@ -17,7 +17,10 @@ export interface ImageHandlers {
     aspectRatio: string,
     modalId?: string,
     imageCount?: number,
-    sourceImageUrl?: string
+    sourceImageUrl?: string,
+    sceneNumber?: number,
+    previousSceneImageUrl?: string,
+    storyboardMetadata?: Record<string, string>
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   handleTextCreate: (text: string, x: number, y: number) => void;
   handleAddImageToCanvas: (url: string) => Promise<void>;
@@ -46,7 +49,7 @@ export function createImageHandlers(
       const image = state.images[index];
       const deltaX = updates.x !== undefined ? updates.x - (image.x || 0) : 0;
       const deltaY = updates.y !== undefined ? updates.y - (image.y || 0) : 0;
-      
+
       if (deltaX !== 0 || deltaY !== 0) {
         const elementId = (image as any).elementId || `img-${index}`;
         appendOp({
@@ -83,7 +86,7 @@ export function createImageHandlers(
 
   const handleImageDelete = (index: number) => {
     const image = state.images[index];
-    
+
     setters.setImages((prev) => {
       const newImages = [...prev];
       // Clean up blob URL if it exists
@@ -146,7 +149,7 @@ export function createImageHandlers(
         const response = await fetch(imageData.url);
         const blob = await response.blob();
         filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png'}`;
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -160,7 +163,7 @@ export function createImageHandlers(
         // Use proxy download endpoint for Zata URLs and external URLs
         const { buildProxyDownloadUrl } = await import('@/lib/proxyUtils');
         downloadUrl = buildProxyDownloadUrl(imageData.url);
-        
+
         // Extract filename from URL or use default
         try {
           const urlObj = new URL(imageData.url);
@@ -236,10 +239,13 @@ export function createImageHandlers(
     aspectRatio: string,
     modalId?: string,
     imageCount?: number,
-    sourceImageUrl?: string
+    sourceImageUrl?: string,
+    sceneNumber?: number,
+    previousSceneImageUrl?: string,
+    storyboardMetadata?: Record<string, string>
   ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
     console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
-      
+
     // Ensure we have a project ID
     if (!projectId) {
       throw new Error('Project not initialized. Please refresh the page.');
@@ -264,7 +270,7 @@ export function createImageHandlers(
       const baseSize = 1024; // Base size for generation
       let genWidth: number;
       let genHeight: number;
-      
+
       if (aspectRatioValue >= 1) {
         // Landscape or square
         genWidth = Math.round(baseSize * aspectRatioValue);
@@ -275,8 +281,52 @@ export function createImageHandlers(
         genHeight = Math.round(baseSize / aspectRatioValue);
       }
 
+      // Resolve stitched reference from snapshot metadata (belt-and-suspenders override)
+      let effectiveSourceImageUrl = sourceImageUrl;
+      if (projectId) {
+        try {
+          const { getCurrentSnapshot } = await import('@/lib/canvasApi');
+          const current = await getCurrentSnapshot(projectId);
+          const stitchedMeta = (current?.snapshot?.metadata as any)?.stitchedimage as any;
+          let stitchedUrl: string | undefined;
+          if (stitchedMeta) {
+            if (typeof stitchedMeta === 'string') {
+              stitchedUrl = stitchedMeta;
+            } else if (typeof stitchedMeta === 'object') {
+              const entries = Object.entries(stitchedMeta) as Array<[string, string]>;
+              if (entries.length > 0) {
+                const last = entries[entries.length - 1][1];
+                stitchedUrl = last;
+              }
+            }
+          }
+          if (stitchedUrl && (!effectiveSourceImageUrl || effectiveSourceImageUrl.includes(','))) {
+            effectiveSourceImageUrl = stitchedUrl;
+            console.log('[handleImageGenerate] 🔄 Overriding sourceImageUrl with stitched snapshot URL (from metadata.stitchedimage)');
+          }
+        } catch (e) {
+          console.warn('[handleImageGenerate] Failed to read snapshot metadata for stitchedimage:', e);
+        }
+      }
+
       // Call the Canvas-specific generation API
       const { generateImageForCanvas } = await import('@/lib/api');
+      console.log('[handleImageGenerate] 🎨 Calling generateImageForCanvas with:', {
+        prompt: prompt.substring(0, 100) + '...',
+        model,
+        aspectRatio,
+        imageCount: queuedCount,
+        sourceImageUrl: effectiveSourceImageUrl ? `${effectiveSourceImageUrl.substring(0, 100)}...` : 'none',
+        sourceImageUrlCount: effectiveSourceImageUrl ? effectiveSourceImageUrl.split(',').length : 0,
+        isCommaSeparated: effectiveSourceImageUrl?.includes(','),
+        willUseImageToImage: !!effectiveSourceImageUrl,
+      });
+
+      if (!effectiveSourceImageUrl) {
+        console.warn('[handleImageGenerate] ⚠️ WARNING: No sourceImageUrl provided! Will use text-to-image mode.');
+      } else {
+        console.log('[handleImageGenerate] ✅ sourceImageUrl provided - will use image-to-image mode');
+      }
       const result = await generateImageForCanvas(
         prompt,
         model,
@@ -285,9 +335,12 @@ export function createImageHandlers(
         genWidth,
         genHeight,
         queuedCount,
-        sourceImageUrl
+        effectiveSourceImageUrl,
+        sceneNumber,
+        previousSceneImageUrl,
+        storyboardMetadata
       );
-      
+
       console.log('Image generated successfully:', result);
       // Return URL(s) for generator overlay
       // Always return images array if present (even for single image when imageCount > 1)

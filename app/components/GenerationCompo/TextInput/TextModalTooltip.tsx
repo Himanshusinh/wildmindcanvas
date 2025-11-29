@@ -25,7 +25,7 @@ export const TextModalTooltip: React.FC<TextModalTooltipProps> = ({
 
   if (!isHovered) return null;
 
-  const tooltipBg = isDark ? '#121212' : '#ffffff';
+  const tooltipBg = isDark ? '#1a1a1a' : '#ffffff';
   const tooltipText = isDark ? '#ffffff' : '#1f2937';
 
   return (

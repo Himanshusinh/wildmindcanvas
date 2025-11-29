@@ -46,11 +46,11 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
-  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const frameBg = isDark ? '#121212' : '#ffffff';
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
 
   return (
@@ -68,9 +68,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         aspectRatio: getAspectRatio(displayAspectRatio),
         minHeight: `${400 * scale}px`,
         backgroundColor: frameBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${16 * scale}px`,
+        borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${20 * scale}px`,
         // keep top/left/right borders, but remove bottom border when controls are hovered (only for generated images)
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
@@ -89,8 +87,8 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
     >
       {generatedImageUrl ? (
         <img
-          src={generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata') 
-            ? buildProxyResourceUrl(generatedImageUrl) 
+          src={generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')
+            ? buildProxyResourceUrl(generatedImageUrl)
             : generatedImageUrl}
           alt="Generated"
           style={{
@@ -98,7 +96,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             height: '100%',
             objectFit: 'cover',
             pointerEvents: 'none',
-            borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${16 * scale}px`,
+            borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${17 * scale}px`,
           }}
           draggable={false}
         />

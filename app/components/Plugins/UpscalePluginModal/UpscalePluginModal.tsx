@@ -89,7 +89,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -110,8 +110,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -154,7 +154,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       }
     }
   }, [connectedImageSource, initialLocalUpscaledImageUrl, initialSourceImageUrl, sourceImageUrl]);
-  
+
 
   // Update image resolution when upscaled image loads
   useEffect(() => {
@@ -196,7 +196,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[UpscalePluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -207,20 +207,20 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       isActionIcons: !!isActionIcons,
       buttonTitle: target.closest('button')?.getAttribute('title'),
     });
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       console.log('[UpscalePluginModal] Calling onSelect');
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
       // Track initial mouse position to detect drag vs click
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
       hasDraggedRef.current = false;
-      
+
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -268,19 +268,19 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
     };
@@ -305,28 +305,28 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       selectedModel,
       scaleValue,
     });
-    
+
     if (!onUpscale) {
       console.error('[UpscalePluginModal] onUpscale is not defined');
       return;
     }
-    
+
     if (isUpscaling || externalIsUpscaling) {
       console.log('[UpscalePluginModal] Already upscaling, skipping');
       return;
     }
-    
+
     if (!sourceImageUrl) {
       alert('Please connect an image first');
       return;
     }
-    
+
     setIsUpscaling(true);
     // Persist isUpscaling state
     if (onOptionsChange) {
       onOptionsChange({ isUpscaling: true } as any);
     }
-    
+
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
     const frameHeight = 600;
@@ -334,7 +334,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
       const newModal = {
@@ -350,10 +350,10 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from upscale plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of upscale plugin, left side of new frame)
@@ -365,17 +365,17 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       const controlsHeight = 100; // Approximate controls section height (not scaled, as it's in canvas coordinates)
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of upscale plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -388,28 +388,28 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[UpscalePluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
-    
+
     try {
       const imageUrl = sourceImageUrl;
       console.log('[UpscalePluginModal] Calling onUpscale with:', { selectedModel, scaleValue, imageUrl });
       const result = await onUpscale(selectedModel, scaleValue, imageUrl || undefined);
       console.log('[UpscalePluginModal] onUpscale returned:', result);
-      
+
       // Extract URL from result (result should be a string URL, but handle both string and object)
       const upscaledUrl = typeof result === 'string' ? result : ((result as any)?.url || (result as any)?.data?.url || null);
-      
+
       if (!upscaledUrl) {
         console.error('[UpscalePluginModal] No URL in result:', result);
         throw new Error('Upscale completed but no image URL was returned');
       }
-      
+
       console.log('[UpscalePluginModal] Extracted upscaled URL:', upscaledUrl);
-      
+
       // Update the image generation frame with the result
       if (upscaledUrl && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
@@ -424,7 +424,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         });
         console.log('[UpscalePluginModal] Updated image modal state with URL:', upscaledUrl);
       }
-      
+
       // Also store the upscaled image in the plugin
       if (upscaledUrl && upscaledUrl !== localUpscaledImageUrl) {
         setLocalUpscaledImageUrl(upscaledUrl);
@@ -502,8 +502,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -528,7 +528,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -536,7 +536,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
+
         {/* Label below */}
         <div
           style={{
@@ -566,39 +566,39 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             }}
           >
             <UpscaleControls
-          scale={scale}
-          selectedModel={selectedModel}
-          scaleValue={scaleValue}
-          isUpscaling={isUpscaling}
-          externalIsUpscaling={externalIsUpscaling}
-          sourceImageUrl={sourceImageUrl}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          onModelChange={(model) => {
-            setSelectedModel(model);
-            if (onOptionsChange) {
-              onOptionsChange({ model, scale: scaleValue });
-            }
-          }}
-          onScaleChange={(newScale) => {
-            setScaleValue(newScale);
-            if (onOptionsChange) {
-              onOptionsChange({ model: selectedModel, scale: newScale });
-            }
-          }}
+              scale={scale}
+              selectedModel={selectedModel}
+              scaleValue={scaleValue}
+              isUpscaling={isUpscaling}
+              externalIsUpscaling={externalIsUpscaling}
+              sourceImageUrl={sourceImageUrl}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              onModelChange={(model) => {
+                setSelectedModel(model);
+                if (onOptionsChange) {
+                  onOptionsChange({ model, scale: scaleValue });
+                }
+              }}
+              onScaleChange={(newScale) => {
+                setScaleValue(newScale);
+                if (onOptionsChange) {
+                  onOptionsChange({ model: selectedModel, scale: newScale });
+                }
+              }}
               onUpscale={handleUpscale}
               onHoverChange={setIsHovered}
             />
             <UpscaleImageFrame
-          id={id}
-          scale={scale}
-          frameBorderColor={frameBorderColor}
-          frameBorderWidth={frameBorderWidth}
-          isUpscaledImage={isUpscaledImage}
-          isDraggingContainer={isDraggingContainer}
-          isHovered={isHovered}
-          isSelected={isSelected || false}
-          sourceImageUrl={sourceImageUrl}
+              id={id}
+              scale={scale}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              isUpscaledImage={isUpscaledImage}
+              isDraggingContainer={isDraggingContainer}
+              isHovered={isHovered}
+              isSelected={isSelected || false}
+              sourceImageUrl={sourceImageUrl}
               onMouseDown={handleMouseDown}
               onSelect={onSelect}
             />

@@ -20,6 +20,7 @@ interface ScriptFrameModalOverlaysProps {
   onDelete?: (frameId: string) => void;
   onPositionChange?: (frameId: string, x: number, y: number) => void;
   onPositionCommit?: (frameId: string, x: number, y: number) => void;
+  onTextUpdate?: (frameId: string, text: string) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -32,6 +33,7 @@ export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> =
   onGenerateScenes,
   onPositionChange,
   onPositionCommit,
+  onTextUpdate,
   stageRef,
   scale,
   position,
@@ -61,6 +63,7 @@ export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> =
           onGenerateScenes={onGenerateScenes}
           onPositionChange={onPositionChange}
           onPositionCommit={onPositionCommit}
+          onTextUpdate={onTextUpdate}
         />
       ))}
     </>
@@ -77,6 +80,7 @@ interface ScriptFrameModalProps {
   onGenerateScenes?: (scriptFrameId: string) => void;
   onPositionChange?: (frameId: string, x: number, y: number) => void;
   onPositionCommit?: (frameId: string, x: number, y: number) => void;
+  onTextUpdate?: (frameId: string, text: string) => void;
 }
 
 const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
@@ -88,6 +92,7 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
   onGenerateScenes,
   onPositionChange,
   onPositionCommit,
+  onTextUpdate,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -343,6 +348,7 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
           scale={scale}
           text={frame.text}
           isDark={isDark}
+          onTextChange={(newText) => onTextUpdate?.(frame.id, newText)}
         />
       </div>
     </div>

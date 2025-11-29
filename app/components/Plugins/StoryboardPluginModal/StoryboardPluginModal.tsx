@@ -2,7 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import '../../common/canvasCaptureGuard';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
+import { StoryboardControls } from './StoryboardControls';
+
+import { ImageModalState } from '../../ModalOverlays/types';
+import { ImageUpload } from '@/types/canvas';
 
 interface StoryboardPluginModalProps {
   isOpen: boolean;
@@ -22,10 +26,25 @@ interface StoryboardPluginModalProps {
   isSelected?: boolean;
   frameWidth?: number;
   frameHeight?: number;
-  onOptionsChange?: (opts: { frameWidth?: number; frameHeight?: number }) => void;
+  onOptionsChange?: (opts: { frameWidth?: number; frameHeight?: number; characterInput?: string; characterNames?: string; backgroundDescription?: string; specialRequest?: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
   textInputStates?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   scriptText?: string | null;
+  initialCharacterInput?: string;
+  initialCharacterNames?: string;
+  initialBackgroundDescription?: string;
+  initialSpecialRequest?: string;
+  initialCharacterNamesMap?: Record<number, string>;
+  initialPropsNamesMap?: Record<number, string>;
+  initialBackgroundNamesMap?: Record<number, string>;
+  imageModalStates?: ImageModalState[];
+  images?: ImageUpload[];
+  onGenerate?: (inputs: {
+    characterInput?: string;
+    characterNames?: string;
+    backgroundDescription?: string;
+    specialRequest?: string;
+  }) => void;
 }
 
 export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
@@ -50,6 +69,16 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   connections = [],
   textInputStates = [],
   scriptText,
+  initialCharacterInput = '',
+  initialCharacterNames = '',
+  initialBackgroundDescription = '',
+  initialSpecialRequest = '',
+  initialCharacterNamesMap = {},
+  initialPropsNamesMap = {},
+  initialBackgroundNamesMap = {},
+  imageModalStates = [],
+  images = [],
+  onGenerate,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -59,6 +88,16 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
   const [isDark, setIsDark] = useState(false);
+
+  // New state for controls
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [characterInput, setCharacterInput] = useState(initialCharacterInput);
+  const [characterNames, setCharacterNames] = useState(initialCharacterNames);
+  const [backgroundDescription, setBackgroundDescription] = useState(initialBackgroundDescription);
+  const [specialRequest, setSpecialRequest] = useState(initialSpecialRequest);
+  const [characterNamesMap, setCharacterNamesMap] = useState<Record<number, string>>(initialCharacterNamesMap);
+  const [propsNamesMap, setPropsNamesMap] = useState<Record<number, string>>(initialPropsNamesMap);
+  const [backgroundNamesMap, setBackgroundNamesMap] = useState<Record<number, string>>(initialBackgroundNamesMap);
 
   useEffect(() => {
     const checkTheme = () => {
@@ -74,7 +113,10 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
 
-  // No additional variables needed for simple circular plugin
+  const frameBorderColor = isSelected
+    ? '#437eb5'
+    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderWidth = 2;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only handle left mouse button
@@ -83,7 +125,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isImage = target.tagName === 'IMG';
-    const isControls = target.closest('[data-controls]');
+    const isControls = target.closest('.controls-overlay');
     // Check if clicking on connection nodes - prevent popup and dragging
     const isConnectionNode = target.closest('[data-node-id]') || target.hasAttribute('data-node-id') || target.hasAttribute('data-node-side');
 
@@ -162,6 +204,11 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
 
+      // Only toggle popup if it was a click (not a drag)
+      if (!wasDragging) {
+        setIsPopupOpen(prev => !prev);
+      }
+
       if (onPositionCommit) {
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
@@ -179,6 +226,56 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
+
+  const handleGenerate = () => {
+    console.log('Generate Storyboard', {
+      characterInput,
+      characterNames,
+      backgroundDescription,
+      specialRequest,
+    });
+    if (onGenerate) {
+      onGenerate({
+        characterInput,
+        characterNames,
+        backgroundDescription,
+        specialRequest,
+      });
+    }
+  };
+
+  const updateOptions = (updates: Partial<{ characterInput: string; characterNames: string; backgroundDescription: string; specialRequest: string; characterNamesMap: Record<number, string>; propsNamesMap: Record<number, string>; backgroundNamesMap: Record<number, string> }>) => {
+    if (onOptionsChange) {
+      onOptionsChange(updates);
+    }
+  };
+
+  // Resolve connected images
+  const getConnectedImages = (anchor: string): string[] => {
+    if (!id || !connections) return [];
+    const matchingConnections = connections.filter(c => c.to === id && c.toAnchor === anchor);
+
+    const imageUrls: string[] = [];
+
+    matchingConnections.forEach(connection => {
+      const imageNode = imageModalStates.find(img => img.id === connection.from);
+      if (imageNode) {
+        if (imageNode.generatedImageUrl) imageUrls.push(imageNode.generatedImageUrl);
+        else if (imageNode.sourceImageUrl) imageUrls.push(imageNode.sourceImageUrl);
+      } else {
+        const mediaImage = images.find(img => img.elementId === connection.from);
+        if (mediaImage && mediaImage.url) {
+          imageUrls.push(mediaImage.url);
+        }
+      }
+    });
+
+    return imageUrls;
+  };
+
+  const connectedCharacterImages = getConnectedImages('receive-character');
+  const connectedBackgroundImages = getConnectedImages('receive-background');
+  const connectedPropsImages = getConnectedImages('receive-props');
 
   if (!isOpen) return null;
 
@@ -225,7 +322,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
             boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
@@ -256,7 +353,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
             <line x1="12" y1="3" x2="12" y2="9" />
           </svg>
 
-          <ConnectionNodes
+          <StoryboardConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}
@@ -279,6 +376,67 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         >
           Storyboard
         </div>
+
+        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {isPopupOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: `${12 * scale}px`,
+              zIndex: 1000,
+            }}
+          >
+            <StoryboardControls
+              id={id}
+              scale={scale}
+              characterInput={characterInput}
+              characterNames={characterNames}
+              backgroundDescription={backgroundDescription}
+              specialRequest={specialRequest}
+              connectedCharacterImages={connectedCharacterImages}
+              connectedBackgroundImages={connectedBackgroundImages}
+              connectedPropsImages={connectedPropsImages}
+              frameBorderColor={frameBorderColor}
+              frameBorderWidth={frameBorderWidth}
+              onCharacterInputChange={(val) => {
+                setCharacterInput(val);
+                updateOptions({ characterInput: val });
+              }}
+              onCharacterNamesChange={(val) => {
+                setCharacterNames(val);
+                updateOptions({ characterNames: val });
+              }}
+              onBackgroundDescriptionChange={(val) => {
+                setBackgroundDescription(val);
+                updateOptions({ backgroundDescription: val });
+              }}
+              onSpecialRequestChange={(val) => {
+                setSpecialRequest(val);
+                updateOptions({ specialRequest: val });
+              }}
+              onGenerate={handleGenerate}
+              onHoverChange={setIsHovered}
+              characterNamesMap={characterNamesMap}
+              propsNamesMap={propsNamesMap}
+              backgroundNamesMap={backgroundNamesMap}
+              onCharacterNamesMapChange={(map) => {
+                setCharacterNamesMap(map);
+                updateOptions({ characterNamesMap: map });
+              }}
+              onPropsNamesMapChange={(map) => {
+                setPropsNamesMap(map);
+                updateOptions({ propsNamesMap: map });
+              }}
+              onBackgroundNamesMapChange={(map) => {
+                setBackgroundNamesMap(map);
+                updateOptions({ backgroundNamesMap: map });
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -552,6 +552,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isHovered={isHovered}
         isPinned={isPinned}
         isUploadedVideo={!!isUploadedVideo}
+        isSelected={Boolean(isSelected)}
         prompt={effectivePrompt}
         isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}

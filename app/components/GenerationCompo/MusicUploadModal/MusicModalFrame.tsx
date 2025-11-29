@@ -55,7 +55,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   const [duration, setDuration] = useState(0);
   const [isDraggingProgress, setIsDraggingProgress] = useState(false);
 
-  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const frameBg = isDark ? '#121212' : '#ffffff';
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
   const progressBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const timeColor = isDark ? (generatedMusicUrl ? '#cccccc' : '#666666') : (generatedMusicUrl ? '#6b7280' : '#9ca3af');
@@ -186,8 +186,6 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         height: `${300 * scale}px`,
         minHeight: `${200 * scale}px`,
         backgroundColor: frameBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,

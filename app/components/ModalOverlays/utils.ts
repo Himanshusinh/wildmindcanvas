@@ -39,7 +39,7 @@ export const getComponentType = (id?: string | null): string | null => {
 
 export const computeNodeCenter = (
   id: string,
-  side: 'send' | 'receive',
+  side: string,
   stageRef: React.RefObject<Konva.Stage | null>,
   position: { x: number; y: number },
   scale: number,
@@ -57,7 +57,7 @@ export const computeNodeCenter = (
   sceneFrameModalStates?: any[]
 ): { x: number; y: number } | null => {
   if (!id) return null;
-  
+
   // First, try to use the actual node element position (most accurate for plugins with circular nodes)
   const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
   if (el) {
@@ -67,7 +67,7 @@ export const computeNodeCenter = (
     const centerY = Math.round(rect.top + rect.height / 2);
     return { x: centerX, y: centerY };
   }
-  
+
   // Fallback: Prefer frame element (set via data-frame-id on inner frame)
   const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`);
   if (frameEl) {

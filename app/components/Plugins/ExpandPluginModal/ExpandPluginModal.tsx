@@ -111,7 +111,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -194,8 +194,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -204,7 +204,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    
+
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
@@ -215,7 +215,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       }
       return url;
     }
-    
+
     // Then check if it's from a canvas image (uploaded image)
     if (images && images.length > 0) {
       const canvasImage = images.find(img => {
@@ -231,7 +231,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         return url;
       }
     }
-    
+
     return null;
   }, [id, connections, imageModalStates, images]);
 
@@ -284,13 +284,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (isButton || isInput || isControls || isActionIcons) {
       return;
@@ -302,13 +302,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
     e.preventDefault();
     e.stopPropagation();
-    
+
     setIsDraggingContainer(true);
     const startX = e.clientX;
     const startY = e.clientY;
     const startCanvasX = x;
     const startCanvasY = y;
-    
+
     setDragOffset({ x: 0, y: 0 });
     lastCanvasPosRef.current = { x: startCanvasX, y: startCanvasY };
 
@@ -326,10 +326,10 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       const deltaY = (moveEvent.clientY - startY) / scale;
       const newX = startCanvasX + deltaX;
       const newY = startCanvasY + deltaY;
-      
+
       setDragOffset({ x: deltaX, y: deltaY });
       lastCanvasPosRef.current = { x: newX, y: newY };
-      
+
       if (onPositionChange) {
         onPositionChange(newX, newY);
       }
@@ -340,19 +340,19 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       setIsDraggingContainer(false);
       setDragOffset({ x: 0, y: 0 });
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging && sourceImageUrl) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (lastCanvasPosRef.current && onPositionCommit) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
-      
+
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -387,7 +387,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Create image generation frame with isGenerating flag to show loading state
     if (onPersistImageModalCreate) {
       const newModal = {
@@ -403,27 +403,27 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from expand plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of expand plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of expand plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -436,7 +436,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[ExpandPluginModal] Created connection from plugin to new frame:', newConnector);
       }
@@ -448,13 +448,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       }
 
       // Validate frame info before calling API
-      if (!frameInfo.canvasSize || frameInfo.canvasSize.length !== 2 || 
-          frameInfo.canvasSize[0] <= 0 || frameInfo.canvasSize[1] <= 0) {
+      if (!frameInfo.canvasSize || frameInfo.canvasSize.length !== 2 ||
+        frameInfo.canvasSize[0] <= 0 || frameInfo.canvasSize[1] <= 0) {
         throw new Error('Invalid canvas size. Please ensure the frame is properly configured.');
       }
 
       if (!frameInfo.originalImageSize || frameInfo.originalImageSize.length !== 2 ||
-          frameInfo.originalImageSize[0] <= 0 || frameInfo.originalImageSize[1] <= 0) {
+        frameInfo.originalImageSize[0] <= 0 || frameInfo.originalImageSize[1] <= 0) {
         throw new Error('Invalid image size. Please ensure the image is loaded.');
       }
 
@@ -532,7 +532,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         }
         // Persist the local expanded image URL
         if (onOptionsChangeRef.current) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localExpandedImageUrl: result,
             isExpanding: false
           });
@@ -611,8 +611,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -637,7 +637,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -645,7 +645,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
+
         {/* Label below */}
         <div
           style={{

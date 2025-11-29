@@ -6,6 +6,7 @@ interface ImageModalControlsProps {
   isHovered: boolean;
   isPinned: boolean;
   isUploadedImage: boolean;
+  isSelected?: boolean;
   prompt: string;
   isPromptDisabled?: boolean;
   selectedModel: string;
@@ -41,6 +42,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   isHovered,
   isPinned,
   isUploadedImage,
+  isSelected = false,
   prompt,
   isPromptDisabled = false,
   selectedModel,
@@ -85,11 +87,11 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
-  const frameBorderColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
-  const controlsBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const controlsBg = isDark ? '#121212' : '#ffffff';
   const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
   const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
   const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
@@ -190,8 +192,6 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           maxWidth: '90vw',
           padding: `${16 * scale}px`,
           backgroundColor: controlsBg,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
           borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
           boxShadow: 'none',
           transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,

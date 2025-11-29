@@ -136,14 +136,14 @@ const Header: React.FC<HeaderProps> = ({
                                     <input
                                         type="number"
                                         value={dimension.width}
-                                        onChange={(e) => setDimension({ ...dimension, width: Number(e.target.value) })}
+                                        onChange={(e) => setDimension({ ...dimension, width: Number(e.target.value), name: 'Custom' })}
                                         className="w-full p-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                     />
                                     <span className="text-gray-400">x</span>
                                     <input
                                         type="number"
                                         value={dimension.height}
-                                        onChange={(e) => setDimension({ ...dimension, height: Number(e.target.value) })}
+                                        onChange={(e) => setDimension({ ...dimension, height: Number(e.target.value), name: 'Custom' })}
                                         className="w-full p-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                     />
                                 </div>
@@ -152,7 +152,7 @@ const Header: React.FC<HeaderProps> = ({
                                 {PRESET_DIMENSIONS.map((preset) => (
                                     <button
                                         key={preset.name}
-                                        onClick={() => { setDimension({ width: preset.width, height: preset.height }); setShowResizeMenu(false); }}
+                                        onClick={() => { setDimension({ width: preset.width, height: preset.height, name: preset.name }); setShowResizeMenu(false); }}
                                         className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-violet-50 hover:text-violet-700 flex items-center justify-between group transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
