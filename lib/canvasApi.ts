@@ -3,7 +3,7 @@
  * These functions interact with the Canvas backend endpoints
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api-gateway-services-wildmind.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wildmindai.com';
 const CANVAS_API = `${API_BASE_URL}/api/canvas`;
 
 export interface CanvasProject {
