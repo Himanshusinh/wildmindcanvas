@@ -179,7 +179,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -306,10 +306,10 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isModelDropdownOpen && (
             <div
               style={{
@@ -336,27 +336,27 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       onSetIsModelDropdownOpen(false);
-                      
+
                       // Get valid options for the new model
                       const defaultDuration = getModelDefaultDuration(model);
                       const defaultAspectRatio = getModelDefaultAspectRatio(model);
                       const defaultResolution = getModelDefaultResolution(model);
-                      
+
                       // Update duration if current is not valid
-                      const newDuration = isValidDurationForModel(model, selectedDuration) 
-                        ? selectedDuration 
+                      const newDuration = isValidDurationForModel(model, selectedDuration)
+                        ? selectedDuration
                         : defaultDuration;
-                      
+
                       // Update aspect ratio if current is not valid
                       const newAspectRatio = isValidAspectRatioForModel(model, selectedAspectRatio)
                         ? selectedAspectRatio
                         : defaultAspectRatio;
-                      
+
                       // Update resolution if current is not valid
                       const newResolution = isValidResolutionForModel(model, selectedResolution)
                         ? selectedResolution
                         : defaultResolution;
-                      
+
                       // Update state
                       if (newDuration !== selectedDuration) {
                         onDurationChange(newDuration);
@@ -367,10 +367,10 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                       if (newResolution !== selectedResolution) {
                         onResolutionChange(newResolution);
                       }
-                      
+
                       const [w, h] = newAspectRatio.split(':').map(Number);
                       const frameWidth = 600;
-                      const ar = w && h ? (w / h) : 16/9;
+                      const ar = w && h ? (w / h) : 16 / 9;
                       const rawHeight = Math.round(frameWidth / ar);
                       const frameHeight = Math.max(400, rawHeight);
                       onModelChange(model);
@@ -379,26 +379,26 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     style={{
                       padding: `${6 * scale}px ${12 * scale}px`,
                       fontSize: controlFontSize,
-                    color: dropdownText,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: selectedModel === model ? selectedBg : 'transparent',
-                    transition: 'background-color 0.3s ease, color 0.3s ease',
+                      color: dropdownText,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedModel === model ? selectedBg : 'transparent',
+                      transition: 'background-color 0.3s ease, color 0.3s ease',
                       borderRadius: `${6 * scale}px`,
                       whiteSpace: 'nowrap',
                       minWidth: 'max-content',
                     }}
-                  onMouseEnter={(e) => {
-                    if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}
+                    onMouseEnter={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
                   >
                     {selectedModel === model && (
                       <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
@@ -446,7 +446,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isAspectRatioDropdownOpen && (
             <div
               style={{
@@ -475,7 +475,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsAspectRatioDropdownOpen(false);
                     const [w, h] = ratio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onAspectRatioChange(ratio);
@@ -514,7 +514,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             </div>
           )}
         </div>
-        
+
         {/* Duration Selector - Custom Dropdown */}
         <div ref={durationDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
           <button
@@ -548,7 +548,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#34d399' : '#10b981'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isDurationDropdownOpen && (
             <div
               style={{
@@ -577,7 +577,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsDurationDropdownOpen(false);
                     const [w, h] = selectedAspectRatio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onDurationChange(dur);
@@ -650,7 +650,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#a78bfa' : '#8b5cf6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isResolutionDropdownOpen && (
             <div
               style={{
@@ -679,7 +679,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsResolutionDropdownOpen(false);
                     const [w, h] = selectedAspectRatio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onResolutionChange(res);

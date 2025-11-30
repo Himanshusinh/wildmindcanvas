@@ -207,7 +207,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
           borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
           borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-          transition: 'background-color 0.3s ease, border-color 0.3s ease',
+          transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
         }}
         onMouseEnter={() => onSetIsHovered(true)}
         onMouseLeave={() => onSetIsHovered(false)}

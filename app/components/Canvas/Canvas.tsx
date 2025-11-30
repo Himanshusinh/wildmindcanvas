@@ -799,7 +799,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Persist the change
         if (onPersistStoryboardModalMove) {
-          onPersistStoryboardModalMove(storyboardId, { 
+          onPersistStoryboardModalMove(storyboardId, {
             ...(stitchedImageUrl ? { stitchedImageUrl } : {}),
           } as any);
         }
@@ -1117,7 +1117,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             const { getCurrentSnapshot } = await import('@/lib/canvasApi');
             const current = await getCurrentSnapshot(projectId);
             const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
-            
+
             if (stitchedImageData && typeof stitchedImageData === 'object') {
               const url = Object.values(stitchedImageData)[0];
               if (url && typeof url === 'string') {
@@ -1163,7 +1163,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           const { getCurrentSnapshot } = await import('@/lib/canvasApi');
           const current = await getCurrentSnapshot(projectId);
           const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
-          
+
           if (stitchedImageData && typeof stitchedImageData === 'object') {
             // Get the first (and only) URL from the stitched-image object
             const url = Object.values(stitchedImageData)[0];
@@ -2748,7 +2748,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         x: viewportSize.width / 2 - CANVAS_CENTER * scale,
         y: viewportSize.height / 2 - CANVAS_CENTER * scale,
       };
-      
+
       console.log('[Canvas] Empty canvas detected - centering on dot pattern area center', {
         canvasCenter: CANVAS_CENTER,
         infiniteCanvasSize: INFINITE_CANVAS_SIZE,
@@ -2756,7 +2756,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         scale,
         newPos,
       });
-      
+
       setPosition(newPos);
       setTimeout(() => updateViewportCenter(newPos, scale), 0);
       shouldCenterOnLoadRef.current = false;
