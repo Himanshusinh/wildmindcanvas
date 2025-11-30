@@ -336,15 +336,13 @@ export function createImageHandlers(
         model,
         aspectRatio,
         projectId,
-        genWidth,
-        genHeight,
+        width || genWidth,
+        height || genHeight,
         queuedCount,
         effectiveSourceImageUrl,
         sceneNumber,
         previousSceneImageUrl,
-        storyboardMetadata,
-        width,
-        height
+        storyboardMetadata
       );
 
       console.log('Image generated successfully:', result);

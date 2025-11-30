@@ -130,7 +130,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             if (sourceUrl.includes(',')) return undefined;
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onGenerate={async (prompt, model, frame, aspectRatio, width, height) => {
+          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrl, width, height) => {
             console.log('[ImageModalOverlays] onGenerate called!', { modalId: modalState.id, hasOnImageGenerate: !!onImageGenerate });
             if (onImageGenerate) {
               try {
@@ -458,12 +458,16 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                       prompt,
                     } as any)).catch(console.error);
                   }
+
+                  return result;
                 }
+                return null;
               } catch (error) {
-                console.error('Error generating image:', error);
-                // Error is already handled in the modal component
+                console.error('[ImageModalOverlays] Failed to generate image:', error);
+                return null;
               }
             }
+            return null;
           }}
           generatedImageUrl={modalState.generatedImageUrl}
           generatedImageUrls={modalState.generatedImageUrls}
