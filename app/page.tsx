@@ -11,7 +11,7 @@ import LibrarySidebar from '@/app/components/Canvas/LibrarySidebar';
 import PluginSidebar from '@/app/components/Canvas/PluginSidebar';
 import { ImageUpload } from '@/types/canvas';
 import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
-import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/lib/canvasApi';
+import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/lib/canvasApi';
 import { ProjectSelector } from '@/app/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
 import { useOpManager } from '@/hooks/useOpManager';
@@ -1593,8 +1593,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     // Update project name in backend if we have a project ID
     if (projectId) {
       try {
-        // TODO: Implement project update API call when available
-        // await updateProject(projectId, { name });
+        await updateProject(projectId, { name });
       } catch (error) {
         console.error('Failed to update project name:', error);
       }
@@ -1694,6 +1693,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         {projectId ? (
           <>
             <Canvas
+              key={projectId}
               isUIHidden={isUIHidden}
               images={images}
               onViewportChange={handleViewportChange}

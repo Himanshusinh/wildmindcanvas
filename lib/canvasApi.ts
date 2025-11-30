@@ -113,6 +113,31 @@ export async function getProject(projectId: string): Promise<CanvasProject | nul
 }
 
 /**
+ * Update a Canvas project
+ */
+export async function updateProject(
+  projectId: string,
+  updates: Partial<{ name: string; description: string; settings: CanvasProject['settings'] }>
+): Promise<CanvasProject> {
+  const response = await fetch(`${CANVAS_API}/projects/${projectId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to update project' }));
+    throw new Error(error.message || 'Failed to update project');
+  }
+
+  const result = await response.json();
+  return result.data?.project;
+}
+
+/**
  * Append an operation to a project
  */
 export async function appendOp(
@@ -165,7 +190,7 @@ export async function getOps(
  */
 export async function listProjects(limit: number = 20): Promise<CanvasProject[]> {
   const cacheKey = `listProjects:${limit}`;
-  
+
   // Check cache first (import dynamically to avoid circular dependency)
   const { getCachedRequest, setCachedRequest } = await import('./apiCache');
   const cached = getCachedRequest<CanvasProject[]>(cacheKey);

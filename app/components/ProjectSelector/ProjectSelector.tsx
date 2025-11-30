@@ -15,6 +15,17 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('Untitled');
   const creatingRef = useRef(false); // Prevent duplicate creation requests
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     loadProjects();
@@ -25,7 +36,7 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
       setLoading(true);
       const userProjects = await listProjects(20);
       setProjects(userProjects);
-      
+
       // If no current project and we have projects, select the first one
       if (!currentProjectId && userProjects.length > 0) {
         onProjectSelect(userProjects[0]);
@@ -65,12 +76,22 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
     }
   };
 
+  const bgColor = isDark ? '#1e1e1e' : '#ffffff';
+  const textColor = isDark ? '#e5e7eb' : '#1f2937';
+  const subTextColor = isDark ? '#9ca3af' : '#4b5563';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const hoverBorderColor = isDark ? '#3b82f6' : '#3b82f6';
+  const activeBorderColor = isDark ? '#2563eb' : '#2563eb';
+  const activeBgColor = isDark ? 'rgba(37, 99, 235, 0.1)' : '#eff6ff';
+  const inputBg = isDark ? '#374151' : '#ffffff';
+  const inputBorder = isDark ? '#4b5563' : '#d1d5db';
+
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[20002]">
+        <div className="rounded-lg p-6" style={{ backgroundColor: bgColor }}>
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading projects...</p>
+          <p style={{ color: subTextColor }}>Loading projects...</p>
         </div>
       </div>
     );
@@ -78,15 +99,21 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
 
   if (showCreateModal) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-96">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[20002]">
+        <div className="rounded-lg p-6 w-96" style={{ backgroundColor: bgColor, color: textColor }}>
           <h2 className="text-xl font-bold mb-4">Create New Project</h2>
           <input
             type="text"
             value={newProjectName}
             onChange={(e) => setNewProjectName(e.target.value)}
             placeholder="Project name"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              backgroundColor: inputBg,
+              borderColor: inputBorder,
+              borderWidth: '1px',
+              color: textColor
+            }}
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -99,7 +126,8 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowCreateModal(false)}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              className="px-4 py-2 hover:opacity-80"
+              style={{ color: subTextColor }}
               disabled={isCreating}
             >
               Cancel
@@ -118,8 +146,8 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[20002]">
+      <div className="rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" style={{ backgroundColor: bgColor, color: textColor }}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Select Project</h2>
           <button
@@ -132,7 +160,7 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
 
         {projects.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-600 mb-4">No projects found</p>
+            <p className="mb-4" style={{ color: subTextColor }}>No projects found</p>
             <button
               onClick={() => setShowCreateModal(true)}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -146,17 +174,27 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
               <div
                 key={project.id}
                 onClick={() => onProjectSelect(project)}
-                className={`p-4 border-2 rounded-lg cursor-pointer hover:border-blue-500 transition-colors ${
-                  currentProjectId === project.id
-                    ? 'border-blue-600 bg-blue-50'
-                    : 'border-gray-200'
-                }`}
+                className="p-4 border-2 rounded-lg cursor-pointer transition-colors"
+                style={{
+                  borderColor: currentProjectId === project.id ? activeBorderColor : borderColor,
+                  backgroundColor: currentProjectId === project.id ? activeBgColor : 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  if (currentProjectId !== project.id) {
+                    e.currentTarget.style.borderColor = hoverBorderColor;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentProjectId !== project.id) {
+                    e.currentTarget.style.borderColor = borderColor;
+                  }
+                }}
               >
                 <h3 className="font-semibold text-lg mb-2">{project.name}</h3>
                 {project.description && (
-                  <p className="text-sm text-gray-600 mb-2">{project.description}</p>
+                  <p className="text-sm mb-2" style={{ color: subTextColor }}>{project.description}</p>
                 )}
-                <p className="text-xs text-gray-500">
+                <p className="text-xs" style={{ color: subTextColor, opacity: 0.8 }}>
                   {project.updatedAt
                     ? new Date(project.updatedAt).toLocaleDateString()
                     : 'Recently updated'}

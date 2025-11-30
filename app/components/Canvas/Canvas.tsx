@@ -49,7 +49,9 @@ interface CanvasProps {
     sourceImageUrl?: string,
     sceneNumber?: number,
     previousSceneImageUrl?: string,
-    storyboardMetadata?: Record<string, string>
+    storyboardMetadata?: Record<string, string>,
+    width?: number,
+    height?: number
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;

@@ -41,7 +41,7 @@ interface ImageUploadModalProps {
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
   initialCount?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
@@ -380,6 +380,35 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
       setIsGenerating(true);
       try {
+        // Calculate width and height based on resolution and aspect ratio
+        let width: number | undefined;
+        let height: number | undefined;
+
+        if (selectedResolution) {
+          const [wRatio, hRatio] = selectedAspectRatio.split(':').map(Number);
+          const ratio = wRatio / hRatio;
+          let baseSize = 1024; // Default 1K
+
+          if (selectedResolution === '2K') baseSize = 2048;
+          if (selectedResolution === '4K') baseSize = 4096;
+
+          if (ratio >= 1) {
+            // Landscape or square
+            width = Math.round(baseSize * ratio);
+            height = baseSize;
+          } else {
+            // Portrait
+            width = baseSize;
+            height = Math.round(baseSize / ratio);
+          }
+
+          // Special case for Flux 2 Pro 1024x2048
+          if (selectedResolution === '1024x2048') {
+            width = 1024;
+            height = 2048;
+          }
+        }
+
         // If a stitched reference is provided via props, force using ONLY that URL
         const stitchedOnly = typeof sourceImageUrl === 'string' && sourceImageUrl.includes('reference-stitched');
 
@@ -776,6 +805,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           targetModalId,
           referenceImageUrls: allReferenceImageUrls,
           imageCount,
+          width,
+          height,
         });
         const result = await onImageGenerate(
           promptToUse,
@@ -785,7 +816,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           targetModalId,
           imageCount,
           // If stitched reference exists, pass ONLY that single URL; otherwise, join collected references
-          stitchedOnly && finalSourceImageUrl ? finalSourceImageUrl : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined)
+          stitchedOnly && finalSourceImageUrl ? finalSourceImageUrl : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined),
+          width,
+          height
         );
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
 
@@ -863,8 +896,43 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     window.addEventListener('canvas-frame-dim', handleDim as any);
     return () => window.removeEventListener('canvas-frame-dim', handleDim as any);
   }, [id]);
+  // Helper to parse model string into base model and resolution
+  const parseModelAndResolution = (modelString: string) => {
+    if (!modelString) return { model: 'Google Nano Banana', resolution: '2K' };
+
+    const lower = modelString.toLowerCase();
+
+    // Check for known resolutions at the end of the string
+    const resolutions = ['1K', '2K', '4K', '1024x2048'];
+    let foundResolution = '2K'; // Default
+    let baseModel = modelString;
+
+    for (const res of resolutions) {
+      // Check if string ends with resolution (case insensitive)
+      if (lower.endsWith(res.toLowerCase())) {
+        foundResolution = res;
+        // Remove resolution from end (and trim)
+        baseModel = modelString.substring(0, modelString.length - res.length).trim();
+        break;
+      }
+    }
+
+    // Special handling for "Google nano banana pro" which might be lowercased in some contexts
+    if (baseModel.toLowerCase() === 'google nano banana pro') {
+      baseModel = 'Google nano banana pro';
+    } else if (baseModel.toLowerCase() === 'flux 2 pro') {
+      baseModel = 'Flux 2 pro';
+    }
+
+    return { model: baseModel, resolution: foundResolution };
+  };
+
   useEffect(() => {
-    if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel);
+    if (initialModel) {
+      const { model, resolution } = parseModelAndResolution(initialModel);
+      if (model !== selectedModel) setSelectedModel(model);
+      if (resolution !== selectedResolution) setSelectedResolution(resolution);
+    }
   }, [initialModel]);
   useEffect(() => {
     if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame);
@@ -976,6 +1044,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // Seedream, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
+    if (
+      modelLower.includes('seedream') ||
+      modelLower.includes('imagen') ||
+      modelLower.includes('flux pro 1.1')
+    ) {
+      return [
+        { value: '1K', label: '1K (1024px)' },
+        { value: '2K', label: '2K (2048px)' },
+        { value: '4K', label: '4K (4096px)' },
+      ];
+    }
+
     // Other models don't have resolution options
     return [];
   };
@@ -992,6 +1073,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // For Flux 2 Pro, append resolution
     if (modelLower.includes('flux 2 pro')) {
       return `Flux 2 Pro ${selectedResolution}`;
+    }
+
+    // For Seedream, Imagen, and Flux Pro 1.1, append resolution
+    if (
+      modelLower.includes('seedream') ||
+      modelLower.includes('imagen') ||
+      modelLower.includes('flux pro 1.1')
+    ) {
+      return `${selectedModel} ${selectedResolution}`;
     }
 
     // For other models, use as-is
@@ -1260,7 +1350,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onResolutionChange={(resolution) => {
           setSelectedResolution(resolution);
           if (onOptionsChange) {
-            onOptionsChange({ model: `Google nano banana pro ${resolution}`, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount } as any);
+            // Helper to get model name with NEW resolution
+            const getModelNameWithResolution = (res: string) => {
+              const modelLower = selectedModel.toLowerCase();
+              if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
+              if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
+              if (
+                modelLower.includes('seedream') ||
+                modelLower.includes('imagen') ||
+                modelLower.includes('flux pro 1.1')
+              ) {
+                return `${selectedModel} ${res}`;
+              }
+              return selectedModel;
+            };
+
+            onOptionsChange({
+              model: getModelNameWithResolution(resolution),
+              aspectRatio: selectedAspectRatio,
+              frame: selectedFrame,
+              prompt,
+              frameWidth: 600,
+              frameHeight: 400,
+              imageCount
+            } as any);
           }
         }}
         onGenerate={handleGenerate}

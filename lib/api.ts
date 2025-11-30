@@ -234,7 +234,7 @@ export async function generateImageForCanvas(
         projectId,
       },
     };
-    
+
     console.log('[generateImageForCanvas] 📤 STEP 6: Sending request to backend:', {
       url: `${API_GATEWAY_URL}/canvas/generate`,
       requestBody: {
@@ -246,7 +246,7 @@ export async function generateImageForCanvas(
         prompt: prompt.substring(0, 100) + '...',
       },
     });
-    
+
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate`, {
       method: 'POST',
       credentials: 'include', // Include cookies (app_session)
@@ -1233,40 +1233,40 @@ export async function createStitchedReferenceImage(
     if (projectId) {
       // eslint-disable-next-line no-console
       console.log('[createStitchedReferenceImage] 💾 Starting snapshot save...', { projectId, stitchedKey: stitched.key });
-      
+
       const { getCurrentSnapshot, setCurrentSnapshot } = await import('./canvasApi');
       const current = await getCurrentSnapshot(projectId);
       const elements = current?.snapshot?.elements || {};
       const existingMeta = (current?.snapshot?.metadata || {}) as Record<string, any>;
-      
+
       // eslint-disable-next-line no-console
       console.log('[createStitchedReferenceImage] 📋 Existing metadata keys:', Object.keys(existingMeta));
-      
+
       // Store only the latest stitched image (replace, don't accumulate)
       const stitchedMap = {
         [stitched.key]: stitched.url,
       } as Record<string, string>;
-      
-      const metadata = { 
-        ...existingMeta, 
-        'stitched-image': stitchedMap 
+
+      const metadata = {
+        ...existingMeta,
+        'stitched-image': stitchedMap
       };
-      
+
       // eslint-disable-next-line no-console
       console.log('[createStitchedReferenceImage] 📤 Saving metadata with stitched-image:', {
         'stitched-image': stitchedMap,
         allMetadataKeys: Object.keys(metadata),
       });
-      
+
       await setCurrentSnapshot(projectId, { elements, metadata });
-      
+
       // Verify it was saved
       const verify = await getCurrentSnapshot(projectId);
       const savedMeta = (verify?.snapshot?.metadata || {}) as Record<string, any>;
-      
+
       // eslint-disable-next-line no-console
-      console.log('[createStitchedReferenceImage] ✅ Saved stitched-image to snapshot current', { 
-        key: stitched.key, 
+      console.log('[createStitchedReferenceImage] ✅ Saved stitched-image to snapshot current', {
+        key: stitched.key,
         url: stitched.url,
         metadataKey: 'stitched-image',
         savedStitchedImage: savedMeta['stitched-image'],
@@ -1505,15 +1505,25 @@ export interface MediaLibraryResponse {
     videos?: MediaItem[];
     music?: MediaItem[];
     uploaded?: MediaItem[];
+    pagination?: {
+      page: number;
+      limit: number;
+      totalImages: number;
+      totalVideos: number;
+      totalUploaded: number;
+      hasMoreImages: boolean;
+      hasMoreVideos: boolean;
+      hasMoreUploaded: boolean;
+    };
   };
 }
 
 /**
  * Get user's media library (generated and uploaded)
  */
-export async function getMediaLibrary(): Promise<MediaLibraryResponse> {
+export async function getMediaLibrary(page: number = 1, limit: number = 20): Promise<MediaLibraryResponse> {
   try {
-    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library`, {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library?page=${page}&limit=${limit}`, {
       method: 'GET',
       credentials: 'include',
       headers: {

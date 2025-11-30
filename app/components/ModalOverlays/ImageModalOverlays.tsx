@@ -25,7 +25,9 @@ interface ImageModalOverlaysProps {
     sourceImageUrl?: string,
     sceneNumber?: number,
     previousSceneImageUrl?: string,
-    storyboardMetadata?: Record<string, string>
+    storyboardMetadata?: Record<string, string>,
+    width?: number,
+    height?: number
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
@@ -128,7 +130,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             if (sourceUrl.includes(',')) return undefined;
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onGenerate={async (prompt, model, frame, aspectRatio) => {
+          onGenerate={async (prompt, model, frame, aspectRatio, width, height) => {
             console.log('[ImageModalOverlays] onGenerate called!', { modalId: modalState.id, hasOnImageGenerate: !!onImageGenerate });
             if (onImageGenerate) {
               try {
@@ -164,16 +166,16 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                     const { getCurrentSnapshot } = await import('@/lib/canvasApi');
                     // Try to get projectId from multiple sources
                     let projectId: string | null = null;
-                    
+
                     // 1. Try from URL params
                     const urlParams = new URLSearchParams(window.location.search);
                     projectId = urlParams.get('projectId');
-                    
+
                     // 2. Try from window global
                     if (!projectId) {
                       projectId = (window as any).__PROJECT_ID__ || (window as any).projectId;
                     }
-                    
+
                     // 3. Try from storyboard connection (if available)
                     if (!projectId) {
                       const sceneConnection = connections.find(c => c.to === modalState.id);
@@ -189,11 +191,11 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                         }
                       }
                     }
-                    
+
                     if (projectId) {
                       const current = await getCurrentSnapshot(projectId);
                       const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
-                      
+
                       if (stitchedImageData && typeof stitchedImageData === 'object') {
                         const stitchedUrl = Object.values(stitchedImageData)[0];
                         if (stitchedUrl && typeof stitchedUrl === 'string') {
@@ -227,21 +229,21 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
 
                 // If sourceImageUrl is not already set, try to resolve it from scene connections using namedImages
                 if (!sourceImageUrl) {
-                // Check if this image generator is connected to a Scene Frame
-                const sceneConnection = connections.find(c => c.to === modalState.id);
-                if (sceneConnection && sceneFrameModalStates) {
-                  const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
+                  // Check if this image generator is connected to a Scene Frame
+                  const sceneConnection = connections.find(c => c.to === modalState.id);
+                  if (sceneConnection && sceneFrameModalStates) {
+                    const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
 
-                  if (connectedScene && scriptFrameModalStates && scriptFrameModalStates.length > 0) {
-                    const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
+                    if (connectedScene && scriptFrameModalStates && scriptFrameModalStates.length > 0) {
+                      const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
 
-                    if (parentScript && storyboardModalStates && storyboardModalStates.length > 0) {
-                      const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
+                      if (parentScript && storyboardModalStates && storyboardModalStates.length > 0) {
+                        const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
 
                         if (sourceStoryboard && (sourceStoryboard as any).namedImages) {
                           console.log('[ImageModalOverlays] ✅ Found source Storyboard with namedImages:', sourceStoryboard.id);
                           const namedImages = (sourceStoryboard as any).namedImages;
-                        const referenceImageUrls: string[] = [];
+                          const referenceImageUrls: string[] = [];
 
                           // Match character names from scene to namedImages
                           if ((connectedScene as any).characterNames && Array.isArray((connectedScene as any).characterNames)) {
@@ -306,8 +308,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                             });
                           }
 
-                        if (referenceImageUrls.length > 0) {
-                          sourceImageUrl = referenceImageUrls.join(',');
+                          if (referenceImageUrls.length > 0) {
+                            sourceImageUrl = referenceImageUrls.join(',');
                             console.log('[ImageModalOverlays] ✅ Matched reference images from namedImages:', {
                               count: referenceImageUrls.length,
                               urls: referenceImageUrls.map(url => url.substring(0, 60) + '...'),
@@ -420,7 +422,9 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                   finalSourceImageUrl, // Reference images only (for Scene 1, this is all we need)
                   extractedSceneNumber, // Scene number
                   extractedPreviousSceneImageUrl, // Previous scene image (Scene 2+ only)
-                  extractedStoryboardMetadata // Storyboard metadata
+                  extractedStoryboardMetadata, // Storyboard metadata
+                  width,
+                  height
                 );
                 if (result) {
                   // Extract image URLs
@@ -563,7 +567,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           scale={scale}
           position={position}
           onPersistImageModalCreate={onPersistImageModalCreate}
-          onImageGenerate={onImageGenerate}
+
           initialCount={modalState.imageCount}
           onUpdateModalState={(modalId, updates) => {
             setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));

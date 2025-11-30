@@ -20,7 +20,9 @@ export interface ImageHandlers {
     sourceImageUrl?: string,
     sceneNumber?: number,
     previousSceneImageUrl?: string,
-    storyboardMetadata?: Record<string, string>
+    storyboardMetadata?: Record<string, string>,
+    width?: number,
+    height?: number
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   handleTextCreate: (text: string, x: number, y: number) => void;
   handleAddImageToCanvas: (url: string) => Promise<void>;
@@ -242,9 +244,11 @@ export function createImageHandlers(
     sourceImageUrl?: string,
     sceneNumber?: number,
     previousSceneImageUrl?: string,
-    storyboardMetadata?: Record<string, string>
+    storyboardMetadata?: Record<string, string>,
+    width?: number,
+    height?: number
   ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
-    console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount });
+    console.log('Generate image:', { prompt, model, frame, aspectRatio, modalId, imageCount, width, height });
 
     // Ensure we have a project ID
     if (!projectId) {
@@ -338,7 +342,9 @@ export function createImageHandlers(
         effectiveSourceImageUrl,
         sceneNumber,
         previousSceneImageUrl,
-        storyboardMetadata
+        storyboardMetadata,
+        width,
+        height
       );
 
       console.log('Image generated successfully:', result);
