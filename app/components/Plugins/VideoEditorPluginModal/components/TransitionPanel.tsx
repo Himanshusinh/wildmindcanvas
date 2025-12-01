@@ -1,144 +1,310 @@
-import React, { useState } from 'react';
-import { X, ArrowRight, ArrowUp, ArrowDown, Check } from 'lucide-react';
+
+import React from 'react';
+import { X, Circle, ArrowRight, ArrowLeft, ArrowUp, ArrowDown, MoveRight, Layers, Copy, Grid, RotateCcw, Ban, Wand2, ScanLine, CheckCircle2, Square, Gem, Plus, Columns, AlignJustify, Clock, LayoutGrid, Zap, BookOpen, Film, Sun, Moon, Waves, Eraser, RotateCw, MoveDiagonal, ZapOff, Split, Flame, Heart, Triangle, Box, Monitor, Droplet, Brush, Palette, Image, Maximize, Minimize, Shuffle, Grip, Wind } from 'lucide-react';
 import { Transition, TransitionType } from '../types';
 
 interface TransitionPanelProps {
-    isOpen: boolean;
+    transition: Transition | undefined;
+    onUpdate: (t: Transition) => void;
+    onApplyToAll: (t: Transition) => void;
+    onHover: (t: TransitionType | null) => void;
     onClose: () => void;
-    onSelect: (transition: Transition) => void;
-    onApplyToAll: (transition: Transition) => void;
-    selectedTransition?: Transition | null;
-    onPreview: (transition: Transition | null) => void;
 }
 
-const TransitionPanel: React.FC<TransitionPanelProps> = ({
-    isOpen, onClose, onSelect, onApplyToAll, selectedTransition, onPreview
-}) => {
-    const [duration, setDuration] = useState(0.5);
-    const [direction, setDirection] = useState<'left' | 'right' | 'up' | 'down'>('left');
+const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate, onApplyToAll, onHover, onClose }) => {
+    const currentType = transition?.type || 'none';
+    const currentDuration = transition?.duration || 0.5;
+    const currentDirection = transition?.direction || 'left';
+    const currentSpeed = transition?.speed || 1.0;
+    const currentOrigin = transition?.origin || 'center';
 
-    const TRANSITIONS: { id: TransitionType, name: string, category: string }[] = [
-        { id: 'none', name: 'None', category: 'Basic' },
-        { id: 'dissolve', name: 'Dissolve', category: 'Basic' },
-        { id: 'dip-to-black', name: 'Dip to Black', category: 'Basic' },
-        { id: 'dip-to-white', name: 'Dip to White', category: 'Basic' },
-        { id: 'zoom-in', name: 'Zoom In', category: 'Motion' },
-        { id: 'zoom-out', name: 'Zoom Out', category: 'Motion' },
-        { id: 'slide', name: 'Slide', category: 'Motion' },
-        { id: 'push', name: 'Push', category: 'Motion' },
-        { id: 'whip', name: 'Whip', category: 'Motion' },
-        { id: 'wipe', name: 'Wipe', category: 'Shape' },
-        { id: 'iris-round', name: 'Iris Round', category: 'Shape' },
-        { id: 'iris-box', name: 'Iris Box', category: 'Shape' },
-        { id: 'clock-wipe', name: 'Clock Wipe', category: 'Shape' },
+    const [activeSection, setActiveSection] = React.useState<'normal' | 'advanced'>('normal');
+    const [justApplied, setJustApplied] = React.useState(false);
+
+    const normalTransitions: { id: TransitionType; label: string; icon: React.ElementType; category?: string }[] = [
+        { id: 'none', label: 'None', icon: Ban, category: 'Basic' },
+
+        // Dissolves
+        { id: 'dissolve', label: 'Dissolve', icon: Grid, category: 'Dissolve' },
+        { id: 'film-dissolve', label: 'Film Dissolve', icon: Film, category: 'Dissolve' },
+        { id: 'additive-dissolve', label: 'Additive', icon: Sun, category: 'Dissolve' },
+        { id: 'dip-to-black', label: 'Dip to Black', icon: Moon, category: 'Dissolve' },
+        { id: 'dip-to-white', label: 'Dip to White', icon: Sun, category: 'Dissolve' },
+
+        // Slides
+        { id: 'slide', label: 'Slide', icon: MoveRight, category: 'Slide' },
+        { id: 'push', label: 'Push', icon: ArrowRight, category: 'Slide' },
+        { id: 'whip', label: 'Whip', icon: Zap, category: 'Slide' },
+        { id: 'split', label: 'Split', icon: Columns, category: 'Slide' },
+
+        // Iris
+        { id: 'circle', label: 'Iris Round', icon: Circle, category: 'Iris' },
+        { id: 'iris-box', label: 'Iris Box', icon: Square, category: 'Iris' },
+        { id: 'iris-diamond', label: 'Iris Diamond', icon: Gem, category: 'Iris' },
+        { id: 'iris-cross', label: 'Iris Cross', icon: Plus, category: 'Iris' },
+
+        // Wipes
+        { id: 'wipe', label: 'Wipe', icon: ArrowRight, category: 'Wipe' },
+        { id: 'barn-doors', label: 'Barn Doors', icon: LayoutGrid, category: 'Wipe' },
+        { id: 'clock-wipe', label: 'Clock Wipe', icon: Clock, category: 'Wipe' },
+        { id: 'venetian-blinds', label: 'Venetian', icon: AlignJustify, category: 'Wipe' },
+        { id: 'checker-wipe', label: 'Checker', icon: Grid, category: 'Wipe' },
+        { id: 'zig-zag', label: 'Zig Zag', icon: Zap, category: 'Wipe' },
+
+        // Zoom & Page
+        // Zoom & Page
+        { id: 'cross-zoom', label: 'Cross Zoom', icon: MoveRight, category: 'Zoom' },
+        { id: 'zoom-in', label: 'Zoom In', icon: Maximize, category: 'Zoom' },
+        { id: 'zoom-out', label: 'Zoom Out', icon: Minimize, category: 'Zoom' },
+        { id: 'warp-zoom', label: 'Warp Zoom', icon: MoveDiagonal, category: 'Zoom' },
+        { id: 'morph-cut', label: 'Morph Cut', icon: Wand2, category: 'Zoom' },
+        { id: 'page-peel', label: 'Page Peel', icon: BookOpen, category: 'Page' },
+        { id: 'page-curl', label: 'Page Curl', icon: BookOpen, category: 'Page' },
+
+        // Legacy
+        { id: 'stack', label: 'Stack', icon: Layers, category: 'Other' },
+        { id: 'flow', label: 'Flow', icon: RotateCcw, category: 'Other' },
     ];
 
-    const categories = Array.from(new Set(TRANSITIONS.map(t => t.category)));
+    const advancedTransitions: { id: TransitionType; label: string; icon: React.ElementType; category?: string }[] = [
+        // 3D & Perspective
+        { id: 'cube-rotate', label: 'Cube Rotate', icon: Box, category: '3D' },
+        { id: 'flip-3d', label: '3D Flip', icon: RotateCw, category: '3D' },
+        { id: 'spin-3d', label: '3D Spin', icon: RotateCw, category: '3D' },
 
-    const handleSelect = (type: TransitionType) => {
-        const newTransition: Transition = {
-            type,
-            duration,
-            direction: ['slide', 'push', 'wipe'].includes(type) ? direction : undefined
-        };
-        onSelect(newTransition);
+        // Glitch & Digital
+        { id: 'glitch', label: 'Glitch', icon: ZapOff, category: 'Digital' },
+        { id: 'rgb-split', label: 'RGB Split', icon: Split, category: 'Digital' },
+        { id: 'chromatic-aberration', label: 'Chromatic', icon: Split, category: 'Digital' },
+        { id: 'pixelate', label: 'Pixelate', icon: Grid, category: 'Digital' },
+        { id: 'datamosh', label: 'Datamosh', icon: Monitor, category: 'Digital' },
+
+        // Light & Color
+        { id: 'film-burn', label: 'Film Burn', icon: Flame, category: 'Light' },
+        { id: 'flash', label: 'Flash', icon: Zap, category: 'Light' },
+        { id: 'light-leak', label: 'Light Leak', icon: Sun, category: 'Light' },
+        { id: 'luma-dissolve', label: 'Luma Dissolve', icon: Sun, category: 'Light' },
+        { id: 'fade-color', label: 'Fade Color', icon: Palette, category: 'Light' },
+
+        // Distort & Liquid
+        { id: 'ripple', label: 'Ripple', icon: Waves, category: 'Distort' },
+        { id: 'liquid', label: 'Liquid', icon: Droplet, category: 'Distort' },
+        { id: 'stretch', label: 'Stretch', icon: MoveRight, category: 'Distort' },
+
+        // Shapes
+        { id: 'shape-circle', label: 'Circle', icon: Circle, category: 'Shape' },
+        { id: 'shape-heart', label: 'Heart', icon: Heart, category: 'Shape' },
+        { id: 'shape-triangle', label: 'Triangle', icon: Triangle, category: 'Shape' },
+
+        // Tile & Grid
+        { id: 'tile-drop', label: 'Tile Drop', icon: LayoutGrid, category: 'Tile' },
+        { id: 'mosaic-grid', label: 'Mosaic', icon: Grid, category: 'Tile' },
+        { id: 'multi-panel', label: 'Multi Panel', icon: Columns, category: 'Tile' },
+        { id: 'split-screen', label: 'Split Screen', icon: Columns, category: 'Tile' },
+
+        // Blur & Speed
+        { id: 'speed-blur', label: 'Speed Blur', icon: Wind, category: 'Blur' },
+        { id: 'whip-pan', label: 'Whip Pan', icon: MoveRight, category: 'Blur' },
+        { id: 'zoom-blur', label: 'Zoom Blur', icon: MoveDiagonal, category: 'Blur' },
+
+        // Stylized
+        { id: 'brush-reveal', label: 'Brush', icon: Brush, category: 'Stylized' },
+        { id: 'ink-splash', label: 'Ink Splash', icon: Droplet, category: 'Stylized' },
+
+        // Previous Advanced
+        { id: 'fade-dissolve', label: 'Fade Dissolve', icon: Moon, category: 'Advanced' },
+        { id: 'flash-zoom-in', label: 'Flash Zoom In', icon: Zap, category: 'Advanced' },
+        { id: 'flash-zoom-out', label: 'Flash Zoom Out', icon: Zap, category: 'Advanced' },
+        { id: 'film-roll', label: 'Film Roll', icon: Film, category: 'Advanced' },
+        { id: 'ripple-dissolve', label: 'Ripple Dissolve', icon: Waves, category: 'Distortion' },
+        { id: 'smooth-wipe', label: 'Smooth Wipe', icon: Eraser, category: 'Cinematic' },
+        { id: 'spin', label: 'Spin', icon: RotateCw, category: 'Trendy' },
+    ];
+
+    const handleTypeSelect = (type: TransitionType) => {
+        if (type === 'none') {
+            onUpdate({ type: 'none', duration: 0 });
+        } else {
+            onUpdate({
+                type,
+                duration: currentDuration,
+                direction: currentDirection,
+                origin: currentOrigin,
+                speed: currentSpeed
+            });
+        }
     };
 
+    const handleApplyAll = () => {
+        if (transition) {
+            onApplyToAll(transition);
+            setJustApplied(true);
+            setTimeout(() => setJustApplied(false), 2000);
+        }
+    };
+
+    const displayedTransitions = activeSection === 'normal' ? normalTransitions : advancedTransitions;
+
     return (
-        <div className={`bg-white h-full border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden relative z-20 ${isOpen ? 'w-80' : 'w-0 opacity-0'}`}>
-            <div className="w-80 h-full flex flex-col">
-                <div className="h-16 flex items-center justify-between px-5 border-b border-gray-100 shrink-0 bg-white z-10">
-                    <span className="font-bold text-gray-800 text-lg tracking-tight">Transitions</span>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
-                        <X size={18} />
-                    </button>
-                </div>
+        <div className="absolute left-[72px] top-0 bottom-0 w-80 bg-white border-r border-gray-200 z-50 flex flex-col shadow-xl animate-in slide-in-from-left duration-200">
+            {/* Header */}
+            <div className="h-16 flex items-center justify-between px-5 border-b border-gray-100 shrink-0 bg-white">
+                <span className="font-bold text-gray-800 text-lg tracking-tight">Transitions</span>
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                    <X size={18} />
+                </button>
+            </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-                    {/* Settings for Selected Transition */}
-                    {selectedTransition && selectedTransition.type !== 'none' && (
-                        <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-xs font-bold text-gray-700 uppercase">Settings</span>
-                                <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{TRANSITIONS.find(t => t.id === selectedTransition.type)?.name}</span>
-                            </div>
+            <div className="flex flex-col flex-1 overflow-hidden bg-white">
+                {/* Horizontal Tabs */}
+                <div className="px-5 pt-5 pb-2 space-y-3">
+                    <div className="flex p-1 bg-gray-100 rounded-xl">
+                        <button
+                            onClick={() => setActiveSection('normal')}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${activeSection === 'normal' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Normal
+                        </button>
+                        <button
+                            onClick={() => setActiveSection('advanced')}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${activeSection === 'advanced' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Advanced
+                        </button>
+                    </div>
 
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label className="text-xs text-gray-500">Duration</label>
-                                        <span className="text-xs font-bold text-gray-700">{duration}s</span>
-                                    </div>
-                                    <input
-                                        type="range" min="0.1" max="2.0" step="0.1"
-                                        value={duration}
-                                        onChange={(e) => {
-                                            setDuration(Number(e.target.value));
-                                            handleSelect(selectedTransition.type);
-                                        }}
-                                        className="w-full accent-violet-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                </div>
-
-                                {['slide', 'push', 'wipe'].includes(selectedTransition.type) && (
-                                    <div>
-                                        <label className="text-xs text-gray-500 mb-2 block">Direction</label>
-                                        <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                                            {['left', 'right', 'up', 'down'].map((dir) => (
-                                                <button
-                                                    key={dir}
-                                                    onClick={() => {
-                                                        setDirection(dir as any);
-                                                        const newT = { ...selectedTransition, direction: dir as any };
-                                                        onSelect(newT);
-                                                    }}
-                                                    className={`flex-1 py-1.5 flex items-center justify-center rounded-md transition-all ${direction === dir ? 'bg-violet-50 text-violet-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                                >
-                                                    {dir === 'left' && <ArrowRight size={14} className="rotate-180" />}
-                                                    {dir === 'right' && <ArrowRight size={14} />}
-                                                    {dir === 'up' && <ArrowUp size={14} />}
-                                                    {dir === 'down' && <ArrowDown size={14} />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <button
-                                    onClick={() => onApplyToAll(selectedTransition)}
-                                    className="w-full py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 hover:text-violet-600 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Check size={14} /> Apply to all pages
-                                </button>
-                            </div>
+                    {/* Timing Selection (Moved to Top) */}
+                    {currentType !== 'none' && (
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                onClick={() => onUpdate({ ...transition!, timing: 'prefix' })}
+                                className={`py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-all ${(transition?.timing || 'postfix') === 'prefix' ? 'bg-violet-50 border-violet-500 text-violet-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+                            >
+                                Prefix
+                            </button>
+                            <button
+                                onClick={() => onUpdate({ ...transition!, timing: 'overlap' })}
+                                className={`py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-all ${(transition?.timing || 'postfix') === 'overlap' ? 'bg-violet-50 border-violet-500 text-violet-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+                            >
+                                Overlap
+                            </button>
+                            <button
+                                onClick={() => onUpdate({ ...transition!, timing: 'postfix' })}
+                                className={`py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-all ${(transition?.timing || 'postfix') === 'postfix' ? 'bg-violet-50 border-violet-500 text-violet-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+                            >
+                                Postfix
+                            </button>
                         </div>
                     )}
+                </div>
 
-                    {categories.map(category => (
-                        <div key={category} className="mb-6">
-                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{category}</h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                {TRANSITIONS.filter(t => t.category === category).map(t => (
-                                    <button
-                                        key={t.id}
-                                        onClick={() => handleSelect(t.id)}
-                                        onMouseEnter={() => onPreview({ type: t.id, duration: 1.0 })}
-                                        onMouseLeave={() => onPreview(null)}
-                                        className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${selectedTransition?.type === t.id
-                                            ? 'border-violet-600 bg-violet-50 ring-1 ring-violet-200'
-                                            : 'border-gray-200 bg-white hover:border-violet-300 hover:shadow-sm'
-                                            }`}
-                                    >
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedTransition?.type === t.id ? 'bg-violet-200 text-violet-700' : 'bg-gray-100 text-gray-400'}`}>
-                                            {/* Icon placeholder - could be dynamic based on type */}
-                                            <div className="w-4 h-4 bg-current rounded-sm opacity-50"></div>
-                                        </div>
-                                        <span className={`text-[10px] font-bold ${selectedTransition?.type === t.id ? 'text-violet-700' : 'text-gray-600'}`}>{t.name}</span>
-                                    </button>
-                                ))}
+                {/* Transitions Grid */}
+                <div className="flex-1 overflow-y-auto px-5 pb-5 custom-scrollbar">
+                    <div className="grid grid-cols-4 gap-3 mb-8">
+                        {displayedTransitions.map((t) => (
+                            <div
+                                key={t.id}
+                                className="flex flex-col items-center gap-2 group cursor-pointer"
+                                onClick={() => handleTypeSelect(t.id)}
+                                onMouseEnter={() => onHover(t.id)}
+                                onMouseLeave={() => onHover(null)}
+                            >
+                                <div
+                                    className={`w-full aspect-video rounded-lg flex items-center justify-center border transition-all duration-200 relative overflow-hidden ${currentType === t.id
+                                        ? 'border-violet-600 bg-violet-50 text-violet-600 ring-2 ring-violet-100 ring-offset-1'
+                                        : 'border-gray-200 bg-gray-50 text-gray-500 group-hover:border-violet-300 group-hover:bg-white group-hover:shadow-sm'
+                                        }`}
+                                >
+                                    <t.icon size={24} strokeWidth={1.5} />
+                                </div>
+                                <span className={`text-[10px] font-medium text-center leading-tight ${currentType === t.id ? 'text-violet-700' : 'text-gray-500'}`}>{t.label}</span>
                             </div>
+                        ))}
+                    </div>
+
+                    {currentType !== 'none' && (
+                        <div className="space-y-6 border-t border-gray-100 pt-6">
+
+                            {/* Duration Slider */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Duration</label>
+                                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 border border-gray-200">{currentDuration}s</span>
+                                </div>
+                                <div className="px-1">
+                                    <input
+                                        type="range"
+                                        min="0.1"
+                                        max="2.5"
+                                        step="0.1"
+                                        value={currentDuration}
+                                        onChange={(e) => onUpdate({ ...transition!, duration: parseFloat(e.target.value) })}
+                                        className="w-full accent-violet-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Speed Slider */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Speed</label>
+                                    <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 border border-gray-200">{currentSpeed}x</span>
+                                </div>
+                                <div className="px-1">
+                                    <input
+                                        type="range"
+                                        min="0.1"
+                                        max="2.0"
+                                        step="0.1"
+                                        value={currentSpeed}
+                                        onChange={(e) => onUpdate({ ...transition!, speed: parseFloat(e.target.value) })}
+                                        className="w-full accent-violet-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Direction */}
+                            {(['slide', 'push', 'whip', 'split', 'band-slide', 'wipe', 'band-wipe', 'barn-doors', 'venetian-blinds', 'line-wipe', 'match-move', 'flow', 'chop'].includes(currentType)) && (
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Direction</label>
+                                    <div className="flex gap-2">
+                                        {(['left', 'right', 'up', 'down'] as const).map(dir => (
+                                            <button
+                                                key={dir}
+                                                onClick={() => onUpdate({ ...transition!, direction: dir })}
+                                                className={`w-9 h-9 rounded-lg flex items-center justify-center border transition-all ${currentDirection === dir
+                                                    ? 'bg-violet-100 border-violet-500 text-violet-700 shadow-inner'
+                                                    : 'bg-white border-gray-200 text-gray-400 hover:bg-gray-50 hover:text-gray-600 hover:border-gray-300'
+                                                    }`}
+                                                title={`Direction: ${dir}`}
+                                            >
+                                                {dir === 'left' && <ArrowLeft size={16} />}
+                                                {dir === 'right' && <ArrowRight size={16} />}
+                                                {dir === 'up' && <ArrowUp size={16} />}
+                                                {dir === 'down' && <ArrowDown size={16} />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleApplyAll}
+                                className={`w-full py-3 border rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center justify-center gap-2 ${justApplied
+                                    ? 'bg-green-50 border-green-300 text-green-700'
+                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 active:scale-[0.98]'
+                                    }`}
+                            >
+                                {justApplied ? (
+                                    <>
+                                        <CheckCircle2 size={16} /> Applied to all pages
+                                    </>
+                                ) : (
+                                    "Apply between all pages"
+                                )}
+                            </button>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
         </div>
