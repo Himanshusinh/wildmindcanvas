@@ -1,7 +1,6 @@
-export type ActiveSection = 'profile' | 'canvas' | 'theme' | 'keyboard' | 'notification';
-export type ThemeMode = 'dark' | 'light';
+export type ActiveSection = 'profile' | 'canvas' | 'keyboard' | 'notification';
 export type CursorType = 'default' | 'crosshair' | 'pointer' | 'grab' | 'text';
-export type BackgroundType = 'dots' | 'grid' | 'solid' | 'none';
+export type BackgroundType = 'dots' | 'dots-vertical' | 'dots-horizontal' | 'lines-vertical' | 'lines-horizontal' | 'grid' | 'solid' | 'none';
 
 export interface CanvasSettings {
   cursorType: CursorType;
@@ -10,6 +9,9 @@ export interface CanvasSettings {
   backgroundColor: string;
   dotSize: number;
   gridSpacing: number;
+  showPointerTool?: boolean;
+  showMoveTool?: boolean;
+  showThemeToggle?: boolean;
 }
 
 export interface SettingsPopupProps {

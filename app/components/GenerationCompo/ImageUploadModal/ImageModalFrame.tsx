@@ -2,6 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ImageModalFrameProps {
   id?: string;
@@ -34,17 +35,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   onSelect,
   getAspectRatio,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const frameBorderColor = isSelected
     ? '#437eb5'

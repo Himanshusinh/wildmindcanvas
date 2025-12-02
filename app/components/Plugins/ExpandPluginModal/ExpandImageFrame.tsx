@@ -42,6 +42,7 @@ export const ExpandImageFrame: React.FC<ExpandImageFrameProps> = ({
   const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
   const [touchStart, setTouchStart] = useState<{ center: { x: number; y: number }; pan: { x: number; y: number } } | null>(null);
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const panNeedsCenterRef = useRef(true);
 
   // Calculate minimum zoom to fit 6000x6000 canvas in viewport
   const getMinZoom = useCallback(() => {
@@ -319,6 +320,10 @@ export const ExpandImageFrame: React.FC<ExpandImageFrameProps> = ({
   }, [previewImage, imagePosition?.x, imagePosition?.y, imageSize?.width, imageSize?.height, aspectPreset, frameBounds]);
 
   useEffect(() => {
+    panNeedsCenterRef.current = true;
+  }, [aspectPreset, customWidth, customHeight, previewImage]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -452,9 +457,18 @@ export const ExpandImageFrame: React.FC<ExpandImageFrameProps> = ({
     }
   }, [containerSize, getMinZoom, zoom]);
 
-  // Constrain pan when zoom or container size changes
+  // Constrain pan when zoom or container size changes, centering when needed
   useEffect(() => {
-    if (containerSize) {
+    if (!containerSize) return;
+    const scaledCanvas = 6000 * zoom;
+    if (panNeedsCenterRef.current) {
+      const centeredPan = {
+        x: (containerSize.width - scaledCanvas) / 2,
+        y: (containerSize.height - scaledCanvas) / 2,
+      };
+      setPan(constrainPan(centeredPan, zoom));
+      panNeedsCenterRef.current = false;
+    } else {
       setPan(prev => constrainPan(prev, zoom));
     }
   }, [zoom, containerSize, constrainPan]);

@@ -1,19 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 export const NotificationSection: React.FC = () => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const containerBg = isDark ? '#121212' : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#111827';
@@ -26,8 +17,7 @@ export const NotificationSection: React.FC = () => {
         padding: '20px', 
         background: containerBg, 
         borderRadius: '12px',
-        border: `1px solid ${borderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease'
+        transition: 'background-color 0.3s ease'
       }}>
         <h4 style={{ 
           margin: '0 0 12px 0', 

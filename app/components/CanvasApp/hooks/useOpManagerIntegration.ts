@@ -46,7 +46,6 @@ export function useOpManagerIntegration({
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
         const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
         const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
-        const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string }> = [];
         const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
         const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
         const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
@@ -87,8 +86,6 @@ export function useOpManagerIntegration({
               newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
             } else if (element.type === 'erase-plugin') {
               newEraseGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, erasedImageUrl: element.meta?.erasedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localErasedImageUrl: element.meta?.localErasedImageUrl || null, model: element.meta?.model });
-            } else if (element.type === 'replace-plugin') {
-              newReplaceGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, replacedImageUrl: element.meta?.replacedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, model: element.meta?.model });
             } else if (element.type === 'expand-plugin') {
               newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
             } else if (element.type === 'vectorize-plugin') {
@@ -141,7 +138,6 @@ export function useOpManagerIntegration({
         setters.setUpscaleGenerators(newUpscaleGenerators);
         setters.setRemoveBgGenerators(newRemoveBgGenerators);
         setters.setEraseGenerators(newEraseGenerators);
-        setters.setReplaceGenerators(newReplaceGenerators);
         setters.setExpandGenerators(newExpandGenerators);
         setters.setVectorizeGenerators(newVectorizeGenerators);
         console.log('[Snapshot] Loading storyboard generators:', newStoryboardGenerators.length, newStoryboardGenerators);
@@ -262,7 +258,6 @@ export function useOpManagerIntegration({
         setters.setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setters.setReplaceGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));

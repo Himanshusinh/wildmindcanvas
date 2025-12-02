@@ -7,6 +7,7 @@ import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 import { TextModalFrame } from './TextModalFrame';
 import { TextModalNodes } from './TextModalNodes';
 import { TextModalControls } from './TextModalControls';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface TextInputProps {
   id: string;
@@ -25,6 +26,7 @@ interface TextInputProps {
   position: { x: number; y: number };
   isSelected?: boolean;
   onScriptGenerated?: (textModalId: string, script: string) => void;
+  onScriptGenerationStart?: (textModalId: string) => void;
   connections?: Array<{ from: string; to: string }>;
   storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
 }
@@ -46,6 +48,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   position,
   isSelected,
   onScriptGenerated,
+  onScriptGenerationStart,
   connections = [],
   storyboardModalStates = [],
 }) => {
@@ -62,6 +65,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStatus, setEnhanceStatus] = useState('');
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
   // Listen for global node-drag active state so nodes stay visible during drag
@@ -76,17 +80,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   }, []);
 
 
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -187,6 +181,11 @@ export const TextInput: React.FC<TextInputProps> = ({
   const handleEnhance = async () => {
     if (!text.trim() || isEnhancing) return;
 
+    // Trigger loading state immediately
+    if (onScriptGenerationStart) {
+      onScriptGenerationStart(id);
+    }
+
     setIsEnhancing(true);
     setEnhanceStatus('Preparing storyboard script...');
     try {
@@ -221,14 +220,45 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
       data-modal-component="text"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true, true)}
+      onMouseLeave={() => requestHoverState(false)}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
@@ -296,6 +326,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           }}
           connections={connections}
           storyboardModalStates={storyboardModalStates}
+          onHoverChange={requestHoverState}
         />
 
         {/* Pin Icon Button - Below Input Box */}
@@ -374,7 +405,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         onModelChange={(model) => {
           setSelectedModel(model);
         }}
-        onSetIsHovered={setIsHovered}
+        onSetIsHovered={requestHoverState}
         onSetIsPinned={setIsPinned}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}

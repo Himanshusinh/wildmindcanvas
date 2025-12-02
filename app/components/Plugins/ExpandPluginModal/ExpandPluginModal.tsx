@@ -8,6 +8,7 @@ import { ExpandImageFrame } from './ExpandImageFrame';
 import { ExpandControls } from './ExpandControls';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandPluginModalProps {
   isOpen: boolean;
@@ -111,6 +112,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
+  const hasSourceImage = Boolean(sourceImageUrl);
 
   // Update ref when callback changes
   useEffect(() => {
@@ -182,17 +184,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const frameBorderColor = isSelected
     ? '#437eb5'
@@ -342,7 +334,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       dragStartPosRef.current = null;
 
       // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging && sourceImageUrl) {
+      if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
 
@@ -599,6 +591,22 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Expand
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -646,21 +654,6 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
           />
         </div>
 
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Expand
-        </div>
       </div>
 
       {isPopupOpen && (
@@ -720,8 +713,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             }
           }}
         >
-          {(() => {
-            return (
+        {hasSourceImage ? (
               <div
                 style={{
                   backgroundColor: isDark ? '#121212' : 'white',
@@ -822,8 +814,47 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   />
                 </div>
               </div>
-            );
-          })()}
+        ) : (
+          <div
+            style={{
+              backgroundColor: isDark ? '#121212' : 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              width: 'min(420px, 90vw)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignItems: 'center',
+              textAlign: 'center',
+              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
+              pointerEvents: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
+              Connect an image to expand
+            </h3>
+            <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
+              Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
+            </p>
+            <button
+              onClick={() => setIsPopupOpen(false)}
+              style={{
+                marginTop: '8px',
+                padding: '10px 20px',
+                borderRadius: '999px',
+                border: 'none',
+                backgroundColor: '#437eb5',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 500,
+              }}
+            >
+              Close
+            </button>
+          </div>
+        )}
         </div>
       )}
     </div>

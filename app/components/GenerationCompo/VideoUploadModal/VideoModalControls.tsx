@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, Fragment, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import {
   getModelDurations,
   getModelDefaultDuration,
@@ -99,17 +100,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   onSetIsFrameOrderSwapped,
   onOptionsChange,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';

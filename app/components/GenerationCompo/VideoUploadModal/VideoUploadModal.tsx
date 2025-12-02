@@ -19,6 +19,7 @@ import {
   isValidResolutionForModel,
 } from '@/lib/videoModelConfig';
 import { ImageUpload } from '@/types/canvas';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 const VIDEO_MODEL_OPTIONS = [
   'Sora 2 Pro',
@@ -177,17 +178,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     return `${width} / ${height}`;
   };
 
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;

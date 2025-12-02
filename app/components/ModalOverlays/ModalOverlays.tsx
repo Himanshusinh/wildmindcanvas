@@ -12,7 +12,6 @@ import { MusicModalOverlays } from './MusicModalOverlays';
 import { UpscaleModalOverlays } from './UpscaleModalOverlays';
 import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
 import { EraseModalOverlays } from './EraseModalOverlays';
-import { ReplaceModalOverlays } from './ReplaceModalOverlays';
 import { ExpandModalOverlays } from './ExpandModalOverlays';
 import { VectorizeModalOverlays } from './VectorizeModalOverlays';
 import { StoryboardModalOverlays } from './StoryboardModalOverlays';
@@ -28,7 +27,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   upscaleModalStates,
   removeBgModalStates,
   eraseModalStates,
-  replaceModalStates,
   expandModalStates,
   vectorizeModalStates,
   storyboardModalStates,
@@ -48,8 +46,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedRemoveBgModalIds,
   selectedEraseModalId,
   selectedEraseModalIds,
-  selectedReplaceModalId,
-  selectedReplaceModalIds,
   selectedExpandModalId,
   selectedExpandModalIds,
   selectedVectorizeModalId,
@@ -79,9 +75,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setEraseModalStates = () => { },
   setSelectedEraseModalId = () => { },
   setSelectedEraseModalIds = () => { },
-  setReplaceModalStates = () => { },
-  setSelectedReplaceModalId = () => { },
-  setSelectedReplaceModalIds = () => { },
   setExpandModalStates = () => { },
   setSelectedExpandModalId = () => { },
   setSelectedExpandModalIds = () => { },
@@ -130,10 +123,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistEraseModalMove,
   onPersistEraseModalDelete,
   onErase,
-  onPersistReplaceModalCreate,
-  onPersistReplaceModalMove,
-  onPersistReplaceModalDelete,
-  onReplace,
   onPersistExpandModalCreate,
   onPersistExpandModalMove,
   onPersistExpandModalDelete,
@@ -151,6 +140,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onTextUpdate,
   onGenerateScenes,
   onDeleteSceneFrame,
+  onDuplicateSceneFrame,
+  onSceneFrameContentUpdate,
   onSceneFramePositionChange,
   onSceneFramePositionCommit,
   onPersistTextModalCreate,
@@ -161,6 +152,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistConnectorCreate,
   onPersistConnectorDelete,
   onPluginSidebarOpen,
+  onScriptGenerationStart,
   onGenerateStoryboard,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
@@ -188,10 +180,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     upscaleModalStates,
     removeBgModalStates: removeBgModalStates ?? [],
     eraseModalStates: eraseModalStates ?? [],
-    replaceModalStates: replaceModalStates ?? [],
     expandModalStates: expandModalStates ?? [],
     vectorizeModalStates: vectorizeModalStates ?? [],
     storyboardModalStates: storyboardModalStates ?? [],
+  scriptFrameModalStates: scriptFrameModalStates ?? [],
     sceneFrameModalStates: sceneFrameModalStates ?? [],
   });
 
@@ -213,10 +205,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         upscaleModalStates={upscaleModalStates}
         removeBgModalStates={removeBgModalStates ?? []}
         eraseModalStates={eraseModalStates ?? []}
-        replaceModalStates={replaceModalStates ?? []}
         expandModalStates={expandModalStates ?? []}
         vectorizeModalStates={vectorizeModalStates ?? []}
         storyboardModalStates={storyboardModalStates ?? []}
+        scriptFrameModalStates={scriptFrameModalStates ?? []}
         sceneFrameModalStates={sceneFrameModalStates ?? []}
         viewportUpdateKey={viewportUpdateKey}
       />
@@ -235,6 +227,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
         onScriptGenerated={onTextScriptGenerated}
+        onScriptGenerationStart={onScriptGenerationStart}
         connections={externalConnections ?? []}
         storyboardModalStates={storyboardModalStates}
       />
@@ -368,29 +361,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
-      <ReplaceModalOverlays
-        replaceModalStates={replaceModalStates ?? []}
-        selectedReplaceModalId={selectedReplaceModalId ?? null}
-        selectedReplaceModalIds={selectedReplaceModalIds ?? []}
-        clearAllSelections={clearAllSelections}
-        setReplaceModalStates={setReplaceModalStates}
-        setSelectedReplaceModalId={setSelectedReplaceModalId}
-        setSelectedReplaceModalIds={setSelectedReplaceModalIds}
-        onReplace={onReplace}
-        onPersistReplaceModalCreate={onPersistReplaceModalCreate}
-        onPersistReplaceModalMove={onPersistReplaceModalMove}
-        onPersistReplaceModalDelete={onPersistReplaceModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-      />
-
       <ExpandModalOverlays
         expandModalStates={expandModalStates ?? []}
         selectedExpandModalId={selectedExpandModalId ?? null}
@@ -467,15 +437,19 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        clearAllSelections={clearAllSelections}
       />
       <SceneFrameModalOverlays
         sceneFrameModalStates={sceneFrameModalStates ?? []}
         onDelete={onDeleteSceneFrame}
+        onDuplicate={onDuplicateSceneFrame}
+        onContentUpdate={onSceneFrameContentUpdate}
         onPositionChange={onSceneFramePositionChange}
         onPositionCommit={onSceneFramePositionCommit}
         stageRef={stageRef}
         scale={scale}
         position={position}
+        clearAllSelections={clearAllSelections}
       />
 
       <ComponentCreationMenu
@@ -494,8 +468,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setRemoveBgModalStates={setRemoveBgModalStates}
         onPersistEraseModalCreate={onPersistEraseModalCreate}
         setEraseModalStates={setEraseModalStates}
-        onPersistReplaceModalCreate={onPersistReplaceModalCreate}
-        setReplaceModalStates={setReplaceModalStates}
         onPersistExpandModalCreate={onPersistExpandModalCreate}
         setExpandModalStates={setExpandModalStates}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}

@@ -9,7 +9,9 @@ export function buildSnapshotElements(
 
   // Build connection map keyed by source element id
   const connectionsBySource: Record<string, Array<any>> = {};
-  const connectorsToUse = connectorsOverride ?? state.connectors;
+  const connectorsToUse = (connectorsOverride ?? state.connectors).filter(
+    (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+  );
   connectorsToUse.forEach((c) => {
     if (!c || !c.id) return;
     const src = c.from;
@@ -142,31 +144,6 @@ export function buildSnapshotElements(
     elements[modal.id] = {
       id: modal.id,
       type: 'erase-plugin',
-      x: modal.x,
-      y: modal.y,
-      meta: metaObj,
-    };
-  });
-
-  // Replace generators
-  state.replaceGenerators.forEach((modal) => {
-    if (!modal || !modal.id) return;
-    const metaObj: any = {
-      replacedImageUrl: modal.replacedImageUrl || null,
-      sourceImageUrl: modal.sourceImageUrl || null,
-      localReplacedImageUrl: modal.localReplacedImageUrl || null,
-      model: modal.model || 'bria/eraser',
-      frameWidth: modal.frameWidth || 400,
-      frameHeight: modal.frameHeight || 500,
-      isReplacing: modal.isReplacing || false,
-    };
-    // Attach any connections originating from this element into its meta
-    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-      metaObj.connections = connectionsBySource[modal.id];
-    }
-    elements[modal.id] = {
-      id: modal.id,
-      type: 'replace-plugin',
       x: modal.x,
       y: modal.y,
       meta: metaObj,

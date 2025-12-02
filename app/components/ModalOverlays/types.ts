@@ -56,6 +56,7 @@ export interface MusicModalState {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  isGenerating?: boolean;
 }
 
 export interface UpscaleModalState {
@@ -98,19 +99,6 @@ export interface EraseModalState {
   frameWidth?: number;
   frameHeight?: number;
   isErasing?: boolean;
-}
-
-export interface ReplaceModalState {
-  id: string;
-  x: number;
-  y: number;
-  replacedImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localReplacedImageUrl?: string | null;
-  model?: string;
-  frameWidth?: number;
-  frameHeight?: number;
-  isReplacing?: boolean;
 }
 
 export interface ExpandModalState {
@@ -159,6 +147,7 @@ export interface ScriptFrameModalState {
   frameWidth: number;
   frameHeight: number;
   text: string;
+  isLoading?: boolean;
 }
 
 export interface SceneFrameModalState {
@@ -215,7 +204,6 @@ export interface ModalOverlaysProps {
   upscaleModalStates?: UpscaleModalState[];
   removeBgModalStates?: RemoveBgModalState[];
   eraseModalStates?: EraseModalState[];
-  replaceModalStates?: ReplaceModalState[];
   expandModalStates?: ExpandModalState[];
   vectorizeModalStates?: VectorizeModalState[];
   storyboardModalStates?: StoryboardModalState[];
@@ -235,8 +223,6 @@ export interface ModalOverlaysProps {
   selectedRemoveBgModalIds?: string[];
   selectedEraseModalId?: string | null;
   selectedEraseModalIds?: string[];
-  selectedReplaceModalId?: string | null;
-  selectedReplaceModalIds?: string[];
   selectedExpandModalId?: string | null;
   selectedExpandModalIds?: string[];
   selectedVectorizeModalId?: string | null;
@@ -266,9 +252,6 @@ export interface ModalOverlaysProps {
   setEraseModalStates?: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
   setSelectedEraseModalId?: (id: string | null) => void;
   setSelectedEraseModalIds?: (ids: string[]) => void;
-  setReplaceModalStates?: React.Dispatch<React.SetStateAction<ReplaceModalState[]>>;
-  setSelectedReplaceModalId?: (id: string | null) => void;
-  setSelectedReplaceModalIds?: (ids: string[]) => void;
   setExpandModalStates?: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
   setSelectedExpandModalId?: (id: string | null) => void;
   setSelectedExpandModalIds?: (ids: string[]) => void;
@@ -283,6 +266,7 @@ export interface ModalOverlaysProps {
   setIsDragSelection?: (value: boolean) => void;
   images?: ImageUpload[];
   onTextCreate?: (text: string, x: number, y: number) => void;
+  onScriptGenerationStart?: (textModalId: string) => void;
   onTextScriptGenerated?: (textModalId: string, script: string) => void;
   onImageSelect?: (file: File) => void;
   onImageGenerate?: (
@@ -308,7 +292,7 @@ export interface ModalOverlaysProps {
   position: { x: number; y: number };
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }>) => void | Promise<void>;
@@ -328,10 +312,6 @@ export interface ModalOverlaysProps {
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
   onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
   onErase?: (model: string, sourceImageUrl?: string, mask?: string) => Promise<string | null>;
-  onPersistReplaceModalCreate?: (modal: { id: string; x: number; y: number; replacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  onPersistReplaceModalMove?: (id: string, updates: Partial<{ x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; isReplacing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
-  onPersistReplaceModalDelete?: (id: string) => void | Promise<void>;
-  onReplace?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>) => void | Promise<void>;
   onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
@@ -355,6 +335,8 @@ export interface ModalOverlaysProps {
   onTextUpdate?: (id: string, text: string) => void;
   onGenerateScenes?: (scriptFrameId: string) => void;
   onDeleteSceneFrame?: (frameId: string) => void;
+  onDuplicateSceneFrame?: (frameId: string) => void;
+  onSceneFrameContentUpdate?: (frameId: string, content: string) => void;
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;

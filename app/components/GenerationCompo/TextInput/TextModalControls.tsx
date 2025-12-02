@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface TextModalControlsProps {
   scale: number;
@@ -40,17 +41,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   onSetIsModelHovered,
   onEnhance,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
@@ -75,7 +66,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
     }
   }, [isModelDropdownOpen, onSetIsModelDropdownOpen]);
 
-  return (  
+  return (
     <div
       className="controls-overlay"
       style={{
@@ -109,39 +100,39 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
     >
       {/* Model Selector and Enhance Button - Side by Side */}
       <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', width: '100%' }}>
-        {/* Model Selector - Custom Dropdown */}
+      {/* Model Selector - Custom Dropdown */}
         <div ref={modelDropdownRef} style={{ position: 'relative', flex: 1, overflow: 'visible', zIndex: 3002 }} onMouseEnter={() => onSetIsModelHovered(true)} onMouseLeave={() => onSetIsModelHovered(false)}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSetIsModelDropdownOpen(!isModelDropdownOpen);
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetIsModelDropdownOpen(!isModelDropdownOpen);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
               padding: `${14 * scale}px ${28 * scale}px ${14 * scale}px ${14 * scale}px`,
               minHeight: `${40 * scale}px`,
-              backgroundColor: controlsBg,
-              border: `1px solid ${dropdownBorderColor}`,
-              borderRadius: `${9999 * scale}px`,
-              fontSize: controlFontSize,
-              fontWeight: '500',
-              color: dropdownText,
-              outline: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              textAlign: 'left',
-              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
-            }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
-            <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+            backgroundColor: controlsBg,
+            border: `1px solid ${dropdownBorderColor}`,
+            borderRadius: `${9999 * scale}px`,
+            fontSize: controlFontSize,
+            fontWeight: '500',
+            color: dropdownText,
+            outline: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            textAlign: 'left',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+          }}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+          <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+            <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
         
         {isModelDropdownOpen && (
           <div

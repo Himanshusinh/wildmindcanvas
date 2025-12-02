@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { SceneFrame } from '@/app/components/Plugins/StoryboardPluginModal/SceneFrame';
 import { ConnectionNodes } from '@/app/components/Plugins/UpscalePluginModal/ConnectionNodes';
+import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 
 interface SceneFrameModalState {
     id: string;
@@ -19,21 +20,27 @@ interface SceneFrameModalState {
 interface SceneFrameModalOverlaysProps {
     sceneFrameModalStates: SceneFrameModalState[];
     onDelete?: (frameId: string) => void;
+    onDuplicate?: (frameId: string) => void;
+    onContentUpdate?: (frameId: string, content: string) => void;
     onPositionChange?: (frameId: string, x: number, y: number) => void;
     onPositionCommit?: (frameId: string, x: number, y: number) => void;
     stageRef: React.RefObject<Konva.Stage | null>;
     scale: number;
     position: { x: number; y: number };
+    clearAllSelections: () => void;
 }
 
 export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = ({
     sceneFrameModalStates,
     onDelete,
+    onDuplicate,
+    onContentUpdate,
     onPositionChange,
     onPositionCommit,
     stageRef,
     scale,
     position,
+    clearAllSelections,
 }) => {
     const [isDark, setIsDark] = useState(false);
 
@@ -59,8 +66,11 @@ export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = (
                     scale={scale}
                     position={position}
                     onDelete={onDelete}
+                    onDuplicate={onDuplicate}
+                    onContentUpdate={onContentUpdate}
                     onPositionChange={onPositionChange}
                     onPositionCommit={onPositionCommit}
+                    clearAllSelections={clearAllSelections}
                 />
             ))}
         </>
@@ -74,8 +84,11 @@ interface SceneFrameModalProps {
     scale: number;
     position: { x: number; y: number };
     onDelete?: (frameId: string) => void;
+    onDuplicate?: (frameId: string) => void;
+    onContentUpdate?: (frameId: string, content: string) => void;
     onPositionChange?: (frameId: string, x: number, y: number) => void;
     onPositionCommit?: (frameId: string, x: number, y: number) => void;
+    clearAllSelections: () => void;
 }
 
 const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
@@ -84,17 +97,30 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
     scale,
     position,
     onDelete,
+    onDuplicate,
+    onContentUpdate,
     onPositionChange,
     onPositionCommit,
+    clearAllSelections,
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+    const [isSelected, setIsSelected] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(frame.content);
+    const [copied, setCopied] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const containerRef = React.useRef<HTMLDivElement>(null);
     const lastCanvasPosRef = React.useRef<{ x: number; y: number } | null>(null);
     const dragStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
     const hasDraggedRef = React.useRef(false);
     const activePointerIdRef = React.useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!isEditing) {
+            setEditContent(frame.content);
+        }
+    }, [frame.content, isEditing]);
 
     const screenX = frame.x * scale + position.x;
     const screenY = frame.y * scale + position.y;
@@ -119,6 +145,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
             return;
         }
 
+        clearAllSelections();
         // Capture this pointer so we reliably receive move/up events
         try {
             (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -229,6 +256,22 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
         };
     }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit, frame.id, frame.x, frame.y]);
 
+    useEffect(() => {
+        const handleClear = () => setIsSelected(false);
+        window.addEventListener('canvas-clear-selection', handleClear as any);
+        return () => window.removeEventListener('canvas-clear-selection', handleClear as any);
+    }, []);
+
+    useEffect(() => {
+        const handleDocumentClick = (e: MouseEvent) => {
+            if (!containerRef.current?.contains(e.target as Node)) {
+                setIsSelected(false);
+            }
+        };
+        document.addEventListener('mousedown', handleDocumentClick);
+        return () => document.removeEventListener('mousedown', handleDocumentClick);
+    }, []);
+
     return (
         <div
             ref={containerRef}
@@ -237,13 +280,23 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
             onPointerDown={handlePointerDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onClick={(e) => {
+                e.stopPropagation();
+                setIsSelected(true);
+            }}
             style={{
                 position: 'absolute',
                 left: `${screenX}px`,
                 top: `${screenY}px`,
-                zIndex: isHovered ? 2001 : 2000,
+                zIndex: isHovered || isSelected ? 2001 : 2000,
                 userSelect: 'none',
                 cursor: isDragging ? 'grabbing' : 'grab',
+            }}
+        tabIndex={0}
+        onBlur={(e) => {
+            if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+                setIsSelected(false);
+            }
             }}
         >
             <div
@@ -254,13 +307,15 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     minHeight: `${cardMinHeight}px`,
                     backgroundColor: isDark ? '#1b1b1b' : '#ffffff',
                     borderRadius: `${cardRadius}px`,
-                    border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
-                    boxShadow: isDark
+                    border: isSelected ? `${2 * scale}px solid #437eb5` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
+                    boxShadow: isSelected
+                        ? '0 0 0 3px rgba(67, 126, 181, 0.25)'
+                        : isDark
                         ? '0 12px 24px rgba(0,0,0,0.6)'
                         : '0 12px 24px rgba(15,23,42,0.18)',
                     padding: `${cardPadding}px`,
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    transition: 'box-shadow 0.2s ease',
+                    transition: 'box-shadow 0.2s ease, border 0.2s ease',
                     pointerEvents: 'auto',
                 }}
             >
@@ -268,7 +323,23 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     id={frame.id}
                     scale={scale}
                     isHovered={isHovered}
-                    isSelected={false}
+                    isSelected={isSelected}
+                />
+                <ModalActionIcons
+                    isSelected={isSelected}
+                    scale={scale}
+                    onDelete={() => onDelete?.(frame.id)}
+                    onCopy={() => {
+                        try {
+                            navigator.clipboard.writeText(frame.content || '');
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                        } catch (err) {
+                            console.warn('Scene copy failed', err);
+                        }
+                    }}
+                    onEdit={() => setIsEditing(prev => !prev)}
+                    editActive={isEditing}
                 />
                 <div
                     style={{
@@ -288,51 +359,95 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                         }}
                     >
                         Scene {frame.sceneNumber}
+                        {copied && (
+                            <span
+                                style={{
+                                    fontSize: `${11 * scale}px`,
+                                    color: isDark ? '#a7f3d0' : '#047857',
+                                    marginLeft: `${8 * scale}px`,
+                                }}
+                            >
+                                Copied!
+                            </span>
+                        )}
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete?.(frame.id);
-                        }}
-                        title="Delete scene frame"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: `${28 * scale}px`,
-                            height: `${28 * scale}px`,
-                            borderRadius: '50%',
-                            border: 'none',
-                            backgroundColor: isDark ? 'rgba(248,113,113,0.15)' : 'rgba(239,68,68,0.12)',
-                            color: isDark ? '#fecaca' : '#dc2626',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        <svg
-                            width={14 * scale}
-                            height={14 * scale}
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                        </svg>
-                    </button>
                 </div>
 
+                {isEditing ? (
+                    <div
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: `${10 * scale}px`,
+                        }}
+                    >
+                        <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            placeholder="Describe the scene details..."
+                            style={{
+                                width: '100%',
+                                minHeight: `${160 * scale}px`,
+                                fontSize: `${13 * scale}px`,
+                                lineHeight: `${20 * scale}px`,
+                                color: isDark ? '#f8fafc' : '#0f172a',
+                                backgroundColor: isDark ? 'rgba(15,15,15,0.9)' : '#f8fafc',
+                                border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
+                                borderRadius: `${8 * scale}px`,
+                                padding: `${12 * scale}px`,
+                                resize: 'vertical',
+                                fontFamily: 'system-ui, -apple-system, sans-serif',
+                        }}
+                        />
+                        <div style={{ display: 'flex', gap: `${8 * scale}px` }}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onContentUpdate?.(frame.id, editContent);
+                                    setIsEditing(false);
+                                }}
+                                style={{
+                                    padding: `${6 * scale}px ${12 * scale}px`,
+                                    borderRadius: `${6 * scale}px`,
+                                    border: 'none',
+                                    backgroundColor: '#2563eb',
+                                    color: '#ffffff',
+                                    fontSize: `${12 * scale}px`,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditContent(frame.content);
+                                    setIsEditing(false);
+                                }}
+                                style={{
+                                    padding: `${6 * scale}px ${12 * scale}px`,
+                                    borderRadius: `${6 * scale}px`,
+                                    border: 'none',
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.05)',
+                                    color: isDark ? '#f8fafc' : '#0f172a',
+                                    fontSize: `${12 * scale}px`,
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Cancel
+                    </button>
+                </div>
+                    </div>
+                ) : (
                 <SceneFrame
                     scale={scale}
                     sceneNumber={frame.sceneNumber}
                     sceneContent={frame.content}
                     isDark={isDark}
                 />
+                )}
             </div>
         </div>
     );

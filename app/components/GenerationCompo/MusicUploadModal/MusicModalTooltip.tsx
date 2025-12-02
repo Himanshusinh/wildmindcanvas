@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface MusicModalTooltipProps {
   isHovered: boolean;
@@ -11,17 +11,7 @@ export const MusicModalTooltip: React.FC<MusicModalTooltipProps> = ({
   isHovered,
   scale,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   if (!isHovered) return null;
 

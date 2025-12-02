@@ -18,10 +18,10 @@ interface UseConnectionManagerProps {
   upscaleModalStates?: any[];
   removeBgModalStates?: any[];
   eraseModalStates?: any[];
-  replaceModalStates?: any[];
   expandModalStates?: any[];
   vectorizeModalStates?: any[];
   storyboardModalStates?: any[];
+  scriptFrameModalStates?: any[];
   sceneFrameModalStates?: any[];
 }
 
@@ -40,10 +40,10 @@ export function useConnectionManager({
   upscaleModalStates,
   removeBgModalStates,
   eraseModalStates,
-  replaceModalStates,
   expandModalStates,
   vectorizeModalStates,
   storyboardModalStates,
+  scriptFrameModalStates,
   sceneFrameModalStates,
 }: UseConnectionManagerProps) {
   const [localConnections, setLocalConnections] = useState<Connection[]>([]);
@@ -65,6 +65,11 @@ export function useConnectionManager({
 
     // Storyboard specific validation
     if (toType === 'storyboard') {
+      // Special case for script input - allow text
+      if (toSide === 'receive-script') {
+        return fromType === 'text';
+      }
+
       // If connecting to specific receive nodes (character, background, prompt)
       if (toSide && toSide.startsWith('receive-')) {
         // Only allow image connections (generated or media)
@@ -80,7 +85,7 @@ export function useConnectionManager({
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music', 'storyboard'],
-      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize', 'storyboard'],
+      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'storyboard'],
       video: ['video'],
       music: ['video'],
     };
@@ -151,8 +156,16 @@ export function useConnectionManager({
 
       // Storyboard specific validation
       if (toType === 'storyboard') {
+        // Special case for script input - allow text
+        if (side === 'receive-script') {
+          if (fromType !== 'text') {
+            setActiveDrag(null);
+            try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+            return;
+          }
+        }
         // If connecting to specific receive nodes (character, background, prompt)
-        if (side && side.startsWith('receive-')) {
+        else if (side && side.startsWith('receive-')) {
           // Only allow image connections (generated or media)
           if (fromType !== 'image') {
             setActiveDrag(null);
@@ -173,7 +186,7 @@ export function useConnectionManager({
 
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music', 'storyboard'],
-        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'replace', 'expand', 'vectorize', 'storyboard'],
+        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'storyboard'],
         video: ['video'],
         music: ['video'],
       };
@@ -251,8 +264,8 @@ export function useConnectionManager({
       }
 
       // Add connection if not duplicate
-      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
-      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates);
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
       // Include toAnchor in the connection
@@ -425,7 +438,7 @@ export function useConnectionManager({
       window.removeEventListener('mouseup', handleUp);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, replaceModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
+  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {

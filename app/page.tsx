@@ -37,7 +37,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
   const [eraseGenerators, setEraseGenerators] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
-  const [replaceGenerators, setReplaceGenerators] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
   const [expandGenerators, setExpandGenerators] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
   const [storyboardGenerators, setStoryboardGenerators] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
@@ -203,6 +202,51 @@ export function CanvasApp({ user }: CanvasAppProps) {
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null }];
           });
+        } else if (element.type === 'text-generator') {
+          setTextGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
+          });
+        } else if (element.type === 'upscale-plugin') {
+          setUpscaleGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'removebg-plugin') {
+          setRemoveBgGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'erase-plugin') {
+          setEraseGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'expand-plugin') {
+          setExpandGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'vectorize-plugin') {
+          setVectorizeGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'storyboard-plugin') {
+          setStoryboardGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'script-frame') {
+          setScriptFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'scene-frame') {
+          setSceneFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
@@ -228,7 +272,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setImageGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setTextGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -295,6 +347,27 @@ export function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
+        // Update other generators (Text, Plugins, Frames)
+        const updateGeneratorPos = (prev: any[]) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        };
+        setTextGenerators(updateGeneratorPos);
+        setUpscaleGenerators(updateGeneratorPos);
+        setRemoveBgGenerators(updateGeneratorPos);
+        setEraseGenerators(updateGeneratorPos);
+        setExpandGenerators(updateGeneratorPos);
+        setVectorizeGenerators(updateGeneratorPos);
+        setStoryboardGenerators(updateGeneratorPos);
+        setScriptFrameGenerators(updateGeneratorPos);
+        setSceneFrameGenerators(updateGeneratorPos);
+
       } else if (op.type === 'update' && op.elementId && op.data.updates) {
         // Also handle regular element updates
         setImages((prev) => {
@@ -308,33 +381,27 @@ export function CanvasApp({ user }: CanvasAppProps) {
           return prev;
         });
         // Update a generator modal if matched (needed for undo/redo)
-        setImageGenerators((prev) => {
+        const updateGeneratorState = (prev: any[]) => {
           const idx = prev.findIndex(m => m.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            next[idx] = { ...next[idx], ...op.data.updates };
             return next;
           }
           return prev;
-        });
-        setVideoGenerators((prev) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0 && op.data.updates) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
-            return next;
-          }
-          return prev;
-        });
-        setMusicGenerators((prev) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0 && op.data.updates) {
-            const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
-            return next;
-          }
-          return prev;
-        });
+        };
+        setImageGenerators(updateGeneratorState);
+        setVideoGenerators(updateGeneratorState);
+        setMusicGenerators(updateGeneratorState);
+        setTextGenerators(updateGeneratorState);
+        setUpscaleGenerators(updateGeneratorState);
+        setRemoveBgGenerators(updateGeneratorState);
+        setEraseGenerators(updateGeneratorState);
+        setExpandGenerators(updateGeneratorState);
+        setVectorizeGenerators(updateGeneratorState);
+        setStoryboardGenerators(updateGeneratorState);
+        setScriptFrameGenerators(updateGeneratorState);
+        setSceneFrameGenerators(updateGeneratorState);
         // If this update modified meta.connections, update connectors state accordingly (backwards compat)
         if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
           const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
@@ -389,7 +456,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           upscaleGenerators,
           removeBgGenerators,
           eraseGenerators,
-          replaceGenerators,
           expandGenerators,
           vectorizeGenerators,
           storyboardGenerators,
@@ -607,7 +673,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           upscaleGenerators,
           removeBgGenerators,
           eraseGenerators,
-          replaceGenerators,
           expandGenerators,
           vectorizeGenerators,
           storyboardGenerators,
@@ -628,7 +693,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, replaceGenerators, expandGenerators, vectorizeGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -645,7 +710,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
           const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
-          const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
           const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
@@ -667,6 +731,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 fromAnchor: element.meta?.fromAnchor,
                 toAnchor: element.meta?.toAnchor
               };
+              if (
+                (connector.from && connector.from.startsWith('replace-')) ||
+                (connector.to && connector.to.startsWith('replace-'))
+              ) {
+                return;
+              }
               const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
               if (!connectorSignatures.has(signature)) {
                 connectorSignatures.add(signature);
@@ -771,22 +841,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'replace-plugin') {
-                newReplaceGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  replacedImageUrl: element.meta?.replacedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localReplacedImageUrl: element.meta?.localReplacedImageUrl || null,
-                  model: element.meta?.model || 'bria/eraser',
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isReplacing: element.meta?.isReplacing || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'expand-plugin') {
                 newExpandGenerators.push({
                   id: element.id,
@@ -878,7 +932,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setUpscaleGenerators(newUpscaleGenerators);
           setRemoveBgGenerators(newRemoveBgGenerators);
           setEraseGenerators(newEraseGenerators);
-          setReplaceGenerators(newReplaceGenerators);
           setExpandGenerators(newExpandGenerators);
           setVectorizeGenerators(newVectorizeGenerators);
           setStoryboardGenerators(newStoryboardGenerators);
@@ -939,7 +992,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
     upscaleGenerators,
     removeBgGenerators,
     eraseGenerators,
-    replaceGenerators,
     expandGenerators,
     vectorizeGenerators,
     storyboardGenerators,
@@ -958,7 +1010,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setUpscaleGenerators,
     setRemoveBgGenerators,
     setEraseGenerators,
-    setReplaceGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
     setStoryboardGenerators,
@@ -1365,6 +1416,61 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
   };
 
+  // Spacebar shortcut for temporary pan tool
+  const previousToolRef = useRef<typeof selectedTool | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        (target as any).isContentEditable === true
+      );
+      if (isTyping) return;
+
+      if (e.code === 'Space' && !e.repeat) {
+        // Only switch if not already moving
+        if (selectedTool !== 'move') {
+          e.preventDefault(); // Prevent scrolling
+          previousToolRef.current = selectedTool;
+          setSelectedTool('move');
+        }
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Ignore if typing in an input
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        (target as any).isContentEditable === true
+      );
+      if (isTyping) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (previousToolRef.current) {
+          setSelectedTool(previousToolRef.current);
+          previousToolRef.current = null;
+        } else if (selectedTool === 'move') {
+          // Fallback if previous tool wasn't captured (e.g. initial load)
+          setSelectedTool('cursor');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedTool]);
+
 
   const handleToolbarUpload = (files: File[]) => {
     // Check if any file is a GLTF file (which might need dependencies)
@@ -1729,7 +1835,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalUpscaleModals={upscaleGenerators}
               externalRemoveBgModals={removeBgGenerators}
               externalEraseModals={eraseGenerators}
-              externalReplaceModals={replaceGenerators}
               externalExpandModals={expandGenerators}
               externalVectorizeModals={vectorizeGenerators}
               externalStoryboardModals={storyboardGenerators}
@@ -1782,7 +1887,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         upscaleGenerators,
                         removeBgGenerators,
                         eraseGenerators,
-                        replaceGenerators,
                         expandGenerators,
                         vectorizeGenerators,
                         storyboardGenerators,
@@ -1825,7 +1929,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         upscaleGenerators,
                         removeBgGenerators,
                         eraseGenerators,
-                        replaceGenerators,
                         expandGenerators,
                         vectorizeGenerators,
                         storyboardGenerators,
@@ -2025,10 +2128,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistEraseModalMove={pluginHandlers.onPersistEraseModalMove}
               onPersistEraseModalDelete={pluginHandlers.onPersistEraseModalDelete}
               onErase={pluginHandlers.onErase}
-              onPersistReplaceModalCreate={pluginHandlers.onPersistReplaceModalCreate}
-              onPersistReplaceModalMove={pluginHandlers.onPersistReplaceModalMove}
-              onPersistReplaceModalDelete={pluginHandlers.onPersistReplaceModalDelete}
-              onReplace={pluginHandlers.onReplace}
               onPersistExpandModalCreate={pluginHandlers.onPersistExpandModalCreate}
               onPersistExpandModalMove={pluginHandlers.onPersistExpandModalMove}
               onPersistExpandModalDelete={pluginHandlers.onPersistExpandModalDelete}
@@ -2057,22 +2156,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistTextModalMove={async (id, updates) => {
-                // Optimistic update with capture of previous state for correct inverse
-                let capturedPrev: { id: string; x: number; y: number; value?: string } | undefined = undefined;
+                // 1. Capture previous state (for inverse op)
+                const prevItem = textGenerators.find(t => t.id === id);
+
+                // 2. Optimistic update
                 setTextGenerators((prev) => {
-                  const found = prev.find(t => t.id === id);
-                  capturedPrev = found ? { ...found } : undefined;
                   return prev.map(t => t.id === id ? { ...t, ...updates } : t);
                 });
+
+                // 3. Broadcast via realtime
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast update text', id, Object.keys(updates || {}));
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
+
+                // 4. Append op for undo/redo
                 if (projectId && opManagerInitialized) {
                   const inverseUpdates: any = {};
-                  if (capturedPrev) {
+                  if (prevItem) {
                     for (const k of Object.keys(updates || {})) {
-                      (inverseUpdates as any)[k] = (capturedPrev as any)[k];
+                      (inverseUpdates as any)[k] = (prevItem as any)[k];
                     }
                   }
                   await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
@@ -2546,96 +2649,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         frameWidth: 400,
                         frameHeight: 500,
                         isErasing: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'replace') {
-            const viewportCenter = viewportCenterRef.current;
-            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
-            // Otherwise use viewport center
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              // Convert screen coordinates to canvas coordinates
-              // We need to get the canvas container position to do this properly
-              // For now, use viewport center as fallback
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              // Use viewport center
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newReplace = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              replacedImageUrl: null,
-              sourceImageUrl: null,
-              localReplacedImageUrl: null,
-              model: 'bria/eraser',
-              frameWidth: 400,
-              frameHeight: 500,
-              isReplacing: false,
-            };
-            console.log('[Plugin] Creating replace modal at viewport center:', newReplace, 'viewportCenter:', viewportCenter);
-            // Persist via callback (this will trigger realtime + ops)
-            // Use the same callback pattern as Canvas component
-            (async () => {
-              // Optimistic update
-              setReplaceGenerators(prev => {
-                // Check if modal already exists to avoid duplicates
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newReplace];
-                console.log('[Plugin] Updated replaceGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create replace', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'replace',
-                  x: modalX,
-                  y: modalY,
-                  replacedImageUrl: null,
-                  sourceImageUrl: null,
-                  localReplacedImageUrl: null,
-                  model: 'bria/replacer',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isReplacing: false,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'replace-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        replacedImageUrl: null,
-                        sourceImageUrl: null,
-                        localReplacedImageUrl: null,
-                        model: 'bria/replacer',
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isReplacing: false,
                       },
                     },
                   },

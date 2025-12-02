@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface RemoveBgImageFrameProps {
   id: string | undefined;
@@ -30,17 +31,7 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
   onMouseDown,
   onSelect,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   return (
     <div
@@ -67,6 +58,7 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
         maxWidth: '90vw',
         minHeight: `${150 * scale}px`,
         maxHeight: `${400 * scale}px`,
+        height: sourceImageUrl ? `${220 * scale}px` : 'auto',
         backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -82,6 +74,7 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
         zIndex: 1,
         transition: 'border 0.18s ease, background-color 0.3s ease',
         padding: `${16 * scale}px`,
+        marginTop: `${-frameBorderWidth * scale}px`,
       }}
     >
       {sourceImageUrl ? (

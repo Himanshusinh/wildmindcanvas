@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ActiveSection } from './types';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface SettingsSidebarProps {
   activeSection: ActiveSection;
@@ -14,22 +15,11 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   onSectionChange,
   onLogout,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const sections = [
     { id: 'profile' as ActiveSection, label: 'Profile' },
     { id: 'canvas' as ActiveSection, label: 'Canvas' },
-    { id: 'theme' as ActiveSection, label: 'Theme' },
     { id: 'keyboard' as ActiveSection, label: 'Keyboard Shortcuts' },
     { id: 'notification' as ActiveSection, label: 'Notification' },
   ];

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface CustomDimensionInputProps {
   width: number;
@@ -17,17 +18,7 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
   onHeightChange,
   onClose,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const [localWidth, setLocalWidth] = useState(width);
   const [localHeight, setLocalHeight] = useState(height);

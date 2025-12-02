@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ImageModalTooltipProps {
   isHovered: boolean;
   isUploadedImage: boolean;
   imageResolution: { width: number; height: number } | null;
   scale: number;
+  model?: string;
 }
 
 export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
@@ -14,23 +15,24 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
   isUploadedImage,
   imageResolution,
   scale,
+  model,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   if (!isHovered) return null;
 
   const tooltipBg = isDark ? '#1a1a1a' : '#ffffff';
   const tooltipText = isDark ? '#ffffff' : '#1f2937';
+
+  // Determine title based on model if it's an uploaded/media image
+  let title = isUploadedImage ? 'Media' : 'Image Generator';
+
+  if (isUploadedImage && model) {
+    // Check for specific plugin models that should show their name
+    if (['Upscale', 'Remove BG', 'Vectorize', 'Erase', 'Expand'].includes(model)) {
+      title = model;
+    }
+  }
 
   return (
     <div
@@ -56,7 +58,7 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
       }}
     >
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span>{isUploadedImage ? 'Media' : 'Image Generator'}</span>
+        <span>{title}</span>
         {imageResolution && (
           <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
             {imageResolution.width} × {imageResolution.height}

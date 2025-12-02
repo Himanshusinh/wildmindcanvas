@@ -60,7 +60,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             try {
               const url = await onMusicGenerate(prompt, model, frame, aspectRatio);
               if (url) {
-                setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url } : m));
+                setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url, isGenerating: false } : m));
                 if (onPersistMusicModalMove) {
                   const frameWidth = 600;
                   const frameHeight = 300;
@@ -80,6 +80,13 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             return null;
           }}
           generatedMusicUrl={modalState.generatedMusicUrl}
+          initialModel={modalState.model}
+          initialFrame={modalState.frame}
+          initialAspectRatio={modalState.aspectRatio}
+          initialPrompt={modalState.prompt}
+          onOptionsChange={(opts) => {
+            setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
+          }}
           onSelect={() => {
             clearAllSelections();
             setSelectedMusicModalId(modalState.id);
@@ -112,6 +119,11 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
               x: modalState.x + 600 + 50,
               y: modalState.y,
               generatedMusicUrl: modalState.generatedMusicUrl,
+              model: modalState.model,
+              frame: modalState.frame,
+              aspectRatio: modalState.aspectRatio,
+              prompt: modalState.prompt,
+              isGenerating: false,
             };
             setMusicModalStates(prev => [...prev, duplicated]);
             if (onPersistMusicModalCreate) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VideoModalTooltipProps {
   isHovered: boolean;
@@ -15,17 +15,7 @@ export const VideoModalTooltip: React.FC<VideoModalTooltipProps> = ({
   videoResolution,
   scale,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   if (!isHovered) return null;
 

@@ -31,7 +31,7 @@ interface ImageModalOverlaysProps {
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
   connections: Connection[];
@@ -130,16 +130,26 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             if (sourceUrl.includes(',')) return undefined;
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrl, width, height) => {
-            console.log('[ImageModalOverlays] onGenerate called!', { modalId: modalState.id, hasOnImageGenerate: !!onImageGenerate });
+          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height) => {
+            console.log('[ImageModalOverlays] onGenerate called!', {
+              modalId: modalState.id,
+              hasOnImageGenerate: !!onImageGenerate,
+              sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
+            });
             if (onImageGenerate) {
               try {
                 const imageCount = modalState.imageCount || 1;
 
-                // Automatically collect Storyboard images for Scene-based generation
-                // First, check if sourceImageUrl is already set in the modal state (from scene generation)
-                let sourceImageUrl: string | undefined = modalState.sourceImageUrl || undefined;
+                // CRITICAL: Prioritize sourceImageUrl passed from ImageUploadModal (for simple image-to-image)
+                // Fall back to modalState.sourceImageUrl only for scene-based generation
+                let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
                 const sceneNumber = (modalState as any).sceneNumber;
+
+                console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
+                  fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
+                  fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+                  finalChoice: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+                });
 
                 console.log('[ImageModalOverlays] 🔍 Checking modalState.sourceImageUrl:', {
                   modalId: modalState.id,
@@ -412,12 +422,23 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                   console.log('[ImageModalOverlays] ✅ Reference images will be passed to API (image-to-image mode)');
                 }
 
+                // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
+                // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
+                const targetFrameId = modalId || modalState.id;
+
+                console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
+                  modalIdParam: modalId || 'NONE',
+                  modalStateId: modalState.id,
+                  targetFrameId,
+                  willUpdateNewFrame: modalId !== modalState.id,
+                });
+
                 const result = await onImageGenerate(
                   prompt,
                   model,
                   frame,
                   aspectRatio,
-                  modalState.id,
+                  targetFrameId,
                   imageCount,
                   finalSourceImageUrl, // Reference images only (for Scene 1, this is all we need)
                   extractedSceneNumber, // Scene number
@@ -434,11 +455,12 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                       ? [result.url]
                       : [];
 
-                  // Keep the modal visible and show the generated image(s) inside the frame
-                  setImageModalStates(prev => prev.map(m => m.id === modalState.id ? {
+                  // CRITICAL: Update the TARGET frame (which may be a new frame), not the current frame
+                  setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
                     ...m,
                     generatedImageUrl: imageUrls[0] || null,
                     generatedImageUrls: imageUrls,
+                    isGenerating: false,
                   } : m));
                   if (onPersistImageModalMove) {
                     // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
@@ -447,7 +469,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                     const ar = w && h ? (w / h) : 1;
                     const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
                     const frameHeight = Math.max(400, rawHeight);
-                    Promise.resolve(onPersistImageModalMove(modalState.id, {
+                    Promise.resolve(onPersistImageModalMove(targetFrameId, {
                       generatedImageUrl: imageUrls[0] || null,
                       generatedImageUrls: imageUrls,
                       model,
@@ -456,6 +478,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                       frameWidth,
                       frameHeight,
                       prompt,
+                      isGenerating: false,
                     } as any)).catch(console.error);
                   }
 

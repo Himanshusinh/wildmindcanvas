@@ -38,7 +38,7 @@ interface ImageUploadModalProps {
   initialFrame?: string;
   initialAspectRatio?: string;
   initialPrompt?: string;
-  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number; isGenerating?: boolean }) => void;
   initialCount?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
@@ -158,6 +158,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
 
+  const setGeneratingState = (next: boolean) => {
+    setIsGenerating(next);
+    onOptionsChange?.({ isGenerating: next });
+  };
+
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
     const [width, height] = ratio.split(':').map(Number);
@@ -245,7 +250,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1',
     'Seedream v4 4K',
     'Upscale', // Upscale is treated as media (no controls)
-    'Remove BG' // Remove BG is treated as media (no controls)
+    'Remove BG', // Remove BG is treated as media (no controls)
+    'Vectorize', // Vectorize is treated as media (no controls)
+    'Erase', // Erase is treated as media (no controls)
+    'Expand' // Expand is treated as media (no controls)
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -258,10 +266,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     initialModel === 'Uploaded Image' ||
     initialModel === 'Upscale' ||
     initialModel === 'Remove BG' ||
+    initialModel === 'Vectorize' ||
+    initialModel === 'Erase' ||
+    initialModel === 'Expand' ||
     selectedModel === 'Library Image' ||
     selectedModel === 'Uploaded Image' ||
     selectedModel === 'Upscale' ||
     selectedModel === 'Remove BG' ||
+    selectedModel === 'Vectorize' ||
+    selectedModel === 'Erase' ||
+    selectedModel === 'Expand' ||
     (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
 
   // Detect connected image nodes (for image-to-image generation)
@@ -292,7 +306,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const sourceImageUrl = connectedImageSource?.url || null;
 
   // Check if an image is already generated in this modal
-  const hasExistingImage = Boolean(generatedImageUrl && !isGenerating && !externalIsGenerating);
+  const hasExistingImage = Boolean(generatedImageUrl);
 
   // Filter models: 
   // - If image is connected from another modal OR an image is already generated in this modal, only show image-to-image models
@@ -378,7 +392,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // Use effective prompt (connected text or local prompt)
     const promptToUse = effectivePrompt;
     if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
-      setIsGenerating(true);
+      // CRITICAL: Only set current frame to generating if we're NOT creating a new frame
+      // If hasExistingImage is true, we'll create a new frame and that frame will be marked as generating
+      // The current frame should remain unchanged
+      const willCreateNewFrame = hasExistingImage && generatedImageUrl;
+      let didSetCurrentFrameGenerating = false;
+      if (!willCreateNewFrame) {
+        setGeneratingState(true);
+        didSetCurrentFrameGenerating = true;
+      }
+
+      console.log('[ImageUploadModal] 🎯 Generation state management:', {
+        hasExistingImage,
+        generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+        willCreateNewFrame,
+        didSetCurrentFrameGenerating,
+      });
+
       try {
         // Calculate width and height based on resolution and aspect ratio
         let width: number | undefined;
@@ -789,14 +819,52 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
         // Determine final reference: prefer stitched reference exclusively when present
         let allReferenceImageUrls: string[] = [];
+
+        console.log('[Image Generation] 🔍 STEP 1: Before building allReferenceImageUrls:', {
+          stitchedOnly,
+          finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NULL/UNDEFINED',
+          referenceImageUrls: referenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          referenceImageUrlsLength: referenceImageUrls.length,
+        });
+
         if (stitchedOnly && finalSourceImageUrl) {
           allReferenceImageUrls = [finalSourceImageUrl];
+          console.log('[Image Generation] 🔍 STEP 2a: Using stitched-only path');
         } else {
           allReferenceImageUrls = [...referenceImageUrls];
+          console.log('[Image Generation] 🔍 STEP 2b: Copied referenceImageUrls, length:', allReferenceImageUrls.length);
+
           if (finalSourceImageUrl && !allReferenceImageUrls.includes(finalSourceImageUrl)) {
+            console.log('[Image Generation] 🔍 STEP 3: Adding finalSourceImageUrl to allReferenceImageUrls');
             allReferenceImageUrls.push(finalSourceImageUrl);
+          } else {
+            console.log('[Image Generation] 🔍 STEP 3: NOT adding finalSourceImageUrl because:', {
+              hasFinalSourceImageUrl: !!finalSourceImageUrl,
+              alreadyInArray: allReferenceImageUrls.includes(finalSourceImageUrl || ''),
+            });
           }
         }
+
+        console.log('[Image Generation] 🔍 STEP 4: After building allReferenceImageUrls:', {
+          allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          allReferenceImageUrlsLength: allReferenceImageUrls.length,
+        });
+
+        // CRITICAL: When creating a new frame for image-to-image (hasExistingImage is true),
+        // we MUST pass the source image URL explicitly because the new frame doesn't have it yet
+        // The finalSourceImageUrl contains the current frame's generatedImageUrl which should be used as the source
+        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl
+          ? finalSourceImageUrl
+          : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined);
+
+        console.log('[Image Generation] 🎯 Source image determination:', {
+          hasExistingImage,
+          generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+          finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NONE',
+          allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          finalSourceImageUrlParam: finalSourceImageUrlParam ? finalSourceImageUrlParam.substring(0, 100) + '...' : 'NONE',
+          willCreateNewFrame: hasExistingImage && generatedImageUrl,
+        });
 
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
@@ -804,10 +872,24 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         console.log(`[Image Generation] 🔍 About to call onImageGenerate with:`, {
           targetModalId,
           referenceImageUrls: allReferenceImageUrls,
+          finalSourceImageUrl,
+          finalSourceImageUrlParam,
+          hasExistingImage,
+          generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+          willUseImageToImage: !!finalSourceImageUrlParam,
           imageCount,
           width,
           height,
         });
+
+        console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
+          'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
+          'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
+          'finalSourceImageUrlParam truthy': !!finalSourceImageUrlParam,
+          'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
+          'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
+        });
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
@@ -815,8 +897,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           selectedAspectRatio,
           targetModalId,
           imageCount,
-          // If stitched reference exists, pass ONLY that single URL; otherwise, join collected references
-          stitchedOnly && finalSourceImageUrl ? finalSourceImageUrl : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined),
+          finalSourceImageUrlParam,
           width,
           height
         );
@@ -871,7 +952,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         console.error('Error generating images:', error);
         alert('Failed to generate images. Please try again.');
       } finally {
-        setIsGenerating(false);
+        // Only reset generating state if we set it to true for the current frame
+        if (didSetCurrentFrameGenerating) {
+          setGeneratingState(false);
+        }
       }
     }
   };
@@ -1206,6 +1290,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isUploadedImage={Boolean(isUploadedImage)}
         imageResolution={imageResolution}
         scale={scale}
+        model={selectedModel}
       />
 
       <ModalActionIcons

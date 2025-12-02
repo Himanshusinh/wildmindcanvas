@@ -87,6 +87,7 @@ export function calculateSceneFramePositions(
     scriptFrameX: number,
     scriptFrameY: number,
     scriptFrameWidth: number,
+    scriptFrameHeight: number,
     numScenes: number,
     sceneFrameWidth: number = 350,
     sceneFrameHeight: number = 300,
@@ -96,7 +97,14 @@ export function calculateSceneFramePositions(
 
     // Start to the right of the script frame
     const startX = scriptFrameX + scriptFrameWidth + gap * 2;
-    const startY = scriptFrameY;
+
+    // Calculate total height of all scene frames including gaps
+    const totalScenesHeight = numScenes * sceneFrameHeight + (numScenes - 1) * gap;
+
+    // Calculate the starting Y position to center the block of scenes relative to the script frame
+    // Center of script frame = scriptFrameY + scriptFrameHeight / 2
+    // Top of scenes block = Center of script frame - totalScenesHeight / 2
+    const startY = (scriptFrameY + scriptFrameHeight / 2) - (totalScenesHeight / 2);
 
     // Arrange in a single vertical column
     for (let i = 0; i < numScenes; i++) {

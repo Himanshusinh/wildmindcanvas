@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ImageModalControlsProps {
   scale: number;
@@ -72,17 +73,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   onSetIsAspectRatioDropdownOpen,
   onSetIsResolutionDropdownOpen,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);

@@ -19,8 +19,6 @@ interface ComponentCreationMenuProps {
   setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setEraseModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
-  onPersistReplaceModalCreate?: (modal: { id: string; x: number; y: number; replacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  setReplaceModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
   setExpandModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
@@ -44,8 +42,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setRemoveBgModalStates,
   onPersistEraseModalCreate,
   setEraseModalStates,
-  onPersistReplaceModalCreate,
-  setReplaceModalStates,
   onPersistExpandModalCreate,
   setExpandModalStates,
   onPersistStoryboardModalCreate,
@@ -84,7 +80,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'upscale-plugin', label: 'Upscale Plugin', type: 'plugin' },
     { id: 'removebg-plugin', label: 'Remove BG Plugin', type: 'plugin' },
     { id: 'erase-plugin', label: 'Erase Plugin', type: 'plugin' },
-    { id: 'replace-plugin', label: 'Replace Plugin', type: 'plugin' },
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
     { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
@@ -280,23 +275,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setEraseModalStates(prev => [...prev, newErase]);
                 Promise.resolve(onPersistEraseModalCreate(newErase)).catch(console.error);
-              } else if (comp.id === 'replace-plugin' && comp.type === 'plugin' && onPersistReplaceModalCreate && setReplaceModalStates) {
-                // Create replace plugin modal
-                newComponentId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const newReplace = {
-                  id: newComponentId,
-                  x: canvasX,
-                  y: canvasY,
-                  replacedImageUrl: null,
-                  sourceImageUrl: null,
-                  localReplacedImageUrl: null,
-                  model: 'bria/eraser',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isReplacing: false,
-                };
-                setReplaceModalStates(prev => [...prev, newReplace]);
-                Promise.resolve(onPersistReplaceModalCreate(newReplace)).catch(console.error);
               } else if (comp.id === 'expand-plugin' && comp.type === 'plugin' && onPersistExpandModalCreate && setExpandModalStates) {
                 newComponentId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 const newExpand = {

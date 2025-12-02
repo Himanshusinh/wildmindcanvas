@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface StoryboardConnectionNodesProps {
     id: string | undefined;
@@ -30,17 +31,7 @@ export const StoryboardConnectionNodes: React.FC<StoryboardConnectionNodesProps>
     // Always show nodes clearly - higher base opacity for better visibility
     const nodeOpacity = (isHovered || isSelected || globalDragActive) ? 1 : 0.85;
 
-    const [isDark, setIsDark] = useState(false);
-
-    useEffect(() => {
-        const checkTheme = () => {
-            setIsDark(document.documentElement.classList.contains('dark'));
-        };
-        checkTheme();
-        const observer = new MutationObserver(checkTheme);
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-        return () => observer.disconnect();
-    }, []);
+    const isDark = useIsDarkTheme();
 
     // Darker, more visible nodes with better contrast
     const nodeColor = isDark ? '#808080' : '#606060';

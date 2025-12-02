@@ -47,6 +47,8 @@ interface StoryboardModalOverlaysProps {
     characterNames?: string;
     backgroundDescription?: string;
     specialRequest?: string;
+    isAiMode?: boolean;
+    manualScript?: string;
   }) => void;
 }
 

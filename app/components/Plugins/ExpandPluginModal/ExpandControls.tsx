@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { CustomDimensionInput } from './CustomDimensionInput';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandControlsProps {
   aspectPreset: string;
@@ -36,17 +37,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
   onCustomWidthChange,
   onCustomHeightChange,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const [showCustomInput, setShowCustomInput] = useState(false);
   const customButtonRef = useRef<HTMLDivElement>(null);

@@ -48,6 +48,7 @@ export interface MusicGenerator {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  isGenerating?: boolean;
 }
 
 export interface UpscaleGenerator {
@@ -90,19 +91,6 @@ export interface EraseGenerator {
   frameWidth?: number;
   frameHeight?: number;
   isErasing?: boolean;
-}
-
-export interface ReplaceGenerator {
-  id: string;
-  x: number;
-  y: number;
-  replacedImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localReplacedImageUrl?: string | null;
-  model?: string;
-  frameWidth?: number;
-  frameHeight?: number;
-  isReplacing?: boolean;
 }
 
 export interface ExpandGenerator {
@@ -205,7 +193,6 @@ export interface CanvasAppState {
   upscaleGenerators: UpscaleGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
   eraseGenerators: EraseGenerator[];
-  replaceGenerators: ReplaceGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
   storyboardGenerators: StoryboardGenerator[];
@@ -224,7 +211,6 @@ export interface CanvasAppSetters {
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
-  setReplaceGenerators: React.Dispatch<React.SetStateAction<ReplaceGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;

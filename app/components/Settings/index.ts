@@ -1,4 +1,4 @@
 export { SettingsPopup } from './SettingsPopup';
 export { default } from './SettingsPopup';
-export type { SettingsPopupProps, ActiveSection, ThemeMode, CanvasSettings, CursorType, BackgroundType } from './types';
+export type { SettingsPopupProps, ActiveSection, CanvasSettings, CursorType, BackgroundType } from './types';
 

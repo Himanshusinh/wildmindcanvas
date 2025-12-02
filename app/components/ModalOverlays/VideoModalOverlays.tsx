@@ -91,7 +91,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                 } as any)).catch(console.error);
               }
               // Optimistic state update with tracking fields
-              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider } : m));
+              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider, status: 'submitted' } : m));
               if (!taskId) return null;
               
               // Determine which service to poll based on provider or model
@@ -174,8 +174,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     }
                     
                     if (videoUrl) {
-                      setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedVideoUrl: videoUrl } : m));
-                      if (onPersistVideoModalMove) {
+                      setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedVideoUrl: videoUrl, status: 'completed' } : m));
+                    if (onPersistVideoModalMove) {
                         Promise.resolve(onPersistVideoModalMove(modalState.id, {
                           generatedVideoUrl: videoUrl,
                           status: 'completed',
@@ -189,6 +189,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'failed' } as any)).catch(console.error);
                     }
+                    setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'failed' } : m));
                     break;
                   }
                 } catch (pollErr: any) {
@@ -201,6 +202,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                         error: pollErr?.message || 'Prediction not found. The prediction may have been deleted or expired.'
                       } as any)).catch(console.error);
                     }
+                    setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'failed' } : m));
                     break; // Stop polling
                   }
                   console.warn('[Canvas Video Poll] status check error', pollErr, { provider, taskId });
@@ -212,6 +214,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               if (onPersistVideoModalMove) {
                 Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'error' } as any)).catch(console.error);
               }
+              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'error' } : m));
             }
             return null;
           }}

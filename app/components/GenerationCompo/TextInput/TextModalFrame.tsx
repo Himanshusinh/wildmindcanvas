@@ -1,5 +1,6 @@
 'use client';
 import React, { useRef, useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface TextModalFrameProps {
   id: string;
@@ -24,6 +25,7 @@ interface TextModalFrameProps {
   onScriptGenerated?: (script: string) => void;
   connections?: Array<{ from: string; to: string }>;
   storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
+  onHoverChange?: (hovered: boolean) => void;
 }
 
 export const TextModalFrame: React.FC<TextModalFrameProps> = ({
@@ -49,10 +51,11 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   onScriptGenerated,
   connections = [],
   storyboardModalStates = [],
+  onHoverChange,
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSettingHeightRef = useRef(false); // Flag to prevent ResizeObserver from firing during programmatic changes
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useIsDarkTheme();
   const [textareaHeight, setTextareaHeight] = useState<number | null>(null); // Store height in canvas coordinates (will be scaled)
 
   // Autocomplete state
@@ -61,16 +64,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [mentionQuery, setMentionQuery] = useState('');
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     // Only autofocus the inner textarea when allowed. Default is to autofocus
@@ -149,7 +142,10 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   const handleBg = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)';
 
   return (
-    <>
+    <div
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => onHoverChange?.(false)}
+    >
       {/* Drag handle header */}
       <div
         className="text-input-header"
@@ -341,9 +337,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           ))}
         </div>
       )}
-
-
-    </>
+    </div>
   );
 };
 

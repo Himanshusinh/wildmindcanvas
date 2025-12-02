@@ -19,6 +19,7 @@ interface TextInputOverlaysProps {
   scale: number;
   position: { x: number; y: number };
   onScriptGenerated?: (textModalId: string, script: string) => void;
+  onScriptGenerationStart?: (textModalId: string) => void;
   connections?: Connection[];
   storyboardModalStates?: StoryboardModalState[];
 }
@@ -37,6 +38,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
   scale,
   position,
   onScriptGenerated,
+  onScriptGenerationStart,
   connections = [],
   storyboardModalStates = [],
 }) => {
@@ -126,6 +128,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
           scale={scale}
           position={position}
           onScriptGenerated={onScriptGenerated}
+          onScriptGenerationStart={onScriptGenerationStart}
           connections={connections}
           storyboardModalStates={storyboardModalStates}
         />

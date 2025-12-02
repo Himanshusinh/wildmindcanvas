@@ -6,25 +6,14 @@ import { SettingsSidebar } from './SettingsSidebar';
 import { SettingsHeader } from './SettingsHeader';
 import { ProfileSection } from './ProfileSection';
 import { CanvasSection } from './CanvasSection';
-import { ThemeSection } from './ThemeSection';
 import { KeyboardShortcutsSection } from './KeyboardShortcutsSection';
 import { NotificationSection } from './NotificationSection';
-import { SettingsPopupProps, ActiveSection, ThemeMode, CanvasSettings, CursorType, BackgroundType } from './types';
+import { SettingsPopupProps, ActiveSection, CanvasSettings, CursorType, BackgroundType } from './types';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, scale = 1 }) => {
   const [activeSection, setActiveSection] = useState<ActiveSection>('profile');
-  const [selectedTheme, setSelectedTheme] = useState<ThemeMode>(() => {
-    // Check localStorage or system preference
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme');
-      if (stored === 'dark' || stored === 'light') return stored;
-      // Check system preference
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-    }
-    return 'light';
-  });
+  const isDark = useIsDarkTheme();
 
   const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>(() => {
     if (typeof window !== 'undefined') {
@@ -32,16 +21,19 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
       if (stored) {
         try {
           return JSON.parse(stored);
-        } catch {}
+        } catch { }
       }
     }
     return {
       cursorType: 'default' as CursorType,
       backgroundType: 'dots' as BackgroundType,
-      dotColor: '#000000',
+      dotColor: 'gray',
       backgroundColor: '#ffffff',
       dotSize: 4,
       gridSpacing: 30,
+      showPointerTool: true,
+      showMoveTool: true,
+      showThemeToggle: true,
     };
   });
 
@@ -70,23 +62,6 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
-
-  const [isDark, setIsDark] = useState(selectedTheme === 'dark');
-
-  // Apply theme on mount and when it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (selectedTheme === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-        setIsDark(true);
-      } else {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-        setIsDark(false);
-      }
-    }
-  }, [selectedTheme]);
 
   // Save canvas settings to localStorage
   useEffect(() => {
@@ -246,11 +221,6 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
               {/* Canvas Section */}
               {activeSection === 'canvas' && (
                 <CanvasSection canvasSettings={canvasSettings} setCanvasSettings={setCanvasSettings} />
-              )}
-
-              {/* Theme Section */}
-              {activeSection === 'theme' && (
-                <ThemeSection selectedTheme={selectedTheme} setSelectedTheme={setSelectedTheme} />
               )}
 
               {/* Keyboard Shortcuts Section */}

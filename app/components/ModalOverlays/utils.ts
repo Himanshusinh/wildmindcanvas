@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ReplaceModalState, ExpandModalState, VectorizeModalState, StoryboardModalState } from './types';
+import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ExpandModalState, VectorizeModalState, StoryboardModalState, ScriptFrameModalState } from './types';
 
 export const getComponentType = (id?: string | null): string | null => {
   if (!id) return null;
@@ -50,10 +50,10 @@ export const computeNodeCenter = (
   upscaleModalStates?: UpscaleModalState[],
   removeBgModalStates?: RemoveBgModalState[],
   eraseModalStates?: EraseModalState[],
-  replaceModalStates?: ReplaceModalState[],
   expandModalStates?: ExpandModalState[],
   vectorizeModalStates?: VectorizeModalState[],
   storyboardModalStates?: StoryboardModalState[],
+  scriptFrameModalStates?: ScriptFrameModalState[],
   sceneFrameModalStates?: any[]
 ): { x: number; y: number } | null => {
   if (!id) return null;
@@ -107,14 +107,14 @@ export const computeNodeCenter = (
         if (rm) return { x: rm.x, y: rm.y, width: rm.frameWidth || 400, height: rm.frameHeight || 500 };
         const em = eraseModalStates?.find(m => m.id === id);
         if (em) return { x: em.x, y: em.y, width: em.frameWidth || 400, height: em.frameHeight || 500 };
-        const rp = replaceModalStates?.find(m => m.id === id);
-        if (rp) return { x: rp.x, y: rp.y, width: rp.frameWidth || 400, height: rp.frameHeight || 500 };
         const ep = expandModalStates?.find(m => m.id === id);
         if (ep) return { x: ep.x, y: ep.y, width: ep.frameWidth || 400, height: ep.frameHeight || 500 };
         const vzm = vectorizeModalStates?.find(m => m.id === id);
         if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
         const sb = storyboardModalStates?.find(m => m.id === id);
         if (sb) return { x: sb.x, y: sb.y, width: sb.frameWidth || 400, height: sb.frameHeight || 500 };
+        const sfModal = scriptFrameModalStates?.find(m => m.id === id);
+        if (sfModal) return { x: sfModal.x, y: sfModal.y, width: sfModal.frameWidth || 360, height: sfModal.frameHeight || 260 };
         const sf = sceneFrameModalStates?.find(m => m.id === id);
         if (sf) return { x: sf.x, y: sf.y, width: sf.frameWidth || 400, height: sf.frameHeight || 500 };
         return null;

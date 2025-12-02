@@ -7,6 +7,7 @@ import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizePluginModalProps {
   isOpen: boolean;
@@ -97,21 +98,13 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useIsDarkTheme();
+  const circleDiameter = 100 * scale;
+  const controlsWidthPx = `${400 * scale}px`;
+  const overlapRatio = 0.3;
+  const popupOverlap = Math.max(0, (circleDiameter * overlapRatio) - (8 * scale));
 
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const frameBorderColor = isSelected
-    ? '#437eb5'
-    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
   const frameBorderWidth = 2;
 
   // Detect if this is a vectorized image result (media-like, no controls)
@@ -488,6 +481,22 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Vectorize
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -496,7 +505,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             height: `${100 * scale}px`,
             backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            border: `${1.5 * scale}px solid ${isSelected ? '#437eb5' : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -506,6 +515,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
             overflow: 'visible', // Allow nodes to extend beyond container
+            zIndex: 20,
           }}
         >
           {/* Vectorize Icon */}
@@ -535,23 +545,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
           />
         </div>
 
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Vectorize
-        </div>
-
-        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {/* Controls shown/hidden on click - overlap beneath circle */}
         {isPopupOpen && !isVectorizedImage && (
           <div
             style={{
@@ -559,40 +553,52 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
               top: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              marginTop: `${12 * scale}px`,
-              zIndex: 1000,
+              marginTop: `${-popupOverlap}px`,
+              zIndex: 15,
+              width: controlsWidthPx,
+              maxWidth: '90vw',
             }}
           >
-            <VectorizeControls
-              scale={scale}
-              mode={mode}
-              isVectorizing={isVectorizing}
-              externalIsVectorizing={externalIsVectorizing}
-              sourceImageUrl={sourceImageUrl}
-              frameBorderColor={frameBorderColor}
-              frameBorderWidth={frameBorderWidth}
-              onModeChange={(newMode) => {
-                setMode(newMode);
-                if (onOptionsChange) {
-                  onOptionsChange({ mode: newMode } as any);
-                }
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 0,
               }}
-              onVectorize={handleVectorize}
-              onHoverChange={setIsHovered}
-            />
-            <VectorizeImageFrame
-              id={id}
-              scale={scale}
-              frameBorderColor={frameBorderColor}
-              frameBorderWidth={frameBorderWidth}
-              isVectorizedImage={isVectorizedImage}
-              isDraggingContainer={isDraggingContainer}
-              isHovered={isHovered}
-              isSelected={isSelected || false}
-              sourceImageUrl={sourceImageUrl}
-              onMouseDown={handleMouseDown}
-              onSelect={onSelect}
-            />
+            >
+              <VectorizeControls
+                scale={scale}
+                mode={mode}
+                isVectorizing={isVectorizing}
+                externalIsVectorizing={externalIsVectorizing}
+                sourceImageUrl={sourceImageUrl}
+                frameBorderColor={frameBorderColor}
+                frameBorderWidth={frameBorderWidth}
+                extraTopPadding={popupOverlap + 12 * scale}
+                onModeChange={(newMode) => {
+                  setMode(newMode);
+                  if (onOptionsChange) {
+                    onOptionsChange({ mode: newMode } as any);
+                  }
+                }}
+                onVectorize={handleVectorize}
+                onHoverChange={setIsHovered}
+              />
+              <VectorizeImageFrame
+                id={id}
+                scale={scale}
+                frameBorderColor={frameBorderColor}
+                frameBorderWidth={frameBorderWidth}
+                isVectorizedImage={isVectorizedImage}
+                isDraggingContainer={isDraggingContainer}
+                isHovered={isHovered}
+                isSelected={isSelected || false}
+                sourceImageUrl={sourceImageUrl}
+                onMouseDown={handleMouseDown}
+                onSelect={onSelect}
+              />
+            </div>
           </div>
         )}
       </div>

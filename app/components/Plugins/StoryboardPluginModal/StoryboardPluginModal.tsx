@@ -2,15 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import '../../common/canvasCaptureGuard';
-import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
-
 import { ImageModalState } from '../../ModalOverlays/types';
 import { ImageUpload } from '@/types/canvas';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface StoryboardPluginModalProps {
   isOpen: boolean;
-  id?: string;
+  id?: string; 
   onClose: () => void;
   stageRef: React.RefObject<any>;
   scale: number;
@@ -44,6 +43,8 @@ interface StoryboardPluginModalProps {
     characterNames?: string;
     backgroundDescription?: string;
     specialRequest?: string;
+    isAiMode?: boolean;
+    manualScript?: string;
   }) => void;
 }
 
@@ -87,7 +88,10 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  const [isDark, setIsDark] = useState(false);
+  const dragOriginRef = useRef<{ x: number; y: number }>({ x, y });
+  const activePointerIdRef = useRef<number | null>(null);
+  const pointerTypeRef = useRef<string | null>(null);
+  const isDark = useIsDarkTheme();
 
   // New state for controls
   const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -99,53 +103,59 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const [propsNamesMap, setPropsNamesMap] = useState<Record<number, string>>(initialPropsNamesMap);
   const [backgroundNamesMap, setBackgroundNamesMap] = useState<Record<number, string>>(initialBackgroundNamesMap);
 
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const [isAiMode, setIsAiMode] = useState(true);
+  const [manualScript, setManualScript] = useState('');
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
+  const circleDiameter = 100 * scale;
+  const controlsWidthPx = `${400 * scale}px`;
+  const overlapRatio = 0.3;
+  const popupOverlap = Math.max(0, (circleDiameter * overlapRatio) - (8 * scale));
 
-  const frameBorderColor = isSelected
-    ? '#437eb5'
-    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
   const frameBorderWidth = 2;
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only handle left mouse button
-
-    const target = e.target as HTMLElement;
+  const isDragBlockedTarget = (target: Element | null) => {
+    if (!target) return true;
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-    const isButton = target.tagName === 'BUTTON' || target.closest('button');
+    const isButton = target.tagName === 'BUTTON' || Boolean(target.closest('button'));
     const isImage = target.tagName === 'IMG';
-    const isControls = target.closest('.controls-overlay');
-    // Check if clicking on connection nodes - prevent popup and dragging
-    const isConnectionNode = target.closest('[data-node-id]') || target.hasAttribute('data-node-id') || target.hasAttribute('data-node-side');
+    const isControls = Boolean(target.closest('.controls-overlay'));
+    const isActionIcons =
+      Boolean(target.closest('[data-action-icons]')) ||
+      Boolean(target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"], button[title="Copy"], button[title="Edit"]'));
+    const isConnectionNode =
+      Boolean(target.closest('[data-node-id]')) || target.hasAttribute('data-node-id') || target.hasAttribute('data-node-side');
 
-    // Don't do anything if clicking on connection nodes
-    if (isConnectionNode) {
-      return;
-    }
+    return isInput || isButton || isImage || isControls || isActionIcons || isConnectionNode;
+  };
 
-    // Call onSelect when clicking on the modal
-    if (onSelect && !isInput && !isButton && !isControls && !isConnectionNode) {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const target = e.target as Element;
+    const isBlocked = isDragBlockedTarget(target);
+
+    if (onSelect && !isBlocked) {
       onSelect();
     }
 
-    // Only allow dragging from the frame, not from controls or connection nodes
-    if (!isInput && !isButton && !isImage && !isControls && !isConnectionNode) {
-      // Track initial mouse position to detect drag vs click
+    if (!isBlocked) {
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      dragOriginRef.current = { x, y };
       hasDraggedRef.current = false;
-
+      lastCanvasPosRef.current = null;
+      pointerTypeRef.current = e.pointerType;
+      activePointerIdRef.current = e.pointerId;
       setIsDraggingContainer(true);
+
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch (err) {
+        // ignore
+      }
+
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({
@@ -153,7 +163,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
           y: e.clientY - rect.top,
         });
       }
-      lastCanvasPosRef.current = { x, y };
+
       e.preventDefault();
       e.stopPropagation();
     }
@@ -163,10 +173,11 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   useEffect(() => {
     if (!isDraggingContainer) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!containerRef.current || !onPositionChange) return;
+      const activeId = activePointerIdRef.current;
+      if (activeId !== null && e.pointerId !== activeId) return;
 
-      // Check if mouse moved significantly (more than 5px) to detect drag
       if (dragStartPosRef.current) {
         const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
         const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
@@ -175,57 +186,59 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         }
       }
 
-      // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
-
-      // Convert screen coordinates back to canvas coordinates
       const newCanvasX = (newScreenX - position.x) / scale;
       const newCanvasY = (newScreenY - position.y) / scale;
 
       onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
+      e.preventDefault();
     };
 
-    const handleMouseUp = (e?: MouseEvent) => {
-      // Don't toggle popup if the mouse up was on a connection node
-      if (e) {
-        const target = e.target as HTMLElement;
-        const isConnectionNode = target.closest('[data-node-id]') || target.hasAttribute('data-node-id') || target.hasAttribute('data-node-side');
-        if (isConnectionNode) {
-          setIsDraggingContainer(false);
-          dragStartPosRef.current = null;
-          hasDraggedRef.current = false;
-          return; // Don't toggle popup or commit position if clicking on connection node
-        }
-      }
-
+    const finishDrag = () => {
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
+      pointerTypeRef.current = null;
 
-      // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
 
-      if (onPositionCommit) {
-        const finalX = lastCanvasPosRef.current?.x ?? x;
-        const finalY = lastCanvasPosRef.current?.y ?? y;
+      if (wasDragging && onPositionCommit) {
+        const fallback = dragOriginRef.current;
+        const finalX = lastCanvasPosRef.current?.x ?? fallback.x;
+        const finalY = lastCanvasPosRef.current?.y ?? fallback.y;
         onPositionCommit(finalX, finalY);
       }
 
       hasDraggedRef.current = false;
+      lastCanvasPosRef.current = null;
+      activePointerIdRef.current = null;
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = (e: PointerEvent) => {
+      const activeId = activePointerIdRef.current;
+      if (activeId !== null && e.pointerId !== activeId) return;
+      try {
+        containerRef.current?.releasePointerCapture?.(e.pointerId);
+      } catch (err) {
+        // ignore
+      }
+      finishDrag();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
+  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
 
   const handleGenerate = () => {
     console.log('Generate Storyboard', {
@@ -233,6 +246,8 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       characterNames,
       backgroundDescription,
       specialRequest,
+      isAiMode,
+      manualScript,
     });
     if (onGenerate) {
       onGenerate({
@@ -240,7 +255,9 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         characterNames,
         backgroundDescription,
         specialRequest,
-      });
+        isAiMode,
+        manualScript,
+      } as any);
     }
   };
 
@@ -284,7 +301,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       ref={containerRef}
       data-modal-component="storyboard"
       data-overlay-id={id}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -293,6 +310,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         top: `${screenY}px`,
         zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
+        touchAction: 'none',
       }}
     >
       {/* Plugin node design with icon and label */}
@@ -308,8 +326,24 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Storyboard
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -318,7 +352,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
             height: `${100 * scale}px`,
             backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            border: `${1.5 * scale}px solid ${isSelected ? '#437eb5' : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -328,6 +362,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
             overflow: 'visible',
+            zIndex: 20,
           }}
         >
           {/* Storyboard Icon - Using SVG */}
@@ -352,41 +387,20 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
             <line x1="2" y1="9" x2="22" y2="9" />
             <line x1="12" y1="3" x2="12" y2="9" />
           </svg>
-
-          <StoryboardConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
         </div>
 
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Storyboard
-        </div>
-
-        {/* Controls shown/hidden on click - positioned absolutely below */}
-        {isPopupOpen && (
+        {/* Controls shown/hidden on click - overlap beneath circle */}
+        {isPopupOpen && isSelected && (
           <div
             style={{
               position: 'absolute',
               top: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              marginTop: `${12 * scale}px`,
-              zIndex: 1000,
+              marginTop: `${-popupOverlap}px`,
+              zIndex: 15,
+              width: controlsWidthPx,
+              maxWidth: '90vw',
             }}
           >
             <StoryboardControls
@@ -401,6 +415,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
               connectedPropsImages={connectedPropsImages}
               frameBorderColor={frameBorderColor}
               frameBorderWidth={frameBorderWidth}
+              extraTopPadding={popupOverlap + 16 * scale}
               onCharacterInputChange={(val) => {
                 setCharacterInput(val);
                 updateOptions({ characterInput: val });
@@ -434,6 +449,10 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
                 setBackgroundNamesMap(map);
                 updateOptions({ backgroundNamesMap: map });
               }}
+              isAiMode={isAiMode}
+              onAiModeChange={setIsAiMode}
+              manualScript={manualScript}
+              onManualScriptChange={setManualScript}
             />
           </div>
         )}

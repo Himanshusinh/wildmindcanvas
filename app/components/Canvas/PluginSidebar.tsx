@@ -43,13 +43,8 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
     },
     {
       id: 'erase',
-      name: 'Erase',
-      description: 'Erase parts of images using AI',
-    },
-    {
-      id: 'replace',
-      name: 'Replace',
-      description: 'Replace parts of images using AI',
+      name: 'Erase / Replace',
+      description: 'Erase or replace parts of images using AI',
     },
     {
       id: 'expand',

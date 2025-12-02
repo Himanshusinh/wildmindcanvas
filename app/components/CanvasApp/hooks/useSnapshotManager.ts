@@ -19,7 +19,9 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
 
     // Build connection map keyed by source element id
     const connectionsBySource: Record<string, Array<any>> = {};
-    const connectorsToUse = connectorsOverride ?? state.connectors;
+    const connectorsToUse = (connectorsOverride ?? state.connectors).filter(
+      (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+    );
     connectorsToUse.forEach((c) => {
       if (!c || !c.id) return;
       const src = c.from;
@@ -158,29 +160,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
       elements[modal.id] = {
         id: modal.id,
         type: 'erase-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: metaObj,
-      };
-    });
-    // Replace generators
-    state.replaceGenerators.forEach((modal) => {
-      if (!modal || !modal.id) return;
-      const metaObj: any = {
-        replacedImageUrl: modal.replacedImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localReplacedImageUrl: modal.localReplacedImageUrl || null,
-        model: modal.model || 'bria/eraser',
-        frameWidth: modal.frameWidth || 400,
-        frameHeight: modal.frameHeight || 500,
-        isReplacing: modal.isReplacing || false,
-      };
-      if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-        metaObj.connections = connectionsBySource[modal.id];
-      }
-      elements[modal.id] = {
-        id: modal.id,
-        type: 'replace-plugin',
         x: modal.x,
         y: modal.y,
         meta: metaObj,
@@ -392,7 +371,9 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
     });
     // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
     // Also include connector elements as top-level elements so snapshots contain explicit connector records
-    const connectorsToUseFinal = connectorsOverride ?? state.connectors;
+    const connectorsToUseFinal = (connectorsOverride ?? state.connectors).filter(
+      (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+    );
     connectorsToUseFinal.forEach(c => {
       if (!c || !c.id) return;
       elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
@@ -420,7 +401,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.replaceGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
+  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -437,7 +418,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
           const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
-          const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
           const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
@@ -539,11 +519,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'replace-plugin') {
-                newReplaceGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, replacedImageUrl: element.meta?.replacedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, model: element.meta?.model });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'expand-plugin') {
                 newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
                 // Skip restoring connections from element.meta.connections
@@ -605,8 +580,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
           setters.setMusicGenerators(newMusicGenerators);
           setters.setUpscaleGenerators(newUpscaleGenerators);
           setters.setRemoveBgGenerators(newRemoveBgGenerators);
-          setters.setEraseGenerators(newEraseGenerators);
-          setters.setReplaceGenerators(newReplaceGenerators);
+        setters.setEraseGenerators(newEraseGenerators);
           setters.setExpandGenerators(newExpandGenerators);
           setters.setVectorizeGenerators(newVectorizeGenerators);
           setters.setStoryboardGenerators(newStoryboardGenerators);

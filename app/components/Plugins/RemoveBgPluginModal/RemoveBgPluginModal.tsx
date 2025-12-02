@@ -7,6 +7,7 @@ import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { RemoveBgControls } from './RemoveBgControls';
 import { RemoveBgImageFrame } from './RemoveBgImageFrame';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
@@ -101,21 +102,13 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useIsDarkTheme();
+  const circleDiameter = 100 * scale;
+  const controlsWidthPx = `${400 * scale}px`;
+  const overlapRatio = 0.3;
+  const popupOverlap = Math.max(0, (circleDiameter * overlapRatio) - (8 * scale));
 
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const frameBorderColor = isSelected
-    ? '#437eb5'
-    : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
   const frameBorderWidth = 2;
 
   // Detect if this is a removed bg image result (media-like, no controls)
@@ -479,6 +472,22 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Remove BG
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -487,7 +496,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             height: `${100 * scale}px`,
             backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            border: `${1.5 * scale}px solid ${isSelected ? '#437eb5' : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -497,6 +506,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
             overflow: 'visible', // Allow nodes to extend beyond container
+            zIndex: 20,
           }}
         >
           {/* Layer Icon */}
@@ -526,23 +536,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
           />
         </div>
 
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Remove BG
-        </div>
-
-        {/* Controls shown/hidden on click - positioned absolutely below */}
+        {/* Controls shown/hidden on click - overlap beneath circle */}
         {isPopupOpen && (
           <div
             style={{
@@ -550,54 +544,66 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               top: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              marginTop: `${12 * scale}px`,
-              zIndex: 1000,
+              marginTop: `${-popupOverlap}px`,
+              zIndex: 15,
+              width: controlsWidthPx,
+              maxWidth: '90vw',
             }}
           >
-            <RemoveBgControls
-              scale={scale}
-              selectedModel={selectedModel}
-              selectedBackgroundType={selectedBackgroundType}
-              scaleValue={scaleValue}
-              isRemovingBg={isRemovingBg}
-              externalIsRemovingBg={externalIsRemovingBg}
-              sourceImageUrl={sourceImageUrl}
-              frameBorderColor={frameBorderColor}
-              frameBorderWidth={frameBorderWidth}
-              onModelChange={(model) => {
-                setSelectedModel(model);
-                if (onOptionsChange) {
-                  onOptionsChange({ model, backgroundType: selectedBackgroundType, scaleValue });
-                }
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 0,
               }}
-              onBackgroundTypeChange={(backgroundType) => {
-                setSelectedBackgroundType(backgroundType);
-                if (onOptionsChange) {
-                  onOptionsChange({ model: selectedModel, backgroundType, scaleValue });
-                }
-              }}
-              onScaleChange={(newScale) => {
-                setScaleValue(newScale);
-                if (onOptionsChange) {
-                  onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
-                }
-              }}
-              onRemoveBg={handleRemoveBg}
-              onHoverChange={setIsHovered}
-            />
-            <RemoveBgImageFrame
-              id={id}
-              scale={scale}
-              frameBorderColor={frameBorderColor}
-              frameBorderWidth={frameBorderWidth}
-              isRemovedBgImage={isRemovedBgImage}
-              isDraggingContainer={isDraggingContainer}
-              isHovered={isHovered}
-              isSelected={isSelected || false}
-              sourceImageUrl={sourceImageUrl}
-              onMouseDown={handleMouseDown}
-              onSelect={onSelect}
-            />
+            >
+              <RemoveBgControls
+                scale={scale}
+                selectedModel={selectedModel}
+                selectedBackgroundType={selectedBackgroundType}
+                scaleValue={scaleValue}
+                isRemovingBg={isRemovingBg}
+                externalIsRemovingBg={externalIsRemovingBg}
+                sourceImageUrl={sourceImageUrl}
+                frameBorderColor={frameBorderColor}
+                frameBorderWidth={frameBorderWidth}
+                extraTopPadding={popupOverlap + 12 * scale}
+                onModelChange={(model) => {
+                  setSelectedModel(model);
+                  if (onOptionsChange) {
+                    onOptionsChange({ model, backgroundType: selectedBackgroundType, scaleValue });
+                  }
+                }}
+                onBackgroundTypeChange={(backgroundType) => {
+                  setSelectedBackgroundType(backgroundType);
+                  if (onOptionsChange) {
+                    onOptionsChange({ model: selectedModel, backgroundType, scaleValue });
+                  }
+                }}
+                onScaleChange={(newScale) => {
+                  setScaleValue(newScale);
+                  if (onOptionsChange) {
+                    onOptionsChange({ model: selectedModel, backgroundType: selectedBackgroundType, scaleValue: newScale });
+                  }
+                }}
+                onRemoveBg={handleRemoveBg}
+                onHoverChange={setIsHovered}
+              />
+              <RemoveBgImageFrame
+                id={id}
+                scale={scale}
+                frameBorderColor={frameBorderColor}
+                frameBorderWidth={frameBorderWidth}
+                isRemovedBgImage={isRemovedBgImage}
+                isDraggingContainer={isDraggingContainer}
+                isHovered={isHovered}
+                isSelected={isSelected || false}
+                sourceImageUrl={sourceImageUrl}
+                onMouseDown={handleMouseDown}
+                onSelect={onSelect}
+              />
+            </div>
           </div>
         )}
       </div>

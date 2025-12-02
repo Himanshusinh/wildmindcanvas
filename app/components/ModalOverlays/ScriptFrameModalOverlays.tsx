@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { ScriptFrame } from '@/app/components/Plugins/StoryboardPluginModal/ScriptFrame';
 import { ConnectionNodes } from '@/app/components/Plugins/UpscalePluginModal/ConnectionNodes';
+import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 
 interface ScriptFrameModalState {
   id: string;
@@ -13,11 +14,13 @@ interface ScriptFrameModalState {
   frameWidth: number;
   frameHeight: number;
   text: string;
+  isLoading?: boolean;
 }
 
 interface ScriptFrameModalOverlaysProps {
   scriptFrameModalStates: ScriptFrameModalState[];
   onDelete?: (frameId: string) => void;
+  onDuplicate?: (frameId: string) => void;
   onPositionChange?: (frameId: string, x: number, y: number) => void;
   onPositionCommit?: (frameId: string, x: number, y: number) => void;
   onTextUpdate?: (frameId: string, text: string) => void;
@@ -25,11 +28,13 @@ interface ScriptFrameModalOverlaysProps {
   scale: number;
   position: { x: number; y: number };
   onGenerateScenes?: (scriptFrameId: string) => void;
+  clearAllSelections: () => void;
 }
 
 export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> = ({
   scriptFrameModalStates,
   onDelete,
+  onDuplicate,
   onGenerateScenes,
   onPositionChange,
   onPositionCommit,
@@ -37,6 +42,7 @@ export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> =
   stageRef,
   scale,
   position,
+  clearAllSelections,
 }) => {
   const [isDark, setIsDark] = useState(false);
 
@@ -60,10 +66,12 @@ export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> =
           scale={scale}
           position={position}
           onDelete={onDelete}
+          onDuplicate={onDuplicate}
           onGenerateScenes={onGenerateScenes}
           onPositionChange={onPositionChange}
           onPositionCommit={onPositionCommit}
           onTextUpdate={onTextUpdate}
+              clearAllSelections={clearAllSelections}
         />
       ))}
     </>
@@ -77,10 +85,12 @@ interface ScriptFrameModalProps {
   scale: number;
   position: { x: number; y: number };
   onDelete?: (frameId: string) => void;
+  onDuplicate?: (frameId: string) => void;
   onGenerateScenes?: (scriptFrameId: string) => void;
   onPositionChange?: (frameId: string, x: number, y: number) => void;
   onPositionCommit?: (frameId: string, x: number, y: number) => void;
   onTextUpdate?: (frameId: string, text: string) => void;
+  clearAllSelections: () => void;
 }
 
 const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
@@ -89,18 +99,23 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
   scale,
   position,
   onDelete,
+  onDuplicate,
   onGenerateScenes,
   onPositionChange,
   onPositionCommit,
   onTextUpdate,
+  clearAllSelections,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isSelected, setIsSelected] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = React.useRef<HTMLDivElement>(null);
   const lastCanvasPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const dragStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = React.useRef(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const screenX = frame.x * scale + position.x;
   const screenY = frame.y * scale + position.y;
@@ -116,11 +131,16 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
     const target = e.target as HTMLElement;
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isConnectionNode = target.closest('[data-node-id]') || target.hasAttribute('data-node-id');
+    const isActionIcons = target.closest('[data-action-icons]');
 
-    // Don't drag if clicking on buttons or connection nodes
-    if (isButton || isConnectionNode) {
+    // Don't drag if clicking on buttons, connection nodes, or action icons
+    if (isButton || isConnectionNode || isActionIcons) {
       return;
     }
+
+    clearAllSelections();
+    // Set selected on click
+    setIsSelected(true);
 
     // Track initial mouse position to detect drag vs click
     dragStartPosRef.current = { x: e.clientX, y: e.clientY };
@@ -135,7 +155,6 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
       });
     }
     lastCanvasPosRef.current = { x: frame.x, y: frame.y };
-    e.preventDefault();
     e.stopPropagation();
   };
 
@@ -187,6 +206,28 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
     };
   }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit, frame.id, frame.x, frame.y]);
 
+  useEffect(() => {
+    const handleClear = () => setIsSelected(false);
+    window.addEventListener('canvas-clear-selection', handleClear as any);
+    return () => window.removeEventListener('canvas-clear-selection', handleClear as any);
+  }, []);
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setIsSelected(false);
+      }
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    return () => document.removeEventListener('mousedown', handleDocumentClick);
+  }, []);
+
+  const handleOverlayBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsSelected(false);
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -195,11 +236,17 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsSelected(true);
+      }}
+      tabIndex={0}
+      onBlur={handleOverlayBlur}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered ? 2001 : 2000,
+        zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
       }}
     >
@@ -211,21 +258,41 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
           minHeight: `${cardMinHeight}px`,
           backgroundColor: isDark ? '#1b1b1b' : '#ffffff',
           borderRadius: `${cardRadius}px`,
-          border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
-          boxShadow: isDark
-            ? '0 12px 24px rgba(0,0,0,0.6)'
-            : '0 12px 24px rgba(15,23,42,0.18)',
+          border: isSelected ? `${2 * scale}px solid #437eb5` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
+          boxShadow: isSelected
+            ? '0 0 0 3px rgba(67, 126, 181, 0.25)'
+            : isDark
+              ? '0 12px 24px rgba(0,0,0,0.6)'
+              : '0 12px 24px rgba(15,23,42,0.18)',
           padding: `${cardPadding}px`,
           cursor: isDragging ? 'grabbing' : 'grab',
-          transition: 'box-shadow 0.2s ease',
+          transition: 'box-shadow 0.2s ease, border 0.2s ease',
         }}
       >
         <ConnectionNodes
           id={frame.id}
           scale={scale}
           isHovered={isHovered}
-          isSelected={false}
+          isSelected={isSelected}
         />
+
+        <ModalActionIcons
+          isSelected={isSelected}
+          scale={scale}
+          onDelete={() => onDelete?.(frame.id)}
+          onCopy={() => {
+            try {
+              navigator.clipboard.writeText(frame.text || '');
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            } catch (err) {
+              console.warn('Clipboard copy failed', err);
+            }
+          }}
+          onEdit={() => setIsEditing(prev => !prev)}
+          editActive={isEditing}
+        />
+
         <div
           style={{
             display: 'flex',
@@ -269,78 +336,6 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
             >
               Generate Scenes
             </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!frame.text.trim()) return;
-                navigator.clipboard.writeText(frame.text).catch(console.error);
-              }}
-              title="Copy script"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: `${28 * scale}px`,
-                height: `${28 * scale}px`,
-                borderRadius: '50%',
-                border: 'none',
-                backgroundColor: isDark ? 'rgba(56,189,248,0.15)' : 'rgba(37,99,235,0.12)',
-                color: isDark ? '#bae6fd' : '#1d4ed8',
-                cursor: frame.text.trim() ? 'pointer' : 'not-allowed',
-                opacity: frame.text.trim() ? 1 : 0.5,
-              }}
-              disabled={!frame.text.trim()}
-            >
-              <svg
-                width={14 * scale}
-                height={14 * scale}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4 a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.(frame.id);
-              }}
-              title="Delete script frame"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: `${28 * scale}px`,
-                height: `${28 * scale}px`,
-                borderRadius: '50%',
-                border: 'none',
-                backgroundColor: isDark ? 'rgba(248,113,113,0.15)' : 'rgba(239,68,68,0.12)',
-                color: isDark ? '#fecaca' : '#dc2626',
-                cursor: 'pointer',
-              }}
-            >
-              <svg
-                width={14 * scale}
-                height={14 * scale}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
-                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -348,7 +343,10 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
           scale={scale}
           text={frame.text}
           isDark={isDark}
+          isLoading={frame.isLoading}
           onTextChange={(newText) => onTextUpdate?.(frame.id, newText)}
+          isEditing={isEditing}
+          onEditToggle={setIsEditing}
         />
       </div>
     </div>

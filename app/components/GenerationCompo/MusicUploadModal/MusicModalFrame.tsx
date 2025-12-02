@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useState, useEffect } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface MusicModalFrameProps {
   id?: string;
@@ -35,17 +36,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   getAspectRatio,
   onSetIsPinned,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const musicAreaRef = useRef<HTMLDivElement>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface EraseImageFrameProps {
   id: string | undefined;
@@ -30,17 +31,7 @@ export const EraseImageFrame: React.FC<EraseImageFrameProps> = ({
   onMouseDown,
   onSelect,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   return (
     <div
