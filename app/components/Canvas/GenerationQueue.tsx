@@ -4,11 +4,14 @@ import React from 'react';
 
 export type GenerationQueueItem = {
   id: string;
-  prompt: string;
+  type: 'image' | 'video' | 'music' | 'upscale' | 'vectorize' | 'removebg' | 'erase' | 'expand' | 'storyboard' | 'script' | 'scene';
+  operationName: string; // Display name like "Generating Image", "Upscaling", etc.
+  prompt?: string; // Optional - plugins may not have prompts
   model: string;
   total: number;
   index: number;
   startedAt: number;
+  completed?: boolean; // Track if operation completed successfully
 };
 
 interface GenerationQueueProps {
@@ -35,105 +38,97 @@ const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
           position: 'fixed',
           right: 24,
           bottom: 24,
-          width: 320,
-          maxHeight: 260,
-          backgroundColor: 'rgba(255,255,255,0.98)',
-          color: '#0f172a',
-          borderRadius: 16,
-          boxShadow: '0 20px 40px rgba(15,23,42,0.15)',
-          padding: '16px 18px',
+          width: 280,
+          maxHeight: 400, // Increased height to allow stacking
           zIndex: 6000,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
-          border: '1px solid rgba(226,232,240,0.8)',
+          gap: 10,
+          pointerEvents: 'none', // Allow clicks to pass through container
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontWeight: 600,
-            fontSize: 14,
-            letterSpacing: 0.2,
-            textTransform: 'uppercase',
-            color: '#475569',
-          }}
-        >
-          <span>Generating</span>
-          <span>{items.length}</span>
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-            maxHeight: 180,
-            overflowY: items.length > 3 ? 'auto' : 'hidden',
-            paddingRight: items.length > 3 ? 6 : 0,
-          }}
-        >
-          {items.map((item) => (
+        {items.map((item) => {
+          const isCompleted = item.completed === true;
+
+          return (
             <div
               key={item.id}
               style={{
                 display: 'flex',
+                alignItems: 'center',
                 gap: 12,
-                padding: '10px 12px',
+                padding: '12px 16px',
                 borderRadius: 12,
-                backgroundColor: '#f8fafc',
-                border: '1px solid rgba(148,163,184,0.25)',
-                boxShadow: '0 6px 12px rgba(15,23,42,0.05)',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)', // Slightly translucent white
+                border: '1px solid rgba(226,232,240,0.8)',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)', // Stronger shadow for floating effect
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                pointerEvents: 'auto', // Re-enable clicks on items
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isCompleted ? 'scale(0.98)' : 'scale(1)',
+                opacity: isCompleted ? 0.9 : 1,
               }}
             >
+              {isCompleted ? (
+                // Green checkmark when completed
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="10"
+                    viewBox="0 0 10 8"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M1 4L3.5 6.5L9 1"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              ) : (
+                // Loading spinner
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(203,213,225,0.7)',
+                    borderTopColor: '#2563eb',
+                    animation: 'wm-queue-spin 0.85s linear infinite',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
               <div
                 style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  border: '2px solid rgba(203,213,225,0.7)',
-                  borderTopColor: '#2563eb',
-                  animation: 'wm-queue-spin 0.85s linear infinite',
-                  flexShrink: 0,
-                  marginTop: 4,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: '#1e293b',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: '#0f172a',
-                    marginBottom: 4,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {item.prompt}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: '#64748b',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}
-                >
-                  <span>Image {item.index}/{item.total}</span>
-                  <span>•</span>
-                  <span>{item.model}</span>
-                  <span>•</span>
-                  <span>{formatElapsed(item.startedAt)} elapsed</span>
-                </div>
+              >
+                {item.operationName}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
       <style>
         {`

@@ -1355,7 +1355,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
     appendOp,
     realtimeActive,
     realtimeRef,
-    removeAndPersistConnectorsForElement
+    removeAndPersistConnectorsForElement,
+    setGenerationQueue
   );
 
   // Now assign all handler functions (after handlers are created)
@@ -1720,6 +1721,20 @@ export function CanvasApp({ user }: CanvasAppProps) {
       return { generationId: undefined, taskId: undefined };
     }
 
+    // Add to generation queue
+    const queueId = `video-${modalId || Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem = {
+      id: queueId,
+      type: 'video' as const,
+      operationName: 'Generating Video',
+      prompt: prompt.trim(),
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
 
@@ -1747,6 +1762,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
       console.error('Error generating video:', error);
       alert(error.message || 'Failed to generate video. Please try again.');
       return { generationId: undefined, taskId: undefined };
+    } finally {
+      // Mark as completed and show green checkmark briefly before removing
+      setGenerationQueue((prev) =>
+        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
+      );
+      // Remove from queue after brief delay to show completion
+      setTimeout(() => {
+        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      }, 1500);
     }
   };
 
@@ -1757,11 +1781,37 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   const handleMusicGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string): Promise<string | null> => {
     console.log('Generate music:', { prompt, model, frame, aspectRatio });
-    // TODO: Implement music generation API call here
-    // For now, just close the modal
-    // When music is generated, set the generatedMusicUrl
-    // setGeneratedMusicUrl(generatedMusicUrl);
-    return null;
+
+    // Add to generation queue
+    const queueId = `music-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem = {
+      id: queueId,
+      type: 'music' as const,
+      operationName: 'Generating Music',
+      prompt: prompt.trim(),
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setGenerationQueue((prev) => [...prev, queueItem]);
+
+    try {
+      // TODO: Implement music generation API call here
+      // For now, just close the modal
+      // When music is generated, set the generatedMusicUrl
+      // setGeneratedMusicUrl(generatedMusicUrl);
+      return null;
+    } finally {
+      // Mark as completed and show green checkmark briefly before removing
+      setGenerationQueue((prev) =>
+        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
+      );
+      // Remove from queue after brief delay to show completion
+      setTimeout(() => {
+        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      }, 1500);
+    }
   };
 
   if (isInitializing) {

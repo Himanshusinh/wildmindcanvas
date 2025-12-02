@@ -79,6 +79,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) && !isUploadedVideo ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        paddingBottom: (isHovered || isPinned) && !isUploadedVideo ? `${frameBorderWidth * scale}px` : '0px',
         transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',
@@ -114,7 +115,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
                 videoRef.current.pause();
                 setIsPlaying(false);
               } else {
-                videoRef.current.play().catch(() => {});
+                videoRef.current.play().catch(() => { });
                 setIsPlaying(true);
                 setWasJustPlayed(true);
               }
