@@ -641,6 +641,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
 
         // 3. Prepare New Item
         const isTargetMain = targetTrack.id === 'main-video';
+        const isSourceMain = sourceTrackId === 'main-video';
         const newItem: TimelineItem = {
             ...item,
             trackId: targetTrackId,
@@ -650,7 +651,9 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
             width: isTargetMain ? 100 : (item.type === 'text' ? item.width : (item.width || 50)),
             height: isTargetMain ? 100 : (item.type === 'text' ? item.height : (item.height || 50)),
             x: isTargetMain ? 0 : (item.x || 0),
-            y: isTargetMain ? 0 : (item.y || 0)
+            y: isTargetMain ? 0 : (item.y || 0),
+            // Remove transition if moving from main to overlay
+            transition: (isSourceMain && !isTargetMain) ? { type: 'none', duration: 0 } : item.transition
         };
 
         addToHistory();

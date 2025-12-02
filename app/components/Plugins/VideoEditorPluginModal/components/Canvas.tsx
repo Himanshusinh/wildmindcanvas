@@ -41,6 +41,16 @@ const PRESET_COLORS = [
 
 const MAX_RENDER_WIDTH = 1920;
 
+interface RenderItem {
+    item: TimelineItem;
+    role: 'main' | 'outgoing';
+    opacity?: number;
+    transition?: Transition;
+    transitionProgress?: number;
+    zIndexBase: number;
+    isBuffered?: boolean;
+}
+
 const Canvas: React.FC<CanvasProps> = ({
     dimension, tracks, currentTime, isPlaying,
     previewTransition, previewTargetId, selectedItemId,
@@ -360,13 +370,13 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // --- Rendering Logic ---
     const renderItems = React.useMemo(() => {
-        const active: { item: TimelineItem, role: 'main' | 'outgoing', opacity?: number, transition?: Transition, transitionProgress?: number, zIndexBase: number }[] = [];
+        const active: RenderItem[] = [];
 
         tracks.forEach((track, trackIndex) => {
             if (track.isHidden) return;
             const zIndexBase = trackIndex * 10;
 
-            if (track.type === 'video') {
+            if (track.type === 'video' || track.type === 'overlay') {
                 const sortedItems = [...track.items].sort((a, b) => a.start - b.start);
 
                 // 1. Find the item that *should* be playing at currentTime (Main Item)
@@ -468,6 +478,27 @@ const Canvas: React.FC<CanvasProps> = ({
         });
         return active;
     }, [tracks, currentTime, previewTransition, previewTargetId]);
+
+    // --- Buffered Items (Pre-mount nearby videos) ---
+    const bufferedItems = React.useMemo(() => {
+        const buffered: RenderItem[] = [];
+        const renderedIds = new Set(renderItems.map(r => r.item.id));
+
+        tracks.forEach((track, trackIndex) => {
+            if (track.type !== 'video' || track.isHidden) return;
+            track.items.forEach(item => {
+                if (item.type !== 'video' && item.type !== 'image') return; // Only buffer heavy media
+                if (renderedIds.has(item.id)) return;
+
+                // Buffer window: 2 seconds before and 2 seconds after
+                // This keeps the DOM element mounted so it doesn't have to re-initialize
+                if (currentTime >= item.start - 2 && currentTime < item.start + item.duration + 2) {
+                    buffered.push({ item, role: 'main', zIndexBase: trackIndex * 10, isBuffered: true });
+                }
+            });
+        });
+        return buffered;
+    }, [tracks, currentTime, renderItems]);
     // Use a ref to store the latest renderItems to avoid re-running the effect every frame
     const latestRenderItems = useRef(renderItems);
     latestRenderItems.current = renderItems;
@@ -493,7 +524,8 @@ const Canvas: React.FC<CanvasProps> = ({
                 const { item, role, transition, transitionProgress } = obj;
 
                 // Skip audio and text (text is DOM overlay), and animated items (rendered in DOM)
-                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation) return;
+                // Optimization: Also skip video and image as they are rendered in the DOM to avoid double-rendering and improve performance for 4K/8K
+                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation || item.type === 'video' || item.type === 'image') return;
 
                 const mediaEl = mediaRefs.current[item.id];
                 if (!mediaEl) return;
@@ -624,8 +656,9 @@ const Canvas: React.FC<CanvasProps> = ({
     }, [renderScale, dimension]);
 
     // --- Playback Synchronization ---
+    // --- Playback Synchronization ---
     useEffect(() => {
-        renderItems.forEach(({ item, role }) => {
+        [...renderItems, ...bufferedItems].forEach(({ item, role, isBuffered }) => {
             if (item.type === 'video' || item.type === 'audio') {
                 const keys = [item.id]; if (item.type === 'video') keys.push(item.id + '_filter');
                 keys.forEach(key => {
@@ -633,15 +666,33 @@ const Canvas: React.FC<CanvasProps> = ({
                     if (mediaEl && mediaEl instanceof HTMLMediaElement) {
                         const speed = item.speed || 1;
                         let mediaTime = role === 'main' ? ((currentTime - item.start) * speed) + item.offset : (item.duration * speed) + item.offset + ((currentTime - (item.start + item.duration)) * speed);
-                        if (mediaTime < 0) mediaTime = 0; if (Number.isFinite(mediaEl.duration) && mediaTime > mediaEl.duration) mediaTime = mediaEl.duration;
-                        if (Math.abs(mediaEl.currentTime - mediaTime) > 0.2) mediaEl.currentTime = mediaTime;
-                        if (item.type === 'video' || item.type === 'audio') { mediaEl.playbackRate = speed; mediaEl.volume = (item.volume ?? 100) / 100; mediaEl.muted = (item.volume === 0); }
-                        if (isPlaying) mediaEl.play().catch(e => { }); else mediaEl.pause();
+
+                        // Clamp time
+                        if (mediaTime < 0) mediaTime = 0;
+                        if (Number.isFinite(mediaEl.duration) && mediaTime > mediaEl.duration) mediaTime = mediaEl.duration;
+
+                        // Sync Current Time
+                        if (Math.abs(mediaEl.currentTime - mediaTime) > 0.2) {
+                            mediaEl.currentTime = mediaTime;
+                        }
+
+                        if (item.type === 'video' || item.type === 'audio') {
+                            mediaEl.playbackRate = speed;
+                            mediaEl.volume = (item.volume ?? 100) / 100;
+                            mediaEl.muted = (item.volume === 0);
+                        }
+
+                        // Play/Pause Logic
+                        if (isPlaying && !isBuffered) {
+                            mediaEl.play().catch(e => { });
+                        } else {
+                            mediaEl.pause();
+                        }
                     }
                 });
             }
         });
-    }, [currentTime, isPlaying, renderItems, interactionMode, selectedItemId]);
+    }, [currentTime, isPlaying, renderItems, bufferedItems, interactionMode, selectedItemId]);
 
     const fitScale = Math.min((window.innerWidth - 400) / dimension.width, (window.innerHeight - 400) / dimension.height) * 0.85;
     const currentScale = scalePercent === 0 ? Math.max(0.2, fitScale) : scalePercent / 100;
@@ -1007,8 +1058,8 @@ const Canvas: React.FC<CanvasProps> = ({
         }
     };
 
-    const renderItemContent = (obj: typeof renderItems[0], isOverlayPass: boolean) => {
-        const { item, role, zIndexBase } = obj;
+    const renderItemContent = (obj: RenderItem, isOverlayPass: boolean) => {
+        const { item, role, zIndexBase, isBuffered } = obj;
         const transitionStyle = getTransitionStyle(obj);
         const { style: posStyle, transform: itemTransform } = getItemPositionAndTransform(item);
 
@@ -1134,7 +1185,8 @@ const Canvas: React.FC<CanvasProps> = ({
             height: item.isBackground ? '100%' : (item.height ? `${item.height}%` : 'auto'),
             transform: itemTransform, opacity: isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100,
             ...maskStyle, filter: `${adjustmentStyle} ${presetFilterStyle}`.trim(), ...transitionStyle,
-            willChange: 'transform, opacity' // GPU Acceleration Hint
+            willChange: 'transform, opacity', // GPU Acceleration Hint
+            ...(isBuffered ? { opacity: 0, pointerEvents: 'none' } : {})
         };
 
         if (transitionStyle.transform && itemTransform) finalStyle.transform = `${itemTransform} ${transitionStyle.transform}`;
@@ -1384,7 +1436,11 @@ const Canvas: React.FC<CanvasProps> = ({
                             </div>
                         )}
 
+                        {/* Render Visible Items */}
                         {renderItems.filter(obj => obj.item.type !== 'audio').map((obj) => renderItemContent(obj, false))}
+
+                        {/* Render Buffered Items (Hidden but Mounted) */}
+                        {bufferedItems.map((obj) => renderItemContent(obj, false))}
 
                         {/* Cursor for Eraser - Moved outside to fixed position */}
                     </div>

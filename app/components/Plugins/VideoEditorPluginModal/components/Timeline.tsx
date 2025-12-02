@@ -4,7 +4,7 @@ import { Track, TimelineItem, TransitionType, ANIMATIONS } from '../types';
 import {
     Play, Pause, ZoomIn, ZoomOut, Scissors,
     Trash2, Plus, Video, Music, Type, Settings,
-    GripVertical, Sparkles, ChevronRight, Zap,
+    GripVertical, Sparkles, ChevronRight, Zap, ZapOff,
     MoreHorizontal, Copy, Clipboard, CopyPlus, Lock, Unlock,
     ImageMinus, MessageSquare, Image, Film
 } from 'lucide-react';
@@ -280,7 +280,7 @@ const Timeline: React.FC<TimelineProps> = ({
     };
 
     const renderTransitions = (track: Track) => {
-        if (track.type !== 'video') return null;
+        if (track.type !== 'video' && track.type !== 'overlay') return null;
 
         const transitions = [];
         const sortedItems = [...track.items].sort((a, b) => a.start - b.start);
@@ -657,7 +657,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 {activeClipMenu && (
                     <div
                         ref={menuRef}
-                        className="fixed z-[100] bg-white rounded-lg shadow-xl border border-gray-200 w-56 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                        className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 w-56 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
                         style={{
                             top: Math.min(window.innerHeight - 300, activeClipMenu.y),
                             left: Math.min(window.innerWidth - 230, activeClipMenu.x)
@@ -697,6 +697,11 @@ const Timeline: React.FC<TimelineProps> = ({
                                     <button onClick={() => { onSelectTransition(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
                                         <Zap size={16} /> Add Transition
                                     </button>
+                                    {item.transition && item.transition.type !== 'none' && (
+                                        <button onClick={() => { onUpdateClip(track.id, { ...item, transition: { type: 'none', duration: 0 } }); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-3 text-red-600">
+                                            <ZapOff size={16} /> Remove Transition
+                                        </button>
+                                    )}
                                     <button onClick={() => alert('Comments feature coming soon!')} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
                                         <MessageSquare size={16} /> Comment
                                     </button>
