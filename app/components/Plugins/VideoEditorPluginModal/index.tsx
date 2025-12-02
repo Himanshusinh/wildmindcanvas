@@ -11,6 +11,7 @@ import Timeline from './components/Timeline';
 import ProjectDrawer from './components/ProjectDrawer';
 import TransitionPanel from './components/TransitionPanel';
 import RightSidebar from './components/RightSidebar';
+import PreviewModal from './components/PreviewModal';
 import { Tab, CanvasDimension, Track, TimelineItem, RESIZE_OPTIONS, MOCK_VIDEOS, MOCK_IMAGES, Transition, TransitionType } from './types';
 
 interface VideoEditorPluginModalProps {
@@ -21,7 +22,7 @@ interface VideoEditorPluginModalProps {
 const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen, onClose }) => {
     // --- State ---
     const [projectName, setProjectName] = useState('Untitled Video Design');
-    const [activeTab, setActiveTab] = useState<Tab>('tools');
+    const [activeTab, setActiveTab] = useState<Tab>('text');
     const [isResourcePanelOpen, setIsResourcePanelOpen] = useState(true);
     const [isEditPanelOpen, setIsEditPanelOpen] = useState(false);
     const [activeEditView, setActiveEditView] = useState<'main' | 'adjust' | 'eraser' | 'color' | 'text-effects' | 'animate' | 'font'>('main');
@@ -29,7 +30,9 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
     const [currentDimension, setCurrentDimension] = useState<CanvasDimension>(RESIZE_OPTIONS[3]);
     const [timelineHeight, setTimelineHeight] = useState(260);
     const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
+
     const [scalePercent, setScalePercent] = useState(0); // 0 means "Fit"
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
     // Interaction Modes
     const [interactionMode, setInteractionMode] = useState<'none' | 'crop' | 'erase'>('none');
@@ -1263,6 +1266,26 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
         }));
     };
 
+    const handleDimensionChange = (newDim: CanvasDimension) => {
+        setCurrentDimension(newDim);
+
+        // Update background items to "contain" fit to prevent cropping
+        setTracks(prev => prev.map(track => {
+            if (track.type === 'video' || track.type === 'overlay') {
+                return {
+                    ...track,
+                    items: track.items.map(item => {
+                        if (item.isBackground) {
+                            return { ...item, fit: 'fill' };
+                        }
+                        return item;
+                    })
+                };
+            }
+            return track;
+        }));
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -1273,7 +1296,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     setProjectName={setProjectName}
                     onToggleProjectMenu={() => setIsProjectDrawerOpen(true)}
                     currentDimension={currentDimension}
-                    onResize={setCurrentDimension}
+                    onResize={handleDimensionChange}
                     scalePercent={scalePercent}
                     setScalePercent={setScalePercent}
                     onUndo={handleUndo}
@@ -1286,11 +1309,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     onLoadProject={handleLoadProject}
                     onMakeCopy={handleMakeCopy}
                     onMoveToTrash={handleMoveToTrash}
-                />
-
-                <ProjectDrawer
-                    isOpen={isProjectDrawerOpen}
-                    onClose={() => setIsProjectDrawerOpen(false)}
+                    onPreview={() => setIsPreviewOpen(true)}
                 />
 
                 <div className="flex-1 flex overflow-hidden relative">
@@ -1429,6 +1448,15 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     <X size={20} className="text-gray-600" />
                 </button>
             </div>
+            {/* Preview Modal */}
+            <PreviewModal
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                tracks={tracks}
+                dimension={currentDimension}
+                totalDuration={totalDuration}
+                onDimensionChange={handleDimensionChange}
+            />
         </div>
     );
 };

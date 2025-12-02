@@ -670,20 +670,21 @@ const Timeline: React.FC<TimelineProps> = ({
 
                             return (
                                 <>
-                                    <button onClick={() => { onCopy(item); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
-                                        <Copy size={16} /> Copy
-                                    </button>
-                                    <button onClick={() => { onPaste(track.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
-                                        <Clipboard size={16} /> Paste
-                                    </button>
-                                    <button onClick={() => { onDuplicate(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
-                                        <CopyPlus size={16} /> Duplicate
-                                    </button>
-                                    <div className="h-px bg-gray-100 my-1"></div>
-                                    <button onClick={() => { onDeleteClip(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 text-red-600 flex items-center gap-3">
-                                        <Trash2 size={16} /> Delete
-                                    </button>
-                                    <div className="h-px bg-gray-100 my-1"></div>
+                                    <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100 mb-1">
+                                        <button onClick={() => { onCopy(item); setActiveClipMenu(null); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" title="Copy">
+                                            <Copy size={16} />
+                                        </button>
+                                        <button onClick={() => { onPaste(track.id); setActiveClipMenu(null); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" title="Paste">
+                                            <Clipboard size={16} />
+                                        </button>
+                                        <button onClick={() => { onDuplicate(track.id, item.id); setActiveClipMenu(null); }} className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900 transition-colors" title="Duplicate">
+                                            <CopyPlus size={16} />
+                                        </button>
+                                        <button onClick={() => { onDeleteClip(track.id, item.id); setActiveClipMenu(null); }} className="p-1.5 hover:bg-red-50 rounded text-red-500 hover:text-red-600 transition-colors" title="Delete">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+
                                     <button onClick={() => { onLock(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
                                         {item.isLocked ? <Unlock size={16} /> : <Lock size={16} />}
                                         {item.isLocked ? 'Unlock' : 'Lock'}

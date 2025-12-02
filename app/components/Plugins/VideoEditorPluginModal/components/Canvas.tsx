@@ -30,6 +30,7 @@ interface CanvasProps {
     onAlign: (trackId: string, itemId: string, align: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
     scalePercent: number;
     setScalePercent: (scale: number) => void;
+    className?: string;
 }
 
 const PRESET_COLORS = [
@@ -47,7 +48,7 @@ const Canvas: React.FC<CanvasProps> = ({
     onSelectClip, onUpdateClip, onDeleteClip, onSplitClip,
     onOpenEditPanel, onOpenColorPanel,
     onCopy, onPaste, onDuplicate, onLock, onDetach, onAlign,
-    scalePercent, setScalePercent
+    scalePercent, setScalePercent, className
 }) => {
 
     const [previewProgress, setPreviewProgress] = useState(0.5);
@@ -510,8 +511,37 @@ const Canvas: React.FC<CanvasProps> = ({
                 let h = 0;
 
                 if (item.isBackground) {
-                    w = canvas.width;
-                    h = canvas.height;
+                    // Calculate Aspect Ratio
+                    let mediaAspect = 1;
+                    if (mediaEl instanceof HTMLVideoElement) {
+                        mediaAspect = mediaEl.videoWidth / mediaEl.videoHeight;
+                    } else if (mediaEl instanceof HTMLImageElement) {
+                        mediaAspect = mediaEl.naturalWidth / mediaEl.naturalHeight;
+                    }
+
+                    const canvasAspect = canvas.width / canvas.height;
+                    const fitMode = item.fit || 'cover';
+
+                    if (fitMode === 'contain') {
+                        if (mediaAspect > canvasAspect) {
+                            w = canvas.width;
+                            h = canvas.width / mediaAspect;
+                        } else {
+                            h = canvas.height;
+                            w = canvas.height * mediaAspect;
+                        }
+                    } else if (fitMode === 'fill') {
+                        w = canvas.width;
+                        h = canvas.height;
+                    } else { // cover (default)
+                        if (mediaAspect > canvasAspect) {
+                            h = canvas.height;
+                            w = canvas.height * mediaAspect;
+                        } else {
+                            w = canvas.width;
+                            h = canvas.width / mediaAspect;
+                        }
+                    }
                 } else {
                     if (item.width) w = (item.width / 100) * canvas.width;
                     else w = canvas.width; // Fallback
@@ -1103,7 +1133,7 @@ const Canvas: React.FC<CanvasProps> = ({
             width: item.isBackground ? '100%' : (item.width ? `${item.width}%` : 'auto'),
             height: item.isBackground ? '100%' : (item.height ? `${item.height}%` : 'auto'),
             transform: itemTransform, opacity: isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100,
-            ...maskStyle, filter: adjustmentStyle, ...transitionStyle,
+            ...maskStyle, filter: `${adjustmentStyle} ${presetFilterStyle}`.trim(), ...transitionStyle,
             willChange: 'transform, opacity' // GPU Acceleration Hint
         };
 
@@ -1133,7 +1163,7 @@ const Canvas: React.FC<CanvasProps> = ({
                         <>
                             {item.type === 'video' && (
                                 <>
-                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ objectPosition, transform: cropTransform, boxSizing: 'border-box' }} playsInline crossOrigin="anonymous" />
+                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} playsInline crossOrigin="anonymous" />
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
                                     )}
@@ -1145,7 +1175,7 @@ const Canvas: React.FC<CanvasProps> = ({
                             )}
                             {item.type === 'image' && (
                                 <>
-                                    <img ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ objectPosition, transform: cropTransform, boxSizing: 'border-box' }} />
+                                    <img ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} />
                                     {/* Add Color Overlay for Tinting Images */}
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
@@ -1283,7 +1313,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
     return (
         <div
-            className="flex-1 bg-gray-100 relative overflow-hidden flex items-center justify-center p-8"
+            className={`flex-1 relative overflow-hidden flex items-center justify-center ${className || 'bg-gray-100 p-8'}`}
             onClick={(e) => {
                 if (selectedItemId) {
                     onSelectClip('', null);

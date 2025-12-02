@@ -1,5 +1,4 @@
-
-export type Tab = 'tools' | 'text' | 'images' | 'videos' | 'audio' | 'uploads' | 'projects';
+export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects';
 
 export interface Project {
     id: string;
@@ -494,6 +493,7 @@ export interface TimelineItem {
     maskImage?: string; // Data URL for alpha mask (eraser)
 
     // Image Editing
+    fit?: 'cover' | 'contain' | 'fill'; // Object fit mode
     adjustments?: Adjustments;
     filter?: string; // Filter ID
     filterIntensity?: number; // 0 to 100

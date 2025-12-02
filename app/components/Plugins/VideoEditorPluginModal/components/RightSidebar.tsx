@@ -179,13 +179,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     <span className="text-[10px] font-medium">Animate</span>
                 </button>
 
-                {/* Eraser (Image/Video) */}
-                {(isImage || isVideo) && (
-                    <button onClick={onEraser} className="flex flex-col items-center justify-center py-3 w-full transition-all relative shrink-0 hover:text-gray-100 hover:bg-[#1f2021]">
-                        <Eraser size={20} className="mb-1.5" />
-                        <span className="text-[10px] font-medium">Eraser</span>
-                    </button>
-                )}
+
 
                 {/* Crop (Image/Video) */}
                 {(isImage || isVideo) && (

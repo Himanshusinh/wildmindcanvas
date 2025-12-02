@@ -752,10 +752,14 @@ const EditPanel: React.FC<EditPanelProps> = ({
             </div>
         </div>
     );
+
+
     const renderMainAdjust = () => (
         <div className="mb-4">
             {/* Transform Section for Images/Videos */}
             {(itemToRender?.type === 'image' || itemToRender?.type === 'video') && renderTransformSection()}
+
+
 
             {itemToRender?.type === 'video' && (
                 <div className="mb-6 border-b border-gray-100 pb-4">
@@ -902,20 +906,7 @@ const EditPanel: React.FC<EditPanelProps> = ({
                     </div>
                 </button>
 
-                {itemToRender?.type !== 'text' && (
-                    <button
-                        onClick={() => setInteractionMode('erase')}
-                        className="p-2 bg-white border border-gray-100 rounded-lg flex flex-col items-center gap-2 hover:border-violet-300 hover:shadow-sm transition-all group text-center h-full"
-                    >
-                        <div className="w-8 h-8 rounded-md bg-gray-50 border border-gray-200 flex items-center justify-center group-hover:scale-105 transition-transform">
-                            <Eraser size={16} className="text-gray-600 group-hover:text-violet-600" />
-                        </div>
-                        <div className="min-w-0 w-full">
-                            <p className="text-xs font-bold text-gray-800 truncate">Eraser</p>
-                            <p className="text-[9px] text-gray-500 truncate">Remove objects</p>
-                        </div>
-                    </button>
-                )}
+
             </div>
         </div>
     );

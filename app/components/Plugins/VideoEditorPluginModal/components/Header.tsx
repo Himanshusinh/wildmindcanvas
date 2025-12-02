@@ -24,6 +24,7 @@ interface HeaderProps {
     onLoadProject: () => void;
     onMakeCopy: () => void;
     onMoveToTrash: () => void;
+    onPreview: () => void;
 }
 
 const NEW_PROJECT_OPTIONS: CanvasDimension[] = [
@@ -53,7 +54,8 @@ const Header: React.FC<HeaderProps> = ({
     onSaveProject,
     onLoadProject,
     onMakeCopy,
-    onMoveToTrash
+    onMoveToTrash,
+    onPreview
 }) => {
     const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
     const [isResizeMenuOpen, setIsResizeMenuOpen] = useState(false);
@@ -264,6 +266,13 @@ const Header: React.FC<HeaderProps> = ({
                         Fit
                     </button>
                 </div>
+
+                <button
+                    onClick={onPreview}
+                    className="px-4 py-1.5 bg-[#27272a] hover:bg-white/10 text-gray-200 text-sm font-medium rounded-lg transition-colors border border-gray-700 flex items-center gap-2"
+                >
+                    <Play size={14} fill="currentColor" /> Preview
+                </button>
 
                 <button className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
                     Export

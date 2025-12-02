@@ -2,7 +2,7 @@
 import React from 'react';
 import {
     Type, UploadCloud, FolderKanban,
-    Image, Video, MousePointer2, Sparkles, Music
+    Image, Video, Sparkles, Music
 } from 'lucide-react';
 import { Tab } from '../types';
 
@@ -13,7 +13,6 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     const tools = [
-        { id: 'tools', icon: MousePointer2, label: 'Tools' },
         { id: 'text', icon: Type, label: 'Text' },
         { id: 'uploads', icon: UploadCloud, label: 'Uploads' },
         { id: 'images', icon: Image, label: 'Photos' },
