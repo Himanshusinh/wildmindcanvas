@@ -1565,6 +1565,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedVectorizeModalIds([]);
     setSelectedStoryboardModalId(null);
     setSelectedStoryboardModalIds([]);
+    setSelectedVideoEditorModalId(null);
+    setSelectedVideoEditorModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -4892,7 +4894,25 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedImageModalIds.length > 0 ||
         selectedVideoModalIds.length > 0 ||
         selectedMusicModalIds.length > 0 ||
-        selectedTextInputIds.length > 0;
+        selectedTextInputIds.length > 0 ||
+        selectedUpscaleModalId !== null ||
+        selectedUpscaleModalIds.length > 0 ||
+        selectedExpandModalId !== null ||
+        selectedExpandModalIds.length > 0 ||
+        selectedEraseModalId !== null ||
+        selectedEraseModalIds.length > 0 ||
+        selectedRemoveBgModalId !== null ||
+        selectedRemoveBgModalIds.length > 0 ||
+        selectedVectorizeModalId !== null ||
+        selectedVectorizeModalIds.length > 0 ||
+        selectedStoryboardModalId !== null ||
+        selectedStoryboardModalIds.length > 0 ||
+        selectedVideoEditorModalId !== null ||
+        selectedVideoEditorModalIds.length > 0 ||
+        selectedScriptFrameModalId !== null ||
+        selectedScriptFrameModalIds.length > 0 ||
+        selectedSceneFrameModalId !== null ||
+        selectedSceneFrameModalIds.length > 0;
 
       if (hasSelections) {
         clearAllSelections(true);

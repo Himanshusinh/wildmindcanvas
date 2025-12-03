@@ -639,6 +639,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
+            position: 'relative',
             marginBottom: `${8 * scale}px`,
             fontSize: `${12 * scale}px`,
             fontWeight: 500,
@@ -650,6 +651,70 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
           }}
         >
           Expand
+
+          {/* Delete button - always visible */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (onDelete) {
+                onDelete();
+              }
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+              e.currentTarget.style.color = '#ef4444';
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              const defaultBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+              const defaultColor = isDark ? '#cccccc' : '#4b5563';
+              e.currentTarget.style.backgroundColor = defaultBg;
+              e.currentTarget.style.color = defaultColor;
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+            }}
+            style={{
+              position: 'absolute',
+              top: `${-36 * scale}px`,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: `${28 * scale}px`,
+              height: `${28 * scale}px`,
+              padding: 0,
+              backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'}`,
+              borderRadius: `${8 * scale}px`,
+              color: isDark ? '#cccccc' : '#4b5563',
+              cursor: 'pointer',
+              boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'}`,
+              zIndex: 3001,
+              pointerEvents: 'auto',
+            }}
+            title="Delete plugin"
+          >
+            <svg
+              width={`${16 * scale}px`}
+              height={`${16 * scale}px`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+          </button>
         </div>
 
         {/* Main plugin container - Circular */}
@@ -758,150 +823,150 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             }
           }}
         >
-        {hasSourceImage ? (
+          {hasSourceImage ? (
+            <div
+              style={{
+                backgroundColor: isDark ? '#121212' : 'white',
+                borderRadius: '16px',
+                padding: '24px',
+                width: '90vw',
+                maxWidth: '1200px',
+                height: '85vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+                overflow: 'hidden',
+                pointerEvents: 'auto',
+                transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => {
+                // Only prevent default if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              onTouchMove={(e) => {
+                // Only prevent default if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              onMouseDown={(e) => {
+                // Only prevent propagation if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.stopPropagation();
+                }
+              }}
+              onMouseMove={(e) => {
+                // Prevent mouse move events from reaching main canvas
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.stopPropagation();
+                }
+              }}
+            >
+              {/* Header with Controls */}
+              <ExpandControls
+                aspectPreset={aspectPreset}
+                expandPrompt={expandPrompt}
+                isExpanding={isExpanding}
+                externalIsExpanding={externalIsExpanding}
+                sourceImageUrl={sourceImageUrl || connectedImageSource}
+                onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
+                onExpandPromptChange={setExpandPrompt}
+                onExpand={handleExpand}
+                onClose={() => setIsPopupOpen(false)}
+                aspectPresets={aspectPresets}
+                customWidth={customWidth}
+                customHeight={customHeight}
+                onCustomWidthChange={setCustomWidth}
+                onCustomHeightChange={setCustomHeight}
+                imageSize={imageSize}
+              />
+
+              {/* Image Preview with Canvas */}
               <div
                 style={{
-                  backgroundColor: isDark ? '#121212' : 'white',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  width: '90vw',
-                  maxWidth: '1200px',
-                  height: '85vh',
-                  maxHeight: '90vh',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+                  position: 'relative',
+                  width: '100%',
+                  flex: 1,
+                  minHeight: 0,
                   overflow: 'hidden',
-                  pointerEvents: 'auto',
-                  transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onWheel={(e) => {
-                  // Only prevent default if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                onTouchMove={(e) => {
-                  // Only prevent default if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                onMouseDown={(e) => {
-                  // Only prevent propagation if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.stopPropagation();
-                  }
-                }}
-                onMouseMove={(e) => {
-                  // Prevent mouse move events from reaching main canvas
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.stopPropagation();
-                  }
+                  borderRadius: '8px',
+                  border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
+                  backgroundColor: isDark ? '#1a1a1a' : '#f9fafb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.3s ease, border-color 0.3s ease',
                 }}
               >
-                {/* Header with Controls */}
-                <ExpandControls
-                  aspectPreset={aspectPreset}
-                  expandPrompt={expandPrompt}
-                  isExpanding={isExpanding}
-                  externalIsExpanding={externalIsExpanding}
+                <ExpandImageFrame
                   sourceImageUrl={sourceImageUrl || connectedImageSource}
-                  onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
-                  onExpandPromptChange={setExpandPrompt}
-                  onExpand={handleExpand}
-                  onClose={() => setIsPopupOpen(false)}
+                  localExpandedImageUrl={localExpandedImageUrl}
+                  expandedImageUrl={expandedImageUrl}
+                  aspectPreset={aspectPreset}
                   aspectPresets={aspectPresets}
                   customWidth={customWidth}
                   customHeight={customHeight}
-                  onCustomWidthChange={setCustomWidth}
-                  onCustomHeightChange={setCustomHeight}
-                  imageSize={imageSize}
+                  onFrameInfoChange={setFrameInfo}
+                  onImageSizeChange={setImageSize}
                 />
-
-                {/* Image Preview with Canvas */}
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: 'hidden',
-                    borderRadius: '8px',
-                    border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
-                    backgroundColor: isDark ? '#1a1a1a' : '#f9fafb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background-color 0.3s ease, border-color 0.3s ease',
-                  }}
-                >
-                  <ExpandImageFrame
-                    sourceImageUrl={sourceImageUrl || connectedImageSource}
-                    localExpandedImageUrl={localExpandedImageUrl}
-                    expandedImageUrl={expandedImageUrl}
-                    aspectPreset={aspectPreset}
-                    aspectPresets={aspectPresets}
-                    customWidth={customWidth}
-                    customHeight={customHeight}
-                    onFrameInfoChange={setFrameInfo}
-                    onImageSizeChange={setImageSize}
-                  />
-                </div>
               </div>
-        ) : (
-          <div
-            style={{
-              backgroundColor: isDark ? '#121212' : 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              width: 'min(420px, 90vw)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              alignItems: 'center',
-              textAlign: 'center',
-              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
-              pointerEvents: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
-              Connect an image to expand
-            </h3>
-            <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
-              Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
-            </p>
-            <button
-              onClick={() => setIsPopupOpen(false)}
+            </div>
+          ) : (
+            <div
               style={{
-                marginTop: '8px',
-                padding: '10px 20px',
-                borderRadius: '999px',
-                border: 'none',
-                backgroundColor: '#437eb5',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 500,
+                backgroundColor: isDark ? '#121212' : 'white',
+                borderRadius: '16px',
+                padding: '32px',
+                width: 'min(420px, 90vw)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                alignItems: 'center',
+                textAlign: 'center',
+                boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
+                pointerEvents: 'auto',
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              Close
-            </button>
-          </div>
-        )}
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
+                Connect an image to expand
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
+                Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
+              </p>
+              <button
+                onClick={() => setIsPopupOpen(false)}
+                style={{
+                  marginTop: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  backgroundColor: '#437eb5',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

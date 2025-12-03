@@ -1281,6 +1281,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isUploadedImage={Boolean(isUploadedImage)}
         imageResolution={imageResolution}
         scale={scale}
+        modelName={selectedModel}
       />
 
       <ModalActionIcons
