@@ -45,6 +45,15 @@ export interface VideoModalState {
   provider?: string;
 }
 
+export interface VideoEditorModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+}
+
 export interface MusicModalState {
   id: string;
   x: number;
@@ -200,6 +209,7 @@ export interface ModalOverlaysProps {
   textInputStates: TextModalState[];
   imageModalStates: ImageModalState[];
   videoModalStates: VideoModalState[];
+  videoEditorModalStates?: VideoEditorModalState[];
   musicModalStates: MusicModalState[];
   upscaleModalStates?: UpscaleModalState[];
   removeBgModalStates?: RemoveBgModalState[];
@@ -215,6 +225,8 @@ export interface ModalOverlaysProps {
   selectedImageModalIds: string[];
   selectedVideoModalId: string | null;
   selectedVideoModalIds: string[];
+  selectedVideoEditorModalId?: string | null;
+  selectedVideoEditorModalIds?: string[];
   selectedMusicModalId: string | null;
   selectedMusicModalIds: string[];
   selectedUpscaleModalId?: string | null;
@@ -240,6 +252,9 @@ export interface ModalOverlaysProps {
   setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
   setSelectedVideoModalId: (id: string | null) => void;
   setSelectedVideoModalIds: (ids: string[]) => void;
+  setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
+  setSelectedVideoEditorModalId?: (id: string | null) => void;
+  setSelectedVideoEditorModalIds?: (ids: string[]) => void;
   setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
   setSelectedMusicModalId: (id: string | null) => void;
   setSelectedMusicModalIds: (ids: string[]) => void;
@@ -297,6 +312,10 @@ export interface ModalOverlaysProps {
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }>) => void | Promise<void>;
   onPersistVideoModalDelete?: (id: string) => void | Promise<void>;
+  onPersistVideoEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
+  onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
+  onOpenVideoEditor?: () => void;
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;

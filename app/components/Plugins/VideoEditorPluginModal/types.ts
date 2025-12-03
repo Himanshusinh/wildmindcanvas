@@ -1,4 +1,4 @@
-export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects' | 'tools';
+export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects' | 'tools' | 'library';
 
 export interface Project {
     id: string;
@@ -693,6 +693,13 @@ export const MOCK_AUDIO = [
     { id: 'a2', src: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg', name: 'Ocean Waves', duration: '0:45', category: 'Nature' },
     { id: 'a3', src: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg', name: 'Heavy Rain', duration: '0:30', category: 'Nature' },
     { id: 'a4', src: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg', name: 'Digital Alarm', duration: '0:06', category: 'Effects' },
+];
+
+export const MOCK_TEXT_STYLES = [
+    { id: 'ts1', preview: 'Heading', fontSize: 60, fontWeight: 'bold' },
+    { id: 'ts2', preview: 'Subheading', fontSize: 40, fontWeight: 'bold' },
+    { id: 'ts3', preview: 'Body Text', fontSize: 24, fontWeight: 'normal' },
+    { id: 'ts4', preview: 'Caption', fontSize: 18, fontWeight: 'normal' },
 ];
 
 export const MOCK_PROJECTS: Project[] = [

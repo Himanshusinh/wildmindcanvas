@@ -1,7 +1,9 @@
 
-import React, { useState, useRef } from 'react';
-import { Tab, MOCK_UPLOADS, MOCK_PROJECTS, MOCK_IMAGES, MOCK_VIDEOS, MOCK_AUDIO, FONT_COMBINATIONS, TimelineItem, getTextEffectStyle } from '../types';
-import { Search, X, MousePointer, PenTool, Square, Circle, Minus, Type, Hand, Triangle, Hexagon, UploadCloud, Music, Play, Pause, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignVerticalJustifyCenter, AlignEndVertical, Plus } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Tab, MOCK_UPLOADS, MOCK_PROJECTS, MOCK_IMAGES, MOCK_VIDEOS, MOCK_AUDIO, FONT_COMBINATIONS, TimelineItem, getTextEffectStyle, MOCK_TEXT_STYLES } from '../types';
+import { Search, X, MousePointer, PenTool, Square, Circle, Minus, Type, Hand, Triangle, Hexagon, UploadCloud, Music, Play, Pause, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignVerticalJustifyCenter, AlignEndVertical, Plus, Loader2 } from 'lucide-react';
+import { getMediaLibrary, MediaItem } from '@/lib/api';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface ResourcePanelProps {
     activeTab: Tab;
@@ -17,6 +19,24 @@ interface ResourcePanelProps {
 const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClose, onAddClip, selectedItem, onAlign, uploads, onUpload }) => {
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
     const audioPlayer = useRef<HTMLAudioElement | null>(null);
+
+    // Library State
+    const [mediaLibrary, setMediaLibrary] = useState<{
+        images: MediaItem[];
+        videos: MediaItem[];
+        music: MediaItem[];
+        uploaded: MediaItem[];
+    }>({
+        images: [],
+        videos: [],
+        music: [],
+        uploaded: [],
+    });
+    const [libraryLoading, setLibraryLoading] = useState(false);
+    const [libraryPage, setLibraryPage] = useState(1);
+    const [libraryHasMore, setLibraryHasMore] = useState(true);
+    const [activeLibraryCategory, setActiveLibraryCategory] = useState<'images' | 'videos' | 'music' | 'uploaded'>('images');
+    const libraryScrollRef = useRef<HTMLDivElement>(null);
 
     const handlePlayPreview = (src: string, id: string) => {
         if (playingAudioId === id) {
@@ -41,6 +61,172 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
         return parseFloat(durationStr) || 0;
     };
 
+    const handleDragStart = (e: React.DragEvent, type: string, src: string, overrides: any = {}) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            type,
+            src,
+            ...overrides
+        }));
+    };
+
+    const fetchMediaLibrary = useCallback(async (pageNum: number, isRefresh = false) => {
+        if (libraryLoading && !isRefresh) return;
+
+        setLibraryLoading(true);
+        try {
+            const limit = 20;
+            const response = await getMediaLibrary(pageNum, limit);
+
+            if (response.responseStatus === 'success' && response.data) {
+                setMediaLibrary(prev => {
+                    if (pageNum === 1) {
+                        return {
+                            images: response.data?.images || [],
+                            videos: response.data?.videos || [],
+                            music: response.data?.music || [],
+                            uploaded: response.data?.uploaded || [],
+                        };
+                    } else {
+                        return {
+                            images: [...prev.images, ...(response.data?.images || [])],
+                            videos: [...prev.videos, ...(response.data?.videos || [])],
+                            music: [...prev.music, ...(response.data?.music || [])],
+                            uploaded: [...prev.uploaded, ...(response.data?.uploaded || [])],
+                        };
+                    }
+                });
+
+                if (response.data.pagination) {
+                    const p = response.data.pagination;
+                    setLibraryHasMore(p.hasMoreImages || p.hasMoreVideos || p.hasMoreUploaded);
+                } else {
+                    setLibraryHasMore(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching media library:', error);
+        } finally {
+            setLibraryLoading(false);
+        }
+    }, [libraryLoading]);
+
+    useEffect(() => {
+        if (activeTab === 'library') {
+            setLibraryPage(1);
+            setLibraryHasMore(true);
+            fetchMediaLibrary(1, true);
+        }
+    }, [activeTab, fetchMediaLibrary]);
+
+    const handleLibraryScroll = () => {
+        if (libraryScrollRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = libraryScrollRef.current;
+            if (scrollTop + clientHeight >= scrollHeight - 50 && !libraryLoading && libraryHasMore) {
+                const nextPage = libraryPage + 1;
+                setLibraryPage(nextPage);
+                fetchMediaLibrary(nextPage);
+            }
+        }
+    };
+
+    const getMediaUrl = (media: MediaItem) => {
+        let url = media.url || media.thumbnail || '';
+        if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+            url = buildProxyResourceUrl(url);
+        }
+        return url;
+    };
+
+    const renderLibrary = () => {
+        const items = mediaLibrary[activeLibraryCategory];
+
+        return (
+            <div className="h-full flex flex-col pb-20">
+                {/* Category Tabs */}
+                <div className="flex border-b border-gray-200 px-4 shrink-0">
+                    {[
+                        { id: 'images', label: 'Images' },
+                        { id: 'videos', label: 'Videos' },
+                        { id: 'music', label: 'Music' },
+                        { id: 'uploaded', label: 'Uploads' },
+                    ].map((category) => (
+                        <button
+                            key={category.id}
+                            onClick={() => setActiveLibraryCategory(category.id as any)}
+                            className={`flex-1 py-3 text-xs font-medium border-b-2 transition-colors ${activeLibraryCategory === category.id
+                                ? 'border-violet-600 text-violet-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            {category.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Media Grid */}
+                <div
+                    ref={libraryScrollRef}
+                    onScroll={handleLibraryScroll}
+                    className="flex-1 overflow-y-auto p-4 custom-scrollbar"
+                >
+                    <div className="grid grid-cols-2 gap-3">
+                        {items.map((item) => {
+                            const mediaUrl = getMediaUrl(item);
+                            const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
+                            const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, item.type === 'music' ? 'audio' : item.type, mediaUrl, { name: item.prompt || 'Media' })}
+                                    onClick={() => onAddClip(mediaUrl, item.type === 'music' ? 'audio' : (item.type as any) || (isVideo ? 'video' : 'image'), { name: item.prompt || 'Media' })}
+                                    className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-violet-500 transition-all relative group"
+                                >
+                                    {isVideo ? (
+                                        <video
+                                            src={mediaUrl}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                            onMouseEnter={(e) => e.currentTarget.play().catch(() => { })}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.pause();
+                                                e.currentTarget.currentTime = 0;
+                                            }}
+                                        />
+                                    ) : isMusic ? (
+                                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-violet-500 to-fuchsia-500">
+                                            <Music className="text-white" size={24} />
+                                        </div>
+                                    ) : (
+                                        <img
+                                            src={mediaUrl}
+                                            alt={item.prompt || 'Media'}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {libraryLoading && (
+                        <div className="flex justify-center p-4">
+                            <Loader2 className="animate-spin text-violet-600" size={24} />
+                        </div>
+                    )}
+                    {!libraryLoading && items.length === 0 && (
+                        <div className="text-center py-8 text-gray-500 text-sm">
+                            No items found
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const renderTools = () => (
         <div className="p-4 space-y-6 pb-24 w-full h-full flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4">
@@ -53,30 +239,79 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
         </div>
     );
 
-    const renderTextTab = () => (
-        <div className="p-4 space-y-4">
-            <button
-                onClick={() => onAddItem({ type: 'text', name: 'Add a heading', src: '', duration: 5, width: 80, height: 20, fontSize: 60, fontWeight: 'bold', color: '#000000' })}
-                className="w-full bg-violet-600 text-white py-3 rounded-lg font-bold hover:bg-violet-700 transition-colors shadow-sm"
-            >
-                Add a text box
-            </button>
+    const renderText = () => (
+        <div className="p-4 space-y-6 pb-24">
+            {/* Standard Text Options */}
+            <div className="flex gap-2 w-1/2">
+                <button
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, 'text', '', { name: 'Add a heading', fontSize: 60, fontWeight: 'bold' })}
+                    onClick={() => onAddClip('', 'text', { name: 'Add a heading', duration: 5, width: 80, height: 20, fontSize: 60, fontWeight: 'bold', color: '#000000' })}
+                    className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all group"
+                >
+                    <span className="text-sm font-bold text-gray-700 group-hover:text-violet-600">H1</span>
+                </button>
+                <button
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, 'text', '', { name: 'Add a subheading', fontSize: 40, fontWeight: 'bold' })}
+                    onClick={() => onAddClip('', 'text', { name: 'Add a subheading', duration: 5, width: 60, height: 15, fontSize: 40, fontWeight: 'bold', color: '#333333' })}
+                    className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all group"
+                >
+                    <span className="text-xs font-semibold text-gray-700 group-hover:text-violet-600">H2</span>
+                </button>
+                <button
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, 'text', '', { name: 'Add a little bit of body text', fontSize: 24, fontWeight: 'normal' })}
+                    onClick={() => onAddClip('', 'text', { name: 'Add a little bit of body text', duration: 5, width: 50, height: 10, fontSize: 24, fontWeight: 'normal', color: '#4b5563' })}
+                    className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all group"
+                >
+                    <span className="text-[10px] font-normal text-gray-700 group-hover:text-violet-600">Aa</span>
+                </button>
+            </div>
 
+            {/* Alignment Options */}
+            <div className="space-y-2">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Alignment</h3>
+                <div className="flex gap-2">
+                    <button onClick={() => onAlign('left')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignLeft size={18} /></button>
+                    <button onClick={() => onAlign('center')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignCenter size={18} /></button>
+                    <button onClick={() => onAlign('right')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignRight size={18} /></button>
+                    <button onClick={() => onAlign('top')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignStartVertical size={18} /></button>
+                    <button onClick={() => onAlign('middle')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignVerticalJustifyCenter size={18} /></button>
+                    <button onClick={() => onAlign('bottom')} className="flex-1 aspect-square bg-white border border-gray-200 hover:border-violet-500 hover:bg-violet-50 rounded-lg flex items-center justify-center transition-all text-gray-600 hover:text-violet-600"><AlignEndVertical size={18} /></button>
+                </div>
+            </div>
+
+            {/* Font Combinations */}
             <div className="space-y-3">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Default Styles</h3>
-                {MOCK_TEXT_STYLES.map(style => (
-                    <div
-                        key={style.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, 'text', '', { name: style.preview, fontSize: style.fontSize, fontWeight: style.fontWeight })}
-                        onClick={() => onAddItem({ type: 'text', name: style.preview, src: '', duration: 5, width: 60, height: 15, fontSize: style.fontSize, fontWeight: style.fontWeight as any, color: '#000000' })}
-                        className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-transparent hover:border-gray-200 transition-all"
-                    >
-                        <p style={{ fontSize: Math.max(12, style.fontSize / 3), fontWeight: style.fontWeight as any }} className="text-gray-800 truncate">
-                            {style.preview}
-                        </p>
-                    </div>
-                ))}
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Font Combinations</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {FONT_COMBINATIONS.map(combo => (
+                        <div
+                            key={combo.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, 'text', '', { ...combo.style, name: combo.label })}
+                            onClick={() => onAddClip('', 'text', { ...combo.style, name: combo.label, duration: 5, width: 60, height: 30 })}
+                            className="aspect-square bg-gray-50 hover:bg-gray-100 rounded-xl cursor-pointer border border-transparent hover:border-violet-200 transition-all flex items-center justify-center p-4 text-center group relative overflow-hidden"
+                        >
+                            <div
+                                style={{
+                                    fontFamily: combo.style.fontFamily,
+                                    color: combo.style.color,
+                                    fontWeight: combo.style.fontWeight as any,
+                                    fontStyle: combo.style.fontStyle as any,
+                                    ...(combo.style.textEffect ? getTextEffectStyle(combo.style.textEffect, combo.style.color, 0.4) : {})
+                                }}
+                                className="text-lg leading-tight pointer-events-none select-none"
+                            >
+                                {combo.label}
+                            </div>
+                            <div className="absolute bottom-2 left-0 right-0 text-[10px] text-gray-400 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                {combo.name}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -262,6 +497,7 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
 
     const renderContent = () => {
         switch (activeTab) {
+            case 'library': return renderLibrary();
             case 'tools': return renderTools();
             case 'text': return renderText();
             case 'uploads': return renderUploads();

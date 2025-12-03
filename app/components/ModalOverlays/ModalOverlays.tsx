@@ -8,6 +8,7 @@ import { ConnectionLines } from './ConnectionLines';
 import { TextInputOverlays } from './TextInputOverlays';
 import { ImageModalOverlays } from './ImageModalOverlays';
 import { VideoModalOverlays } from './VideoModalOverlays';
+import { VideoEditorModalOverlays } from './VideoEditorModalOverlays';
 import { MusicModalOverlays } from './MusicModalOverlays';
 import { UpscaleModalOverlays } from './UpscaleModalOverlays';
 import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
@@ -23,6 +24,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   textInputStates,
   imageModalStates,
   videoModalStates,
+  videoEditorModalStates,
   musicModalStates,
   upscaleModalStates,
   removeBgModalStates,
@@ -38,6 +40,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedImageModalIds,
   selectedVideoModalId,
   selectedVideoModalIds,
+  selectedVideoEditorModalId,
+  selectedVideoEditorModalIds,
   selectedMusicModalId,
   selectedMusicModalIds,
   selectedUpscaleModalId,
@@ -63,6 +67,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setVideoModalStates,
   setSelectedVideoModalId,
   setSelectedVideoModalIds,
+  setVideoEditorModalStates = () => { },
+  setSelectedVideoEditorModalId = () => { },
+  setSelectedVideoEditorModalIds = () => { },
   setMusicModalStates,
   setSelectedMusicModalId,
   setSelectedMusicModalIds,
@@ -108,6 +115,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistVideoModalCreate,
   onPersistVideoModalMove,
   onPersistVideoModalDelete,
+  onPersistVideoEditorModalCreate,
+  onPersistVideoEditorModalMove,
+  onPersistVideoEditorModalDelete,
+  onOpenVideoEditor,
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
@@ -183,7 +194,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     expandModalStates: expandModalStates ?? [],
     vectorizeModalStates: vectorizeModalStates ?? [],
     storyboardModalStates: storyboardModalStates ?? [],
-  scriptFrameModalStates: scriptFrameModalStates ?? [],
+    scriptFrameModalStates: scriptFrameModalStates ?? [],
     sceneFrameModalStates: sceneFrameModalStates ?? [],
   });
 
@@ -274,6 +285,22 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         imageModalStates={imageModalStates}
         images={images}
         stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
+
+      <VideoEditorModalOverlays
+        videoEditorModalStates={videoEditorModalStates}
+        selectedVideoEditorModalId={selectedVideoEditorModalId}
+        selectedVideoEditorModalIds={selectedVideoEditorModalIds}
+        clearAllSelections={clearAllSelections}
+        setVideoEditorModalStates={setVideoEditorModalStates}
+        setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
+        setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
+        onPersistVideoEditorModalCreate={onPersistVideoEditorModalCreate}
+        onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
+        onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
+        onOpenVideoEditor={onOpenVideoEditor}
         scale={scale}
         position={position}
       />

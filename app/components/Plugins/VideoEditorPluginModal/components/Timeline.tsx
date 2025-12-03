@@ -701,9 +701,7 @@ const Timeline: React.FC<TimelineProps> = ({
                                             <ZapOff size={16} /> Remove Transition
                                         </button>
                                     )}
-                                    <button onClick={() => alert('Comments feature coming soon!')} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
-                                        <MessageSquare size={16} /> Comment
-                                    </button>
+
                                 </>
                             );
                         })()}

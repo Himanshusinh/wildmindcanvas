@@ -1182,10 +1182,11 @@ const Canvas: React.FC<CanvasProps> = ({
             zIndex, inset: item.isBackground ? 0 : undefined,
             ...posStyle,
             width: item.isBackground ? '100%' : (item.width ? `${item.width}%` : 'auto'),
-            height: item.isBackground ? '100%' : (item.height ? `${item.height}%` : 'auto'),
-            transform: itemTransform, opacity: isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100,
+            height: item.isBackground ? '100%' : (item.type === 'text' ? 'auto' : (item.height ? `${item.height}%` : 'auto')),
+            transform: itemTransform, opacity: isBuffered ? 0 : (isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100),
             ...maskStyle, filter: adjustmentStyle, ...transitionStyle,
-            mixBlendMode: (transitionStyle.mixBlendMode as any)
+            mixBlendMode: (transitionStyle as any).mixBlendMode,
+            pointerEvents: isBuffered ? 'none' : 'auto'
         };
 
         if (transitionStyle.transform && itemTransform) finalStyle.transform = `${itemTransform} ${transitionStyle.transform}`;

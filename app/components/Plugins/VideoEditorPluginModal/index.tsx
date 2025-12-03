@@ -493,6 +493,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
             listType: 'none',
 
             // Apply Overrides
+            fit: type === 'image' ? 'contain' : 'cover',
             ...overrides
         };
 
@@ -1293,7 +1294,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
 
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm" style={{ zIndex: 20000 }}>
-            <div className="bg-white w-[95vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden relative" style={{ zIndex: 20001 }}>
+            <div className="bg-white w-[100vw] h-[100vh]  shadow-2xl flex flex-col overflow-hidden relative" style={{ zIndex: 20001 }}>
                 <Header
                     projectName={projectName}
                     setProjectName={setProjectName}

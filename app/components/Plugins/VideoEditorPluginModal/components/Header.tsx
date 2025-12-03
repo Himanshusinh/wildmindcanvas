@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     Menu, Undo2, Redo2, Cloud, Share2,
     ChevronDown, FileText, Download, Trash2,
-    Copy, FolderOpen, Plus, Play, Minus, ChevronRight
+    Copy, FolderOpen, Plus, Play, Minus, ChevronRight, Check, Smartphone, Monitor, Instagram, Facebook, Youtube, File
 } from 'lucide-react';
 import { CanvasDimension, RESIZE_OPTIONS } from '../types';
 
@@ -27,14 +27,14 @@ interface HeaderProps {
     onPreview: () => void;
 }
 
-const NEW_PROJECT_OPTIONS: CanvasDimension[] = [
-    { name: '16:9 (Widescreen)', width: 1920, height: 1080 },
-    { name: '9:16 (Portrait)', width: 1080, height: 1920 },
-    { name: '1:1 (Instagram)', width: 1080, height: 1080 },
-    { name: '4:3 (Standard)', width: 1440, height: 1080 },
-    { name: '4:5 (Vertical)', width: 1080, height: 1350 },
-    { name: '21:9 (Cinema)', width: 2560, height: 1080 },
-    { name: '3:4 (Business)', width: 1080, height: 1440 },
+const PRESET_DIMENSIONS = [
+    { name: '16:9 (Widescreen)', width: 1920, height: 1080, icon: <Monitor size={16} /> },
+    { name: '9:16 (Portrait)', width: 1080, height: 1920, icon: <Smartphone size={16} /> },
+    { name: '1:1 (Instagram)', width: 1080, height: 1080, icon: <Instagram size={16} /> },
+    { name: '4:3 (Standard)', width: 1440, height: 1080, icon: <Monitor size={16} /> },
+    { name: '4:5 (Vertical)', width: 1080, height: 1350, icon: <Smartphone size={16} /> },
+    { name: '21:9 (Cinema)', width: 2560, height: 1080, icon: <Monitor size={16} /> },
+    { name: '3:4 (Business)', width: 1080, height: 1440, icon: <FileText size={16} /> },
 ];
 
 const Header: React.FC<HeaderProps> = ({
@@ -78,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({
     }, []);
 
     return (
-        <header className="h-14 bg-[#18181b] text-gray-200 flex items-center justify-between px-4 select-none z-50 relative border-b border-gray-800">
+        <header className="h-14 bg-[#18181b] text-gray-200 flex items-center justify-between px-4 pr-16 select-none z-50 relative border-b border-gray-800">
             {/* Left Section */}
             <div className="flex items-center gap-4">
                 <button
@@ -117,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({
 
                                     {isNewProjectSubmenuOpen && (
                                         <div className="absolute top-0 left-full ml-1 w-56 bg-[#27272a] text-gray-200 rounded-lg shadow-xl border border-gray-700 py-2 z-50 max-h-96 overflow-y-auto">
-                                            {NEW_PROJECT_OPTIONS.map(opt => (
+                                            {PRESET_DIMENSIONS.map(opt => (
                                                 <button
                                                     key={opt.name}
                                                     className="w-full px-4 py-2 text-sm hover:bg-white/5 text-left flex justify-between items-center"
@@ -183,22 +183,22 @@ const Header: React.FC<HeaderProps> = ({
                         Resize
                     </button>
 
-                    {showResizeMenu && (
+                    {isResizeMenuOpen && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                             <div className="px-4 py-2 border-b border-gray-100">
                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Resize Canvas</p>
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="number"
-                                        value={dimension.width}
-                                        onChange={(e) => setDimension({ ...dimension, width: Number(e.target.value), name: 'Custom' })}
+                                        value={currentDimension.width}
+                                        onChange={(e) => onResize({ ...currentDimension, width: Number(e.target.value), name: 'Custom' })}
                                         className="w-full p-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                     />
                                     <span className="text-gray-400">x</span>
                                     <input
                                         type="number"
-                                        value={dimension.height}
-                                        onChange={(e) => setDimension({ ...dimension, height: Number(e.target.value), name: 'Custom' })}
+                                        value={currentDimension.height}
+                                        onChange={(e) => onResize({ ...currentDimension, height: Number(e.target.value), name: 'Custom' })}
                                         className="w-full p-1.5 bg-gray-50 border border-gray-200 rounded text-xs font-bold text-center focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                                     />
                                 </div>
@@ -207,14 +207,14 @@ const Header: React.FC<HeaderProps> = ({
                                 {PRESET_DIMENSIONS.map((preset) => (
                                     <button
                                         key={preset.name}
-                                        onClick={() => { setDimension({ width: preset.width, height: preset.height, name: preset.name }); setShowResizeMenu(false); }}
+                                        onClick={() => { onResize({ width: preset.width, height: preset.height, name: preset.name }); setIsResizeMenuOpen(false); }}
                                         className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-violet-50 hover:text-violet-700 flex items-center justify-between group transition-colors"
                                     >
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-400 group-hover:text-violet-500">{preset.icon}</span>
                                             <span>{preset.name}</span>
                                         </div>
-                                        {(dimension.width === preset.width && dimension.height === preset.height) && <Check size={12} className="text-violet-600" />}
+                                        {(currentDimension.width === preset.width && currentDimension.height === preset.height) && <Check size={12} className="text-violet-600" />}
                                     </button>
                                 ))}
                             </div>

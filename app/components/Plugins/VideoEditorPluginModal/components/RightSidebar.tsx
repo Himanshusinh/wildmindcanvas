@@ -259,13 +259,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                     </>
                 )}
 
-                <div className="h-px w-10 bg-gray-800 mx-auto my-1"></div>
 
-                {/* Comment */}
-                <button onClick={() => alert('Comment feature coming soon!')} className="flex flex-col items-center justify-center py-3 w-full transition-all relative shrink-0 hover:text-gray-100 hover:bg-[#1f2021]">
-                    <MessageSquare size={20} className="mb-1.5" />
-                    <span className="text-[10px] font-medium">Comment</span>
-                </button>
 
                 {/* Lock */}
                 <button onClick={onLock} className="flex flex-col items-center justify-center py-3 w-full transition-all relative shrink-0 hover:text-gray-100 hover:bg-[#1f2021]">

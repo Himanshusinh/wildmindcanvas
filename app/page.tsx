@@ -33,6 +33,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [imageGenerators, setImageGenerators] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
+  const [videoEditorGenerators, setVideoEditorGenerators] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
@@ -105,6 +106,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newImages: ImageUpload[] = [];
         const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }> = [];
         const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }> = [];
+        const newVideoEditorGenerators: Array<{ id: string; x: number; y: number }> = [];
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
 
@@ -137,6 +139,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               } as any);
             } else if (element.type === 'video-generator') {
               newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null });
+            } else if (element.type === 'video-editor-trigger') {
+              newVideoEditorGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0 });
             } else if (element.type === 'music-generator') {
               newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
             } else if (element.type === 'upscale-plugin') {
@@ -196,6 +200,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setVideoGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null }];
+          });
+        } else if (element.type === 'video-editor-trigger') {
+          setVideoEditorGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0 }];
           });
         } else if (element.type === 'music-generator') {
           setMusicGenerators((prev) => {
@@ -384,6 +393,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           images,
           imageGenerators,
           videoGenerators,
+          videoEditorGenerators,
           musicGenerators,
           upscaleGenerators,
           removeBgGenerators,
@@ -601,6 +611,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           images,
           imageGenerators,
           videoGenerators,
+          videoEditorGenerators,
           musicGenerators,
           upscaleGenerators,
           removeBgGenerators,
@@ -920,6 +931,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     images,
     imageGenerators,
     videoGenerators,
+    videoEditorGenerators,
     musicGenerators,
     upscaleGenerators,
     removeBgGenerators,
@@ -938,6 +950,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setImages,
     setImageGenerators,
     setVideoGenerators,
+    setVideoEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
     setRemoveBgGenerators,
@@ -1289,6 +1302,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
     realtimeRef,
     removeAndPersistConnectorsForElement
   );
+
+  // Pass setVideoEditorGenerators to canvasSetters (need to update canvasSetters object first)
+  // But canvasSetters is created before this. We need to ensure it includes setVideoEditorGenerators.
+  // Actually, canvasSetters is created in page.tsx but passed to createPluginHandlers.
+  // I need to update where canvasSetters is defined.
+
 
   // Now assign all handler functions (after handlers are created)
   const handleImageUpdate = imageHandlers.handleImageUpdate;
@@ -1708,6 +1727,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               projectId={projectId}
               externalImageModals={imageGenerators}
               externalVideoModals={videoGenerators}
+              externalVideoEditorModals={videoEditorGenerators}
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
               externalRemoveBgModals={removeBgGenerators}
@@ -1760,6 +1780,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         images,
                         imageGenerators,
                         videoGenerators,
+                        videoEditorGenerators,
                         musicGenerators,
                         upscaleGenerators,
                         removeBgGenerators,
@@ -1802,6 +1823,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         images,
                         imageGenerators,
                         videoGenerators,
+                        videoEditorGenerators,
                         musicGenerators,
                         upscaleGenerators,
                         removeBgGenerators,
@@ -2022,6 +2044,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistSceneFrameModalCreate={pluginHandlers.onPersistSceneFrameModalCreate}
               onPersistSceneFrameModalMove={pluginHandlers.onPersistSceneFrameModalMove}
               onPersistSceneFrameModalDelete={pluginHandlers.onPersistSceneFrameModalDelete}
+              onPersistVideoEditorModalCreate={pluginHandlers.onPersistVideoEditorModalCreate}
+              onPersistVideoEditorModalMove={pluginHandlers.onPersistVideoEditorModalMove}
+              onPersistVideoEditorModalDelete={pluginHandlers.onPersistVideoEditorModalDelete}
+              onOpenVideoEditor={() => setIsVideoEditorOpen(true)}
               onPersistTextModalCreate={async (modal) => {
                 setTextGenerators(prev => prev.some(t => t.id === modal.id) ? prev : [...prev, modal]);
                 if (realtimeActive) {
@@ -2097,7 +2123,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
         onClose={() => setIsPluginSidebarOpen(false)}
         onSelectPlugin={(plugin, x, y) => {
           if (plugin.id === 'video-editor') {
-            setIsVideoEditorOpen(true);
+            const viewportCenter = viewportCenterRef.current;
+            // Use viewport center or click position (converted)
+            const modalX = viewportCenter.x;
+            const modalY = viewportCenter.y;
+
+            const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newTrigger = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+            };
+
+            // Persist via callback
+            (async () => {
+              await pluginHandlers.onPersistVideoEditorModalCreate(newTrigger);
+            })().catch(console.error);
             return;
           }
           if (plugin.id === 'upscale') {
