@@ -7,6 +7,7 @@ import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { UpscaleControls } from './UpscaleControls';
 import { UpscaleImageFrame } from './UpscaleImageFrame';
 import { ConnectionNodes } from './ConnectionNodes';
+import { UpscaleComparisonModal } from './UpscaleComparisonModal';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscalePluginModalProps {
@@ -85,6 +86,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
@@ -95,6 +97,20 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
+
+  // Detect if this is an upscaled image result (media-like, no controls)
+  // The plugin itself should always show controls (model is 'Crystal Upscaler' or undefined)
+  // Only result frames (with model 'Upscale') should be media-like
+  const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
+
+  console.log('[UpscalePluginModal] Render', {
+    id,
+    localUpscaledImageUrl,
+    sourceImageUrl,
+    isComparisonOpen,
+    isPopupOpen,
+    isUpscaledImage
+  });
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -107,11 +123,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
   const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
   const frameBorderWidth = 2;
-
-  // Detect if this is an upscaled image result (media-like, no controls)
-  // The plugin itself should always show controls (model is 'Crystal Upscaler' or undefined)
-  // Only result frames (with model 'Upscale') should be media-like
-  const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
 
   // Detect connected image nodes
   const connectedImageSource = useMemo(() => {
@@ -604,6 +615,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
                 isHovered={isHovered}
                 isSelected={isSelected || false}
                 sourceImageUrl={sourceImageUrl}
+                localUpscaledImageUrl={localUpscaledImageUrl}
+                onPreview={() => setIsComparisonOpen(true)}
                 onMouseDown={handleMouseDown}
                 onSelect={onSelect}
               />
@@ -612,7 +625,18 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         )}
       </div>
 
-    </div>
+
+      {
+        isComparisonOpen && sourceImageUrl && localUpscaledImageUrl && (
+          <UpscaleComparisonModal
+            originalImageUrl={sourceImageUrl}
+            upscaledImageUrl={localUpscaledImageUrl}
+            onClose={() => setIsComparisonOpen(false)}
+            scale={scale}
+          />
+        )
+      }
+    </div >
   );
 };
 

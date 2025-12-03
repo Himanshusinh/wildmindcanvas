@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ModelDropdown } from './ModelDropdown';
 import { ScaleInput } from './ScaleInput';
 import { UpscaleButton } from './UpscaleButton';
+import { Layers } from 'lucide-react';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscaleControlsProps {
@@ -20,6 +21,8 @@ interface UpscaleControlsProps {
   onUpscale: () => void;
   onHoverChange: (hovered: boolean) => void;
   extraTopPadding?: number;
+  localUpscaledImageUrl?: string | null;
+  onPreview?: () => void;
 }
 
 export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
@@ -36,12 +39,20 @@ export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
   onUpscale,
   onHoverChange,
   extraTopPadding,
+  localUpscaledImageUrl,
+  onPreview,
 }) => {
   const isDark = useIsDarkTheme();
 
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const basePadding = 16 * scale;
   const computedTopPadding = Math.max(basePadding, extraTopPadding ?? basePadding);
+
+  console.log('[UpscaleControls] Render', {
+    localUpscaledImageUrl,
+    hasOnPreview: !!onPreview,
+    isDark
+  });
 
   return (
     <div
@@ -92,6 +103,7 @@ export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
           sourceImageUrl={sourceImageUrl}
           onUpscale={onUpscale}
         />
+
       </div>
     </div>
   );

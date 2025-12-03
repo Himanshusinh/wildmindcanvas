@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ArrowLeftRight } from 'lucide-react';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
@@ -14,6 +15,8 @@ interface RemoveBgImageFrameProps {
   isHovered: boolean;
   isSelected: boolean;
   sourceImageUrl: string | null;
+  localRemovedBgImageUrl?: string | null;
+  onPreview?: () => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onSelect?: () => void;
 }
@@ -28,6 +31,8 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
   isHovered,
   isSelected,
   sourceImageUrl,
+  localRemovedBgImageUrl,
+  onPreview,
   onMouseDown,
   onSelect,
 }) => {
@@ -42,7 +47,8 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
           const target = e.target as HTMLElement;
           const isImage = target.tagName === 'IMG';
           const isNode = target.closest('[data-node-id]');
-          if (!isImage && !isNode) {
+          const isButton = target.closest('button');
+          if (!isImage && !isNode && !isButton) {
             onMouseDown(e as any);
           }
         }
@@ -78,17 +84,63 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
       }}
     >
       {sourceImageUrl ? (
-        <img
-          src={sourceImageUrl}
-          alt="Source"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            pointerEvents: 'none',
-          }}
-          draggable={false}
-        />
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <img
+            src={sourceImageUrl}
+            alt="Source"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+            }}
+            draggable={false}
+          />
+
+          {/* Compare Button Overlay */}
+          {localRemovedBgImageUrl && onPreview && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                right: '10px',
+                zIndex: 10,
+              }}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPreview();
+                }}
+                title="Compare with original"
+                style={{
+                  width: `${36 * scale}px`,
+                  height: `${36 * scale}px`,
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  backdropFilter: 'blur(4px)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <ArrowLeftRight size={18 * scale} />
+              </button>
+            </div>
+          )}
+        </div>
       ) : (
         <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `${20 * scale}px`, transition: 'color 0.3s ease' }}>
           <svg
