@@ -171,13 +171,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
 
   return (
     <svg
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        pointerEvents: 'none',
+      style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        width: '100vw', 
+        height: '100vh', 
+        pointerEvents: 'none', 
         zIndex: 1000, // Lower than all components (2000+) so lines appear behind
         transition: 'none', // Disable all transitions
       }}
@@ -228,7 +228,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 if (isSelected) {
                   onSelectConnection(null);
                 } else {
-                  onSelectConnection(connectionId);
+                onSelectConnection(connectionId);
                 }
               }}
               onMouseEnter={(e) => {
@@ -269,8 +269,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                       strokeDashoffset: sweepStartOffset,
                       animation: `connection-line-dash ${dashAnimationDuration}s linear infinite`,
                       animationDelay: `${delay}s`,
-                      '--sweepStart': sweepStartOffset,
-                    } as React.CSSProperties}
+                    }}
                   />
                 ))}
               </>
@@ -280,8 +279,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               cy={line.fromY}
               r={computeCircleRadiusForScale(3, scale)}
               fill={strokeColor}
-              style={{
-                pointerEvents: 'auto',
+              style={{ 
+                pointerEvents: 'auto', 
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
               }}
@@ -299,8 +298,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               cy={line.toY}
               r={computeCircleRadiusForScale(3, scale)}
               fill={strokeColor}
-              style={{
-                pointerEvents: 'auto',
+              style={{ 
+                pointerEvents: 'auto', 
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
               }}

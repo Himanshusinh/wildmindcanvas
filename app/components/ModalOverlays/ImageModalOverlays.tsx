@@ -131,8 +131,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
           onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height) => {
-            console.log('[ImageModalOverlays] onGenerate called!', {
-              modalId: modalState.id,
+            console.log('[ImageModalOverlays] onGenerate called!', { 
+              modalId: modalState.id, 
               hasOnImageGenerate: !!onImageGenerate,
               sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
             });
@@ -144,7 +144,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // Fall back to modalState.sourceImageUrl only for scene-based generation
                 let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
                 const sceneNumber = (modalState as any).sceneNumber;
-
+                
                 console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
                   fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
                   fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
@@ -425,7 +425,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
                 // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
                 const targetFrameId = modalId || modalState.id;
-
+                
                 console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
                   modalIdParam: modalId || 'NONE',
                   modalStateId: modalState.id,

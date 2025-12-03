@@ -9,9 +9,6 @@ export interface CanvasSettings {
   backgroundColor: string;
   dotSize: number;
   gridSpacing: number;
-  showPointerTool?: boolean;
-  showMoveTool?: boolean;
-  showThemeToggle?: boolean;
 }
 
 export interface SettingsPopupProps {

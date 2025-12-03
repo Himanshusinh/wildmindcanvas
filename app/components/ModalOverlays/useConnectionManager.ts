@@ -65,11 +65,6 @@ export function useConnectionManager({
 
     // Storyboard specific validation
     if (toType === 'storyboard') {
-      // Special case for script input - allow text
-      if (toSide === 'receive-script') {
-        return fromType === 'text';
-      }
-
       // If connecting to specific receive nodes (character, background, prompt)
       if (toSide && toSide.startsWith('receive-')) {
         // Only allow image connections (generated or media)
@@ -156,16 +151,8 @@ export function useConnectionManager({
 
       // Storyboard specific validation
       if (toType === 'storyboard') {
-        // Special case for script input - allow text
-        if (side === 'receive-script') {
-          if (fromType !== 'text') {
-            setActiveDrag(null);
-            try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
-            return;
-          }
-        }
         // If connecting to specific receive nodes (character, background, prompt)
-        else if (side && side.startsWith('receive-')) {
+        if (side && side.startsWith('receive-')) {
           // Only allow image connections (generated or media)
           if (fromType !== 'image') {
             setActiveDrag(null);

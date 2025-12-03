@@ -202,51 +202,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null }];
           });
-        } else if (element.type === 'text-generator') {
-          setTextGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
-          });
-        } else if (element.type === 'upscale-plugin') {
-          setUpscaleGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'removebg-plugin') {
-          setRemoveBgGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'erase-plugin') {
-          setEraseGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'expand-plugin') {
-          setExpandGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'vectorize-plugin') {
-          setVectorizeGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'storyboard-plugin') {
-          setStoryboardGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'script-frame') {
-          setScriptFrameGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
-        } else if (element.type === 'scene-frame') {
-          setSceneFrameGenerators((prev) => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { ...element.meta, id: element.id, x: element.x || 0, y: element.y || 0 }];
-          });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
@@ -272,15 +227,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setImageGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setTextGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -347,27 +294,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
-        // Update other generators (Text, Plugins, Frames)
-        const updateGeneratorPos = (prev: any[]) => {
-          const idx = prev.findIndex(m => m.id === op.elementId);
-          if (idx >= 0) {
-            const cur = prev[idx];
-            const next = [...prev];
-            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
-            return next;
-          }
-          return prev;
-        };
-        setTextGenerators(updateGeneratorPos);
-        setUpscaleGenerators(updateGeneratorPos);
-        setRemoveBgGenerators(updateGeneratorPos);
-        setEraseGenerators(updateGeneratorPos);
-        setExpandGenerators(updateGeneratorPos);
-        setVectorizeGenerators(updateGeneratorPos);
-        setStoryboardGenerators(updateGeneratorPos);
-        setScriptFrameGenerators(updateGeneratorPos);
-        setSceneFrameGenerators(updateGeneratorPos);
-
       } else if (op.type === 'update' && op.elementId && op.data.updates) {
         // Also handle regular element updates
         setImages((prev) => {
@@ -381,27 +307,33 @@ export function CanvasApp({ user }: CanvasAppProps) {
           return prev;
         });
         // Update a generator modal if matched (needed for undo/redo)
-        const updateGeneratorState = (prev: any[]) => {
+        setImageGenerators((prev) => {
           const idx = prev.findIndex(m => m.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates };
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
             return next;
           }
           return prev;
-        };
-        setImageGenerators(updateGeneratorState);
-        setVideoGenerators(updateGeneratorState);
-        setMusicGenerators(updateGeneratorState);
-        setTextGenerators(updateGeneratorState);
-        setUpscaleGenerators(updateGeneratorState);
-        setRemoveBgGenerators(updateGeneratorState);
-        setEraseGenerators(updateGeneratorState);
-        setExpandGenerators(updateGeneratorState);
-        setVectorizeGenerators(updateGeneratorState);
-        setStoryboardGenerators(updateGeneratorState);
-        setScriptFrameGenerators(updateGeneratorState);
-        setSceneFrameGenerators(updateGeneratorState);
+        });
+        setVideoGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
+        setMusicGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            return next;
+          }
+          return prev;
+        });
         // If this update modified meta.connections, update connectors state accordingly (backwards compat)
         if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
           const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
@@ -1355,8 +1287,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     appendOp,
     realtimeActive,
     realtimeRef,
-    removeAndPersistConnectorsForElement,
-    setGenerationQueue
+    removeAndPersistConnectorsForElement
   );
 
   // Now assign all handler functions (after handlers are created)
@@ -1416,61 +1347,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
       setIsPluginSidebarOpen(true);
     }
   };
-
-  // Spacebar shortcut for temporary pan tool
-  const previousToolRef = useRef<typeof selectedTool | null>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      const target = e.target as HTMLElement | null;
-      const isTyping = !!target && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        (target as any).isContentEditable === true
-      );
-      if (isTyping) return;
-
-      if (e.code === 'Space' && !e.repeat) {
-        // Only switch if not already moving
-        if (selectedTool !== 'move') {
-          e.preventDefault(); // Prevent scrolling
-          previousToolRef.current = selectedTool;
-          setSelectedTool('move');
-        }
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      const target = e.target as HTMLElement | null;
-      const isTyping = !!target && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        (target as any).isContentEditable === true
-      );
-      if (isTyping) return;
-
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (previousToolRef.current) {
-          setSelectedTool(previousToolRef.current);
-          previousToolRef.current = null;
-        } else if (selectedTool === 'move') {
-          // Fallback if previous tool wasn't captured (e.g. initial load)
-          setSelectedTool('cursor');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [selectedTool]);
 
 
   const handleToolbarUpload = (files: File[]) => {
@@ -1721,20 +1597,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
       return { generationId: undefined, taskId: undefined };
     }
 
-    // Add to generation queue
-    const queueId = `video-${modalId || Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'video' as const,
-      operationName: 'Generating Video',
-      prompt: prompt.trim(),
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
 
@@ -1762,15 +1624,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
       console.error('Error generating video:', error);
       alert(error.message || 'Failed to generate video. Please try again.');
       return { generationId: undefined, taskId: undefined };
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 
@@ -1781,37 +1634,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   const handleMusicGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string): Promise<string | null> => {
     console.log('Generate music:', { prompt, model, frame, aspectRatio });
-
-    // Add to generation queue
-    const queueId = `music-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'music' as const,
-      operationName: 'Generating Music',
-      prompt: prompt.trim(),
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
-    try {
-      // TODO: Implement music generation API call here
-      // For now, just close the modal
-      // When music is generated, set the generatedMusicUrl
-      // setGeneratedMusicUrl(generatedMusicUrl);
-      return null;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
-    }
+    // TODO: Implement music generation API call here
+    // For now, just close the modal
+    // When music is generated, set the generatedMusicUrl
+    // setGeneratedMusicUrl(generatedMusicUrl);
+    return null;
   };
 
   if (isInitializing) {
@@ -2206,26 +2033,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistTextModalMove={async (id, updates) => {
-                // 1. Capture previous state (for inverse op)
-                const prevItem = textGenerators.find(t => t.id === id);
-
-                // 2. Optimistic update
+                // Optimistic update with capture of previous state for correct inverse
+                let capturedPrev: { id: string; x: number; y: number; value?: string } | undefined = undefined;
                 setTextGenerators((prev) => {
+                  const found = prev.find(t => t.id === id);
+                  capturedPrev = found ? { ...found } : undefined;
                   return prev.map(t => t.id === id ? { ...t, ...updates } : t);
                 });
-
-                // 3. Broadcast via realtime
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast update text', id, Object.keys(updates || {}));
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
-
-                // 4. Append op for undo/redo
                 if (projectId && opManagerInitialized) {
                   const inverseUpdates: any = {};
-                  if (prevItem) {
+                  if (capturedPrev) {
                     for (const k of Object.keys(updates || {})) {
-                      (inverseUpdates as any)[k] = (prevItem as any)[k];
+                      (inverseUpdates as any)[k] = (capturedPrev as any)[k];
                     }
                   }
                   await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });

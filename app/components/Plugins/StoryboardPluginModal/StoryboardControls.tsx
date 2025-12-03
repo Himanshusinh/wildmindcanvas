@@ -28,10 +28,6 @@ interface StoryboardControlsProps {
     backgroundNamesMap: Record<number, string>;
     onBackgroundNamesMapChange: (map: Record<number, string>) => void;
     extraTopPadding?: number;
-    isAiMode: boolean;
-    onAiModeChange: (isAiMode: boolean) => void;
-    manualScript: string;
-    onManualScriptChange: (script: string) => void;
 }
 
 export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
@@ -59,10 +55,6 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
     backgroundNamesMap,
     onBackgroundNamesMapChange,
     extraTopPadding,
-    isAiMode,
-    onAiModeChange,
-    manualScript,
-    onManualScriptChange,
 }) => {
     const isDark = useIsDarkTheme();
     const [selectedCharacterIndex, setSelectedCharacterIndex] = useState<number | null>(null);
@@ -164,114 +156,6 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
             onMouseLeave={() => onHoverChange(false)}
             onMouseDown={(e) => e.stopPropagation()} // Prevent dragging when clicking inside controls
         >
-            {/* AI Mode Toggle */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingBottom: `${8 * scale}px`,
-                borderBottom: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                marginBottom: `${4 * scale}px`,
-            }}>
-                <span style={{
-                    fontSize: `${14 * scale}px`,
-                    fontWeight: 600,
-                    color: isDark ? '#ffffff' : '#000000',
-                }}>
-                    AI Mode
-                </span>
-                <div
-                    onClick={() => onAiModeChange(!isAiMode)}
-                    style={{
-                        width: `${40 * scale}px`,
-                        height: `${24 * scale}px`,
-                        backgroundColor: isAiMode ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'),
-                        borderRadius: `${12 * scale}px`,
-                        position: 'relative',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s ease',
-                    }}
-                >
-                    <div style={{
-                        width: `${20 * scale}px`,
-                        height: `${20 * scale}px`,
-                        backgroundColor: '#ffffff',
-                        borderRadius: '50%',
-                        position: 'absolute',
-                        top: `${2 * scale}px`,
-                        left: isAiMode ? `${18 * scale}px` : `${2 * scale}px`,
-                        transition: 'left 0.2s ease',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }} />
-                </div>
-            </div>
-
-            {/* Script Input Section */}
-            <div style={{ position: 'relative' }}>
-                {isAiMode && renderReceiveNode('receive-script', 'Script Input')}
-                <label style={labelStyle}>Script Input</label>
-                {isAiMode ? (
-                    <div style={{
-                        fontSize: `${12 * scale}px`,
-                        color: isDark ? '#a0a0a0' : '#666666',
-                        fontStyle: 'italic',
-                        padding: `${8 * scale}px`,
-                        border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'}`,
-                        borderRadius: `${8 * scale}px`,
-                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                    }}>
-                        Connect a Text Node to use as script...
-                    </div>
-                ) : (
-                    <div style={{ position: 'relative' }}>
-                        <textarea
-                            value={manualScript}
-                            onChange={(e) => onManualScriptChange(e.target.value)}
-                            placeholder="Enter your story script here... Use @CharacterName to mention characters."
-                            style={{
-                                ...inputStyle,
-                                minHeight: `${80 * scale}px`,
-                                resize: 'vertical',
-                                fontFamily: 'inherit',
-                                paddingRight: `${40 * scale}px`, // Make room for button
-                            }}
-                        />
-                        <div
-                            onClick={onGenerate}
-                            style={{
-                                position: 'absolute',
-                                right: `${8 * scale}px`,
-                                bottom: `${8 * scale}px`,
-                                width: `${28 * scale}px`,
-                                height: `${28 * scale}px`,
-                                borderRadius: '50%',
-                                backgroundColor: '#437eb5',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s ease, background-color 0.2s ease',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                                zIndex: 10,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.1)';
-                                e.currentTarget.style.backgroundColor = '#3b6ea0';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)';
-                                e.currentTarget.style.backgroundColor = '#437eb5';
-                            }}
-                            title="Generate Script Frame & Scenes"
-                        >
-                            <svg width={`${16 * scale}`} height={`${16 * scale}`} viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                                <polyline points="12 5 19 12 12 19" />
-                            </svg>
-                        </div>
-                    </div>
-                )}
-            </div>
             <div style={{ position: 'relative' }}>
                 {renderReceiveNode('receive-character', 'Character Input')}
                 <label style={labelStyle}>Character Input</label>

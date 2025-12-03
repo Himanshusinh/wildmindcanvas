@@ -42,7 +42,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   if (!isSelected) return null;
 
   const isTextVariant = variant === 'text';
-  const bgColor = isDark
+  const bgColor = isDark 
     ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
     : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
@@ -81,12 +81,12 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDeleteMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
     const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
-
+    
     if (isTextVariant) {
       e.currentTarget.style.backgroundColor = defaultBg;
       e.currentTarget.style.color = defaultColor;
@@ -107,11 +107,11 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDownloadMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
-
+    
     e.currentTarget.style.backgroundColor = defaultBg;
     e.currentTarget.style.color = defaultColor;
     if (!isTextVariant) {
@@ -132,12 +132,12 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDuplicateMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
     const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
-
+    
     if (isTextVariant) {
       e.currentTarget.style.backgroundColor = defaultBg;
       e.currentTarget.style.color = defaultColor;
@@ -249,11 +249,11 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
             if (e.nativeEvent) {
               e.nativeEvent.stopImmediatePropagation();
             }
-
+            
             // Call delete immediately, don't defer
             console.log('[ModalActionIcons] Calling onDelete callback immediately');
             if (onDelete) {
-              onDelete();
+            onDelete();
               console.log('[ModalActionIcons] onDelete callback completed');
             }
           }}
@@ -381,7 +381,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
             }
           }}
           onMouseLeave={(e) => {
-            const defaultBg = isDark
+            const defaultBg = isDark 
               ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
               : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
             const defaultColor = isDark ? '#cccccc' : '#4b5563';

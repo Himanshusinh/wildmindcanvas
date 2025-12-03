@@ -14,78 +14,29 @@ export const KeyboardShortcutsSection: React.FC = () => {
   const kbdBg = isDark ? '#1a1a1a' : '#f3f4f6';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{
-        padding: '20px',
-        background: containerBg,
+      <div style={{ 
+        padding: '20px', 
+        background: containerBg, 
         borderRadius: '12px',
         transition: 'background-color 0.3s ease'
       }}>
-        <h4 style={{
-          margin: '0 0 20px 0',
-          fontSize: '16px',
-          fontWeight: 600,
-          color: textColor,
+        <h4 style={{ 
+          margin: '0 0 20px 0', 
+          fontSize: '16px', 
+          fontWeight: 600, 
+          color: textColor, 
           paddingBottom: '8px',
           transition: 'color 0.3s ease'
         }}>
           Keyboard Shortcuts
         </h4>
 
-        {/* Tools */}
-        <div style={{ marginBottom: '24px' }}>
-          <h5 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            fontWeight: 600,
-            color: textSecondary,
-            transition: 'color 0.3s ease'
-          }}>Tools</h5>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-              <span style={{ fontSize: '14px', color: textColor, transition: 'color 0.3s ease' }}>Pan Canvas</span>
-              <kbd
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: kbdBg,
-                  border: `1px solid ${borderColor}`,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: textColor,
-                  fontFamily: 'monospace',
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                Space
-              </kbd>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-              <span style={{ fontSize: '14px', color: textColor, transition: 'color 0.3s ease' }}>Crosshair Cursor</span>
-              <kbd
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: kbdBg,
-                  border: `1px solid ${borderColor}`,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: textColor,
-                  fontFamily: 'monospace',
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                Shift
-              </kbd>
-            </div>
-          </div>
-        </div>
-
         {/* Create Elements */}
         <div style={{ marginBottom: '24px' }}>
-          <h5 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            fontWeight: 600,
+          <h5 style={{ 
+            margin: '0 0 12px 0', 
+            fontSize: '14px', 
+            fontWeight: 600, 
             color: textSecondary,
             transition: 'color 0.3s ease'
           }}>Create Elements</h5>
@@ -167,10 +118,10 @@ export const KeyboardShortcutsSection: React.FC = () => {
 
         {/* Actions */}
         <div style={{ marginBottom: '24px' }}>
-          <h5 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            fontWeight: 600,
+          <h5 style={{ 
+            margin: '0 0 12px 0', 
+            fontSize: '14px', 
+            fontWeight: 600, 
             color: textSecondary,
             transition: 'color 0.3s ease'
           }}>Actions</h5>
@@ -230,25 +181,7 @@ export const KeyboardShortcutsSection: React.FC = () => {
               </kbd>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-              <span style={{ fontSize: '14px', color: textColor, transition: 'color 0.3s ease' }}>Zoom to Fit</span>
-              <kbd
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: kbdBg,
-                  border: `1px solid ${borderColor}`,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: textColor,
-                  fontFamily: 'monospace',
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                Z
-              </kbd>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
-              <span style={{ fontSize: '14px', color: textColor, transition: 'color 0.3s ease' }}>Close / Deselect</span>
+              <span style={{ fontSize: '14px', color: textColor, transition: 'color 0.3s ease' }}>Close modal</span>
               <kbd
                 style={{
                   padding: '6px 12px',

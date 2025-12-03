@@ -115,12 +115,12 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   // Handle progress bar click
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!audioElementRef.current || !progressBarRef.current || !duration) return;
-
+    
     const rect = progressBarRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const progress = Math.max(0, Math.min(1, clickX / rect.width));
     const newTime = progress * duration;
-
+    
     audioElementRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
@@ -136,12 +136,12 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!audioElementRef.current || !progressBarRef.current || !duration) return;
-
+      
       const rect = progressBarRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const progress = Math.max(0, Math.min(1, mouseX / rect.width));
       const newTime = progress * duration;
-
+      
       setCurrentTime(newTime);
     };
 
@@ -182,7 +182,6 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        paddingBottom: (isHovered || isPinned) ? `${frameBorderWidth * scale}px` : '0px',
         transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',
@@ -208,7 +207,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             style={{ display: 'none' }}
           />
         )}
-
+        
         {/* Music Icon (when no music generated) */}
         {!generatedMusicUrl && (
           <div style={{ textAlign: 'center', color: placeholderColor, marginBottom: `${8 * scale}px`, transition: 'color 0.3s ease' }}>
@@ -229,7 +228,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             </svg>
           </div>
         )}
-
+        
         {/* Play/Pause Button */}
         <button
           onClick={handlePlayPause}
@@ -325,11 +324,11 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
           </div>
 
           {/* Time Display */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: `${12 * scale}px`,
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            fontSize: `${12 * scale}px`, 
             color: timeColor,
             transition: 'color 0.3s ease'
           }}>

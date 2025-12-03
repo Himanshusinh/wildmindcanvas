@@ -40,8 +40,7 @@ export function createPluginHandlers(
   appendOp: (op: any) => Promise<void>,
   realtimeActive: boolean,
   realtimeRef: React.RefObject<any>,
-  removeAndPersistConnectorsForElement: (elementId: string) => Promise<void>,
-  setGenerationQueue: React.Dispatch<React.SetStateAction<any[]>>
+  removeAndPersistConnectorsForElement: (elementId: string) => Promise<void>
 ): PluginHandlers {
   const onPersistUpscaleModalCreate = async (modal: UpscaleGenerator) => {
     // Optimistic update
@@ -231,19 +230,6 @@ export function createPluginHandlers(
       return null;
     }
 
-    // Add to generation queue
-    const queueId = `upscale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'upscale' as const,
-      operationName: 'Upscaling Image',
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     try {
       console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
       const { upscaleImageForCanvas } = await import('@/lib/api');
@@ -262,15 +248,6 @@ export function createPluginHandlers(
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
       throw error;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 
@@ -466,19 +443,6 @@ export function createPluginHandlers(
       return null;
     }
 
-    // Add to generation queue
-    const queueId = `removebg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'removebg' as const,
-      operationName: 'Removing Background',
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     try {
       console.log('[onRemoveBg] Starting remove bg:', { model, backgroundType, scaleValue, sourceImageUrl });
       const { removeBgImageForCanvas } = await import('@/lib/api');
@@ -495,15 +459,6 @@ export function createPluginHandlers(
     } catch (error: any) {
       console.error('[onRemoveBg] Error:', error);
       throw error;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 
@@ -655,19 +610,6 @@ export function createPluginHandlers(
       return null;
     }
 
-    // Add to generation queue
-    const queueId = `erase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'erase' as const,
-      operationName: 'Erasing Content',
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     // Mask is now optional - image is composited with white mask overlay
     // The composited image already contains the mask, so mask parameter is not required
     console.log('[onErase] Starting erase:', {
@@ -700,15 +642,6 @@ export function createPluginHandlers(
     } catch (error: any) {
       console.error('[onErase] Error:', error);
       throw error;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 
@@ -870,19 +803,6 @@ export function createPluginHandlers(
       throw new Error('Frame information is required for expand. Please ensure the image is positioned in the frame.');
     }
 
-    // Add to generation queue
-    const queueId = `expand-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'expand' as const,
-      operationName: 'Expanding Image',
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     console.log('[onExpand] Starting expand:', {
       model,
       sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
@@ -910,15 +830,6 @@ export function createPluginHandlers(
     } catch (error: any) {
       console.error('[onExpand] Error:', error);
       throw error;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 
@@ -1105,19 +1016,6 @@ export function createPluginHandlers(
       return null;
     }
 
-    // Add to generation queue
-    const queueId = `vectorize-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem = {
-      id: queueId,
-      type: 'vectorize' as const,
-      operationName: 'Vectorizing Image',
-      model: mode || 'simple',
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
-
     try {
       console.log('[onVectorize] Starting vectorize:', { sourceImageUrl, mode });
       const { vectorizeImageForCanvas } = await import('@/lib/api');
@@ -1132,15 +1030,6 @@ export function createPluginHandlers(
     } catch (error: any) {
       console.error('[onVectorize] Error:', error);
       throw error;
-    } finally {
-      // Mark as completed and show green checkmark briefly before removing
-      setGenerationQueue((prev) =>
-        prev.map((job) => job.id === queueId ? { ...job, completed: true } : job)
-      );
-      // Remove from queue after brief delay to show completion
-      setTimeout(() => {
-        setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      }, 1500);
     }
   };
 

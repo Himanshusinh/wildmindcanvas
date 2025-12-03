@@ -9,6 +9,8 @@ interface CustomDimensionInputProps {
   onWidthChange: (width: number) => void;
   onHeightChange: (height: number) => void;
   onClose: () => void;
+  minWidth?: number;
+  minHeight?: number;
 }
 
 export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
@@ -17,12 +19,13 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
   onWidthChange,
   onHeightChange,
   onClose,
+  minWidth = 1024,
+  minHeight = 1024,
 }) => {
   const isDark = useIsDarkTheme();
 
   const [localWidth, setLocalWidth] = useState(width);
   const [localHeight, setLocalHeight] = useState(height);
-  const minSize = 1024;
   const maxSize = 5000;
 
   const containerBg = isDark ? '#121212' : 'white';
@@ -40,16 +43,16 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
   const presetButtonBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#d1d5db';
 
   const handleWidthChange = useCallback((newWidth: number) => {
-    const clamped = Math.max(minSize, Math.min(maxSize, newWidth));
+    const clamped = Math.max(minWidth, Math.min(maxSize, newWidth));
     setLocalWidth(clamped);
     onWidthChange(clamped);
-  }, [onWidthChange]);
+  }, [onWidthChange, minWidth]);
 
   const handleHeightChange = useCallback((newHeight: number) => {
-    const clamped = Math.max(minSize, Math.min(maxSize, newHeight));
+    const clamped = Math.max(minHeight, Math.min(maxSize, newHeight));
     setLocalHeight(clamped);
     onHeightChange(clamped);
-  }, [onHeightChange]);
+  }, [onHeightChange, minHeight]);
 
   const handleWidthInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 0;
@@ -126,7 +129,7 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
               type="number"
               value={localWidth}
               onChange={handleWidthInputChange}
-              min={minSize}
+              min={minWidth}
               max={maxSize}
               style={{
                 width: '70px',
@@ -185,7 +188,7 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
         </div>
         <input
           type="range"
-          min={minSize}
+          min={minWidth}
           max={maxSize}
           value={localWidth}
           onChange={handleWidthSliderChange}
@@ -229,7 +232,7 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
               type="number"
               value={localHeight}
               onChange={handleHeightInputChange}
-              min={minSize}
+              min={minHeight}
               max={maxSize}
               style={{
                 width: '70px',
@@ -288,7 +291,7 @@ export const CustomDimensionInput: React.FC<CustomDimensionInputProps> = ({
         </div>
         <input
           type="range"
-          min={minSize}
+          min={minHeight}
           max={maxSize}
           value={localHeight}
           onChange={handleHeightSliderChange}

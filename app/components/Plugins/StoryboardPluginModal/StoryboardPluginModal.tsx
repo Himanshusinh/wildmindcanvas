@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import '../../common/canvasCaptureGuard';
+import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
 import { ImageModalState } from '../../ModalOverlays/types';
 import { ImageUpload } from '@/types/canvas';
@@ -9,7 +10,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface StoryboardPluginModalProps {
   isOpen: boolean;
-  id?: string; 
+  id?: string;
   onClose: () => void;
   stageRef: React.RefObject<any>;
   scale: number;
@@ -43,8 +44,6 @@ interface StoryboardPluginModalProps {
     characterNames?: string;
     backgroundDescription?: string;
     specialRequest?: string;
-    isAiMode?: boolean;
-    manualScript?: string;
   }) => void;
 }
 
@@ -102,9 +101,6 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const [characterNamesMap, setCharacterNamesMap] = useState<Record<number, string>>(initialCharacterNamesMap);
   const [propsNamesMap, setPropsNamesMap] = useState<Record<number, string>>(initialPropsNamesMap);
   const [backgroundNamesMap, setBackgroundNamesMap] = useState<Record<number, string>>(initialBackgroundNamesMap);
-
-  const [isAiMode, setIsAiMode] = useState(true);
-  const [manualScript, setManualScript] = useState('');
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -246,8 +242,6 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       characterNames,
       backgroundDescription,
       specialRequest,
-      isAiMode,
-      manualScript,
     });
     if (onGenerate) {
       onGenerate({
@@ -255,9 +249,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
         characterNames,
         backgroundDescription,
         specialRequest,
-        isAiMode,
-        manualScript,
-      } as any);
+      });
     }
   };
 
@@ -387,6 +379,13 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
             <line x1="2" y1="9" x2="22" y2="9" />
             <line x1="12" y1="3" x2="12" y2="9" />
           </svg>
+
+          <StoryboardConnectionNodes
+            id={id}
+            scale={scale}
+            isHovered={isHovered}
+            isSelected={isSelected || false}
+          />
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}
@@ -449,10 +448,6 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
                 setBackgroundNamesMap(map);
                 updateOptions({ backgroundNamesMap: map });
               }}
-              isAiMode={isAiMode}
-              onAiModeChange={setIsAiMode}
-              manualScript={manualScript}
-              onManualScriptChange={setManualScript}
             />
           </div>
         )}

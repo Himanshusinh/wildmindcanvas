@@ -21,19 +21,16 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
       if (stored) {
         try {
           return JSON.parse(stored);
-        } catch { }
+        } catch {}
       }
     }
     return {
       cursorType: 'default' as CursorType,
       backgroundType: 'dots' as BackgroundType,
-      dotColor: 'gray',
+      dotColor: '#000000',
       backgroundColor: '#ffffff',
       dotSize: 4,
       gridSpacing: 30,
-      showPointerTool: true,
-      showMoveTool: true,
-      showThemeToggle: true,
     };
   });
 

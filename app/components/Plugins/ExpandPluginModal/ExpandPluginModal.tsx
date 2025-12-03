@@ -101,18 +101,57 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   };
   type AspectPreset = keyof typeof aspectPresets;
   const [aspectPreset, setAspectPreset] = useState<AspectPreset>('1:1');
+
+  // Handle aspect preset change with validation
+  const handleAspectPresetChange = (preset: AspectPreset) => {
+    if (preset === 'custom') {
+      setAspectPreset(preset);
+      return;
+    }
+
+    const presetConfig = aspectPresets[preset];
+    if (!presetConfig || !presetConfig.width || !presetConfig.height) {
+      setAspectPreset(preset);
+      return;
+    }
+
+    // If image is loaded and preset is smaller, switch to custom with image dimensions
+    if (imageSize) {
+      if (presetConfig.width < imageSize.width || presetConfig.height < imageSize.height) {
+        // Switch to custom with image dimensions (or larger)
+        setAspectPreset('custom');
+        setCustomWidth(Math.max(presetConfig.width, imageSize.width));
+        setCustomHeight(Math.max(presetConfig.height, imageSize.height));
+        return;
+      }
+    }
+
+    setAspectPreset(preset);
+  };
   const [customWidth, setCustomWidth] = useState(1024);
   const [customHeight, setCustomHeight] = useState(1024);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [frameInfo, setFrameInfo] = useState<{
     canvasSize: [number, number];
     originalImageSize: [number, number];
     originalImageLocation: [number, number];
     aspectRatio?: string;
   } | null>(null);
+
+  // Adjust custom dimensions when image size is loaded if they're too small
+  useEffect(() => {
+    if (imageSize && aspectPreset === 'custom') {
+      if (customWidth < imageSize.width) {
+        setCustomWidth(imageSize.width);
+      }
+      if (customHeight < imageSize.height) {
+        setCustomHeight(imageSize.height);
+      }
+    }
+  }, [imageSize, aspectPreset]);
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  const hasSourceImage = Boolean(sourceImageUrl);
 
   // Update ref when callback changes
   useEffect(() => {
@@ -226,6 +265,11 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
     return null;
   }, [id, connections, imageModalStates, images]);
+
+  // Check if we have a source image (either from state or connected)
+  const hasSourceImage = useMemo(() => {
+    return Boolean(sourceImageUrl || connectedImageSource);
+  }, [sourceImageUrl, connectedImageSource]);
 
   // Restore images from props on mount or when props change
   useEffect(() => {
@@ -355,7 +399,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
 
   const handleExpand = async () => {
-    if (!onExpand || !sourceImageUrl) {
+    const effectiveSourceImageUrl = sourceImageUrl || connectedImageSource;
+    if (!onExpand || !effectiveSourceImageUrl) {
       setIsPopupOpen(false);
       return;
     }
@@ -463,7 +508,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
       const result = await onExpand(
         selectedModel,
-        sourceImageUrl,
+        effectiveSourceImageUrl,
         expandPrompt || undefined,
         frameInfo.canvasSize,
         frameInfo.originalImageSize,
@@ -773,8 +818,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   expandPrompt={expandPrompt}
                   isExpanding={isExpanding}
                   externalIsExpanding={externalIsExpanding}
-                  sourceImageUrl={sourceImageUrl}
-                  onAspectPresetChange={(preset) => setAspectPreset(preset as AspectPreset)}
+                  sourceImageUrl={sourceImageUrl || connectedImageSource}
+                  onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
                   onExpandPromptChange={setExpandPrompt}
                   onExpand={handleExpand}
                   onClose={() => setIsPopupOpen(false)}
@@ -783,6 +828,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   customHeight={customHeight}
                   onCustomWidthChange={setCustomWidth}
                   onCustomHeightChange={setCustomHeight}
+                  imageSize={imageSize}
                 />
 
                 {/* Image Preview with Canvas */}
@@ -803,7 +849,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   }}
                 >
                   <ExpandImageFrame
-                    sourceImageUrl={sourceImageUrl}
+                    sourceImageUrl={sourceImageUrl || connectedImageSource}
                     localExpandedImageUrl={localExpandedImageUrl}
                     expandedImageUrl={expandedImageUrl}
                     aspectPreset={aspectPreset}
@@ -811,6 +857,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                     customWidth={customWidth}
                     customHeight={customHeight}
                     onFrameInfoChange={setFrameInfo}
+                    onImageSizeChange={setImageSize}
                   />
                 </div>
               </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { CanvasSettings } from '../Settings/types';
 
 interface ToolbarPanelProps {
   onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
@@ -34,30 +33,6 @@ const ensureThemeTransitionStyles = () => {
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const [isDark, setIsDark] = useState(false);
-  const [canvasSettings, setCanvasSettings] = useState<CanvasSettings>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('canvasSettings');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error('Failed to parse canvas settings', e);
-        }
-      }
-    }
-    return {
-      cursorType: 'default',
-      backgroundType: 'dots',
-      dotColor: 'gray',
-      backgroundColor: '#ffffff',
-      dotSize: 4,
-      gridSpacing: 30,
-      showPointerTool: true,
-      showMoveTool: true,
-      showThemeToggle: true,
-    };
-  });
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
 
@@ -69,17 +44,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const handleSettingsChange = (e: CustomEvent<CanvasSettings>) => {
-      setCanvasSettings(e.detail);
-    };
-
-    window.addEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
-    return () => {
-      window.removeEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
-    };
   }, []);
 
   const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
@@ -151,7 +115,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Select',
-      show: canvasSettings.showPointerTool !== false,
     },
     {
       id: 'move' as const,
@@ -166,7 +129,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Move',
-      show: canvasSettings.showMoveTool !== false,
     },
     {
       id: 'text' as const,
@@ -178,7 +140,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Text',
-      show: true,
     },
     {
       id: 'image' as const,
@@ -190,7 +151,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Image',
-      show: true,
     },
     {
       id: 'video' as const,
@@ -201,20 +161,18 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Video',
-      show: true,
     },
-    // {
-    //   id: 'music' as const,
-    //   icon: (
-    //     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    //       <path d="M9 18V5l12-2v13" />
-    //       <circle cx="6" cy="18" r="3" />
-    //       <circle cx="18" cy="16" r="3" />
-    //     </svg>
-    //   ),
-    //   label: 'Music',
-    //   show: true,
-    // },
+    {
+      id: 'music' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+      ),
+      label: 'Music',
+    },
     {
       id: 'library' as const,
       icon: (
@@ -223,7 +181,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Library',
-      show: true,
     },
     {
       id: 'plugin' as const,
@@ -233,7 +190,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'Plugin',
-      show: true,
     },
   ];
 
@@ -267,7 +223,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           transition: 'opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
-        {tools.filter(t => t.show).map((tool) => (
+        {tools.map((tool) => (
           <button
             key={tool.id}
             onClick={() => handleToolClick(tool.id)}
@@ -284,8 +240,8 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               backgroundColor: selectedTool === tool.id
                 ? (isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.3)')
                 : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)'),
-              color: selectedTool === tool.id
-                ? (isDark ? '#60a5fa' : '#3b82f6')
+              color: selectedTool === tool.id 
+                ? (isDark ? '#60a5fa' : '#3b82f6') 
                 : (isDark ? '#cccccc' : '#4b5563'),
               transition: 'all 0.3s ease',
               boxShadow: selectedTool === tool.id
@@ -295,7 +251,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             onMouseEnter={(e) => {
               // Force pointer cursor when hovering toolbar icons to avoid
               // global stage cursors (grab) leaking through.
-              try { document.body.style.cursor = 'pointer'; } catch (err) { }
+              try { document.body.style.cursor = 'pointer'; } catch (err) {}
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.18)';
                 e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937';
@@ -303,7 +259,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               }
             }}
             onMouseLeave={(e) => {
-              try { document.body.style.cursor = ''; } catch (err) { }
+              try { document.body.style.cursor = ''; } catch (err) {}
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
@@ -315,52 +271,50 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           </button>
         ))}
 
-        {canvasSettings.showThemeToggle !== false && (
-          <button
-            onClick={handleThemeToggle}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            style={{
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '10px',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
-              color: isDark ? '#f5f5f5' : '#374151',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={(e) => {
-              try { document.body.style.cursor = 'pointer'; } catch (err) { }
-              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.08)';
-            }}
-            onMouseLeave={(e) => {
-              try { document.body.style.cursor = ''; } catch (err) { }
-              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
-            }}
-          >
-            {isDark ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-        )}
-
+        <button
+          onClick={handleThemeToggle}
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '10px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)',
+            color: isDark ? '#f5f5f5' : '#374151',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            try { document.body.style.cursor = 'pointer'; } catch (err) {}
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.08)';
+          }}
+          onMouseLeave={(e) => {
+            try { document.body.style.cursor = ''; } catch (err) {}
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+          }}
+        >
+          {isDark ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
+        </button>
+        
         {/* Divider */}
         <div
           style={{
@@ -371,7 +325,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'background-color 0.3s ease',
           }}
         />
-
+        
         {/* Upload Button */}
         <button
           onClick={handleUploadClick}
@@ -390,13 +344,13 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            try { document.body.style.cursor = 'pointer'; } catch (err) { }
+            try { document.body.style.cursor = 'pointer'; } catch (err) {}
             e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
             e.currentTarget.style.color = '#22c55e';
             e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
-            try { document.body.style.cursor = ''; } catch (err) { }
+            try { document.body.style.cursor = ''; } catch (err) {}
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
             e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
             e.currentTarget.style.transform = 'scale(1)';

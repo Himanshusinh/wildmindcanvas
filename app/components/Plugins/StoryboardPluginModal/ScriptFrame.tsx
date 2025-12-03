@@ -99,7 +99,7 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
         position: 'relative',
       }}
-    >
+            >
       <div
         className="script-frame-content"
         style={{
@@ -134,26 +134,26 @@ export const ScriptFrame: React.FC<ScriptFrameProps> = ({
         ) : (
           isEditing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: `${10 * scale}px` }}>
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                placeholder="Type your script here with @mentions (e.g., @Aryan, @restaurant)..."
-                style={{
-                  width: '100%',
-                  minHeight: `${150 * scale}px`,
-                  fontSize: `${13 * scale}px`,
-                  lineHeight: `${20 * scale}px`,
-                  color: textColor,
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  resize: 'vertical',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word',
-                }}
-                autoFocus
-              />
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              placeholder="Type your script here with @mentions (e.g., @Aryan, @restaurant)..."
+              style={{
+                width: '100%',
+                minHeight: `${150 * scale}px`,
+                fontSize: `${13 * scale}px`,
+                lineHeight: `${20 * scale}px`,
+                color: textColor,
+                backgroundColor: 'transparent',
+                border: 'none',
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+              }}
+              autoFocus
+            />
               <div style={{ display: 'flex', gap: `${8 * scale}px` }}>
                 <button
                   onClick={(e) => {
