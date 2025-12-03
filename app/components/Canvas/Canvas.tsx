@@ -3938,7 +3938,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (wasDragged) {
           // Optional smart selection over marquee region: compute tight mask bbox
           try {
-            const stageCanvas = stage.getCanvas();
+            const stageCanvas = stage.toCanvas();
             const ctx = (stageCanvas as any)?.getContext?.('2d');
             if (ctx) {
               const rx = Math.max(0, Math.min(marqueeRect.x, INFINITE_CANVAS_SIZE - 1));
@@ -3974,11 +3974,11 @@ export const Canvas: React.FC<CanvasProps> = ({
                       setSelectionBox(null);
                       setIsDragSelection(true);
                     }
-                  }).catch(() => {/* ignore */});
+                  }).catch(() => {/* ignore */ });
                 }
               }
             }
-          } catch {/* best-effort fallback to existing logic */}
+          } catch {/* best-effort fallback to existing logic */ }
           // Find all items that intersect with the marquee using Konva's intersection utility
           const selectedIndices: number[] = [];
           const selectedImageModalIdsList: string[] = [];
@@ -4392,7 +4392,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 // But to be more accurate, let's use a slightly smaller estimate to ensure tight fit
                 // Use a tighter estimate to ensure no extra space at bottom
                 // Actual height is ~140px minimum, but we use 110px to ensure tight fit
-               const textHeight = 110; // Tighter estimate to remove extra bottom space
+                const textHeight = 110; // Tighter estimate to remove extra bottom space
                 minX = Math.min(minX, textState.x);
                 minY = Math.min(minY, textState.y);
                 maxX = Math.max(maxX, textState.x + textWidth);
