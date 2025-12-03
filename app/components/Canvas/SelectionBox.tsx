@@ -554,6 +554,22 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
       <>
+        {/* Keep the normal marquee visible with subtle styling to indicate parallel selection */}
+        {selectionBox && (
+          <Rect
+            x={Math.min(selectionBox.startX, selectionBox.currentX)}
+            y={Math.min(selectionBox.startY, selectionBox.currentY)}
+            width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
+            height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
+            fill="rgba(147, 197, 253, 0.12)"
+            stroke="#93C5FD"
+            strokeWidth={3}
+            dash={[8, 6]}
+            listening={false}
+            globalCompositeOperation="source-over"
+            cornerRadius={0}
+          />
+        )}
         <Group
           ref={selectionGroupRef}
           x={selectionTightRect.x}
@@ -770,10 +786,10 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             y={0}
             width={selectionTightRect.width}
             height={selectionTightRect.height}
-            fill="rgba(147, 197, 253, 0.18)"
-            stroke="#60A5FA"
+            fill="rgba(96, 165, 250, 0.22)"
+            stroke="#2563EB"
             strokeWidth={4}
-            dash={[5, 5]}
+            dash={[6, 6]}
             listening={true}
             cornerRadius={0}
           />

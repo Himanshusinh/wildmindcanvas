@@ -294,6 +294,7 @@ export function createImageHandlers(
           const stitchedMeta = (current?.snapshot?.metadata as any)?.stitchedimage as any;
           let stitchedUrl: string | undefined;
           if (stitchedMeta) {
+            
             if (typeof stitchedMeta === 'string') {
               stitchedUrl = stitchedMeta;
             } else if (typeof stitchedMeta === 'object') {
