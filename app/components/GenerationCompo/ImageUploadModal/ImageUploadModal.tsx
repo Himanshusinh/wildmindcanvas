@@ -41,7 +41,7 @@ interface ImageUploadModalProps {
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number; isGenerating?: boolean }) => void;
   initialCount?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, sceneNumber?: number, previousSceneImageUrl?: string, storyboardMetadata?: Record<string, string>, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
@@ -326,7 +326,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1',
     'Seedream v4 4K',
     'Runway Gen4 Image',
-    'Runway Gen4 Image Turbo'
+    'Runway Gen4 Image Turbo',
+    'Z Image Turbo'
   ];
   const availableModels = (hasConnectedImage || hasExistingImage) ? IMAGE_TO_IMAGE_MODELS : ALL_MODELS;
 
@@ -406,6 +407,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         let height: number | undefined;
 
         if (selectedResolution) {
+          console.log('[ImageUploadModal] Calculating dimensions for resolution:', {
+            model: selectedModel,
+            selectedResolution,
+            selectedAspectRatio
+          });
           const [wRatio, hRatio] = selectedAspectRatio.split(':').map(Number);
           const ratio = wRatio / hRatio;
           let baseSize = 1024; // Default 1K
@@ -429,6 +435,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             height = 2048;
           }
         }
+
+        console.log('[ImageUploadModal] Calculated dimensions:', {
+          selectedResolution,
+          selectedAspectRatio,
+          width,
+          height
+        });
 
         // If a stitched reference is provided via props, force using ONLY that URL
         const stitchedOnly = typeof sourceImageUrl === 'string' && sourceImageUrl.includes('reference-stitched');
@@ -889,6 +902,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           targetModalId,
           imageCount,
           finalSourceImageUrlParam,
+          undefined, // sceneNumber
+          undefined, // previousSceneImageUrl
+          undefined, // storyboardMetadata
           width,
           height
         );
@@ -1132,6 +1148,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // Z Image Turbo supports 1K and 2K only
+    if (modelLower.includes('z image turbo')) {
+      return [
+        { value: '1K', label: '1K (1024px)' },
+        { value: '2K', label: '2K (2048px)' },
+      ];
+    }
+
     // Other models don't have resolution options
     return [];
   };
@@ -1140,9 +1164,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const getFinalModelName = () => {
     const modelLower = selectedModel.toLowerCase();
 
-    // For Google Nano Banana Pro, append resolution
+    // For Google Nano Banana Pro, DO NOT append resolution
+    // The backend expects just "Google nano banana pro" (mapped to google-nano-banana-pro)
+    // and separate width/height parameters.
     if (modelLower.includes('nano banana pro')) {
-      return `Google nano banana pro ${selectedResolution}`;
+      return 'Google nano banana pro';
     }
 
     // For Flux 2 Pro, append resolution
@@ -1150,11 +1176,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       return `Flux 2 Pro ${selectedResolution}`;
     }
 
-    // For Seedream, Imagen, and Flux Pro 1.1, append resolution
+    // For Seedream, Imagen, Flux Pro 1.1, and Z Image Turbo, append resolution
     if (
       modelLower.includes('seedream') ||
       modelLower.includes('imagen') ||
-      modelLower.includes('flux pro 1.1')
+      modelLower.includes('flux pro 1.1') ||
+      modelLower.includes('z image turbo')
     ) {
       return `${selectedModel} ${selectedResolution}`;
     }
@@ -1426,6 +1453,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           }
         }}
         onResolutionChange={(resolution) => {
+          console.log('[ImageUploadModal] Resolution changed:', { resolution, prev: selectedResolution });
           setSelectedResolution(resolution);
           if (onOptionsChange) {
             // Helper to get model name with NEW resolution
@@ -1436,7 +1464,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               if (
                 modelLower.includes('seedream') ||
                 modelLower.includes('imagen') ||
-                modelLower.includes('flux pro 1.1')
+                modelLower.includes('flux pro 1.1') ||
+                modelLower.includes('z image turbo')
               ) {
                 return `${selectedModel} ${res}`;
               }

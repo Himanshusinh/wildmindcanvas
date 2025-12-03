@@ -130,35 +130,24 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             if (sourceUrl.includes(',')) return undefined;
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height) => {
-            console.log('[ImageModalOverlays] onGenerate called!', { 
-              modalId: modalState.id, 
+          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, sceneNumber, previousSceneImageUrl, storyboardMetadata, width, height) => {
+            console.log('[ImageModalOverlays] onGenerate called!', {
+              modalId: modalState.id,
               hasOnImageGenerate: !!onImageGenerate,
               sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
+              width,
+              height
             });
             if (onImageGenerate) {
               try {
-                const imageCount = modalState.imageCount || 1;
-
                 // CRITICAL: Prioritize sourceImageUrl passed from ImageUploadModal (for simple image-to-image)
                 // Fall back to modalState.sourceImageUrl only for scene-based generation
                 let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
-                const sceneNumber = (modalState as any).sceneNumber;
-                
+
                 console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
                   fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
                   fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
                   finalChoice: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-                });
-
-                console.log('[ImageModalOverlays] 🔍 Checking modalState.sourceImageUrl:', {
-                  modalId: modalState.id,
-                  hasSourceImageUrl: !!modalState.sourceImageUrl,
-                  sourceImageUrl: modalState.sourceImageUrl || 'NONE - will try to build from connected scene',
-                  sourceImageUrlPreview: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-                  sceneNumber,
-                  isStitchedImage: modalState.sourceImageUrl?.includes('reference-stitched'),
-                  isCommaSeparated: modalState.sourceImageUrl?.includes(','),
                 });
 
                 // CRITICAL: If modal state already has a stitched image URL, use it and don't override!
@@ -425,7 +414,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
                 // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
                 const targetFrameId = modalId || modalState.id;
-                
+
                 console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
                   modalIdParam: modalId || 'NONE',
                   modalStateId: modalState.id,

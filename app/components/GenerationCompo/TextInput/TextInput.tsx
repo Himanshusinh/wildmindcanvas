@@ -53,7 +53,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   storyboardModalStates = [],
 }) => {
   const [text, setText] = useState('');
-  const [selectedModel, setSelectedModel] = useState('GPT-4');
+  const [selectedModel, setSelectedModel] = useState('GPT-4o');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
@@ -178,24 +178,47 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
-  const handleEnhance = async () => {
-    if (!text.trim() || isEnhancing) return;
+  const isEnhancingRef = useRef(false);
 
-    // Trigger loading state immediately
-    if (onScriptGenerationStart) {
-      onScriptGenerationStart(id);
+  const handleEnhance = async () => {
+    if (!text.trim() || isEnhancing || isEnhancingRef.current) return;
+
+    // Check if connected to storyboard
+    const isConnectedToStoryboard = connections.some(conn => {
+      if (conn.from === id) {
+        return storyboardModalStates.some(s => s.id === conn.to);
+      }
+      if (conn.to === id) {
+        return storyboardModalStates.some(s => s.id === conn.from);
+      }
+      return false;
+    });
+
+    isEnhancingRef.current = true;
+    setIsEnhancing(true);
+
+    if (isConnectedToStoryboard) {
+      // Trigger loading state immediately for storyboard generation
+      if (onScriptGenerationStart) {
+        onScriptGenerationStart(id);
+      }
+      setEnhanceStatus('Preparing storyboard script...');
+    } else {
+      setEnhanceStatus('Enhancing prompt...');
     }
 
-    setIsEnhancing(true);
-    setEnhanceStatus('Preparing storyboard script...');
     try {
       const { queryCanvasPrompt } = await import('@/lib/api');
       const result = await queryCanvasPrompt(text, undefined, {
         onAttempt: (attempt, maxAttempts) => {
-          if (attempt === 1) {
-            setEnhanceStatus('Generating storyboard scenes...');
+          if (isConnectedToStoryboard) {
+            if (attempt === 1) {
+              setEnhanceStatus('Generating storyboard scenes...');
+            } else {
+              setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+            }
           } else {
-            setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+            setEnhanceStatus(`Enhancing (${attempt}/${maxAttempts})...`);
           }
         },
       });
@@ -204,8 +227,16 @@ export const TextInput: React.FC<TextInputProps> = ({
         (typeof result?.response === 'string' && result.response.trim());
 
       if (enhancedText) {
-        if (onScriptGenerated) {
-          onScriptGenerated(id, enhancedText);
+        if (isConnectedToStoryboard) {
+          if (onScriptGenerated) {
+            onScriptGenerated(id, enhancedText);
+          }
+        } else {
+          // Update text in place
+          setText(enhancedText);
+          if (onValueChange) {
+            onValueChange(enhancedText);
+          }
         }
       } else {
         console.warn('[TextInput] No enhanced text returned from queryCanvasPrompt response:', result);
@@ -215,6 +246,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       console.error('[TextInput] Error enhancing prompt:', error);
       alert(`Failed to enhance prompt: ${error.message || 'Unknown error'}`);
     } finally {
+      isEnhancingRef.current = false;
       setIsEnhancing(false);
       setEnhanceStatus('');
     }
@@ -311,10 +343,13 @@ export const TextInput: React.FC<TextInputProps> = ({
           autoFocusInput={autoFocusInput}
           onTextChange={(v) => {
             setText(v);
-            if (onValueChange) onValueChange(v);
+            // Don't call onValueChange here to avoid flooding undo history
           }}
           onTextFocus={() => setIsTextFocused(true)}
-          onTextBlur={() => setIsTextFocused(false)}
+          onTextBlur={() => {
+            setIsTextFocused(false);
+            if (onValueChange) onValueChange(text);
+          }}
           onKeyDown={handleKeyDown}
           onConfirm={handleConfirm}
           selectedModel={selectedModel}

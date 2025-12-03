@@ -156,7 +156,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              {['GPT-4', 'GPT-3.5', 'Claude 3', 'Gemini Pro', 'Llama 2'].map((model) => (
+              {['GPT-4o', 'Gemini 1.5 Pro'].map((model) => (
                 <div
                   key={model}
                   onClick={(e) => {

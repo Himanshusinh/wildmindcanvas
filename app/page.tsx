@@ -215,6 +215,123 @@ export function CanvasApp({ user }: CanvasAppProps) {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
           setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
+        } else if (element.type === 'text-generator') {
+          setTextGenerators((prev) => {
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
+          });
+        } else if (element.type === 'remove-bg-plugin') {
+          setRemoveBgGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              removedBgImageUrl: element.meta?.removedBgImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
+              model: element.meta?.model,
+              backgroundType: element.meta?.backgroundType,
+              scaleValue: element.meta?.scaleValue,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isRemovingBg: element.meta?.isRemovingBg
+            }];
+          });
+        } else if (element.type === 'erase-plugin') {
+          setEraseGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              erasedImageUrl: element.meta?.erasedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localErasedImageUrl: element.meta?.localErasedImageUrl || null,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isErasing: element.meta?.isErasing
+            }];
+          });
+        } else if (element.type === 'expand-plugin') {
+          setExpandGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              expandedImageUrl: element.meta?.expandedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isExpanding: element.meta?.isExpanding
+            }];
+          });
+        } else if (element.type === 'vectorize-plugin') {
+          setVectorizeGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
+              mode: element.meta?.mode,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isVectorizing: element.meta?.isVectorizing
+            }];
+          });
+        } else if (element.type === 'storyboard-plugin') {
+          setStoryboardGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              scriptText: element.meta?.scriptText,
+              characterNamesMap: element.meta?.characterNamesMap,
+              propsNamesMap: element.meta?.propsNamesMap,
+              backgroundNamesMap: element.meta?.backgroundNamesMap
+            }];
+          });
+        } else if (element.type === 'script-frame-plugin') {
+          setScriptFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              pluginId: element.meta?.pluginId,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              text: element.meta?.text
+            }];
+          });
+        } else if (element.type === 'scene-frame-plugin') {
+          setSceneFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              scriptFrameId: element.meta?.scriptFrameId,
+              sceneNumber: element.meta?.sceneNumber,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              content: element.meta?.content,
+              characterNames: element.meta?.characterNames,
+              locationName: element.meta?.locationName,
+              timeOfDay: element.meta?.timeOfDay,
+              mood: element.meta?.mood
+            }];
+          });
         }
       } else if (op.type === 'delete' && op.elementId) {
         // Delete element - directly remove from state (don't call handleImageDelete to avoid sending another delete op)
@@ -237,6 +354,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setTextGenerators((prev) => prev.filter(t => t.id !== op.elementId));
+        setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -303,6 +428,33 @@ export function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
+        setTextGenerators((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        });
+        const updatePluginPosition = (prev: any[]) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        };
+        setRemoveBgGenerators(updatePluginPosition);
+        setEraseGenerators(updatePluginPosition);
+        setExpandGenerators(updatePluginPosition);
+        setVectorizeGenerators(updatePluginPosition);
+        setStoryboardGenerators(updatePluginPosition);
+        setScriptFrameGenerators(updatePluginPosition);
+        setSceneFrameGenerators(updatePluginPosition);
       } else if (op.type === 'update' && op.elementId && op.data.updates) {
         // Also handle regular element updates
         setImages((prev) => {
@@ -343,6 +495,37 @@ export function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
+        setTextGenerators((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...op.data.updates };
+            return next;
+          }
+          return prev;
+        });
+        const updatePluginState = (prev: any[]) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            const updates = { ...op.data.updates };
+            // Flatten meta updates if present
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates };
+            return next;
+          }
+          return prev;
+        };
+        setRemoveBgGenerators(updatePluginState);
+        setEraseGenerators(updatePluginState);
+        setExpandGenerators(updatePluginState);
+        setVectorizeGenerators(updatePluginState);
+        setStoryboardGenerators(updatePluginState);
+        setScriptFrameGenerators(updatePluginState);
+        setSceneFrameGenerators(updatePluginState);
         // If this update modified meta.connections, update connectors state accordingly (backwards compat)
         if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
           const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
@@ -905,18 +1088,36 @@ export function CanvasApp({ user }: CanvasAppProps) {
       // Ctrl/Cmd + Z for undo
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
-        console.log('[Ops] keydown undo', { canUndo });
+        console.log('[Undo/Redo] Cmd+Z pressed, canUndo:', canUndo);
         if (canUndo) {
+          console.log('[Undo/Redo] Executing local undo and broadcasting...');
           undo();
+          if (realtimeRef.current) {
+            console.log('[Undo/Redo] Broadcasting undo via WebSocket');
+            realtimeRef.current.sendUndo();
+          } else {
+            console.warn('[Undo/Redo] realtimeRef.current is null, cannot broadcast');
+          }
+        } else {
+          console.log('[Undo/Redo] Cannot undo (nothing to undo)');
         }
       }
       // Ctrl/Cmd + Shift + Z or Ctrl+Y for redo
       if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
         (e.ctrlKey && e.key.toLowerCase() === 'y')) {
         e.preventDefault();
-        console.log('[Ops] keydown redo', { canRedo });
+        console.log('[Undo/Redo] Cmd+Shift+Z or Ctrl+Y pressed, canRedo:', canRedo);
         if (canRedo) {
+          console.log('[Undo/Redo] Executing local redo and broadcasting...');
           redo();
+          if (realtimeRef.current) {
+            console.log('[Undo/Redo] Broadcasting redo via WebSocket');
+            realtimeRef.current.sendRedo();
+          } else {
+            console.warn('[Undo/Redo] realtimeRef.current is null, cannot broadcast');
+          }
+        } else {
+          console.log('[Undo/Redo] Cannot redo (nothing to redo)');
         }
       }
     };
@@ -924,6 +1125,30 @@ export function CanvasApp({ user }: CanvasAppProps) {
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
   }, [canUndo, canRedo, undo, redo]);
+
+  // Listen to realtime undo/redo broadcasts
+  useEffect(() => {
+    const client = realtimeRef.current;
+    if (!client) {
+      console.warn('[Undo/Redo] Realtime client not available, cannot listen for remote undo/redo');
+      return;
+    }
+    console.log('[Undo/Redo] Registering realtime listener for undo/redo events');
+    const handler = (evt: any) => {
+      if (evt?.type === 'undo') {
+        console.log('[Undo/Redo] Received remote undo event, executing local undo');
+        undo();
+      } else if (evt?.type === 'redo') {
+        console.log('[Undo/Redo] Received remote redo event, executing local redo');
+        redo();
+      }
+    };
+    client.on(handler);
+    return () => {
+      console.log('[Undo/Redo] Unregistering realtime listener');
+      client.off(handler);
+    };
+  }, [undo, redo]);
 
   // Create state and setters objects for handlers (after all dependencies are defined, including processMediaFile)
   // Note: handlers are created here but processMediaFile is defined later - we'll use a wrapper
@@ -1881,16 +2106,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPersistImageModalMove={async (id, updates) => {
-                // Optimistic update
+                // Optimistic update with capture of previous state for correct inverse
+                const prev = imageGenerators.find(m => m.id === id);
+
                 setImageGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+
                 // Broadcast via realtime
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast update image', id, Object.keys(updates || {}));
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
+
                 // Append op for undo/redo step
                 if (projectId && opManagerInitialized) {
-                  const prev = imageGenerators.find(m => m.id === id);
                   const inverseUpdates: any = {};
                   if (prev) {
                     for (const k of Object.keys(updates || {})) {
@@ -2060,21 +2288,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistTextModalMove={async (id, updates) => {
                 // Optimistic update with capture of previous state for correct inverse
-                let capturedPrev: { id: string; x: number; y: number; value?: string } | undefined = undefined;
+                const prevItem = textGenerators.find(t => t.id === id);
+
                 setTextGenerators((prev) => {
-                  const found = prev.find(t => t.id === id);
-                  capturedPrev = found ? { ...found } : undefined;
                   return prev.map(t => t.id === id ? { ...t, ...updates } : t);
                 });
+
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast update text', id, Object.keys(updates || {}));
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
+
                 if (projectId && opManagerInitialized) {
                   const inverseUpdates: any = {};
-                  if (capturedPrev) {
+                  if (prevItem) {
                     for (const k of Object.keys(updates || {})) {
-                      (inverseUpdates as any)[k] = (capturedPrev as any)[k];
+                      (inverseUpdates as any)[k] = (prevItem as any)[k];
                     }
                   }
                   await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
