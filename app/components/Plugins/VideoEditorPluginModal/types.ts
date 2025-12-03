@@ -1,4 +1,4 @@
-export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects';
+export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects' | 'tools';
 
 export interface Project {
     id: string;
@@ -50,6 +50,13 @@ export interface Animation {
     category: 'page' | 'photo' | 'element';
     duration?: number; // seconds
     timing?: 'enter' | 'exit' | 'both';
+}
+
+export interface AnimationDefinition {
+    id: string;
+    name: string;
+    category: string;
+    icon: React.ReactNode;
 }
 
 export interface BorderStyle {
@@ -709,7 +716,7 @@ export const GRADIENT_COLORS = [
 export const ANIMATION_CATEGORIES = [
     'Basic', 'Bounce', 'Rotation', 'Slide', 'Fade', 'Blur', 'Creative', 'Flip', 'Fly', 'Stretch', 'Zoom'
 ];
-export const ANIMATIONS = [
+export const ANIMATIONS: AnimationDefinition[] = [
     // ✅ BASIC
     { id: 'fade-in', name: 'Fade In', category: 'Basic', icon: React.createElement(Eye, { size: 16 }) },
     { id: 'boom', name: 'Boom', category: 'Basic', icon: React.createElement(Maximize, { size: 16 }) },

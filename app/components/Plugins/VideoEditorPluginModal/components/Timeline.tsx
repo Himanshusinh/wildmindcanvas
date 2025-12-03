@@ -1,6 +1,5 @@
-
 import React, { useRef, useState, useEffect } from 'react';
-import { Track, TimelineItem, TransitionType, ANIMATIONS } from '../types';
+import { Track, TimelineItem, TransitionType, ANIMATIONS, AnimationDefinition } from '../types';
 import {
     Play, Pause, ZoomIn, ZoomOut, Scissors,
     Trash2, Plus, Video, Music, Type, Settings,
