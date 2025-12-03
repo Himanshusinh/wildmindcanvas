@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ProfileSectionProps {
   userData: any;
@@ -21,17 +22,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   handleUpgradePlan,
   handleAccountSettings,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const containerBg = isDark ? '#121212' : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#111827';
@@ -142,8 +133,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
         padding: '20px', 
         background: containerBg, 
         borderRadius: '12px',
-        border: `1px solid ${cardBorder}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease'
+        transition: 'background-color 0.3s ease'
       }}>
         <h4 style={{ 
           margin: '0 0 16px 0', 
@@ -176,8 +166,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           padding: '20px',
           background: containerBg,
           borderRadius: '12px',
-          border: `1px solid ${cardBorder}`,
-          transition: 'background-color 0.3s ease, border-color 0.3s ease',
+          transition: 'background-color 0.3s ease',
         }}
       >
         <div>

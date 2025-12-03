@@ -1,4 +1,11 @@
 
+export const STORYBOARD_UTILS_BUILD_TAG = 'sceneUtils@2025-11-29T15:46Z';
+if (typeof window !== 'undefined') {
+    // Visible once per client load to confirm fresh code
+    // eslint-disable-next-line no-console
+    console.info('[WM Canvas] Loaded', STORYBOARD_UTILS_BUILD_TAG);
+}
+
 
 export interface ParsedScene {
     sceneNumber: number;
@@ -73,13 +80,14 @@ export function parseScriptIntoScenes(scriptText: string): ParsedScene[] {
 }
 
 /**
- * Calculate grid positions for scene frames
- * Arranges them in a grid to the right of the script frame
+ * Calculate positions for scene frames
+ * Arranges ALL scenes in a single column to the right of the script frame
  */
 export function calculateSceneFramePositions(
     scriptFrameX: number,
     scriptFrameY: number,
     scriptFrameWidth: number,
+    scriptFrameHeight: number,
     numScenes: number,
     sceneFrameWidth: number = 350,
     sceneFrameHeight: number = 300,
@@ -89,18 +97,20 @@ export function calculateSceneFramePositions(
 
     // Start to the right of the script frame
     const startX = scriptFrameX + scriptFrameWidth + gap * 2;
-    const startY = scriptFrameY;
 
-    // Arrange in a grid (2 columns)
-    const columns = 2;
+    // Calculate total height of all scene frames including gaps
+    const totalScenesHeight = numScenes * sceneFrameHeight + (numScenes - 1) * gap;
 
+    // Calculate the starting Y position to center the block of scenes relative to the script frame
+    // Center of script frame = scriptFrameY + scriptFrameHeight / 2
+    // Top of scenes block = Center of script frame - totalScenesHeight / 2
+    const startY = (scriptFrameY + scriptFrameHeight / 2) - (totalScenesHeight / 2);
+
+    // Arrange in a single vertical column
     for (let i = 0; i < numScenes; i++) {
-        const col = i % columns;
-        const row = Math.floor(i / columns);
-
         positions.push({
-            x: startX + col * (sceneFrameWidth + gap),
-            y: startY + row * (sceneFrameHeight + gap),
+            x: startX,
+            y: startY + i * (sceneFrameHeight + gap),
         });
     }
 

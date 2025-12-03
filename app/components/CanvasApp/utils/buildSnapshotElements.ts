@@ -9,7 +9,9 @@ export function buildSnapshotElements(
 
   // Build connection map keyed by source element id
   const connectionsBySource: Record<string, Array<any>> = {};
-  const connectorsToUse = connectorsOverride ?? state.connectors;
+  const connectorsToUse = (connectorsOverride ?? state.connectors).filter(
+    (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+  );
   connectorsToUse.forEach((c) => {
     if (!c || !c.id) return;
     const src = c.from;
@@ -44,7 +46,16 @@ export function buildSnapshotElements(
 
   // Generators (image/video/music)
   state.imageGenerators.forEach((g) => {
-    const metaObj: any = { generatedImageUrl: g.generatedImageUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
+    const metaObj: any = { 
+      generatedImageUrl: g.generatedImageUrl || null, 
+      sourceImageUrl: (g as any).sourceImageUrl || null, // CRITICAL: Save sourceImageUrl to snapshot
+      frameWidth: g.frameWidth, 
+      frameHeight: g.frameHeight, 
+      model: g.model, 
+      frame: g.frame, 
+      aspectRatio: g.aspectRatio, 
+      prompt: g.prompt 
+    };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
     elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, meta: metaObj };
   });
@@ -139,31 +150,6 @@ export function buildSnapshotElements(
     };
   });
 
-  // Replace generators
-  state.replaceGenerators.forEach((modal) => {
-    if (!modal || !modal.id) return;
-    const metaObj: any = {
-      replacedImageUrl: modal.replacedImageUrl || null,
-      sourceImageUrl: modal.sourceImageUrl || null,
-      localReplacedImageUrl: modal.localReplacedImageUrl || null,
-      model: modal.model || 'bria/eraser',
-      frameWidth: modal.frameWidth || 400,
-      frameHeight: modal.frameHeight || 500,
-      isReplacing: modal.isReplacing || false,
-    };
-    // Attach any connections originating from this element into its meta
-    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-      metaObj.connections = connectionsBySource[modal.id];
-    }
-    elements[modal.id] = {
-      id: modal.id,
-      type: 'replace-plugin',
-      x: modal.x,
-      y: modal.y,
-      meta: metaObj,
-    };
-  });
-
   // Expand generators
   state.expandGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;
@@ -220,7 +206,262 @@ export function buildSnapshotElements(
       frameWidth: modal.frameWidth || 400,
       frameHeight: modal.frameHeight || 500,
       scriptText: modal.scriptText || null,
+      characterNamesMap: (modal as any).characterNamesMap || {},
+      propsNamesMap: (modal as any).propsNamesMap || {},
+      backgroundNamesMap: (modal as any).backgroundNamesMap || {},
+      stitchedImageUrl: (modal as any).stitchedImageUrl || undefined,
     };
+
+    // Build namedImages object: name -> imageUrl mapping
+    // This auto-updates whenever names maps or connections change
+    const namedImages: {
+      characters?: Record<string, string>;
+      backgrounds?: Record<string, string>;
+      props?: Record<string, string>;
+    } = {};
+
+    // Get connections for this storyboard
+    // Images connect TO the storyboard, so we filter by c.to === modal.id
+    const storyboardConnections = connectorsToUse.filter(c => c.to === modal.id);
+    const characterConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-character');
+    const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
+    const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
+    
+    console.log(`[buildSnapshotElements] Storyboard ${modal.id} connections:`, {
+      totalConnections: storyboardConnections.length,
+      characterConnections: characterConnections.length,
+      backgroundConnections: backgroundConnections.length,
+      propsConnections: propsConnections.length,
+      characterConnectionsDetails: characterConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor })),
+    });
+
+    // Build character name -> imageUrl map
+    if ((modal as any).characterNamesMap) {
+      const characterMap: Record<string, string> = {};
+      Object.entries((modal as any).characterNamesMap).forEach(([indexStr, name]) => {
+        const index = parseInt(indexStr, 10);
+        if (name && characterConnections[index]) {
+          // Connection is FROM image TO storyboard, so imageId is c.from
+          const imageId = characterConnections[index].from;
+          let imageUrl: string | undefined = undefined;
+          
+          // First, try to get URL from the elements we've already built (image generators are processed earlier)
+          const imageElement = elements[imageId];
+          if (imageElement && imageElement.type === 'image-generator') {
+            imageUrl = imageElement.meta?.generatedImageUrl || 
+                      imageElement.meta?.sourceImageUrl || 
+                      imageElement.meta?.generatedImageUrls?.[0] ||
+                      imageElement.meta?.url;
+          }
+          
+          // Fallback to state if not found in elements
+          if (!imageUrl) {
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            if (imageGen) {
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            }
+          }
+          
+          // Also try images array (uploaded images also have Zata URLs)
+          if (!imageUrl) {
+            const image = state.images.find(img => (img as any).elementId === imageId);
+            imageUrl = image?.url || (image as any)?.firebaseUrl;
+          }
+          
+          // Also check if it's in the elements as a regular image
+          if (!imageUrl && imageElement && imageElement.type === 'image') {
+            imageUrl = imageElement.meta?.url;
+          }
+          
+          if (imageUrl) {
+            // Store the Zata URL (url field contains the Zata publicUrl)
+            characterMap[name as string] = imageUrl;
+            console.log(`[buildSnapshotElements] Mapped character "${name}" to image URL: ${imageUrl.substring(0, 80)}...`);
+          } else {
+            console.warn(`[buildSnapshotElements] ⚠️ No image URL found for character "${name}" (imageId: ${imageId})`);
+          }
+        }
+      });
+      if (Object.keys(characterMap).length > 0) {
+        namedImages.characters = characterMap;
+        console.log(`[buildSnapshotElements] Built character namedImages for ${modal.id}:`, characterMap);
+      }
+    }
+
+    // Build background name -> imageUrl map
+    if ((modal as any).backgroundNamesMap) {
+      const backgroundMap: Record<string, string> = {};
+      Object.entries((modal as any).backgroundNamesMap).forEach(([indexStr, name]) => {
+        const index = parseInt(indexStr, 10);
+        if (name && backgroundConnections[index]) {
+          // Connection is FROM image TO storyboard, so imageId is c.from
+          const imageId = backgroundConnections[index].from;
+          let imageUrl: string | undefined = undefined;
+          
+          // First, try to get URL from the elements we've already built (image generators are processed earlier)
+          const imageElement = elements[imageId];
+          if (imageElement && imageElement.type === 'image-generator') {
+            imageUrl = imageElement.meta?.generatedImageUrl || 
+                      imageElement.meta?.sourceImageUrl || 
+                      imageElement.meta?.generatedImageUrls?.[0] ||
+                      imageElement.meta?.url;
+          }
+          
+          // Fallback to state if not found in elements
+          if (!imageUrl) {
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            if (imageGen) {
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            }
+          }
+          
+          // Also try images array (uploaded images)
+          if (!imageUrl) {
+            const image = state.images.find(img => (img as any).elementId === imageId);
+            imageUrl = image?.url || (image as any)?.firebaseUrl;
+          }
+          
+          // Also check if it's in the elements as a regular image
+          if (!imageUrl && imageElement && imageElement.type === 'image') {
+            imageUrl = imageElement.meta?.url;
+          }
+          
+          if (imageUrl) {
+            backgroundMap[name as string] = imageUrl;
+            console.log(`[buildSnapshotElements] Mapped background "${name}" to image URL: ${imageUrl.substring(0, 80)}...`);
+          } else {
+            console.warn(`[buildSnapshotElements] ⚠️ No image URL found for background "${name}" (imageId: ${imageId})`);
+          }
+        }
+      });
+      if (Object.keys(backgroundMap).length > 0) {
+        namedImages.backgrounds = backgroundMap;
+        console.log(`[buildSnapshotElements] Built background namedImages for ${modal.id}:`, backgroundMap);
+      }
+    }
+
+    // Build props name -> imageUrl map
+    if ((modal as any).propsNamesMap) {
+      const propsMap: Record<string, string> = {};
+      Object.entries((modal as any).propsNamesMap).forEach(([indexStr, name]) => {
+        const index = parseInt(indexStr, 10);
+        console.log(`[buildSnapshotElements] Processing prop index ${index}, name: "${name}"`);
+        console.log(`[buildSnapshotElements] propsConnections[${index}]:`, propsConnections[index]);
+        
+        if (name && propsConnections[index]) {
+          // Connection is FROM image TO storyboard, so imageId is c.from
+          const imageId = propsConnections[index].from;
+          console.log(`[buildSnapshotElements] Looking for image with ID: ${imageId}`);
+          console.log(`[buildSnapshotElements] Available imageGenerators IDs:`, state.imageGenerators.map(g => g.id));
+          console.log(`[buildSnapshotElements] Available elements keys:`, Object.keys(elements).filter(k => k.includes('image')));
+          
+          let imageUrl: string | undefined = undefined;
+          
+          // First, try to get URL from the elements we've already built (image generators are processed earlier)
+          const imageElement = elements[imageId];
+          if (imageElement) {
+            console.log(`[buildSnapshotElements] Found imageElement in elements:`, {
+              type: imageElement.type,
+              hasMeta: !!imageElement.meta,
+              generatedImageUrl: imageElement.meta?.generatedImageUrl ? `${imageElement.meta.generatedImageUrl.substring(0, 80)}...` : 'null',
+            });
+            if (imageElement.type === 'image-generator') {
+              imageUrl = imageElement.meta?.generatedImageUrl || 
+                        imageElement.meta?.sourceImageUrl || 
+                        imageElement.meta?.generatedImageUrls?.[0] ||
+                        imageElement.meta?.url;
+            } else if (imageElement.type === 'image') {
+              imageUrl = imageElement.meta?.url;
+            }
+          }
+          
+          // Fallback to state if not found in elements
+          if (!imageUrl) {
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            if (imageGen) {
+              console.log(`[buildSnapshotElements] Found imageGen in state:`, {
+                id: imageGen.id,
+                generatedImageUrl: imageGen.generatedImageUrl ? `${imageGen.generatedImageUrl.substring(0, 80)}...` : 'null',
+              });
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            } else {
+              console.warn(`[buildSnapshotElements] ImageGen not found in state.imageGenerators, trying state.images`);
+            }
+          }
+          
+          // Also try images array (uploaded images)
+          if (!imageUrl) {
+            const image = state.images.find(img => (img as any).elementId === imageId);
+            if (image) {
+              console.log(`[buildSnapshotElements] Found image in state.images:`, {
+                elementId: (image as any).elementId,
+                url: image.url ? `${image.url.substring(0, 80)}...` : 'null',
+              });
+            }
+            imageUrl = image?.url || (image as any)?.firebaseUrl;
+          }
+          
+          if (imageUrl) {
+            propsMap[name as string] = imageUrl;
+            console.log(`[buildSnapshotElements] ✅ Mapped prop "${name}" to image URL: ${imageUrl.substring(0, 80)}...`);
+          } else {
+            console.warn(`[buildSnapshotElements] ⚠️ No image URL found for prop "${name}" (imageId: ${imageId})`, {
+              imageElementFound: !!imageElement,
+              imageElementType: imageElement?.type,
+              imageGenFound: !!state.imageGenerators.find(img => img.id === imageId),
+              imageFound: !!state.images.find(img => (img as any).elementId === imageId),
+              allImageGeneratorIds: state.imageGenerators.map(g => g.id),
+            });
+          }
+        } else {
+          console.warn(`[buildSnapshotElements] ⚠️ No connection found for prop index ${index} (name: "${name}")`, {
+            hasName: !!name,
+            hasConnection: !!propsConnections[index],
+            propsConnectionsCount: propsConnections.length,
+            propsConnections: propsConnections.map((c, i) => ({ index: i, from: c.from, to: c.to, toAnchor: c.toAnchor })),
+          });
+        }
+      });
+      if (Object.keys(propsMap).length > 0) {
+        namedImages.props = propsMap;
+        console.log(`[buildSnapshotElements] ✅ Built props namedImages for ${modal.id}:`, propsMap);
+      } else {
+        console.warn(`[buildSnapshotElements] ⚠️ No props mapped for ${modal.id}`, {
+          propsNamesMap: (modal as any).propsNamesMap,
+          propsConnectionsCount: propsConnections.length,
+        });
+      }
+    }
+
+    // Add namedImages to meta if it has any data
+    if (Object.keys(namedImages).length > 0) {
+      metaObj.namedImages = namedImages;
+      console.log(`[buildSnapshotElements] ✅ Added namedImages to storyboard ${modal.id}:`, {
+        characters: Object.keys(namedImages.characters || {}).length,
+        backgrounds: Object.keys(namedImages.backgrounds || {}).length,
+        props: Object.keys(namedImages.props || {}).length,
+        fullObject: namedImages,
+      });
+    } else {
+      console.warn(`[buildSnapshotElements] ⚠️ No namedImages built for storyboard ${modal.id}`, {
+        hasCharacterNamesMap: !!(modal as any).characterNamesMap,
+        hasBackgroundNamesMap: !!(modal as any).backgroundNamesMap,
+        hasPropsNamesMap: !!(modal as any).propsNamesMap,
+        characterConnectionsCount: characterConnections.length,
+        backgroundConnectionsCount: backgroundConnections.length,
+        propsConnectionsCount: propsConnections.length,
+      });
+    }
+
     // Attach any connections originating from this element into its meta
     if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
       metaObj.connections = connectionsBySource[modal.id];
@@ -264,6 +505,11 @@ export function buildSnapshotElements(
       frameWidth: modal.frameWidth || 350,
       frameHeight: modal.frameHeight || 300,
       content: modal.content || '',
+      characterIds: (modal as any).characterIds || undefined,
+      locationId: (modal as any).locationId || undefined,
+      mood: (modal as any).mood || undefined,
+      characterNames: (modal as any).characterNames || undefined,
+      locationName: (modal as any).locationName || undefined,
     };
     if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
       metaObj.connections = connectionsBySource[modal.id];

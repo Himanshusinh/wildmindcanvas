@@ -1,6 +1,7 @@
 'use client';
 import React, { useRef, useState, useEffect } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VideoModalFrameProps {
   id?: string;
@@ -37,24 +38,14 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
   getAspectRatio,
   onSetIsPinned,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const imageAreaRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [wasJustPlayed, setWasJustPlayed] = useState(false);
 
-  const frameBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  const frameBg = isDark ? '#121212' : '#ffffff';
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
   const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
   const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
@@ -83,8 +74,6 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         aspectRatio: getAspectRatio(selectedAspectRatio),
         minHeight: `${400 * scale}px`,
         backgroundColor: frameBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: (isHovered || isPinned) && !isUploadedVideo ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
@@ -136,8 +125,8 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: isPlaying ? '60px' : '72px',
-              height: isPlaying ? '60px' : '72px',
+              width: `${(isPlaying ? 60 : 72) * scale}px`,
+              height: `${(isPlaying ? 60 : 72) * scale}px`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

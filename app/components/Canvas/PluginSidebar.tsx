@@ -30,7 +30,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
     return () => observer.disconnect();
   }, []);
 
-  const [plugins] = useState<Plugin[]>([
+  const [plugins, setPlugins] = useState<Plugin[]>([
     {
       id: 'upscale',
       name: 'Upscale',
@@ -43,13 +43,8 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
     },
     {
       id: 'erase',
-      name: 'Erase',
-      description: 'Erase parts of images using AI',
-    },
-    {
-      id: 'replace',
-      name: 'Replace',
-      description: 'Replace parts of images using AI',
+      name: 'Erase / Replace',
+      description: 'Erase or replace parts of images using AI',
     },
     {
       id: 'expand',
@@ -72,6 +67,40 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       description: 'Edit and assemble videos',
     },
   ]);
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pluginId: string } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, pluginId: string) => {
+    e.preventDefault();
+    e.nativeEvent.preventDefault();
+    e.stopPropagation();
+    console.log('Context menu triggered for:', pluginId);
+    setContextMenu({ x: e.clientX, y: e.clientY, pluginId });
+  };
+
+  const handleDeletePlugin = (id: string) => {
+    setPlugins(prev => prev.filter(p => p.id !== id));
+    setContextMenu(null);
+  };
+
+  const handleDuplicatePlugin = (id: string) => {
+    const plugin = plugins.find(p => p.id === id);
+    if (plugin) {
+      const newPlugin = {
+        ...plugin,
+        id: `${plugin.id}-${Date.now()}`,
+        name: `${plugin.name} (Copy)`,
+      };
+      setPlugins(prev => [...prev, newPlugin]);
+    }
+    setContextMenu(null);
+  };
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {
     if (onSelectPlugin) {
@@ -106,7 +135,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px', padding: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', padding: '16px' }}>
         {items.map((item) => (
           <div
             key={item.id}
@@ -118,7 +147,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               overflow: 'hidden',
               cursor: 'pointer',
               background: cardBg,
-              borderRadius: '16px',
+              borderRadius: '12px',
               border: `2px solid ${cardBorder}`,
               transition: 'all 0.3s ease',
               position: 'relative',
@@ -126,7 +155,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '16px',
+              padding: '12px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';
@@ -147,17 +176,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
               }}
             >
               {item.id === 'upscale' ? (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
               ) : item.id === 'removebg' ? (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
               ) : item.id === 'video-editor' ? (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
                   <line x1="7" y1="2" x2="7" y2="22" />
                   <line x1="17" y1="2" x2="17" y2="22" />
@@ -168,7 +197,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
                   <line x1="17" y1="7" x2="22" y2="7" />
                 </svg>
               ) : (
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
                 </svg>
               )}
@@ -176,11 +205,12 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
             {/* Plugin Name - centered below icon */}
             <div
               style={{
-                fontSize: '12px',
+                fontSize: '11px',
                 fontWeight: 500,
                 color: nameColor,
                 textAlign: 'center',
                 transition: 'color 0.3s ease',
+                lineHeight: '1.2',
               }}
             >
               {item.name}

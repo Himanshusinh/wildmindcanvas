@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 const ERASE_MODELS = [
   'bria/eraser',
@@ -21,17 +22,7 @@ export const EraseModelDropdown: React.FC<EraseModelDropdownProps> = ({
   onToggle,
   onSelect,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';

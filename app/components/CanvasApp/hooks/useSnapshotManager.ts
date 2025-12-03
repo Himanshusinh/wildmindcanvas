@@ -19,7 +19,9 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
 
     // Build connection map keyed by source element id
     const connectionsBySource: Record<string, Array<any>> = {};
-    const connectorsToUse = connectorsOverride ?? state.connectors;
+    const connectorsToUse = (connectorsOverride ?? state.connectors).filter(
+      (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+    );
     connectorsToUse.forEach((c) => {
       if (!c || !c.id) return;
       const src = c.from;
@@ -163,29 +165,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         meta: metaObj,
       };
     });
-    // Replace generators
-    state.replaceGenerators.forEach((modal) => {
-      if (!modal || !modal.id) return;
-      const metaObj: any = {
-        replacedImageUrl: modal.replacedImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localReplacedImageUrl: modal.localReplacedImageUrl || null,
-        model: modal.model || 'bria/eraser',
-        frameWidth: modal.frameWidth || 400,
-        frameHeight: modal.frameHeight || 500,
-        isReplacing: modal.isReplacing || false,
-      };
-      if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-        metaObj.connections = connectionsBySource[modal.id];
-      }
-      elements[modal.id] = {
-        id: modal.id,
-        type: 'replace-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: metaObj,
-      };
-    });
     // Expand generators
     state.expandGenerators.forEach((modal) => {
       if (!modal || !modal.id) return;
@@ -239,7 +218,142 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         frameWidth: modal.frameWidth || 400,
         frameHeight: modal.frameHeight || 500,
         scriptText: modal.scriptText || null,
+        characterNamesMap: (modal as any).characterNamesMap || {},
+        propsNamesMap: (modal as any).propsNamesMap || {},
+        backgroundNamesMap: (modal as any).backgroundNamesMap || {},
+        stitchedImageUrl: (modal as any).stitchedImageUrl || undefined,
       };
+
+      // Build namedImages object: name -> imageUrl mapping (auto-updated)
+      const namedImages: {
+        characters?: Record<string, string>;
+        backgrounds?: Record<string, string>;
+        props?: Record<string, string>;
+      } = {};
+
+      // Get connections for this storyboard
+      // Images connect TO the storyboard, so we filter by c.to === modal.id
+      const storyboardConnections = connectorsToUse.filter(c => c.to === modal.id);
+      const characterConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-character');
+      const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
+      const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
+      
+      console.log(`[useSnapshotManager] Storyboard ${modal.id} connections:`, {
+        totalConnections: storyboardConnections.length,
+        characterConnections: characterConnections.length,
+        characterConnectionsDetails: characterConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor })),
+      });
+
+      // Build character name -> imageUrl map
+      if ((modal as any).characterNamesMap) {
+        const characterMap: Record<string, string> = {};
+        Object.entries((modal as any).characterNamesMap).forEach(([indexStr, name]) => {
+          const index = parseInt(indexStr, 10);
+          if (name && characterConnections[index]) {
+            // Connection is FROM image TO storyboard, so imageId is c.from
+            const imageId = characterConnections[index].from;
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            let imageUrl: string | undefined = undefined;
+            
+            if (imageGen) {
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            }
+            
+            if (!imageUrl) {
+              const image = state.images.find(img => (img as any).elementId === imageId);
+              imageUrl = image?.url || (image as any)?.firebaseUrl;
+            }
+            
+            if (imageUrl) {
+              characterMap[name as string] = imageUrl;
+            }
+          }
+        });
+        if (Object.keys(characterMap).length > 0) {
+          namedImages.characters = characterMap;
+        }
+      }
+
+      // Build background name -> imageUrl map
+      if ((modal as any).backgroundNamesMap) {
+        const backgroundMap: Record<string, string> = {};
+        Object.entries((modal as any).backgroundNamesMap).forEach(([indexStr, name]) => {
+          const index = parseInt(indexStr, 10);
+          if (name && backgroundConnections[index]) {
+            // Connection is FROM image TO storyboard, so imageId is c.from
+            const imageId = backgroundConnections[index].from;
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            let imageUrl: string | undefined = undefined;
+            
+            if (imageGen) {
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            }
+            
+            if (!imageUrl) {
+              const image = state.images.find(img => (img as any).elementId === imageId);
+              imageUrl = image?.url || (image as any)?.firebaseUrl;
+            }
+            
+            if (imageUrl) {
+              backgroundMap[name as string] = imageUrl;
+            }
+          }
+        });
+        if (Object.keys(backgroundMap).length > 0) {
+          namedImages.backgrounds = backgroundMap;
+        }
+      }
+
+      // Build props name -> imageUrl map
+      if ((modal as any).propsNamesMap) {
+        const propsMap: Record<string, string> = {};
+        Object.entries((modal as any).propsNamesMap).forEach(([indexStr, name]) => {
+          const index = parseInt(indexStr, 10);
+          if (name && propsConnections[index]) {
+            // Connection is FROM image TO storyboard, so imageId is c.from
+            const imageId = propsConnections[index].from;
+            const imageGen = state.imageGenerators.find(img => img.id === imageId);
+            let imageUrl: string | undefined = undefined;
+            
+            if (imageGen) {
+              imageUrl = imageGen.generatedImageUrl || 
+                        (imageGen as any)?.sourceImageUrl || 
+                        (imageGen as any)?.generatedImageUrls?.[0] ||
+                        (imageGen as any)?.url;
+            }
+            
+            if (!imageUrl) {
+              const image = state.images.find(img => (img as any).elementId === imageId);
+              imageUrl = image?.url || (image as any)?.firebaseUrl;
+            }
+            
+            if (imageUrl) {
+              propsMap[name as string] = imageUrl;
+            }
+          }
+        });
+        if (Object.keys(propsMap).length > 0) {
+          namedImages.props = propsMap;
+        }
+      }
+
+      // Add namedImages to meta if it has any data
+      if (Object.keys(namedImages).length > 0) {
+        metaObj.namedImages = namedImages;
+        console.log(`[useSnapshotManager] ✅ Added namedImages to storyboard ${modal.id}:`, namedImages);
+      } else {
+        console.warn(`[useSnapshotManager] ⚠️ No namedImages built for storyboard ${modal.id}`, {
+          hasCharacterNamesMap: !!(modal as any).characterNamesMap,
+          characterConnectionsCount: characterConnections.length,
+        });
+      }
+
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -257,7 +371,9 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
     });
     // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
     // Also include connector elements as top-level elements so snapshots contain explicit connector records
-    const connectorsToUseFinal = connectorsOverride ?? state.connectors;
+    const connectorsToUseFinal = (connectorsOverride ?? state.connectors).filter(
+      (c) => !(c?.from && c.from.startsWith('replace-')) && !(c?.to && c.to.startsWith('replace-'))
+    );
     connectorsToUseFinal.forEach(c => {
       if (!c || !c.id) return;
       elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
@@ -285,7 +401,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.replaceGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
+  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -302,7 +418,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
           const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
-          const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
           const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
@@ -310,7 +425,30 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
           const newSceneFrameGenerators: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
+          // Track connector signatures to prevent duplicates: "from|to|toAnchor"
+          const connectorSignatures = new Set<string>();
 
+          // FIRST PASS: Process connector elements first (they are the source of truth)
+          // This ensures we get the correct IDs and properties before processing meta.connections
+          Object.values(elements).forEach((element: any) => {
+            if (element && element.type === 'connector') {
+              const connector = { 
+                id: element.id, 
+                from: element.from || element.meta?.from, 
+                to: element.to || element.meta?.to, 
+                color: element.meta?.color || '#437eb5', 
+                fromAnchor: element.meta?.fromAnchor, 
+                toAnchor: element.meta?.toAnchor 
+              };
+              const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
+              if (!connectorSignatures.has(signature)) {
+                connectorSignatures.add(signature);
+                newConnectors.push(connector);
+              }
+            }
+          });
+
+          // SECOND PASS: Process all other elements and restore from meta.connections only if not already restored
           Object.values(elements).forEach((element: any) => {
             if (element && element.type) {
               let imageUrl = element.meta?.url || element.meta?.mediaId || '';
@@ -329,106 +467,110 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
                   ...(element.id && { elementId: element.id }),
                 };
                 newImages.push(newImage);
-                // If this element had connections in meta, collect them
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'image-generator') {
-                newImageGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedImageUrl: element.meta?.generatedImageUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                newImageGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  generatedImageUrl: element.meta?.generatedImageUrl || null, 
+                  sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl from snapshot
+                  frameWidth: element.meta?.frameWidth, 
+                  frameHeight: element.meta?.frameHeight, 
+                  model: element.meta?.model, 
+                  frame: element.meta?.frame, 
+                  aspectRatio: element.meta?.aspectRatio, 
+                  prompt: element.meta?.prompt 
+                } as any);
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'connector') {
-                // Top-level connector element
-                newConnectors.push({ id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor });
+                // Skip - already processed in first pass
               } else if (element.type === 'video-generator') {
                 newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'music-generator') {
                 newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'text-generator') {
                 newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'upscale-plugin') {
                 newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'removebg-plugin') {
                 newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'erase-plugin') {
                 newEraseGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, erasedImageUrl: element.meta?.erasedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localErasedImageUrl: element.meta?.localErasedImageUrl || null, model: element.meta?.model });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
-              } else if (element.type === 'replace-plugin') {
-                newReplaceGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, replacedImageUrl: element.meta?.replacedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, model: element.meta?.model });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'expand-plugin') {
                 newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'vectorize-plugin') {
                 newVectorizeGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'storyboard-plugin') {
-                newStoryboardGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 500, scriptText: element.meta?.scriptText || null });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                newStoryboardGenerators.push({ 
+                  id: element.id, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  frameWidth: element.meta?.frameWidth || 400, 
+                  frameHeight: element.meta?.frameHeight || 500, 
+                  scriptText: element.meta?.scriptText || null,
+                  characterNamesMap: element.meta?.characterNamesMap || {},
+                  propsNamesMap: element.meta?.propsNamesMap || {},
+                  backgroundNamesMap: element.meta?.backgroundNamesMap || {},
+                  stitchedImageUrl: element.meta?.stitchedImageUrl || undefined,
+                  namedImages: element.meta?.namedImages || undefined,
+                } as any); // Type assertion needed due to optional fields
+                // NOTE: Storyboard connections are NOT stored in storyboard.meta.connections
+                // They are stored in the image elements' meta.connections (as outgoing connections)
+                // OR as top-level connector elements. We'll restore them from connector elements below.
+                // Do NOT restore connections from storyboard.meta.connections as that would create duplicates.
               } else if (element.type === 'script-frame') {
                 newScriptFrameGenerators.push({ id: element.id, pluginId: element.meta?.pluginId || '', x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 300, text: element.meta?.text || '' });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'scene-frame') {
-                newSceneFrameGenerators.push({ id: element.id, scriptFrameId: element.meta?.scriptFrameId || '', sceneNumber: element.meta?.sceneNumber || 0, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 350, frameHeight: element.meta?.frameHeight || 300, content: element.meta?.content || '' });
-                if (element.meta?.connections && Array.isArray(element.meta.connections)) {
-                  element.meta.connections.forEach((c: any) => {
-                    newConnectors.push({ id: c.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`, from: element.id, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
-                  });
-                }
+                newSceneFrameGenerators.push({ 
+                  id: element.id, 
+                  scriptFrameId: element.meta?.scriptFrameId || '', 
+                  sceneNumber: element.meta?.sceneNumber || 0, 
+                  x: element.x || 0, 
+                  y: element.y || 0, 
+                  frameWidth: element.meta?.frameWidth || 350, 
+                  frameHeight: element.meta?.frameHeight || 300, 
+                  content: element.meta?.content || '',
+                  characterIds: element.meta?.characterIds || undefined,
+                  locationId: element.meta?.locationId || undefined,
+                  mood: element.meta?.mood || undefined,
+                  characterNames: element.meta?.characterNames || undefined,
+                  locationName: element.meta?.locationName || undefined,
+                } as any); // Type assertion needed due to optional fields
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               }
             }
           });
@@ -438,8 +580,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
           setters.setMusicGenerators(newMusicGenerators);
           setters.setUpscaleGenerators(newUpscaleGenerators);
           setters.setRemoveBgGenerators(newRemoveBgGenerators);
-          setters.setEraseGenerators(newEraseGenerators);
-          setters.setReplaceGenerators(newReplaceGenerators);
+        setters.setEraseGenerators(newEraseGenerators);
           setters.setExpandGenerators(newExpandGenerators);
           setters.setVectorizeGenerators(newVectorizeGenerators);
           setters.setStoryboardGenerators(newStoryboardGenerators);

@@ -5,6 +5,7 @@ import '../../common/canvasCaptureGuard';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ErasePluginModalProps {
   isOpen: boolean;
@@ -88,11 +89,16 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [brushPreview, setBrushPreview] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
+  const lastBrushPointRef = useRef<{ x: number; y: number } | null>(null);
   const [localErasedImageUrl, setLocalErasedImageUrl] = useState<string | null>(initialLocalErasedImageUrl ?? null);
+  const [isAdjustingBrush, setIsAdjustingBrush] = useState(false);
+  const [isBrushHovering, setIsBrushHovering] = useState(false);
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+  const hasSourceImage = Boolean(sourceImageUrl);
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -111,11 +117,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     scaleY: number
   ) => {
     // Draw on preview canvas (semi-transparent white for visibility)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.fillStyle = '#f7f7f7';
     ctx.beginPath();
     ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // If there's a last point, draw a line to connect strokes smoothly
     if (lastX !== null && lastY !== null) {
       ctx.beginPath();
@@ -123,20 +129,20 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       ctx.lineTo(x, y);
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.strokeStyle = '#f7f7f7';
       ctx.stroke();
     }
-    
+
     // Draw on mask canvas (pure white, scaled to natural image size)
     const naturalX = x * scaleX;
     const naturalY = y * scaleY;
     const naturalBrushSize = brushSize * Math.max(scaleX, scaleY);
-    
+
     maskCtx.fillStyle = 'rgb(255, 255, 255)'; // Pure white
     maskCtx.beginPath();
     maskCtx.arc(naturalX, naturalY, naturalBrushSize / 2, 0, Math.PI * 2);
     maskCtx.fill();
-    
+
     // Connect strokes on mask canvas too
     if (lastX !== null && lastY !== null) {
       const naturalLastX = lastX * scaleX;
@@ -151,23 +157,35 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     }
   };
 
+  const showBrushPreviewFromStoredPoint = () => {
+    if (lastBrushPointRef.current) {
+      setBrushPreview({ ...lastBrushPointRef.current, visible: true });
+      return true;
+    }
+    if (imageRef.current) {
+      const imageRect = imageRef.current.getBoundingClientRect();
+      const centerX = imageRect.left + imageRect.width / 2;
+      const centerY = imageRect.top + imageRect.height / 2;
+      lastBrushPointRef.current = { x: centerX, y: centerY };
+      setBrushPreview({ x: centerX, y: centerY, visible: true });
+      return true;
+    }
+    return false;
+  };
+
+  const updateBrushPreviewPosition = (clientX: number, clientY: number) => {
+    if (!sourceImageUrl) return;
+    lastBrushPointRef.current = { x: clientX, y: clientY };
+    setBrushPreview({ x: clientX, y: clientY, visible: true });
+  };
+
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useIsDarkTheme();
 
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -179,7 +197,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    
+
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
@@ -190,7 +208,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       }
       return url;
     }
-    
+
     // Then check if it's from a canvas image (uploaded image)
     if (images && images.length > 0) {
       const canvasImage = images.find(img => {
@@ -206,11 +224,17 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         return url;
       }
     }
-    
+
     return null;
   }, [id, connections, imageModalStates, images]);
 
   // Restore images from props on mount or when props change
+  const hideBrushPreviewIfIdle = () => {
+    if (!isAdjustingBrush && !isBrushHovering && !isDrawing) {
+      setBrushPreview(prev => ({ ...prev, visible: false }));
+    }
+  };
+
   useEffect(() => {
     if (initialSourceImageUrl !== undefined) {
       setSourceImageUrl(initialSourceImageUrl);
@@ -219,6 +243,31 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       setLocalErasedImageUrl(initialLocalErasedImageUrl);
     }
   }, [initialSourceImageUrl, initialLocalErasedImageUrl]);
+
+  useEffect(() => {
+    if (!sourceImageUrl && brushPreview.visible && !isAdjustingBrush && !isBrushHovering && !isDrawing) {
+      setBrushPreview(prev => ({ ...prev, visible: false }));
+    }
+  }, [sourceImageUrl, brushPreview.visible, isAdjustingBrush, isBrushHovering, isDrawing]);
+
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      setIsAdjustingBrush(false);
+      if (lastBrushPointRef.current) {
+        setBrushPreview({ ...lastBrushPointRef.current, visible: true });
+      } else if (!isBrushHovering) {
+        setBrushPreview(prev => ({ ...prev, visible: false }));
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    window.addEventListener('touchend', handleGlobalPointerUp);
+    window.addEventListener('touchcancel', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalPointerUp);
+      window.removeEventListener('touchend', handleGlobalPointerUp);
+      window.removeEventListener('touchcancel', handleGlobalPointerUp);
+    };
+  }, [isBrushHovering]);
 
   useEffect(() => {
     if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
@@ -235,7 +284,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       }
     }
   }, [connectedImageSource, initialLocalErasedImageUrl, initialSourceImageUrl, sourceImageUrl]);
-  
+
 
 
   // Listen for dimming events
@@ -261,7 +310,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     console.log('[ErasePluginModal] handleMouseDown', {
       timestamp: Date.now(),
       target: target.tagName,
@@ -272,20 +321,20 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       isActionIcons: !!isActionIcons,
       buttonTitle: target.closest('button')?.getAttribute('title'),
     });
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       console.log('[ErasePluginModal] Calling onSelect');
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isImage && !isControls) {
       // Track initial mouse position to detect drag vs click
       dragStartPosRef.current = { x: e.clientX, y: e.clientY };
       hasDraggedRef.current = false;
-      
+
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -333,19 +382,19 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       const wasDragging = hasDraggedRef.current;
       setIsDraggingContainer(false);
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging && sourceImageUrl) {
+      if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (onPositionCommit) {
         // Use lastCanvasPosRef if available, otherwise use current x, y props
         const finalX = lastCanvasPosRef.current?.x ?? x;
         const finalY = lastCanvasPosRef.current?.y ?? y;
         onPositionCommit(finalX, finalY);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
     };
@@ -383,13 +432,13 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       alert('Please connect an image first');
       return;
     }
-    
+
     // Check if mask canvas has been drawn on (white area from brush)
     if (!maskCanvasRef.current) {
       alert('Please draw on the image to mark the area to erase before clicking Erase.');
       return;
     }
-    
+
     // Verify mask has white pixels (brush strokes)
     const maskCtx = maskCanvasRef.current.getContext('2d');
     if (!maskCtx) {
@@ -397,7 +446,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       alert('An internal error occurred: mask canvas context not found.');
       return;
     }
-    
+
     // Sample mask to verify it has white pixels
     const imageData = maskCtx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
     let whitePixelCount = 0;
@@ -409,22 +458,22 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         whitePixelCount++;
       }
     }
-    
+
     if (whitePixelCount === 0) {
       alert('Please draw on the image to mark the area to erase before clicking Erase.');
       return;
     }
-    
+
     // Create composited image: original image + white mask overlay
     const maskCanvas = maskCanvasRef.current;
     const image = imageRef.current;
-    
+
     if (!maskCanvas || !image) {
       console.error('[ErasePluginModal] ❌ Mask canvas or image ref is null');
       alert('An internal error occurred: mask canvas or image not found.');
       return;
     }
-    
+
     // Log mask analysis
     console.log('[ErasePluginModal] 🔍 Mask analysis before capture:', {
       maskDimensions: { width: maskCanvas.width, height: maskCanvas.height },
@@ -433,11 +482,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       whitePercentage: ((whitePixelCount / (maskCanvas.width * maskCanvas.height)) * 100).toFixed(2) + '%',
       hasWhitePixels: whitePixelCount > 0
     });
-    
+
     // Get mask as data URL (pure white mask) - send separately to preserve original image quality
     // The backend will create a proper composited image using sharp without affecting the original colors
     const maskDataUrl = maskCanvas.toDataURL('image/png');
-    
+
     console.log('[ErasePluginModal] ✅ Mask extracted:', {
       hasMask: !!maskDataUrl,
       maskLength: maskDataUrl.length,
@@ -445,13 +494,13 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       maskDimensions: { width: maskCanvas.width, height: maskCanvas.height },
       whiteAreaPercentage: ((whitePixelCount / (maskCanvas.width * maskCanvas.height)) * 100).toFixed(2) + '%'
     });
-    
+
     setIsErasing(true);
     // Persist isErasing state
     if (onOptionsChange) {
       onOptionsChange({ isErasing: true } as any);
     }
-    
+
     // Create new image generation frame immediately (before API call) to show loading state
     const frameWidth = 600;
     const frameHeight = 600;
@@ -459,7 +508,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     if (onPersistImageModalCreate) {
       // Create image generation frame with isGenerating flag to show loading state
       const newModal = {
@@ -475,27 +524,27 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from erase plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of erase plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of erase plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -508,18 +557,18 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[ErasePluginModal] Created connection from plugin to new frame:', newConnector);
       }
     }
-    
+
     try {
       const imageUrl = sourceImageUrl;
-      
+
       // Close popup after capturing mask
       setIsPopupOpen(false);
-      
+
       console.log('[ErasePluginModal] ========== ERASE REQUEST SUMMARY ==========');
       console.log('[ErasePluginModal] User Input Prompt:', erasePrompt || '(none)');
       console.log('[ErasePluginModal] Original Image URL:', imageUrl ? imageUrl.substring(0, 100) + '...' : 'null');
@@ -527,16 +576,16 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       console.log('[ErasePluginModal] Model:', selectedModel);
       console.log('[ErasePluginModal] Calling onErase with original image and separate mask...');
       console.log('[ErasePluginModal] ===========================================');
-      
+
       // Send original image URL and mask separately to preserve image quality
       // The backend will create a proper composited image using sharp without affecting the original colors
       const result = await onErase(selectedModel, imageUrl || undefined, maskDataUrl, erasePrompt || undefined);
-      
+
       console.log('[ErasePluginModal] ✅ onErase completed:', {
         hasResult: !!result,
         resultUrl: result ? result.substring(0, 100) + '...' : 'null'
       });
-      
+
       // Clear isErasing state now that the result is received
       setIsErasing(false);
       if (onOptionsChange) {
@@ -546,7 +595,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       if (onUpdateModalState && id) {
         onUpdateModalState(id, { isErasing: false });
       }
-      
+
       // Update the image generation frame with the result
       if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
@@ -560,7 +609,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           isGenerating: false, // Clear loading state
         });
       }
-      
+
       // Also store the erased image in the plugin
       if (result) {
         setLocalErasedImageUrl(result);
@@ -570,7 +619,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         }
         // Persist the local erased image URL (only if it changed from initial)
         if (onOptionsChangeRef.current && result !== initialLocalErasedImageUrl) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localErasedImageUrl: result,
             isErasing: false
           });
@@ -596,7 +645,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         });
       }
     }
-    
+
     /* Removed old code - kept for reference
     console.log('[ErasePluginModal] handleErase called', {
       hasOnErase: !!onErase,
@@ -803,6 +852,22 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+        Erase / Replace
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -815,8 +880,8 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -841,7 +906,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -849,26 +914,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Erase
-        </div>
+
       </div>
 
       {/* Image Preview Popup with Brush Tool */}
-      {isPopupOpen && sourceImageUrl && (
+      {isPopupOpen && (
         <div
           style={{
             position: 'fixed',
@@ -899,10 +949,12 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             e.stopPropagation();
           }}
         >
+          {hasSourceImage ? (
           <div
             style={{
               backgroundColor: isDark ? '#121212' : 'white',
               borderRadius: '16px',
+              border: `2px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
               padding: '24px',
               width: '90vw',
               maxWidth: '1200px',
@@ -932,13 +984,191 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'nowrap',
+                gap: '10px',
                 marginBottom: '8px',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
-                Erase Image
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: isDark ? '#ffffff' : '#111827',
+                  transition: 'color 0.3s ease',
+                  flex: '0 0 12%',
+                  minWidth: '90px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Erase / Replace
               </h3>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div
+                  onMouseEnter={() => {
+                    setIsBrushHovering(true);
+                    showBrushPreviewFromStoredPoint();
+                  }}
+                  onMouseLeave={() => {
+                    setIsBrushHovering(false);
+                    hideBrushPreviewIfIdle();
+                  }}
+                  onTouchStart={() => {
+                    setIsBrushHovering(true);
+                    showBrushPreviewFromStoredPoint();
+                  }}
+                  onTouchEnd={() => {
+                    setIsBrushHovering(false);
+                    hideBrushPreviewIfIdle();
+                  }}
+                  onMouseMove={(e) => {
+                    if (isBrushHovering || isAdjustingBrush) {
+                      updateBrushPreviewPosition(e.clientX, e.clientY);
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    if (isBrushHovering || isAdjustingBrush) {
+                      const touch = e.touches[0];
+                      updateBrushPreviewPosition(touch.clientX, touch.clientY);
+                    }
+                  }}
+                style={{
+                  flex: '0 0 33%',
+                  minWidth: '150px',
+                  height: '38px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e5e7eb',
+                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                }}
+              >
+                
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                    <button
+                      onClick={() => {
+                        const newSize = Math.max(5, brushSize - 5);
+                        setBrushSize(newSize);
+                        showBrushPreviewFromStoredPoint();
+                      }}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        border: isDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #d1d5db',
+                        backgroundColor: 'transparent',
+                        color: isDark ? '#ffffff' : '#111827',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="range"
+                      min="5"
+                      max="100"
+                      step="1"
+                      value={brushSize}
+                      onChange={(e) => setBrushSize(Number(e.target.value))}
+                      onKeyDown={(e) => {
+                        if (e.key === '+' || e.key === '=' ) {
+                          e.preventDefault();
+                          const newSize = Math.min(100, brushSize + 5);
+                          setBrushSize(newSize);
+                          showBrushPreviewFromStoredPoint();
+                        } else if (e.key === '-' || e.key === '_') {
+                          e.preventDefault();
+                          const newSize = Math.max(5, brushSize - 5);
+                          setBrushSize(newSize);
+                          showBrushPreviewFromStoredPoint();
+                        }
+                      }}
+                      onMouseDown={() => {
+                        setIsAdjustingBrush(true);
+                        showBrushPreviewFromStoredPoint();
+                      }}
+                      onMouseUp={() => {
+                        setIsAdjustingBrush(false);
+                        hideBrushPreviewIfIdle();
+                      }}
+                      onTouchStart={() => {
+                        setIsAdjustingBrush(true);
+                        showBrushPreviewFromStoredPoint();
+                      }}
+                      onTouchEnd={() => {
+                        setIsAdjustingBrush(false);
+                        hideBrushPreviewIfIdle();
+                      }}
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        borderRadius: '2px',
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const newSize = Math.min(100, brushSize + 5);
+                        setBrushSize(newSize);
+                        showBrushPreviewFromStoredPoint();
+                      }}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        border: isDark ? '1px solid rgba(255,255,255,0.3)' : '1px solid #d1d5db',
+                        backgroundColor: 'transparent',
+                        color: isDark ? '#ffffff' : '#111827',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      +
+                    </button>
+                    <span style={{ fontSize: '12px', color: isDark ? '#cccccc' : '#6b7280', minWidth: '32px', textAlign: 'right', transition: 'color 0.3s ease' }}>
+                      {brushSize}px
+                    </span>
+                  </div>
+                </div>
+              <div style={{ flex: '1 1 auto', minWidth: '240px', marginRight: '12px' }}>
+                <input
+                  type="text"
+                  value={erasePrompt}
+                  onChange={(e) => setErasePrompt(e.target.value)}
+                  placeholder="Prompt for Replace"
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e5e7eb',
+                    backgroundColor: isDark ? '#121212' : '#ffffff',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: '13px',
+                    outline: 'none',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+                    height: '40px',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                  flex: '0 0 auto',
+                  minWidth: '120px',
+                  justifyContent: 'flex-start',
+                  marginLeft: 'auto',
+                  paddingRight: '8px',
+                }}
+              >
                 <button
                   onClick={handleErase}
                   disabled={isErasing || externalIsErasing}
@@ -951,9 +1181,29 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     cursor: isErasing || externalIsErasing ? 'not-allowed' : 'pointer',
                     fontSize: '14px',
                     fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '56px',
                   }}
                 >
-                  {isErasing || externalIsErasing ? 'Erasing...' : 'Erase'}
+                  {isErasing || externalIsErasing ? (
+                    'Erasing...'
+                  ) : (
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="M12 5l7 7-7 7" />
+                    </svg>
+                  )}
                 </button>
                 <button
                   onClick={() => setIsPopupOpen(false)}
@@ -977,71 +1227,14 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
               </div>
             </div>
 
-            {/* Erase Prompt Input */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
-            >
-              <label style={{ fontSize: '14px', fontWeight: 500, color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
-                What do you want to remove from the highlighted area? (optional)
-              </label>
-              <input
-                type="text"
-                value={erasePrompt}
-                onChange={(e) => setErasePrompt(e.target.value)}
-                placeholder="e.g., remove the person, erase the text, remove this object..."
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e5e7eb',
-                  backgroundColor: isDark ? '#121212' : '#ffffff',
-                  color: isDark ? '#ffffff' : '#111827',
-                  fontSize: '14px',
-                  outline: 'none',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
-                }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 500, minWidth: '80px', color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>
-                    Brush Size:
-                  </label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="100"
-                    value={brushSize}
-                    onChange={(e) => setBrushSize(Number(e.target.value))}
-                    style={{
-                      flex: 1,
-                      height: '6px',
-                      borderRadius: '3px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '12px', color: isDark ? '#cccccc' : '#6b7280', minWidth: '40px', textAlign: 'right', transition: 'color 0.3s ease' }}>
-                    {brushSize}px
-                  </span>
-                </div>
-                <p style={{ fontSize: '12px', color: isDark ? '#cccccc' : '#6b7280', margin: 0, transition: 'color 0.3s ease' }}>
-                  Draw on the image to mark the area you want to erase. Only the drawn area will be affected.
-                </p>
-              </div>
-            </div>
-            
             {/* Image with Drawing Canvas Overlay - Fixed Frame */}
             <div
               style={{
                 position: 'relative',
                 width: '100%',
                 flex: 1,
-                minHeight: '400px',
-                maxHeight: 'calc(85vh - 200px)',
+                minHeight: 0,
+                height: '100%',
                 overflow: 'hidden',
                 borderRadius: '8px',
                 border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
@@ -1103,7 +1296,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                         const img = imageRef.current;
                         const canvas = canvasRef.current;
                         const maskCanvas = maskCanvasRef.current;
-                        
+
                         // Wait for next frame to ensure image is fully rendered and fits
                         requestAnimationFrame(() => {
                           // Preview canvas matches displayed size (actual rendered size after objectFit: contain)
@@ -1111,15 +1304,15 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                           const displayedHeight = img.clientHeight || img.offsetHeight;
                           canvas.width = displayedWidth;
                           canvas.height = displayedHeight;
-                          
+
                           // Update canvas style to match image size exactly
                           canvas.style.width = `${displayedWidth}px`;
                           canvas.style.height = `${displayedHeight}px`;
-                          
+
                           // Mask canvas matches natural image size (for API)
                           maskCanvas.width = img.naturalWidth;
                           maskCanvas.height = img.naturalHeight;
-                          
+
                           // Clear both canvases
                           const maskCtx = maskCanvas.getContext('2d');
                           const previewCtx = canvas.getContext('2d');
@@ -1131,7 +1324,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                           if (previewCtx) {
                             previewCtx.clearRect(0, 0, canvas.width, canvas.height);
                           }
-                          
+
                           // Reset brush drawing when image loads
                           setLastPoint(null);
                           setIsDrawing(false);
@@ -1170,28 +1363,29 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                   }}
                   className="erase-preview-canvas"
                   onMouseDown={(e) => {
+                    updateBrushPreviewPosition(e.clientX, e.clientY);
                     if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     // Get coordinates relative to image
                     const relativeX = e.clientX - imgRectBounds.left;
                     const relativeY = e.clientY - imgRectBounds.top;
-                    
+
                     // Check if click is within image bounds
                     if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
                       return;
                     }
-                    
+
                     setIsDrawing(true);
                     setLastPoint({ x: relativeX, y: relativeY });
-                    
+
                     // Draw initial brush stroke
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1199,24 +1393,25 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     }
                   }}
                   onMouseMove={(e) => {
+                    updateBrushPreviewPosition(e.clientX, e.clientY);
                     if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     // Get coordinates relative to image
                     const relativeX = e.clientX - imgRectBounds.left;
                     const relativeY = e.clientY - imgRectBounds.top;
-                    
+
                     // Clamp to image bounds
                     const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
                     const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
-                    
+
                     // Draw brush stroke
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1229,35 +1424,38 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       setIsDrawing(false);
                       setLastPoint(null);
                     }
+                    hideBrushPreviewIfIdle();
                   }}
                   onMouseLeave={() => {
                     if (isDrawing) {
                       setIsDrawing(false);
                       setLastPoint(null);
                     }
+                    hideBrushPreviewIfIdle();
                   }}
                   onTouchStart={(e) => {
                     e.preventDefault();
-                    if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
                     const touch = e.touches[0];
+                    updateBrushPreviewPosition(touch.clientX, touch.clientY);
+                    if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     const relativeX = touch.clientX - imgRectBounds.left;
                     const relativeY = touch.clientY - imgRectBounds.top;
-                    
+
                     if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
                       return;
                     }
-                    
+
                     setIsDrawing(true);
                     setLastPoint({ x: relativeX, y: relativeY });
-                    
+
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1266,22 +1464,23 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                   }}
                   onTouchMove={(e) => {
                     e.preventDefault();
-                    if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
                     const touch = e.touches[0];
+                    updateBrushPreviewPosition(touch.clientX, touch.clientY);
+                    if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
                     const img = imageRef.current;
                     const imgRectBounds = img.getBoundingClientRect();
-                    
+
                     const relativeX = touch.clientX - imgRectBounds.left;
                     const relativeY = touch.clientY - imgRectBounds.top;
-                    
+
                     const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
                     const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
-                    
+
                     const canvas = canvasRef.current;
                     const maskCanvas = maskCanvasRef.current;
                     const ctx = canvas.getContext('2d');
                     const maskCtx = maskCanvas.getContext('2d');
-                    
+
                     if (ctx && maskCtx) {
                       const scaleX = img.naturalWidth / img.clientWidth;
                       const scaleY = img.naturalHeight / img.clientHeight;
@@ -1295,16 +1494,76 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       setIsDrawing(false);
                       setLastPoint(null);
                     }
+                    hideBrushPreviewIfIdle();
                   }}
                 />
-              {/* Hidden mask canvas for API */}
-              <canvas
-                ref={maskCanvasRef}
-                style={{ display: 'none' }}
-              />
+                {/* Hidden mask canvas for API */}
+                <canvas
+                  ref={maskCanvasRef}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
+          {sourceImageUrl && brushPreview.visible && (
+            <div
+              style={{
+                position: 'fixed',
+                top: `${brushPreview.y}px`,
+                left: `${brushPreview.x}px`,
+                width: `${brushSize}px`,
+                height: `${brushSize}px`,
+                borderRadius: '50%',
+                border: isDark ? '1px solid rgba(247,247,247,0.5)' : '1px solid rgba(247,247,247,0.9)',
+                backgroundColor: 'rgba(247,247,247,0.2)',
+                pointerEvents: 'none',
+                zIndex: 10006,
+                transform: 'translate(-50%, -50%)',
+                transition: 'width 0.15s ease, height 0.15s ease',
+              }}
+            />
+          )}
           </div>
+          ) : (
+            <div
+              style={{
+                backgroundColor: isDark ? '#121212' : 'white',
+                borderRadius: '16px',
+                padding: '32px',
+                width: 'min(420px, 90vw)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                alignItems: 'center',
+                textAlign: 'center',
+                boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+                transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
+                Connect an image to erase
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
+                Use the connection nodes to attach an image or generated frame. Once connected, the erase workspace will appear here.
+              </p>
+              <button
+                onClick={() => setIsPopupOpen(false)}
+                style={{
+                  marginTop: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  backgroundColor: '#437eb5',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
       )}
 

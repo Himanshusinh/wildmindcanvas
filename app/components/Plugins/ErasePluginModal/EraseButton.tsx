@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface EraseButtonProps {
   scale: number;
@@ -17,18 +18,7 @@ export const EraseButton: React.FC<EraseButtonProps> = ({
   sourceImageUrl,
   onErase,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
+  const isDark = useIsDarkTheme();
   const isDisabled = isErasing || externalIsErasing || !sourceImageUrl;
   const isActive = !isDisabled;
   const disabledBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
@@ -71,7 +61,19 @@ export const EraseButton: React.FC<EraseButtonProps> = ({
       {isErasing || externalIsErasing ? (
         <span>Erasing...</span>
       ) : (
-        <span>Erase</span>
+        <svg
+          width={16 * scale}
+          height={16 * scale}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M5 12h14" />
+          <path d="M12 5l7 7-7 7" />
+        </svg>
       )}
     </button>
   );

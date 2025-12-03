@@ -14,6 +14,8 @@ interface ImageUploadModalProps {
   onClose: () => void;
   onGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => void;
   onImageSelect?: (file: File) => void;
+  sourceImageUrl?: string | null; // Reference image URL for image-to-image generation (e.g., from scene storyboards)
+  refImages?: Record<string, string>; // Global flat map of character/location names to image URLs
   generatedImageUrl?: string | null;
   generatedImageUrls?: string[]; // Array for multiple images (when imageCount > 1)
   isGenerating?: boolean; // Show loading spinner when generating
@@ -36,10 +38,10 @@ interface ImageUploadModalProps {
   initialFrame?: string;
   initialAspectRatio?: string;
   initialPrompt?: string;
-  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number }) => void;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number; isGenerating?: boolean }) => void;
   initialCount?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
@@ -47,6 +49,8 @@ interface ImageUploadModalProps {
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   textInputStates?: Array<{ id: string; value?: string }>;
   sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
+  scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
+  storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -88,6 +92,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onPersistConnectorCreate,
   textInputStates = [],
   sceneFrameModalStates = [],
+  scriptFrameModalStates = [],
+  storyboardModalStates = [],
+  refImages = {},  // Flat map of character/location names to image URLs
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -150,6 +157,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
+
+  const setGeneratingState = (next: boolean) => {
+    setIsGenerating(next);
+    onOptionsChange?.({ isGenerating: next });
+  };
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -285,7 +297,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const sourceImageUrl = connectedImageSource?.url || null;
 
   // Check if an image is already generated in this modal
-  const hasExistingImage = Boolean(generatedImageUrl && !isGenerating && !externalIsGenerating);
+  const hasExistingImage = Boolean(generatedImageUrl);
 
   // Filter models: 
   // - If image is connected from another modal OR an image is already generated in this modal, only show image-to-image models
@@ -324,6 +336,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Priority 3: No source (text-to-image)
   const finalSourceImageUrl = hasExistingImage ? generatedImageUrl : (sourceImageUrl || null);
 
+  console.log('[ImageUploadModal] 🔍 sourceImageUrl prop check:', {
+    modalId: id,
+    hasSourceImageUrlProp: !!sourceImageUrl,
+    sourceImageUrlProp: sourceImageUrl || 'NONE',
+    sourceImageUrlPreview: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+    hasExistingImage,
+    generatedImageUrl: generatedImageUrl || 'NONE',
+    finalSourceImageUrl: finalSourceImageUrl || 'NONE',
+    finalSourceImageUrlPreview: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NONE',
+  });
+
   // Track if we've already initialized the model for image-to-image mode
   const hasInitializedImageToImageModel = useRef(false);
 
@@ -360,8 +383,189 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // Use effective prompt (connected text or local prompt)
     const promptToUse = effectivePrompt;
     if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
-      setIsGenerating(true);
+      // CRITICAL: Only set current frame to generating if we're NOT creating a new frame
+      // If hasExistingImage is true, we'll create a new frame and that frame will be marked as generating
+      // The current frame should remain unchanged
+      const willCreateNewFrame = hasExistingImage && generatedImageUrl;
+      let didSetCurrentFrameGenerating = false;
+      if (!willCreateNewFrame) {
+        setGeneratingState(true);
+        didSetCurrentFrameGenerating = true;
+      }
+      
+      console.log('[ImageUploadModal] 🎯 Generation state management:', {
+        hasExistingImage,
+        generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+        willCreateNewFrame,
+        didSetCurrentFrameGenerating,
+      });
+      
       try {
+        // Calculate width and height based on resolution and aspect ratio
+        let width: number | undefined;
+        let height: number | undefined;
+
+        if (selectedResolution) {
+          const [wRatio, hRatio] = selectedAspectRatio.split(':').map(Number);
+          const ratio = wRatio / hRatio;
+          let baseSize = 1024; // Default 1K
+
+          if (selectedResolution === '2K') baseSize = 2048;
+          if (selectedResolution === '4K') baseSize = 4096;
+
+          if (ratio >= 1) {
+            // Landscape or square
+            width = Math.round(baseSize * ratio);
+            height = baseSize;
+          } else {
+            // Portrait
+            width = baseSize;
+            height = Math.round(baseSize / ratio);
+          }
+
+          // Special case for Flux 2 Pro 1024x2048
+          if (selectedResolution === '1024x2048') {
+            width = 1024;
+            height = 2048;
+          }
+        }
+
+        // If a stitched reference is provided via props, force using ONLY that URL
+        const stitchedOnly = typeof sourceImageUrl === 'string' && sourceImageUrl.includes('reference-stitched');
+
+        // Automatically collect images from connected Storyboard using @mentions
+        const referenceImageUrls: string[] = [];
+
+        console.log('[ImageUploadModal] Starting automatic image collection:', {
+          hasConnectedTextInput: !!connectedTextInput,
+          connectedTextInputId: connectedTextInput?.id,
+          connectedTextInputValue: connectedTextInput?.value,
+          sceneFrameCount: sceneFrameModalStates.length,
+          scriptFrameCount: scriptFrameModalStates?.length,
+          storyboardCount: storyboardModalStates.length,
+        });
+
+        // Try to find storyboard through different paths
+        let sourceStoryboard: typeof storyboardModalStates[0] | undefined;
+        let textToAnalyze: string | undefined;
+
+        // Path 1: If we have a connected scene frame, trace back to Storyboard
+        if (connectedTextInput && sceneFrameModalStates.length > 0) {
+          const connectedScene = sceneFrameModalStates.find(s => s.id === connectedTextInput.id);
+          if (connectedScene && scriptFrameModalStates && scriptFrameModalStates.length > 0) {
+            const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
+            if (parentScript && storyboardModalStates.length > 0) {
+              sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
+              textToAnalyze = connectedScene.content;
+            }
+          }
+        }
+
+        // Path 2: If connected text input is connected directly to a storyboard
+        if (!sourceStoryboard && connectedTextInput) {
+          const textToStoryboardConnections = connections.filter(
+            c => (c.from === connectedTextInput.id && storyboardModalStates.some(sb => sb.id === c.to)) ||
+              (c.to === connectedTextInput.id && storyboardModalStates.some(sb => sb.id === c.from))
+          );
+          if (textToStoryboardConnections.length > 0) {
+            const storyboardId = textToStoryboardConnections[0].from === connectedTextInput.id
+              ? textToStoryboardConnections[0].to
+              : textToStoryboardConnections[0].from;
+            sourceStoryboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+            textToAnalyze = connectedTextInput.value;
+          }
+        }
+
+        if (!stitchedOnly && sourceStoryboard) {
+          console.log('[ImageUploadModal] ✅ Found source Storyboard:', sourceStoryboard.id);
+
+          // Get connected images from storyboard by anchor type
+          const storyboardConnections = connections.filter(c => c.from === sourceStoryboard!.id);
+          const characterConnections = storyboardConnections.filter(c => (c as any).toAnchor === 'receive-character');
+          const backgroundConnections = storyboardConnections.filter(c => (c as any).toAnchor === 'receive-background');
+          const propsConnections = storyboardConnections.filter(c => (c as any).toAnchor === 'receive-props');
+
+          // Collect images by type
+          const connectedCharacterImages: string[] = [];
+          const connectedBackgroundImages: string[] = [];
+          const connectedPropsImages: string[] = [];
+
+          characterConnections.forEach(conn => {
+            const connectedImage = imageModalStates.find(img => img.id === conn.to && img.generatedImageUrl);
+            if (connectedImage?.generatedImageUrl) {
+              connectedCharacterImages.push(connectedImage.generatedImageUrl);
+            } else {
+              const mediaImage = images.find(img => img.elementId === conn.to);
+              if (mediaImage && mediaImage.url) {
+                connectedCharacterImages.push(mediaImage.url);
+              }
+            }
+          });
+
+          backgroundConnections.forEach(conn => {
+            const connectedImage = imageModalStates.find(img => img.id === conn.to && img.generatedImageUrl);
+            if (connectedImage?.generatedImageUrl) {
+              connectedBackgroundImages.push(connectedImage.generatedImageUrl);
+            } else {
+              const mediaImage = images.find(img => img.elementId === conn.to);
+              if (mediaImage && mediaImage.url) {
+                connectedBackgroundImages.push(mediaImage.url);
+              }
+            }
+          });
+
+          propsConnections.forEach(conn => {
+            const connectedImage = imageModalStates.find(img => img.id === conn.to && img.generatedImageUrl);
+            if (connectedImage?.generatedImageUrl) {
+              connectedPropsImages.push(connectedImage.generatedImageUrl);
+            } else {
+              const mediaImage = images.find(img => img.elementId === conn.to);
+              if (mediaImage && mediaImage.url) {
+                connectedPropsImages.push(mediaImage.url);
+              }
+            }
+          });
+
+          // Resolve @mentions from text if available
+          if (textToAnalyze) {
+            const { getReferenceImagesForText } = await import('@/app/components/Plugins/StoryboardPluginModal/mentionUtils');
+            const mentionImages = getReferenceImagesForText({
+              text: textToAnalyze,
+              characterNamesMap: sourceStoryboard.characterNamesMap || {},
+              backgroundNamesMap: sourceStoryboard.backgroundNamesMap || {},
+              propsNamesMap: sourceStoryboard.propsNamesMap || {},
+              connectedCharacterImages,
+              connectedBackgroundImages,
+              connectedPropsImages,
+            });
+            referenceImageUrls.push(...mentionImages);
+            console.log('[ImageUploadModal] Resolved @mentions:', {
+              text: textToAnalyze,
+              mentionCount: mentionImages.length,
+              imageUrls: mentionImages
+            });
+          }
+
+          // If no @mentions found, include all connected images (backward compatibility)
+          if (referenceImageUrls.length === 0) {
+            referenceImageUrls.push(...connectedCharacterImages);
+            referenceImageUrls.push(...connectedBackgroundImages);
+            referenceImageUrls.push(...connectedPropsImages);
+          }
+
+          console.log('[ImageUploadModal] Collected reference images:', {
+            storyboardId: sourceStoryboard.id,
+            imageCount: referenceImageUrls.length,
+            imageUrls: referenceImageUrls
+          });
+        } else if (!stitchedOnly) {
+          console.log('[ImageUploadModal] ❌ No Storyboard found');
+        }
+
+        if (!stitchedOnly) {
+          console.log('[ImageUploadModal] Final reference images:', referenceImageUrls);
+        }
+
         // Calculate frame dimensions for positioning
         const [w, h] = selectedAspectRatio.split(':').map(Number);
         const frameWidth = 600;
@@ -563,15 +767,131 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           }
         }
 
+        // CRITICAL: For SCENE-based generation, look up reference images from refImages using character/location names
+        // This bypasses the need to store sourceImageUrl in modal state
+        if (refImages && Object.keys(refImages).length > 0) {
+          // Check if this modal has scene metadata (from storyboard generation)
+          const modalData = imageModalStates.find(m => m.id === id || m.id === targetModalId);
+          const sceneMetadata = (modalData as any)?.storyboardMetadata;
+
+          if (sceneMetadata) {
+            console.log('[ImageUploadModal] 🎬 Scene generation detected, looking up reference images:', {
+              sceneMetadata,
+              availableRefImages: Object.keys(refImages),
+            });
+
+            // Look up character images
+            if (sceneMetadata.character) {
+              const characterNames = sceneMetadata.character.split(',').map((name: string) => name.trim().toLowerCase());
+              characterNames.forEach((charName: string) => {
+                if (refImages[charName]) {
+                  if (!referenceImageUrls.includes(refImages[charName])) {
+                    referenceImageUrls.push(refImages[charName]);
+                    console.log(`[ImageUploadModal] ✅ Found reference image for character "${charName}"`);
+                  }
+                }
+              });
+            }
+
+            // Look up background images
+            if (sceneMetadata.background) {
+              const bgName = sceneMetadata.background.toLowerCase().trim();
+              if (refImages[bgName]) {
+                if (!referenceImageUrls.includes(refImages[bgName])) {
+                  referenceImageUrls.push(refImages[bgName]);
+                  console.log(`[ImageUploadModal] ✅ Found reference image for background "${bgName}"`);
+                }
+              }
+            }
+
+            console.log(`[ImageUploadModal] 🎯 Total reference images from scene metadata: ${referenceImageUrls.length}`);
+          }
+        }
+
+        // Determine final reference: prefer stitched reference exclusively when present
+        let allReferenceImageUrls: string[] = [];
+        
+        console.log('[Image Generation] 🔍 STEP 1: Before building allReferenceImageUrls:', {
+          stitchedOnly,
+          finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NULL/UNDEFINED',
+          referenceImageUrls: referenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          referenceImageUrlsLength: referenceImageUrls.length,
+        });
+        
+        if (stitchedOnly && finalSourceImageUrl) {
+          allReferenceImageUrls = [finalSourceImageUrl];
+          console.log('[Image Generation] 🔍 STEP 2a: Using stitched-only path');
+        } else {
+          allReferenceImageUrls = [...referenceImageUrls];
+          console.log('[Image Generation] 🔍 STEP 2b: Copied referenceImageUrls, length:', allReferenceImageUrls.length);
+          
+          if (finalSourceImageUrl && !allReferenceImageUrls.includes(finalSourceImageUrl)) {
+            console.log('[Image Generation] 🔍 STEP 3: Adding finalSourceImageUrl to allReferenceImageUrls');
+            allReferenceImageUrls.push(finalSourceImageUrl);
+          } else {
+            console.log('[Image Generation] 🔍 STEP 3: NOT adding finalSourceImageUrl because:', {
+              hasFinalSourceImageUrl: !!finalSourceImageUrl,
+              alreadyInArray: allReferenceImageUrls.includes(finalSourceImageUrl || ''),
+            });
+          }
+        }
+        
+        console.log('[Image Generation] 🔍 STEP 4: After building allReferenceImageUrls:', {
+          allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          allReferenceImageUrlsLength: allReferenceImageUrls.length,
+        });
+
+        // CRITICAL: When creating a new frame for image-to-image (hasExistingImage is true),
+        // we MUST pass the source image URL explicitly because the new frame doesn't have it yet
+        // The finalSourceImageUrl contains the current frame's generatedImageUrl which should be used as the source
+        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl 
+          ? finalSourceImageUrl 
+          : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined);
+        
+        console.log('[Image Generation] 🎯 Source image determination:', {
+          hasExistingImage,
+          generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+          finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NONE',
+          allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
+          finalSourceImageUrlParam: finalSourceImageUrlParam ? finalSourceImageUrlParam.substring(0, 100) + '...' : 'NONE',
+          willCreateNewFrame: hasExistingImage && generatedImageUrl,
+        });
+
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
         console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
         console.log(`[Image Generation] 🔍 About to call onImageGenerate with:`, {
           targetModalId,
-          finalSourceImageUrl: finalSourceImageUrl || 'none',
+          referenceImageUrls: allReferenceImageUrls,
+          finalSourceImageUrl,
+          finalSourceImageUrlParam,
+          hasExistingImage,
+          generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
+          willUseImageToImage: !!finalSourceImageUrlParam,
           imageCount,
+          width,
+          height,
         });
-        const result = await onImageGenerate(promptToUse, getFinalModelName(), selectedFrame, selectedAspectRatio, targetModalId, imageCount, finalSourceImageUrl || undefined);
+        
+        console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
+          'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
+          'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
+          'finalSourceImageUrlParam truthy': !!finalSourceImageUrlParam,
+          'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
+          'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
+        });
+        
+        const result = await onImageGenerate(
+          promptToUse,
+          getFinalModelName(),
+          selectedFrame,
+          selectedAspectRatio,
+          targetModalId,
+          imageCount,
+          finalSourceImageUrlParam,
+          width,
+          height
+        );
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
 
         // Extract all generated image URLs
@@ -623,7 +943,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         console.error('Error generating images:', error);
         alert('Failed to generate images. Please try again.');
       } finally {
-        setIsGenerating(false);
+        // Only reset generating state if we set it to true for the current frame
+        if (didSetCurrentFrameGenerating) {
+          setGeneratingState(false);
+        }
       }
     }
   };
@@ -648,8 +971,43 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     window.addEventListener('canvas-frame-dim', handleDim as any);
     return () => window.removeEventListener('canvas-frame-dim', handleDim as any);
   }, [id]);
+  // Helper to parse model string into base model and resolution
+  const parseModelAndResolution = (modelString: string) => {
+    if (!modelString) return { model: 'Google Nano Banana', resolution: '2K' };
+
+    const lower = modelString.toLowerCase();
+
+    // Check for known resolutions at the end of the string
+    const resolutions = ['1K', '2K', '4K', '1024x2048'];
+    let foundResolution = '2K'; // Default
+    let baseModel = modelString;
+
+    for (const res of resolutions) {
+      // Check if string ends with resolution (case insensitive)
+      if (lower.endsWith(res.toLowerCase())) {
+        foundResolution = res;
+        // Remove resolution from end (and trim)
+        baseModel = modelString.substring(0, modelString.length - res.length).trim();
+        break;
+      }
+    }
+
+    // Special handling for "Google nano banana pro" which might be lowercased in some contexts
+    if (baseModel.toLowerCase() === 'google nano banana pro') {
+      baseModel = 'Google nano banana pro';
+    } else if (baseModel.toLowerCase() === 'flux 2 pro') {
+      baseModel = 'Flux 2 pro';
+    }
+
+    return { model: baseModel, resolution: foundResolution };
+  };
+
   useEffect(() => {
-    if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel);
+    if (initialModel) {
+      const { model, resolution } = parseModelAndResolution(initialModel);
+      if (model !== selectedModel) setSelectedModel(model);
+      if (resolution !== selectedResolution) setSelectedResolution(resolution);
+    }
   }, [initialModel]);
   useEffect(() => {
     if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame);
@@ -761,6 +1119,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // Seedream, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
+    if (
+      modelLower.includes('seedream') ||
+      modelLower.includes('imagen') ||
+      modelLower.includes('flux pro 1.1')
+    ) {
+      return [
+        { value: '1K', label: '1K (1024px)' },
+        { value: '2K', label: '2K (2048px)' },
+        { value: '4K', label: '4K (4096px)' },
+      ];
+    }
+
     // Other models don't have resolution options
     return [];
   };
@@ -777,6 +1148,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // For Flux 2 Pro, append resolution
     if (modelLower.includes('flux 2 pro')) {
       return `Flux 2 Pro ${selectedResolution}`;
+    }
+
+    // For Seedream, Imagen, and Flux Pro 1.1, append resolution
+    if (
+      modelLower.includes('seedream') ||
+      modelLower.includes('imagen') ||
+      modelLower.includes('flux pro 1.1')
+    ) {
+      return `${selectedModel} ${selectedResolution}`;
     }
 
     // For other models, use as-is
@@ -941,6 +1321,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isHovered={isHovered}
         isPinned={isPinned}
         isUploadedImage={Boolean(isUploadedImage)}
+        isSelected={Boolean(isSelected)}
         prompt={effectivePrompt}
         isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}
@@ -1044,7 +1425,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onResolutionChange={(resolution) => {
           setSelectedResolution(resolution);
           if (onOptionsChange) {
-            onOptionsChange({ model: `Google nano banana pro ${resolution}`, aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount } as any);
+            // Helper to get model name with NEW resolution
+            const getModelNameWithResolution = (res: string) => {
+              const modelLower = selectedModel.toLowerCase();
+              if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
+              if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
+              if (
+                modelLower.includes('seedream') ||
+                modelLower.includes('imagen') ||
+                modelLower.includes('flux pro 1.1')
+              ) {
+                return `${selectedModel} ${res}`;
+              }
+              return selectedModel;
+            };
+
+            onOptionsChange({
+              model: getModelNameWithResolution(resolution),
+              aspectRatio: selectedAspectRatio,
+              frame: selectedFrame,
+              prompt,
+              frameWidth: 600,
+              frameHeight: 400,
+              imageCount
+            } as any);
           }
         }}
         onGenerate={handleGenerate}

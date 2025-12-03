@@ -34,7 +34,7 @@ export const EraseLabel: React.FC<EraseLabelProps> = ({
       }}
     >
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span>Erase</span>
+        <span>Erase / Replace</span>
         {imageResolution && (
           <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
             {imageResolution.width} × {imageResolution.height}

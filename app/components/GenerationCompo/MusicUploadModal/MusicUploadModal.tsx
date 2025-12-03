@@ -7,6 +7,7 @@ import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 import { MusicModalFrame } from './MusicModalFrame';
 import { MusicModalNodes } from './MusicModalNodes';
 import { MusicModalControls } from './MusicModalControls';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface MusicUploadModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ interface MusicUploadModalProps {
   initialFrame?: string;
   initialAspectRatio?: string;
   initialPrompt?: string;
-  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
+  onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
 }
 
 export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
@@ -81,17 +82,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     return `${width} / ${height}`;
   };
 
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -101,16 +92,21 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
+  const setGeneratingState = (next: boolean) => {
+    setIsGenerating(next);
+    onOptionsChange?.({ isGenerating: next });
+  };
+
   const handleGenerate = async () => {
     if (onGenerate && prompt.trim() && !isGenerating) {
-      setIsGenerating(true);
+      setGeneratingState(true);
       try {
         await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio);
       } catch (err) {
         console.error('Error generating music:', err);
         alert('Failed to generate music. Please try again.');
       } finally {
-        setIsGenerating(false);
+        setGeneratingState(false);
       }
     }
   };
@@ -278,6 +274,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         scale={scale}
         isHovered={isHovered}
         isPinned={isPinned}
+        isSelected={Boolean(isSelected)}
         prompt={prompt}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}

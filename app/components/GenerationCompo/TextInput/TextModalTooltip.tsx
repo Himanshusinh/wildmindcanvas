@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface TextModalTooltipProps {
   isHovered: boolean;
@@ -11,21 +11,11 @@ export const TextModalTooltip: React.FC<TextModalTooltipProps> = ({
   isHovered,
   scale,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   if (!isHovered) return null;
 
-  const tooltipBg = isDark ? '#121212' : '#ffffff';
+  const tooltipBg = isDark ? '#1a1a1a' : '#ffffff';
   const tooltipText = isDark ? '#ffffff' : '#1f2937';
 
   return (

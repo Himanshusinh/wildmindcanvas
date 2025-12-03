@@ -1,6 +1,6 @@
 import { getCachedRequest, setCachedRequest } from './apiCache';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api-gateway-services-wildmind.onrender.com';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.wildmindai.com';
 const API_GATEWAY_URL = `${API_BASE_URL}/api`;
 
 export interface ImageGenerationRequest {
@@ -208,13 +208,45 @@ export async function generateImageForCanvas(
   width?: number,
   height?: number,
   imageCount?: number,
-  sourceImageUrl?: string
+  sourceImageUrl?: string,
+  sceneNumber?: number,
+  previousSceneImageUrl?: string,
+  storyboardMetadata?: Record<string, string>
 ): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
   try {
+    const requestBody = {
+      prompt,
+      model,
+      width,
+      height,
+      aspectRatio, // Pass aspectRatio for proper model mapping
+      imageCount, // Pass imageCount to generate multiple images
+      sourceImageUrl, // Pass comma-separated reference image URLs (backend will split them)
+      sceneNumber, // Scene number for storyboard generation
+      previousSceneImageUrl, // Previous scene's generated image URL (for Scene 2+)
+      storyboardMetadata, // Metadata for storyboard (character, background, etc.)
+      meta: {
+        source: 'canvas',
+        projectId,
+      },
+    };
+
+    console.log('[generateImageForCanvas] 📤 STEP 6: Sending request to backend:', {
+      url: `${API_GATEWAY_URL}/canvas/generate`,
+      requestBody: {
+        ...requestBody,
+        sourceImageUrl: sourceImageUrl || 'NONE',
+        sourceImageUrlFull: sourceImageUrl,
+        previousSceneImageUrl: previousSceneImageUrl || 'NONE',
+        previousSceneImageUrlFull: previousSceneImageUrl,
+        prompt: prompt.substring(0, 100) + '...',
+      },
+    });
+
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate`, {
       method: 'POST',
       credentials: 'include', // Include cookies (app_session)
@@ -222,19 +254,7 @@ export async function generateImageForCanvas(
         'Content-Type': 'application/json',
       },
       signal: controller.signal,
-      body: JSON.stringify({
-        prompt,
-        model,
-        width,
-        height,
-        aspectRatio, // Pass aspectRatio for proper model mapping
-        imageCount, // Pass imageCount to generate multiple images
-        sourceImageUrl, // Pass sourceImageUrl for image-to-image generation
-        meta: {
-          source: 'canvas',
-          projectId,
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     clearTimeout(timeoutId);
@@ -1173,6 +1193,98 @@ export async function queryCanvasPrompt(
 /**
  * Generate scenes from story text
  */
+export async function createStitchedReferenceImage(
+  images: Array<{ url: string; label: string; type: 'character' | 'background' | 'prop'; name?: string }>,
+  projectId: string,
+  token?: string
+): Promise<{ url: string; key: string }> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_GATEWAY_URL}/canvas/create-stitched-reference`, {
+    method: 'POST',
+    credentials: 'include', // Include cookies (app_session) for authentication
+    headers,
+    body: JSON.stringify({
+      images,
+      projectId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(errorData.message || `Failed to create stitched reference image: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  if (data.responseStatus === 'error') {
+    throw new Error(data.message || 'Failed to create stitched reference image');
+  }
+  const stitched = data.data as { url: string; key: string };
+
+  // Persist stitched reference into snapshot current metadata as a key→url map
+  // Store under 'stitched-image' key to match API endpoint naming convention
+  try {
+    if (projectId) {
+      // eslint-disable-next-line no-console
+      console.log('[createStitchedReferenceImage] 💾 Starting snapshot save...', { projectId, stitchedKey: stitched.key });
+
+      const { getCurrentSnapshot, setCurrentSnapshot } = await import('./canvasApi');
+      const current = await getCurrentSnapshot(projectId);
+      const elements = current?.snapshot?.elements || {};
+      const existingMeta = (current?.snapshot?.metadata || {}) as Record<string, any>;
+
+      // eslint-disable-next-line no-console
+      console.log('[createStitchedReferenceImage] 📋 Existing metadata keys:', Object.keys(existingMeta));
+
+      // Store only the latest stitched image (replace, don't accumulate)
+      const stitchedMap = {
+        [stitched.key]: stitched.url,
+      } as Record<string, string>;
+
+      const metadata = {
+        ...existingMeta,
+        'stitched-image': stitchedMap
+      };
+
+      // eslint-disable-next-line no-console
+      console.log('[createStitchedReferenceImage] 📤 Saving metadata with stitched-image:', {
+        'stitched-image': stitchedMap,
+        allMetadataKeys: Object.keys(metadata),
+      });
+
+      await setCurrentSnapshot(projectId, { elements, metadata });
+
+      // Verify it was saved
+      const verify = await getCurrentSnapshot(projectId);
+      const savedMeta = (verify?.snapshot?.metadata || {}) as Record<string, any>;
+
+      // eslint-disable-next-line no-console
+      console.log('[createStitchedReferenceImage] ✅ Saved stitched-image to snapshot current', {
+        key: stitched.key,
+        url: stitched.url,
+        metadataKey: 'stitched-image',
+        savedStitchedImage: savedMeta['stitched-image'],
+        allMetadataKeys: Object.keys(savedMeta),
+      });
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn('[createStitchedReferenceImage] ⚠️ No projectId provided, skipping snapshot save');
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[createStitchedReferenceImage] ❌ Failed to save stitched-image to snapshot current:', e);
+    // Don't throw - allow the function to return the stitched image even if save fails
+  }
+
+  return stitched;
+}
+
 export async function generateScenesFromStory(story: string): Promise<import('@/types/storyWorld').GenerateScenesResponse> {
   try {
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-scenes`, {
@@ -1393,15 +1505,25 @@ export interface MediaLibraryResponse {
     videos?: MediaItem[];
     music?: MediaItem[];
     uploaded?: MediaItem[];
+    pagination?: {
+      page: number;
+      limit: number;
+      totalImages: number;
+      totalVideos: number;
+      totalUploaded: number;
+      hasMoreImages: boolean;
+      hasMoreVideos: boolean;
+      hasMoreUploaded: boolean;
+    };
   };
 }
 
 /**
  * Get user's media library (generated and uploaded)
  */
-export async function getMediaLibrary(): Promise<MediaLibraryResponse> {
+export async function getMediaLibrary(page: number = 1, limit: number = 20): Promise<MediaLibraryResponse> {
   try {
-    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library`, {
+    const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library?page=${page}&limit=${limit}`, {
       method: 'GET',
       credentials: 'include',
       headers: {

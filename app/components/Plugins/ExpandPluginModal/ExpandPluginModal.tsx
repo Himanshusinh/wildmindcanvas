@@ -8,6 +8,7 @@ import { ExpandImageFrame } from './ExpandImageFrame';
 import { ExpandControls } from './ExpandControls';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandPluginModalProps {
   isOpen: boolean;
@@ -100,18 +101,58 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   };
   type AspectPreset = keyof typeof aspectPresets;
   const [aspectPreset, setAspectPreset] = useState<AspectPreset>('1:1');
+
+  // Handle aspect preset change with validation
+  const handleAspectPresetChange = (preset: AspectPreset) => {
+    if (preset === 'custom') {
+      setAspectPreset(preset);
+      return;
+    }
+
+    const presetConfig = aspectPresets[preset];
+    if (!presetConfig || !presetConfig.width || !presetConfig.height) {
+      setAspectPreset(preset);
+      return;
+    }
+
+    // If image is loaded and preset is smaller, switch to custom with image dimensions
+    if (imageSize) {
+      if (presetConfig.width < imageSize.width || presetConfig.height < imageSize.height) {
+        // Switch to custom with image dimensions (or larger)
+        setAspectPreset('custom');
+        setCustomWidth(Math.max(presetConfig.width, imageSize.width));
+        setCustomHeight(Math.max(presetConfig.height, imageSize.height));
+        return;
+      }
+    }
+
+    setAspectPreset(preset);
+  };
   const [customWidth, setCustomWidth] = useState(1024);
   const [customHeight, setCustomHeight] = useState(1024);
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [frameInfo, setFrameInfo] = useState<{
     canvasSize: [number, number];
     originalImageSize: [number, number];
     originalImageLocation: [number, number];
     aspectRatio?: string;
   } | null>(null);
+
+  // Adjust custom dimensions when image size is loaded if they're too small
+  useEffect(() => {
+    if (imageSize && aspectPreset === 'custom') {
+      if (customWidth < imageSize.width) {
+        setCustomWidth(imageSize.width);
+      }
+      if (customHeight < imageSize.height) {
+        setCustomHeight(imageSize.height);
+      }
+    }
+  }, [imageSize, aspectPreset]);
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
-  
+
   // Update ref when callback changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -182,20 +223,10 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const [isDark, setIsDark] = useState(false);
+  const isDark = useIsDarkTheme();
 
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -204,7 +235,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    
+
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
@@ -215,7 +246,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       }
       return url;
     }
-    
+
     // Then check if it's from a canvas image (uploaded image)
     if (images && images.length > 0) {
       const canvasImage = images.find(img => {
@@ -231,9 +262,14 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         return url;
       }
     }
-    
+
     return null;
   }, [id, connections, imageModalStates, images]);
+
+  // Check if we have a source image (either from state or connected)
+  const hasSourceImage = useMemo(() => {
+    return Boolean(sourceImageUrl || connectedImageSource);
+  }, [sourceImageUrl, connectedImageSource]);
 
   // Restore images from props on mount or when props change
   useEffect(() => {
@@ -284,13 +320,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     const isControls = target.closest('.controls-overlay');
     // Check if clicking on action icons (ModalActionIcons container or its children)
     const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     // Don't select if clicking on buttons, controls, inputs, or action icons
     if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (isButton || isInput || isControls || isActionIcons) {
       return;
@@ -302,13 +338,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
     e.preventDefault();
     e.stopPropagation();
-    
+
     setIsDraggingContainer(true);
     const startX = e.clientX;
     const startY = e.clientY;
     const startCanvasX = x;
     const startCanvasY = y;
-    
+
     setDragOffset({ x: 0, y: 0 });
     lastCanvasPosRef.current = { x: startCanvasX, y: startCanvasY };
 
@@ -326,10 +362,10 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       const deltaY = (moveEvent.clientY - startY) / scale;
       const newX = startCanvasX + deltaX;
       const newY = startCanvasY + deltaY;
-      
+
       setDragOffset({ x: deltaX, y: deltaY });
       lastCanvasPosRef.current = { x: newX, y: newY };
-      
+
       if (onPositionChange) {
         onPositionChange(newX, newY);
       }
@@ -340,19 +376,19 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       setIsDraggingContainer(false);
       setDragOffset({ x: 0, y: 0 });
       dragStartPosRef.current = null;
-      
+
       // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging && sourceImageUrl) {
+      if (!wasDragging) {
         setIsPopupOpen(prev => !prev);
       }
-      
+
       if (lastCanvasPosRef.current && onPositionCommit) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
-      
+
       // Reset drag flag
       hasDraggedRef.current = false;
-      
+
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -363,7 +399,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
 
   const handleExpand = async () => {
-    if (!onExpand || !sourceImageUrl) {
+    const effectiveSourceImageUrl = sourceImageUrl || connectedImageSource;
+    if (!onExpand || !effectiveSourceImageUrl) {
       setIsPopupOpen(false);
       return;
     }
@@ -387,7 +424,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     const targetX = x + offsetX;
     const targetY = y;
     const newModalId = `image-expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Create image generation frame with isGenerating flag to show loading state
     if (onPersistImageModalCreate) {
       const newModal = {
@@ -403,27 +440,27 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         prompt: '',
         isGenerating: true, // Show loading state
       };
-      
+
       await Promise.resolve(onPersistImageModalCreate(newModal));
     }
-    
+
     // Automatically create connection from expand plugin to new frame
     if (onPersistConnectorCreate && id) {
       // Calculate node positions (right side of expand plugin, left side of new frame)
       const controlsHeight = 100; // Approximate controls section height
       const imageFrameHeight = 300; // Typical image frame height in canvas coordinates
       const imageFrameCenterY = controlsHeight + (imageFrameHeight / 2);
-      
+
       const fromX = x + 400; // Right side of expand plugin (width is 400 in canvas coordinates)
       const fromY = y + imageFrameCenterY; // Middle of image frame area (where the send node is)
       const toX = targetX; // Left side of new frame
       const toY = targetY + (frameHeight / 2); // Middle of new frame (where the receive node is)
-      
+
       // Check if connection already exists
       const connectionExists = connections.some(
         conn => conn.from === id && conn.to === newModalId
       );
-      
+
       if (!connectionExists) {
         const newConnector = {
           from: id,
@@ -436,7 +473,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
           fromAnchor: 'send',
           toAnchor: 'receive',
         };
-        
+
         await Promise.resolve(onPersistConnectorCreate(newConnector));
         console.log('[ExpandPluginModal] Created connection from plugin to new frame:', newConnector);
       }
@@ -448,13 +485,13 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
       }
 
       // Validate frame info before calling API
-      if (!frameInfo.canvasSize || frameInfo.canvasSize.length !== 2 || 
-          frameInfo.canvasSize[0] <= 0 || frameInfo.canvasSize[1] <= 0) {
+      if (!frameInfo.canvasSize || frameInfo.canvasSize.length !== 2 ||
+        frameInfo.canvasSize[0] <= 0 || frameInfo.canvasSize[1] <= 0) {
         throw new Error('Invalid canvas size. Please ensure the frame is properly configured.');
       }
 
       if (!frameInfo.originalImageSize || frameInfo.originalImageSize.length !== 2 ||
-          frameInfo.originalImageSize[0] <= 0 || frameInfo.originalImageSize[1] <= 0) {
+        frameInfo.originalImageSize[0] <= 0 || frameInfo.originalImageSize[1] <= 0) {
         throw new Error('Invalid image size. Please ensure the image is loaded.');
       }
 
@@ -471,7 +508,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
       const result = await onExpand(
         selectedModel,
-        sourceImageUrl,
+        effectiveSourceImageUrl,
         expandPrompt || undefined,
         frameInfo.canvasSize,
         frameInfo.originalImageSize,
@@ -532,7 +569,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         }
         // Persist the local expanded image URL
         if (onOptionsChangeRef.current) {
-          onOptionsChangeRef.current({ 
+          onOptionsChangeRef.current({
             localExpandedImageUrl: result,
             isExpanding: false
           });
@@ -599,6 +636,22 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onMouseDown={handleMouseDown}
       >
+        {/* Label above */}
+        <div
+          style={{
+            marginBottom: `${8 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            fontWeight: 500,
+            color: isDark ? '#ffffff' : '#1a1a1a',
+            textAlign: 'center',
+            userSelect: 'none',
+            transition: 'color 0.3s ease',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Expand
+        </div>
+
         {/* Main plugin container - Circular */}
         <div
           style={{
@@ -611,8 +664,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s ease',
-            boxShadow: isDark 
+            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            boxShadow: isDark
               ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
               : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
             transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
@@ -637,7 +690,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
               e.currentTarget.style.display = 'none';
             }}
           />
-          
+
           <ConnectionNodes
             id={id}
             scale={scale}
@@ -645,22 +698,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             isSelected={isSelected || false}
           />
         </div>
-        
-        {/* Label below */}
-        <div
-          style={{
-            marginTop: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
-            color: isDark ? '#ffffff' : '#1a1a1a',
-            textAlign: 'center',
-            userSelect: 'none',
-            transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
-          }}
-        >
-          Expand
-        </div>
+
       </div>
 
       {isPopupOpen && (
@@ -720,8 +758,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             }
           }}
         >
-          {(() => {
-            return (
+        {hasSourceImage ? (
               <div
                 style={{
                   backgroundColor: isDark ? '#121212' : 'white',
@@ -781,8 +818,8 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   expandPrompt={expandPrompt}
                   isExpanding={isExpanding}
                   externalIsExpanding={externalIsExpanding}
-                  sourceImageUrl={sourceImageUrl}
-                  onAspectPresetChange={(preset) => setAspectPreset(preset as AspectPreset)}
+                  sourceImageUrl={sourceImageUrl || connectedImageSource}
+                  onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
                   onExpandPromptChange={setExpandPrompt}
                   onExpand={handleExpand}
                   onClose={() => setIsPopupOpen(false)}
@@ -791,6 +828,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   customHeight={customHeight}
                   onCustomWidthChange={setCustomWidth}
                   onCustomHeightChange={setCustomHeight}
+                  imageSize={imageSize}
                 />
 
                 {/* Image Preview with Canvas */}
@@ -811,7 +849,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                   }}
                 >
                   <ExpandImageFrame
-                    sourceImageUrl={sourceImageUrl}
+                    sourceImageUrl={sourceImageUrl || connectedImageSource}
                     localExpandedImageUrl={localExpandedImageUrl}
                     expandedImageUrl={expandedImageUrl}
                     aspectPreset={aspectPreset}
@@ -819,11 +857,51 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
                     customWidth={customWidth}
                     customHeight={customHeight}
                     onFrameInfoChange={setFrameInfo}
+                    onImageSizeChange={setImageSize}
                   />
                 </div>
               </div>
-            );
-          })()}
+        ) : (
+          <div
+            style={{
+              backgroundColor: isDark ? '#121212' : 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              width: 'min(420px, 90vw)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignItems: 'center',
+              textAlign: 'center',
+              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
+              pointerEvents: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
+              Connect an image to expand
+            </h3>
+            <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
+              Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
+            </p>
+            <button
+              onClick={() => setIsPopupOpen(false)}
+              style={{
+                marginTop: '8px',
+                padding: '10px 20px',
+                borderRadius: '999px',
+                border: 'none',
+                backgroundColor: '#437eb5',
+                color: '#ffffff',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 500,
+              }}
+            >
+              Close
+            </button>
+          </div>
+        )}
         </div>
       )}
     </div>

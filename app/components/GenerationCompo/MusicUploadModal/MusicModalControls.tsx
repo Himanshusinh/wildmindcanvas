@@ -1,10 +1,12 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface MusicModalControlsProps {
   scale: number;
   isHovered: boolean;
   isPinned: boolean;
+  isSelected?: boolean;
   prompt: string;
   selectedModel: string;
   selectedAspectRatio: string;
@@ -30,6 +32,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   scale,
   isHovered,
   isPinned,
+  isSelected = false,
   prompt,
   selectedModel,
   selectedAspectRatio,
@@ -50,22 +53,13 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   onSetIsAspectRatioDropdownOpen,
   onOptionsChange,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
+  const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const inputBg = isDark ? '#121212' : '#ffffff';
   const inputText = isDark ? '#ffffff' : '#1f2937';
@@ -98,13 +92,11 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
       style={{
         position: 'absolute',
         top: '100%',
-        left: `${-2 * scale}px`,
-        width: `calc(100% + ${4 * scale}px)`,
+        left: 0,
+        width: `${600 * scale}px`,
         maxWidth: '90vw',
-        padding: `${12 * scale}px`,
+        padding: `${16 * scale}px`,
         backgroundColor: controlsBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
         boxShadow: 'none',
         transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
@@ -116,10 +108,10 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
         overflow: 'visible',
         zIndex: 3,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease',
+        borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}

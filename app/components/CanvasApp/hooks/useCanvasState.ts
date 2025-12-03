@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -11,7 +11,6 @@ export function useCanvasState() {
   const [upscaleGenerators, setUpscaleGenerators] = useState<UpscaleGenerator[]>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<RemoveBgGenerator[]>([]);
   const [eraseGenerators, setEraseGenerators] = useState<EraseGenerator[]>([]);
-  const [replaceGenerators, setReplaceGenerators] = useState<ReplaceGenerator[]>([]);
   const [expandGenerators, setExpandGenerators] = useState<ExpandGenerator[]>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<VectorizeGenerator[]>([]);
   const [storyboardGenerators, setStoryboardGenerators] = useState<StoryboardGenerator[]>([]);
@@ -29,7 +28,6 @@ export function useCanvasState() {
     upscaleGenerators,
     removeBgGenerators,
     eraseGenerators,
-    replaceGenerators,
     expandGenerators,
     vectorizeGenerators,
     storyboardGenerators,
@@ -48,7 +46,6 @@ export function useCanvasState() {
     setUpscaleGenerators,
     setRemoveBgGenerators,
     setEraseGenerators,
-    setReplaceGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
     setStoryboardGenerators,

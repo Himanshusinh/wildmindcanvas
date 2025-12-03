@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizeImageFrameProps {
   id: string | undefined;
@@ -30,17 +31,7 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
   onMouseDown,
   onSelect,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   return (
     <div
@@ -67,6 +58,7 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
         maxWidth: '90vw',
         minHeight: `${150 * scale}px`,
         maxHeight: `${400 * scale}px`,
+        height: sourceImageUrl ? `${220 * scale}px` : 'auto',
         backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -82,6 +74,7 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
         zIndex: 1,
         transition: 'border 0.18s ease, background-color 0.3s ease',
         padding: `${16 * scale}px`,
+        marginTop: `${-frameBorderWidth * scale}px`,
       }}
     >
       {sourceImageUrl ? (
@@ -109,7 +102,9 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
             strokeLinejoin="round"
             style={{ margin: '0 auto 8px', opacity: 0.3 }}
           >
-            <path d="M5 12h14M12 5l7 7-7 7" />
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
           </svg>
           <p style={{ fontSize: `${12 * scale}px`, margin: 0, opacity: 0.6 }}>Connect an image to vectorize</p>
         </div>

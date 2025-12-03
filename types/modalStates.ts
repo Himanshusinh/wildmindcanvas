@@ -57,6 +57,7 @@ export interface MusicModalState {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  isGenerating?: boolean;
 }
 
 export interface UpscaleModalState {

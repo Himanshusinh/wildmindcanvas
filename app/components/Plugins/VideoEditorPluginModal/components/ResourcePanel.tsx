@@ -53,102 +53,30 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
         </div>
     );
 
-    const renderText = () => (
-        <div className="p-4 space-y-6 pb-24">
-            <div className="grid grid-cols-6 gap-1.5">
-                <button
-                    draggable={true}
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'text', src: 'Heading', name: 'Heading', fontSize: 64, fontWeight: 'bold' }));
-                    }}
-                    onClick={() => onAddClip('Heading', 'text')}
-                    className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all font-bold text-sm cursor-grab active:cursor-grabbing"
-                    title="Drag to add Heading"
-                >
-                    H1
-                </button>
-                <button
-                    draggable={true}
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'text', src: 'Subheading', name: 'Subheading', fontSize: 40, fontWeight: 'bold' }));
-                    }}
-                    onClick={() => onAddClip('Subheading', 'text')}
-                    className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all font-semibold text-xs cursor-grab active:cursor-grabbing"
-                    title="Drag to add Subheading"
-                >
-                    H2
-                </button>
-                <button
-                    draggable={true}
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'text', src: 'Body Text', name: 'Body Text', fontSize: 24 }));
-                    }}
-                    onClick={() => onAddClip('Body Text', 'text')}
-                    className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all text-xs font-medium cursor-grab active:cursor-grabbing"
-                    title="Drag to add Body Text"
-                >
-                    Aa
-                </button>
-            </div>
+    const renderTextTab = () => (
+        <div className="p-4 space-y-4">
+            <button
+                onClick={() => onAddItem({ type: 'text', name: 'Add a heading', src: '', duration: 5, width: 80, height: 20, fontSize: 60, fontWeight: 'bold', color: '#000000' })}
+                className="w-full bg-violet-600 text-white py-3 rounded-lg font-bold hover:bg-violet-700 transition-colors shadow-sm"
+            >
+                Add a text box
+            </button>
 
-            <div className="pt-4 border-t border-gray-100">
-                <h4 className="font-bold text-sm text-gray-700 mb-3">Alignment</h4>
-                <div className={`grid grid-cols-6 gap-1.5 ${!selectedItem ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                    <button onClick={() => onAlign('left')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Left">
-                        <AlignLeft size={16} />
-                    </button>
-                    <button onClick={() => onAlign('center')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Center">
-                        <AlignCenter size={16} />
-                    </button>
-                    <button onClick={() => onAlign('right')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Right">
-                        <AlignRight size={16} />
-                    </button>
-                    <button onClick={() => onAlign('top')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Top">
-                        <AlignStartVertical size={16} />
-                    </button>
-                    <button onClick={() => onAlign('middle')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Middle">
-                        <AlignVerticalJustifyCenter size={16} />
-                    </button>
-                    <button onClick={() => onAlign('bottom')} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-center hover:border-violet-300 hover:text-violet-600 text-gray-600 transition-all" title="Align Bottom">
-                        <AlignEndVertical size={16} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100">
-                <h4 className="font-bold text-sm text-gray-700 mb-4">Font Combinations</h4>
-                <div className="grid grid-cols-2 gap-3">
-                    {FONT_COMBINATIONS.map((combo) => (
-                        <div
-                            key={combo.id}
-                            draggable={true}
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('application/json', JSON.stringify({
-                                    type: 'text',
-                                    src: combo.label,
-                                    name: combo.label,
-                                    ...combo.style
-                                }));
-                            }}
-                            onClick={() => onAddClip(combo.label, 'text', combo.style)}
-                            className="bg-gray-50 p-4 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md transition-all border border-gray-200 hover:border-violet-200 hover:bg-white flex flex-col items-center justify-center text-center aspect-square group relative overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <h5
-                                className="text-xl leading-tight z-10 w-full break-words"
-                                style={{
-                                    fontFamily: combo.style.fontFamily,
-                                    color: combo.style.color,
-                                    ...getTextEffectStyle(combo.style.textEffect!, combo.style.color),
-                                    fontStyle: combo.style.fontStyle
-                                }}
-                            >
-                                {combo.label}
-                            </h5>
-                            <p className="text-[10px] text-gray-400 mt-2 font-sans">{combo.name}</p>
-                        </div>
-                    ))}
-                </div>
+            <div className="space-y-3">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Default Styles</h3>
+                {MOCK_TEXT_STYLES.map(style => (
+                    <div
+                        key={style.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, 'text', '', { name: style.preview, fontSize: style.fontSize, fontWeight: style.fontWeight })}
+                        onClick={() => onAddItem({ type: 'text', name: style.preview, src: '', duration: 5, width: 60, height: 15, fontSize: style.fontSize, fontWeight: style.fontWeight as any, color: '#000000' })}
+                        className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border border-transparent hover:border-gray-200 transition-all"
+                    >
+                        <p style={{ fontSize: Math.max(12, style.fontSize / 3), fontWeight: style.fontWeight as any }} className="text-gray-800 truncate">
+                            {style.preview}
+                        </p>
+                    </div>
+                ))}
             </div>
         </div>
     );

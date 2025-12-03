@@ -15,7 +15,14 @@ import AvatarButton from './AvatarButton';
 import { SettingsPopup } from '@/app/components/Settings';
 import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
 import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY } from '@/lib/canvasHelpers';
-import { generateScenesFromStory } from '@/lib/api';
+import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/lib/api';
+import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
+
+// ... (rest of imports)
+
+// ... (inside handleGenerateScenes)
+
+
 
 interface CanvasProps {
   images?: ImageUpload[];
@@ -32,7 +39,20 @@ interface CanvasProps {
   isImageModalOpen?: boolean;
   onImageModalClose?: () => void;
   onImageSelect?: (file: File) => void;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (
+    prompt: string,
+    model: string,
+    frame: string,
+    aspectRatio: string,
+    modalId?: string,
+    imageCount?: number,
+    sourceImageUrl?: string,
+    sceneNumber?: number,
+    previousSceneImageUrl?: string,
+    storyboardMetadata?: Record<string, string>,
+    width?: number,
+    height?: number
+  ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;
   onVideoModalClose?: () => void;
@@ -46,21 +66,20 @@ interface CanvasProps {
   generatedMusicUrl?: string | null;
   onAddImageToCanvas?: (url: string) => void;
   projectId?: string | null;
-  externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>;
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
   externalEraseModals?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>;
-  externalReplaceModals?: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>;
   externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
   externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
   externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
   externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
-  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
@@ -83,20 +102,16 @@ interface CanvasProps {
   onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
   onErase?: (model: string, sourceImageUrl?: string, mask?: string) => Promise<string | null>;
   // Replace plugin persistence callbacks
-  onPersistReplaceModalCreate?: (modal: { id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }) => void | Promise<void>;
-  onPersistReplaceModalMove?: (id: string, updates: Partial<{ x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>) => void | Promise<void>;
-  onPersistReplaceModalDelete?: (id: string) => void | Promise<void>;
-  onReplace?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>) => void | Promise<void>;
   onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
   onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   // Vectorize plugin persistence callbacks
-  onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
+  onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => void | Promise<void>;
+  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
   onPersistScriptFrameModalCreate?: (modal: { id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }) => void | Promise<void>;
   onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth: number; frameHeight: number; text: string }>) => void | Promise<void>;
@@ -155,7 +170,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalUpscaleModals,
   externalRemoveBgModals,
   externalEraseModals,
-  externalReplaceModals,
   externalExpandModals,
   externalVectorizeModals,
   externalStoryboardModals,
@@ -183,10 +197,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistEraseModalMove,
   onPersistEraseModalDelete,
   onErase,
-  onPersistReplaceModalCreate,
-  onPersistReplaceModalMove,
-  onPersistReplaceModalDelete,
-  onReplace,
   onPersistExpandModalCreate,
   onPersistExpandModalMove,
   onPersistExpandModalDelete,
@@ -288,6 +298,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const layerRef = useRef<Konva.Layer>(null);
   const initializedRef = useRef(false);
   const [patternImage, setPatternImage] = useState<HTMLImageElement | null>(null);
+  // Track theme so we can avoid a white flash on initial load/refresh
+  const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 1200, height: 800 });
   const [scale, setScale] = useState(1);
   // Center the initial view on the canvas
@@ -296,17 +308,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     y: 0
   });
   const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
-  const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>>([]);
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
-  const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>>([]);
   const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
   const [eraseModalStates, setEraseModalStates] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
-  const [replaceModalStates, setReplaceModalStates] = useState<Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isReplacing?: boolean }>>([]);
   const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
-  const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
-  const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>>([]);
+  const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; namedImages?: { characters?: Record<string, string>; backgrounds?: Record<string, string>; props?: Record<string, string> }; stitchedImageUrl?: string }>>([]);
+  const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<import('@/app/components/ModalOverlays/types').ScriptFrameModalState>>([]);
   const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string; characterIds?: string[]; locationId?: string; mood?: string }>>([]);
   // Story World state - stores character/location/style data per storyboard
   const [storyWorldStates, setStoryWorldStates] = useState<Array<{ storyboardId: string; storyWorld: import('@/types/storyWorld').StoryWorld }>>([]);
@@ -321,8 +332,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedRemoveBgModalIds, setSelectedRemoveBgModalIds] = useState<string[]>([]);
   const [selectedEraseModalId, setSelectedEraseModalId] = useState<string | null>(null);
   const [selectedEraseModalIds, setSelectedEraseModalIds] = useState<string[]>([]);
-  const [selectedReplaceModalId, setSelectedReplaceModalId] = useState<string | null>(null);
-  const [selectedReplaceModalIds, setSelectedReplaceModalIds] = useState<string[]>([]);
   const [selectedExpandModalId, setSelectedExpandModalId] = useState<string | null>(null);
   const [selectedExpandModalIds, setSelectedExpandModalIds] = useState<string[]>([]);
   const [selectedVectorizeModalId, setSelectedVectorizeModalId] = useState<string | null>(null);
@@ -367,7 +376,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     return cleaned.trim();
   };
 
-  const ensureScriptFrameForPlugin = (pluginId: string, script: string) => {
+  const ensureScriptFrameForPlugin = (pluginId: string, script: string, isLoading: boolean = false) => {
     const plugin = storyboardModalStates.find(modal => modal.id === pluginId);
     if (!plugin) return;
     const offset = (plugin.frameWidth || 400) + 60;
@@ -385,7 +394,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           existing.x === frameX &&
           existing.y === frameY &&
           existing.frameWidth === frameWidth &&
-          existing.frameHeight === frameHeight
+          existing.frameHeight === frameHeight &&
+          existing.isLoading === isLoading
         ) {
           return prev;
         }
@@ -393,7 +403,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Move persistence call outside of updater
         return prev.map(frame =>
           frame.pluginId === pluginId
-            ? { ...frame, text: script, frameWidth, frameHeight }
+            ? { ...frame, text: script, frameWidth, frameHeight, isLoading }
             : frame
         );
       }
@@ -406,6 +416,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         frameWidth,
         frameHeight,
         text: script,
+        isLoading,
       };
       return [...prev, newFrame];
     });
@@ -454,25 +465,75 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   };
 
-  const handleTextScriptGenerated = async (textModalId: string, script: string) => {
-    if (!textModalId || !script || !script.trim()) return;
-    const sanitizedScript = sanitizeScriptOutput(script);
-    if (!sanitizedScript) return;
+  const handleScriptGenerationStart = (textModalId: string) => {
     const storyboardTargets = (connections ?? [])
       .filter(conn => conn.from === textModalId)
       .map(conn => conn.to)
       .filter(Boolean);
     if (!storyboardTargets.length) return;
 
-    const storyboardIds = storyboardTargets.filter(targetId =>
-      storyboardModalStates.some(modal => modal.id === targetId)
-    );
-    if (!storyboardIds.length) return;
+    // Find target plugin IDs either directly or via script frame ID
+    const targetPluginIds = new Set<string>();
 
+    storyboardTargets.forEach(targetId => {
+      // Check if target is a storyboard plugin
+      if (storyboardModalStates.some(modal => modal.id === targetId)) {
+        targetPluginIds.add(targetId);
+      }
+      // Check if target is a script frame (format: script-{pluginId})
+      else if (targetId.startsWith('script-')) {
+        const potentialPluginId = targetId.replace('script-', '');
+        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
+          targetPluginIds.add(potentialPluginId);
+        }
+      }
+    });
+
+    if (targetPluginIds.size === 0) return;
+
+    for (const id of targetPluginIds) {
+      // Ensure script frame exists and set loading state
+      ensureScriptFrameForPlugin(id, '', true);
+    }
+  };
+
+  const handleTextScriptGenerated = async (textModalId: string, script: string) => {
+    if (!textModalId || !script || !script.trim()) return;
+    const sanitizedScript = sanitizeScriptOutput(script);
+    if (!sanitizedScript) return;
+
+    const storyboardTargets = (connections ?? [])
+      .filter(conn => conn.from === textModalId)
+      .map(conn => conn.to)
+      .filter(Boolean);
+    if (!storyboardTargets.length) return;
+
+    // Find target plugin IDs either directly or via script frame ID
+    const targetPluginIds = new Set<string>();
+
+    storyboardTargets.forEach(targetId => {
+      // Check if target is a storyboard plugin
+      if (storyboardModalStates.some(modal => modal.id === targetId)) {
+        targetPluginIds.add(targetId);
+      }
+      // Check if target is a script frame (format: script-{pluginId})
+      else if (targetId.startsWith('script-')) {
+        const potentialPluginId = targetId.replace('script-', '');
+        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
+          targetPluginIds.add(potentialPluginId);
+        }
+      }
+    });
+
+    if (targetPluginIds.size === 0) return;
+
+    const storyboardIds = Array.from(targetPluginIds);
+
+    // Update storyboard modals with the new script text
     setStoryboardModalStates(prev => {
       let changed = false;
       const updated = prev.map(modal => {
-        if (storyboardIds.includes(modal.id)) {
+        if (targetPluginIds.has(modal.id)) {
           if ((modal.scriptText || '') !== sanitizedScript) {
             changed = true;
             return { ...modal, scriptText: sanitizedScript };
@@ -484,7 +545,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
 
     for (const id of storyboardIds) {
-      const scriptFrameDetails = ensureScriptFrameForPlugin(id, sanitizedScript);
+      // Clear loading state and set text
+      const scriptFrameDetails = ensureScriptFrameForPlugin(id, sanitizedScript, false);
 
       if (onPersistStoryboardModalMove) {
         Promise.resolve(onPersistStoryboardModalMove(id, { scriptText: sanitizedScript })).catch(console.error);
@@ -551,13 +613,253 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  const handleScriptFrameTextUpdate = (frameId: string, text: string) => {
+    setScriptFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, text } : frame))
+    );
+    if (onPersistScriptFrameModalMove) {
+      Promise.resolve(onPersistScriptFrameModalMove(frameId, { text })).catch(console.error);
+    }
+  };
 
+
+
+
+
+  // Helper function to create stitched reference image from storyboard connected images
+  const createStitchedImageForStoryboard = async (
+    storyboardId: string
+  ): Promise<string | undefined> => {
+    if (!projectId) {
+      console.warn('[Canvas] ⚠️ No projectId available, skipping stitched image creation');
+      return undefined;
+    }
+
+    // Get the storyboard to access connected images and names maps
+    const sourceStoryboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+    if (!sourceStoryboard) {
+      console.warn('[Canvas] ⚠️ Storyboard not found:', storyboardId);
+      return undefined;
+    }
+
+    // Get connected images from storyboard
+    const storyboardConnections = (connections ?? []).filter(c => c.to === storyboardId);
+    const characterConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-character');
+    const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
+    const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
+
+    // Collect images by type
+    const connectedCharacterImages: string[] = [];
+    const connectedBackgroundImages: string[] = [];
+    const connectedPropsImages: string[] = [];
+
+    characterConnections.forEach(conn => {
+      const imageId = conn.from;
+      const connectedImage = imageModalStates.find(img => img.id === imageId);
+      if (connectedImage?.generatedImageUrl) {
+        connectedCharacterImages.push(connectedImage.generatedImageUrl);
+      } else if (connectedImage?.sourceImageUrl) {
+        connectedCharacterImages.push(connectedImage.sourceImageUrl);
+      } else {
+        const mediaImage = images.find(img => img.elementId === imageId);
+        if (mediaImage?.url) {
+          connectedCharacterImages.push(mediaImage.url);
+        }
+      }
+    });
+
+    backgroundConnections.forEach(conn => {
+      const imageId = conn.from;
+      const connectedImage = imageModalStates.find(img => img.id === imageId);
+      if (connectedImage?.generatedImageUrl) {
+        connectedBackgroundImages.push(connectedImage.generatedImageUrl);
+      } else if (connectedImage?.sourceImageUrl) {
+        connectedBackgroundImages.push(connectedImage.sourceImageUrl);
+      } else {
+        const mediaImage = images.find(img => img.elementId === imageId);
+        if (mediaImage?.url) {
+          connectedBackgroundImages.push(mediaImage.url);
+        }
+      }
+    });
+
+    propsConnections.forEach(conn => {
+      const imageId = conn.from;
+      const connectedImage = imageModalStates.find(img => img.id === imageId);
+      if (connectedImage?.generatedImageUrl) {
+        connectedPropsImages.push(connectedImage.generatedImageUrl);
+      } else if (connectedImage?.sourceImageUrl) {
+        connectedPropsImages.push(connectedImage.sourceImageUrl);
+      } else {
+        const mediaImage = images.find(img => img.elementId === imageId);
+        if (mediaImage?.url) {
+          connectedPropsImages.push(mediaImage.url);
+        }
+      }
+    });
+
+    const totalConnectedImages = connectedCharacterImages.length + connectedBackgroundImages.length + connectedPropsImages.length;
+
+    if (totalConnectedImages === 0) {
+      console.log('[Canvas] ⚠️ No images connected to storyboard. Skipping stitched image creation.');
+      return undefined;
+    }
+
+    // Build image array with labels
+    const referenceImages: Array<{ url: string; label: string; type: 'character' | 'background' | 'prop'; name?: string }> = [];
+
+    // Use namedImages from storyboard if available (it has correct name->imageUrl mapping)
+    if (sourceStoryboard.namedImages) {
+      if (sourceStoryboard.namedImages.characters) {
+        Object.entries(sourceStoryboard.namedImages.characters).forEach(([charName, imgUrl]) => {
+          if (imgUrl && typeof imgUrl === 'string') {
+            referenceImages.push({
+              url: imgUrl,
+              label: `Character: ${charName}`,
+              type: 'character',
+              name: charName,
+            });
+          }
+        });
+      }
+
+      if (sourceStoryboard.namedImages.backgrounds) {
+        Object.entries(sourceStoryboard.namedImages.backgrounds).forEach(([bgName, imgUrl]) => {
+          if (imgUrl && typeof imgUrl === 'string') {
+            referenceImages.push({
+              url: imgUrl,
+              label: `Background: ${bgName}`,
+              type: 'background',
+              name: bgName,
+            });
+          }
+        });
+      }
+
+      if (sourceStoryboard.namedImages.props) {
+        Object.entries(sourceStoryboard.namedImages.props).forEach(([propName, imgUrl]) => {
+          if (imgUrl && typeof imgUrl === 'string') {
+            referenceImages.push({
+              url: imgUrl,
+              label: `Prop: ${propName}`,
+              type: 'prop',
+              name: propName,
+            });
+          }
+        });
+      }
+    } else {
+      // Fallback: Build from characterNamesMap + connectedCharacterImages (by index)
+      connectedCharacterImages.forEach((imgUrl, idx) => {
+        const charName = sourceStoryboard.characterNamesMap?.[idx] || `Character ${idx + 1}`;
+        referenceImages.push({
+          url: imgUrl,
+          label: `Character: ${charName}`,
+          type: 'character',
+          name: charName,
+        });
+      });
+
+      connectedBackgroundImages.forEach((imgUrl, idx) => {
+        const bgName = sourceStoryboard.backgroundNamesMap?.[idx] || `Background ${idx + 1}`;
+        referenceImages.push({
+          url: imgUrl,
+          label: `Background: ${bgName}`,
+          type: 'background',
+          name: bgName,
+        });
+      });
+
+      connectedPropsImages.forEach((imgUrl, idx) => {
+        const propName = sourceStoryboard.propsNamesMap?.[idx] || `Prop ${idx + 1}`;
+        referenceImages.push({
+          url: imgUrl,
+          label: `Prop: ${propName}`,
+          type: 'prop',
+          name: propName,
+        });
+      });
+    }
+
+    if (referenceImages.length > 0) {
+      try {
+        console.log('[Canvas] 🎨 Creating stitched reference image from all connected images...', {
+          projectId,
+          imageCount: referenceImages.length,
+        });
+
+        const result = await createStitchedReferenceImage(referenceImages, projectId);
+
+        if (result && typeof result === 'object' && 'url' in result && typeof result.url === 'string') {
+          console.log('[Canvas] ✅ Stitched reference image created successfully:', {
+            url: result.url.substring(0, 50) + '...',
+            key: result.key,
+            imageCount: referenceImages.length,
+          });
+          // Note: Stitched image is automatically saved to snapshot metadata by createStitchedReferenceImage function
+          return result.url;
+        } else {
+          console.error('[Canvas] ❌ Stitched reference image URL not found in result:', result);
+          return undefined;
+        }
+      } catch (error) {
+        console.error('[Canvas] ❌ Failed to create stitched reference image:', error);
+        return undefined;
+      }
+    }
+
+    return undefined;
+  };
+
+  // Storyboard generation handler - Only creates stitched image, does NOT generate script
+  const handleGenerateStoryboard = async (
+    storyboardId: string,
+    inputs: {
+      characterInput?: string;
+      characterNames?: string;
+      backgroundDescription?: string;
+      specialRequest?: string;
+    }
+  ) => {
+    console.log('[Canvas] Creating stitched image for storyboard:', storyboardId);
+
+    // Create stitched reference image from all connected images
+    let stitchedImageUrl: string | undefined = undefined;
+    try {
+      stitchedImageUrl = await createStitchedImageForStoryboard(storyboardId);
+      if (stitchedImageUrl) {
+        console.log('[Canvas] ✅ Stitched image created successfully and will be used as sourceImageUrl for all scenes:', {
+          url: stitchedImageUrl.substring(0, 50) + '...',
+        });
+
+        // Update the storyboard modal with the stitched image URL
+        setStoryboardModalStates(prev =>
+          prev.map(modal =>
+            modal.id === storyboardId
+              ? { ...modal, stitchedImageUrl: stitchedImageUrl || (modal as any).stitchedImageUrl }
+              : modal
+          )
+        );
+
+        // Persist the change
+        if (onPersistStoryboardModalMove) {
+          onPersistStoryboardModalMove(storyboardId, {
+            ...(stitchedImageUrl ? { stitchedImageUrl } : {}),
+          } as any);
+        }
+      } else {
+        console.log('[Canvas] ⚠️ No stitched image created (no connected images or error occurred)');
+      }
+    } catch (error) {
+      console.error('[Canvas] ❌ Error creating stitched image:', error);
+    }
+  };
 
   // Scene frame handlers
   const handleGenerateScenes = async (
     scriptFrameId: string,
     overrideText?: string,
-    overrideFrame?: { x: number; y: number; frameWidth: number }
+    overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
   ) => {
     const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
     const textToUse = overrideText || scriptFrame?.text;
@@ -576,9 +878,31 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
 
     try {
+      // Log the story text and detect @mentions before sending to backend
+      const mentionRegex = /@(\w+)/gi;
+      const mentionMatches = Array.from(textToUse.matchAll(mentionRegex));
+      const detectedMentions = [...new Set(mentionMatches.map(m => m[1].toLowerCase()))];
+
+      console.log('[Canvas] 🎬 Generating scenes from story:', {
+        storyPreview: textToUse.substring(0, 200) + (textToUse.length > 200 ? '...' : ''),
+        storyLength: textToUse.length,
+        detectedMentions: detectedMentions,
+        mentionCount: detectedMentions.length,
+        scriptFrameId,
+        storyboardId,
+      });
+
       // Generate scenes using AI - now returns { storyWorld, scenes }
       const result = await generateScenesFromStory(textToUse);
       const { storyWorld, scenes } = result;
+
+      console.log('[Canvas] ✅ Scenes generated:', {
+        sceneCount: scenes.length,
+        characters: storyWorld.characters.map(c => c.name),
+        locations: storyWorld.locations.map(l => l.name),
+        characterIds: storyWorld.characters.map(c => c.id),
+        locationIds: storyWorld.locations.map(l => l.id),
+      });
 
       if (!scenes || scenes.length === 0) {
         console.warn('[Canvas] No scenes generated from story');
@@ -607,6 +931,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         frameToUse.x,
         frameToUse.y,
         frameToUse.frameWidth,
+        frameToUse.frameHeight,
         scenes.length,
         350, // scene frame width
         300  // scene frame height
@@ -615,6 +940,35 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Create scene frames with Story World metadata
       const newSceneFrames = scenes.map((scene: any, index: number) => {
         const outline = outlineByNumber[scene.scene_number];
+
+        // Map character IDs to actual character names
+        const characterNames: string[] = [];
+        if (outline?.character_ids && outline.character_ids.length > 0) {
+          outline.character_ids.forEach((charId: string) => {
+            const character = storyWorld.characters.find(c => c.id === charId);
+            if (character) {
+              characterNames.push(character.name);
+            }
+          });
+        }
+
+        // Map location ID to actual location name
+        let locationName: string | undefined = undefined;
+        if (outline?.location_id) {
+          const location = storyWorld.locations.find(l => l.id === outline.location_id);
+          if (location) {
+            locationName = location.name;
+          }
+        }
+
+        console.log(`[Canvas] Scene ${scene.scene_number} metadata:`, {
+          characterIds: outline?.character_ids,
+          characterNames,
+          locationId: outline?.location_id,
+          locationName,
+          mood: outline?.mood,
+        });
+
         return {
           id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
           scriptFrameId: scriptFrameId,
@@ -624,10 +978,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           frameWidth: 350,
           frameHeight: 300,
           content: scene.content,
-          // Story World metadata
+          // Story World metadata (IDs for reference)
           characterIds: outline?.character_ids,
           locationId: outline?.location_id,
           mood: outline?.mood,
+          // Human-readable names (for display and prompts)
+          characterNames,
+          locationName,
         };
       });
 
@@ -659,19 +1016,366 @@ export const Canvas: React.FC<CanvasProps> = ({
         });
       }
 
-      // Import image prompt builder
+      // Import image prompt builder and mention utilities
       const { buildImagePromptForScene } = await import('@/app/components/Plugins/StoryboardPluginModal/imagePromptUtils');
+      const { getReferenceImagesFromStoryWorld } = await import('@/app/components/Plugins/StoryboardPluginModal/mentionUtils');
+
+      // Get the storyboard to access connected images and names maps
+      const sourceStoryboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+
+      // Get connected images from storyboard
+      // Images connect TO the storyboard, so we filter by c.to === storyboardId
+      const storyboardConnections = (connections ?? []).filter(c => c.to === storyboardId);
+      const characterConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-character');
+      const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
+      const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
+
+      console.log('[Canvas] 🔍 Connection analysis:', {
+        storyboardId,
+        totalStoryboardConnections: storyboardConnections.length,
+        characterConnections: characterConnections.length,
+        backgroundConnections: backgroundConnections.length,
+        propsConnections: propsConnections.length,
+        connectionDetails: storyboardConnections.map(c => ({
+          from: c.from,
+          to: c.to,
+          toAnchor: c.toAnchor,
+        })),
+      });
+
+      // Collect images by type from imageModalStates and images
+      const connectedCharacterImages: string[] = [];
+      const connectedBackgroundImages: string[] = [];
+      const connectedPropsImages: string[] = [];
+
+      characterConnections.forEach(conn => {
+        // Images connect TO storyboard, so conn.from is the image ID
+        const imageId = conn.from;
+        console.log('[Canvas] 🔍 Processing character connection:', { from: imageId, to: conn.to, toAnchor: conn.toAnchor });
+
+        // Try imageModalStates first
+        const connectedImage = imageModalStates.find(img => img.id === imageId);
+        if (connectedImage?.generatedImageUrl) {
+          connectedCharacterImages.push(connectedImage.generatedImageUrl);
+          console.log('[Canvas] ✅ Found character image from imageModalStates:', connectedImage.generatedImageUrl.substring(0, 60) + '...');
+        } else if (connectedImage?.sourceImageUrl) {
+          // Also check sourceImageUrl
+          connectedCharacterImages.push(connectedImage.sourceImageUrl);
+          console.log('[Canvas] ✅ Found character image from sourceImageUrl:', connectedImage.sourceImageUrl.substring(0, 60) + '...');
+        } else {
+          // Try media images array
+          const mediaImage = images.find(img => img.elementId === imageId);
+          if (mediaImage && mediaImage.url) {
+            connectedCharacterImages.push(mediaImage.url);
+            console.log('[Canvas] ✅ Found character image from media images:', mediaImage.url.substring(0, 60) + '...');
+          } else {
+            console.warn('[Canvas] ⚠️ Character connection found but no image URL available:', { imageId, hasConnectedImage: !!connectedImage, hasMediaImage: !!mediaImage });
+          }
+        }
+      });
+
+      backgroundConnections.forEach(conn => {
+        // Images connect TO storyboard, so conn.from is the image ID
+        const imageId = conn.from;
+        console.log('[Canvas] 🔍 Processing background connection:', { from: imageId, to: conn.to, toAnchor: conn.toAnchor });
+
+        // Try imageModalStates first
+        const connectedImage = imageModalStates.find(img => img.id === imageId);
+        if (connectedImage?.generatedImageUrl) {
+          connectedBackgroundImages.push(connectedImage.generatedImageUrl);
+          console.log('[Canvas] ✅ Found background image from imageModalStates:', connectedImage.generatedImageUrl.substring(0, 60) + '...');
+        } else if (connectedImage?.sourceImageUrl) {
+          // Also check sourceImageUrl
+          connectedBackgroundImages.push(connectedImage.sourceImageUrl);
+          console.log('[Canvas] ✅ Found background image from sourceImageUrl:', connectedImage.sourceImageUrl.substring(0, 60) + '...');
+        } else {
+          // Try media images array
+          const mediaImage = images.find(img => img.elementId === imageId);
+          if (mediaImage && mediaImage.url) {
+            connectedBackgroundImages.push(mediaImage.url);
+            console.log('[Canvas] ✅ Found background image from media images:', mediaImage.url.substring(0, 60) + '...');
+          } else {
+            console.warn('[Canvas] ⚠️ Background connection found but no image URL available:', { imageId, hasConnectedImage: !!connectedImage, hasMediaImage: !!mediaImage });
+          }
+        }
+      });
+
+      propsConnections.forEach(conn => {
+        // Images connect TO storyboard, so conn.from is the image ID
+        const imageId = conn.from;
+        console.log('[Canvas] 🔍 Processing props connection:', { from: imageId, to: conn.to, toAnchor: conn.toAnchor });
+
+        // Try imageModalStates first
+        const connectedImage = imageModalStates.find(img => img.id === imageId);
+        if (connectedImage?.generatedImageUrl) {
+          connectedPropsImages.push(connectedImage.generatedImageUrl);
+          console.log('[Canvas] ✅ Found props image from imageModalStates:', connectedImage.generatedImageUrl.substring(0, 60) + '...');
+        } else if (connectedImage?.sourceImageUrl) {
+          // Also check sourceImageUrl
+          connectedPropsImages.push(connectedImage.sourceImageUrl);
+          console.log('[Canvas] ✅ Found props image from sourceImageUrl:', connectedImage.sourceImageUrl.substring(0, 60) + '...');
+        } else {
+          // Try media images array
+          const mediaImage = images.find(img => img.elementId === imageId);
+          if (mediaImage && mediaImage.url) {
+            connectedPropsImages.push(mediaImage.url);
+            console.log('[Canvas] ✅ Found props image from media images:', mediaImage.url.substring(0, 60) + '...');
+          } else {
+            console.warn('[Canvas] ⚠️ Props connection found but no image URL available:', { imageId, hasConnectedImage: !!connectedImage, hasMediaImage: !!mediaImage });
+          }
+        }
+      });
+
+      const totalConnectedImages = connectedCharacterImages.length + connectedBackgroundImages.length + connectedPropsImages.length;
+
+      console.log('[Canvas] Collected connected images:', {
+        characterImages: connectedCharacterImages.length,
+        backgroundImages: connectedBackgroundImages.length,
+        propsImages: connectedPropsImages.length,
+        totalConnectedImages,
+        characterNamesMap: sourceStoryboard?.characterNamesMap,
+        backgroundNamesMap: sourceStoryboard?.backgroundNamesMap,
+        hasSourceStoryboard: !!sourceStoryboard,
+        hasNamedImages: !!(sourceStoryboard?.namedImages),
+        namedImagesKeys: sourceStoryboard?.namedImages ? {
+          characters: Object.keys(sourceStoryboard.namedImages.characters || {}),
+          backgrounds: Object.keys(sourceStoryboard.namedImages.backgrounds || {}),
+          props: Object.keys(sourceStoryboard.namedImages.props || {}),
+        } : 'none',
+      });
+
+      // STEP 1: Get stitched reference image URL from storyboard modal state (created when "Generate Storyboard" was clicked)
+      let stitchedReferenceImageUrl: string | undefined = undefined;
+
+      // First, try to get stitched image URL from storyboard modal state
+      if (sourceStoryboard && (sourceStoryboard as any).stitchedImageUrl) {
+        stitchedReferenceImageUrl = (sourceStoryboard as any).stitchedImageUrl;
+        if (stitchedReferenceImageUrl) {
+          console.log('[Canvas] ✅ STEP 1: Using stitched image URL from storyboard modal state (created when Generate Storyboard was clicked):', {
+            url: stitchedReferenceImageUrl.substring(0, 50) + '...',
+          });
+        }
+      } else {
+        // Fallback: Try to get from snapshot metadata
+        if (projectId) {
+          try {
+            const { getCurrentSnapshot } = await import('@/lib/canvasApi');
+            const current = await getCurrentSnapshot(projectId);
+            const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
+
+            if (stitchedImageData && typeof stitchedImageData === 'object') {
+              const url = Object.values(stitchedImageData)[0];
+              if (url && typeof url === 'string') {
+                stitchedReferenceImageUrl = url;
+                console.log('[Canvas] ✅ STEP 1: Using stitched image URL from snapshot metadata:', {
+                  url: stitchedReferenceImageUrl.substring(0, 50) + '...',
+                });
+              }
+            }
+          } catch (error) {
+            console.error('[Canvas] ❌ Failed to retrieve stitched image from snapshot:', error);
+          }
+        }
+
+        // If still not found, create it now (fallback for old storyboards that didn't have stitched image created)
+        if (!stitchedReferenceImageUrl && totalConnectedImages > 0 && sourceStoryboard) {
+          console.warn('[Canvas] ⚠️ STEP 1: Stitched image not found in storyboard state or snapshot. Creating it now (fallback)...');
+          try {
+            stitchedReferenceImageUrl = await createStitchedImageForStoryboard(storyboardId);
+            if (stitchedReferenceImageUrl) {
+              console.log('[Canvas] ✅ STEP 1: Created stitched image as fallback:', {
+                url: stitchedReferenceImageUrl.substring(0, 50) + '...',
+              });
+            }
+          } catch (error) {
+            console.error('[Canvas] ❌ Failed to create stitched image as fallback:', error);
+          }
+        }
+      }
+
+      if (!stitchedReferenceImageUrl && totalConnectedImages === 0) {
+        console.log('[Canvas] ⚠️ STEP 1: No images connected to storyboard. Scenes will use text-to-image mode (no reference images).');
+      }
+
+      console.log('[Canvas] 🏁 STEP 1 RESULT: stitchedReferenceImageUrl:', stitchedReferenceImageUrl ? stitchedReferenceImageUrl.substring(0, 50) + '...' : 'NONE');
+
+      // STEP 1.5: For Scene 1, retrieve stitched image URL from snapshot metadata (if not just created)
+      // Priority: 1) Just created stitched image, 2) Snapshot metadata, 3) None
+      let stitchedImageUrlFromSnapshot: string | undefined = undefined;
+      if (projectId && !stitchedReferenceImageUrl) {
+        // Only try snapshot if we don't have a freshly created stitched image
+        try {
+          const { getCurrentSnapshot } = await import('@/lib/canvasApi');
+          const current = await getCurrentSnapshot(projectId);
+          const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
+
+          if (stitchedImageData && typeof stitchedImageData === 'object') {
+            // Get the first (and only) URL from the stitched-image object
+            const url = Object.values(stitchedImageData)[0];
+            if (url && typeof url === 'string') {
+              stitchedImageUrlFromSnapshot = url;
+              console.log(`[Canvas] 🎯 Retrieved stitched image URL from snapshot metadata:`, {
+                url: url.substring(0, 50) + '...',
+                key: Object.keys(stitchedImageData)[0],
+              });
+            } else {
+              console.warn(`[Canvas] ⚠️ Stitched image found in metadata but URL is invalid:`, stitchedImageData);
+            }
+          } else {
+            console.warn(`[Canvas] ⚠️ No stitched-image found in snapshot metadata. Available keys:`, Object.keys(current?.snapshot?.metadata || {}));
+          }
+        } catch (error) {
+          console.error(`[Canvas] ❌ Failed to retrieve stitched image from snapshot:`, error);
+        }
+      }
 
       // For each scene frame, create an image modal with enhanced prompt
+      let previousVisualSummary: string | undefined = undefined;
       const newImageModals = newSceneFrames.map(sceneFrame => {
         const imgX = sceneFrame.x + (sceneFrame.frameWidth || 350) + 60;
         const imgY = sceneFrame.y;
         const newId = `image-${Date.now()}-${Math.random()}`;
 
-        // Build rich, context-aware prompt using Story World
-        const { prompt, negativePrompt, aspectRatio, seedKey } = buildImagePromptForScene({
-          storyWorld,
-          scene: sceneFrame,
+        // STEP 1: Get reference images from namedImages (fast, pre-built lookup)
+        // For Scene 1: Use stitched image URL (prioritize just-created, then snapshot, then none)
+        // For Scene 2+: Use the stitched reference image URL from current generation
+
+        let finalSourceImageUrl: string | undefined = undefined;
+
+        // For Scene 1: Prioritize just-created stitched image, then snapshot, then none
+        if (sceneFrame.sceneNumber === 1) {
+          if (stitchedReferenceImageUrl) {
+            // Priority 1: Use the stitched image just created in this flow
+            finalSourceImageUrl = stitchedReferenceImageUrl;
+            console.log(`[Canvas] 🎯 Scene 1: Using just-created stitched reference image:`, {
+              url: stitchedReferenceImageUrl.substring(0, 50) + '...'
+            });
+          } else if (stitchedImageUrlFromSnapshot) {
+            // Priority 2: Use stitched image from snapshot metadata
+            finalSourceImageUrl = stitchedImageUrlFromSnapshot;
+            console.log(`[Canvas] 🎯 Scene 1: Using stitched image URL from snapshot metadata:`, {
+              url: stitchedImageUrlFromSnapshot.substring(0, 50) + '...'
+            });
+          } else {
+            finalSourceImageUrl = undefined;
+            console.warn(`[Canvas] ⚠️ Scene 1: No stitched reference available. Using text-to-image (no sourceImageUrl).`);
+          }
+        } else {
+          // For Scene 2+: Use the stitched reference image from current generation
+          if (stitchedReferenceImageUrl) {
+            finalSourceImageUrl = stitchedReferenceImageUrl;
+            console.log(`[Canvas] 🎯 Scene ${sceneFrame.sceneNumber}: USING stitched reference image from current generation`, {
+              url: stitchedReferenceImageUrl.substring(0, 50) + '...'
+            });
+          } else {
+            finalSourceImageUrl = undefined;
+            console.warn(`[Canvas] ⚠️ Scene ${sceneFrame.sceneNumber}: No stitched reference available. Using text-to-image (no sourceImageUrl).`);
+          }
+        }
+
+        // CRITICAL: If no reference images found, log a clear message
+        if (!finalSourceImageUrl) {
+          console.warn(`[Canvas] ⚠️ Scene ${sceneFrame.sceneNumber}: No reference images available. Will use text-to-image mode.`, {
+            characterNames: (sceneFrame as any).characterNames,
+            locationName: (sceneFrame as any).locationName,
+            hasStitchedReference: !!stitchedReferenceImageUrl,
+            namedImagesAvailable: sourceStoryboard?.namedImages ? {
+              characters: Object.keys(sourceStoryboard.namedImages.characters || {}),
+              backgrounds: Object.keys(sourceStoryboard.namedImages.backgrounds || {}),
+              props: Object.keys(sourceStoryboard.namedImages.props || {}),
+            } : 'none',
+            connectedCharacterImages: connectedCharacterImages.length,
+            connectedBackgroundImages: connectedBackgroundImages.length,
+            connectedPropsImages: connectedPropsImages.length,
+            message: 'This is OK - scenes will be generated using text-to-image mode without reference images.',
+          });
+        } else {
+          console.log(`[Canvas] ✅ Scene ${sceneFrame.sceneNumber}: Reference images ready for image-to-image mode:`, {
+            finalSourceImageUrl: finalSourceImageUrl.substring(0, 200) + (finalSourceImageUrl.length > 200 ? '...' : ''),
+            urlCount: finalSourceImageUrl.split(',').length,
+            isCommaSeparated: finalSourceImageUrl.includes(','),
+          });
+        }
+
+        // Extract additional metadata from story world (Moved up for prompt generation)
+        const sceneCharacters = storyWorld.characters.filter(c =>
+          sceneFrame.characterIds?.includes(c.id)
+        );
+        const sceneLocation = storyWorld.locations.find(l => l.id === sceneFrame.locationId);
+
+        // Construct ReferenceDetails for smart prompt generation
+        const referenceDetails: ReferenceDetails = {
+          character: sceneCharacters.map(c => `${c.name}: ${c.visual_description}`).join('; '),
+          background: sceneLocation ? `${sceneLocation.name}: ${sceneLocation.visual_description}` : undefined,
+          artStyle: storyWorld.global_style?.art_style,
+          camera: storyWorld.global_style?.camera_style,
+          tone: (sceneFrame as any).mood,
+          clothing: sceneCharacters.map(c => `${c.name}: ${c.visual_description}`).join('; '),
+          lighting: storyWorld.global_style?.camera_style,
+        };
+
+        // Generate smart prompt with continuity
+        const generatedPromptData = generateSingleScenePrompt(
+          (sceneFrame as any).content || (sceneFrame as any).summary || '',
+          sceneFrame.sceneNumber,
+          referenceDetails,
+          previousVisualSummary
+        );
+
+        // Update visual summary for next scene
+        previousVisualSummary = generatedPromptData.visualSummary;
+
+        const prompt = generatedPromptData.prompt;
+        const aspectRatio = '1:1'; // Default
+
+        // STEP 2: Determine sourceImageUrl based on scene number
+        // Scene 1: Use stitched reference image (if available) OR individual reference images
+        // Scene 2+: Use stitched reference image (if available) OR individual reference images
+        // The previous scene image will be added separately in handleImageGenerateWithAutoReference
+
+        console.log(`[Canvas] 🎯 STEP 2: Determining sourceImageUrl for Scene ${sceneFrame.sceneNumber}...`, {
+          sceneNumber: sceneFrame.sceneNumber,
+          hasStitchedReference: !!stitchedReferenceImageUrl,
+          stitchedReferenceUrl: stitchedReferenceImageUrl ? stitchedReferenceImageUrl.substring(0, 100) + '...' : 'none',
+        });
+
+        // Build storyboard metadata from scene and story world
+        const storyboardMetadata: Record<string, string> = {};
+        if ((sceneFrame as any).characterNames && Array.isArray((sceneFrame as any).characterNames)) {
+          storyboardMetadata.character = (sceneFrame as any).characterNames.join(', ');
+        }
+        if ((sceneFrame as any).locationName) {
+          storyboardMetadata.background = (sceneFrame as any).locationName;
+        }
+        if ((sceneFrame as any).mood) {
+          storyboardMetadata.mood = (sceneFrame as any).mood;
+        }
+
+        // Use already extracted characters and location
+        if (sceneCharacters.length > 0) {
+          storyboardMetadata.character = sceneCharacters.map(c => c.name).join(', ');
+        }
+        if (sceneLocation) {
+          storyboardMetadata.background = sceneLocation.name;
+          storyboardMetadata.environment = sceneLocation.visual_description;
+        }
+        if (storyWorld.global_style) {
+          storyboardMetadata.style = storyWorld.global_style.art_style;
+          storyboardMetadata.lighting = storyWorld.global_style.camera_style;
+        }
+
+        console.log(`[Canvas] 🎨 STEP 3: Scene ${sceneFrame.sceneNumber} image modal created:`, {
+          modalId: newId,
+          sceneNumber: sceneFrame.sceneNumber,
+          characterIds: sceneFrame.characterIds,
+          locationId: sceneFrame.locationId,
+          characterNames: (sceneFrame as any).characterNames,
+          locationName: (sceneFrame as any).locationName,
+          sourceImageUrl: finalSourceImageUrl || 'NONE',
+          sourceImageUrlFull: finalSourceImageUrl,
+          hasSourceImageUrl: !!finalSourceImageUrl,
+          willUseImageToImage: !!finalSourceImageUrl,
+          storyboardMetadata,
         });
 
         return {
@@ -679,14 +1383,17 @@ export const Canvas: React.FC<CanvasProps> = ({
           x: imgX,
           y: imgY,
           generatedImageUrl: null,
-          prompt, // Rich prompt with character/location consistency
           frameWidth: 600,
           frameHeight: 400,
-          aspectRatio,
-          // Use Google Nano Banana Pro 2K for scene-generated images
-          model: 'Google nano banana pro 2K',
-          frame: 'default',
-        };
+          aspectRatio: '1:1', // Default to 1:1 for scene-generated images
+          sourceImageUrl: finalSourceImageUrl, // Reference images - CRITICAL for image-to-image
+          // Default settings for scene-generated images
+          model: 'Google nano banana pro', // Default model (not 2K)
+          frame: '1:1', // Default frame aspect ratio
+          // Scene metadata for storyboard generation
+          sceneNumber: sceneFrame.sceneNumber,
+          storyboardMetadata,
+        } as any;
       });
 
       // Optimistically add image modals to state
@@ -750,6 +1457,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  const handleSceneFrameContentUpdate = (frameId: string, content: string) => {
+    setSceneFrameModalStates(prev =>
+      prev.map(frame => (frame.id === frameId ? { ...frame, content } : frame))
+    );
+    if (onPersistSceneFrameModalMove) {
+      Promise.resolve(onPersistSceneFrameModalMove(frameId, { content })).catch(console.error);
+    }
+  };
+
+  const handleDuplicateSceneFrame = (frameId: string) => {
+    let duplicatedFrame: import('@/app/components/ModalOverlays/types').SceneFrameModalState | null = null;
+    setSceneFrameModalStates(prev => {
+      const source = prev.find(frame => frame.id === frameId);
+      if (!source) return prev;
+
+      const siblingScenes = prev.filter(frame => frame.scriptFrameId === source.scriptFrameId);
+      const nextSceneNumber = siblingScenes.reduce((max, scene) => Math.max(max, scene.sceneNumber), 0) + 1;
+
+      const newFrame: import('@/app/components/ModalOverlays/types').SceneFrameModalState = {
+        ...source,
+        id: `scene-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        sceneNumber: nextSceneNumber,
+        x: source.x + 60,
+        y: source.y + 40,
+      };
+
+      duplicatedFrame = newFrame;
+      return [...prev, newFrame];
+    });
+
+    if (duplicatedFrame && onPersistSceneFrameModalCreate) {
+      Promise.resolve(onPersistSceneFrameModalCreate(duplicatedFrame)).catch(console.error);
+    }
+  };
+
   // Story World helper functions
   const upsertStoryWorld = (storyboardId: string, storyWorld: import('@/types/storyWorld').StoryWorld) => {
     setStoryWorldStates(prev => {
@@ -797,20 +1539,29 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedRemoveBgModalIds([]);
     setSelectedEraseModalId(null);
     setSelectedEraseModalIds([]);
-    setSelectedReplaceModalId(null);
-    setSelectedReplaceModalIds([]);
     setSelectedExpandModalId(null);
     setSelectedExpandModalIds([]);
     setSelectedVectorizeModalId(null);
     setSelectedVectorizeModalIds([]);
+    setSelectedStoryboardModalId(null);
+    setSelectedStoryboardModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
     setContextMenuModalType(null);
+    setSelectedScriptFrameModalId(null);
+    setSelectedScriptFrameModalIds([]);
+    setSelectedSceneFrameModalId(null);
+    setSelectedSceneFrameModalIds([]);
     if (clearSelectionBoxes) {
       setSelectionBox(null);
       setSelectionTightRect(null);
       setIsDragSelection(false);
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('canvas-clear-selection'));
+    } catch (err) {
+      // ignore
     }
   };
   // Truly infinite canvas - fixed massive size
@@ -828,19 +1579,58 @@ export const Canvas: React.FC<CanvasProps> = ({
     aspectRatio: string,
     modalId?: string,
     imageCount?: number,
-    sourceImageUrl?: string
+    sourceImageUrl?: string,
+    sceneNumber?: number,
+    previousSceneImageUrl?: string,
+    storyboardMetadata?: Record<string, string>
   ): Promise<{ url: string; images?: Array<{ url: string }> } | null> => {
-    console.log('[handleImageGenerateWithAutoReference] Called with:', {
+    console.log('[handleImageGenerateWithAutoReference] 🚀 STEP 4: Called with:', {
       modalId,
+      prompt: prompt.substring(0, 100) + '...',
+      model,
       hasSourceImageUrl: !!sourceImageUrl,
+      sourceImageUrl: sourceImageUrl || 'NONE',
+      sourceImageUrlFull: sourceImageUrl,
+      sceneNumber,
+      hasPreviousSceneImageUrl: !!previousSceneImageUrl,
+      previousSceneImageUrl: previousSceneImageUrl || 'NONE',
+      previousSceneImageUrlFull: previousSceneImageUrl,
+      storyboardMetadata,
       sceneFrameModalStatesCount: sceneFrameModalStates.length,
       connectionsCount: connections.length,
     });
 
     let finalSourceImageUrl = sourceImageUrl;
 
+    // If sourceImageUrl is NOT provided (e.g. from manual generation click), try to find it in the modal state
+    // This is CRITICAL for stitched reference images which are stored in the modal state
+    if (!finalSourceImageUrl && modalId) {
+      const modal = imageModalStates.find(m => m.id === modalId);
+      if (modal && modal.sourceImageUrl) {
+        finalSourceImageUrl = modal.sourceImageUrl;
+        console.log('[handleImageGenerateWithAutoReference] ✅ Found persisted sourceImageUrl in modal state:', {
+          modalId,
+          urlCount: finalSourceImageUrl.split(',').length,
+          preview: finalSourceImageUrl.substring(0, 100) + '...',
+        });
+      }
+    }
+
+    // If sourceImageUrl is already provided (from scene generation), use it!
+    if (sourceImageUrl) {
+      console.log('[handleImageGenerateWithAutoReference] ✅ Using provided sourceImageUrl (from scene generation):', {
+        urlCount: sourceImageUrl.split(',').length,
+        preview: sourceImageUrl.substring(0, 100) + '...',
+      });
+    }
+
+    // Extract scene metadata and previous scene image
+    let extractedSceneNumber: number | undefined = sceneNumber;
+    let extractedPreviousSceneImageUrl: string | undefined = previousSceneImageUrl;
+    let extractedStoryboardMetadata: Record<string, string> | undefined = storyboardMetadata;
+
     // Check if this is a scene-generated image modal
-    if (modalId && !sourceImageUrl) {
+    if (modalId) {
       // 1. Find the scene frame connected to this image modal
       // The connection goes FROM scene TO image modal
       const connection = connections.find(c => c.to === modalId);
@@ -849,6 +1639,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const relatedScene = sceneFrameModalStates.find(s => s.id === connection.from);
 
         if (relatedScene) {
+          extractedSceneNumber = relatedScene.sceneNumber;
           console.log(`[Auto-Reference] Found related scene for modal ${modalId}: Scene ${relatedScene.sceneNumber}`);
 
           // 2. Found the scene! Now find previous scene
@@ -869,10 +1660,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                 const prevImageModal = imageModalStates.find(m => m.id === prevConnection.to);
 
                 if (prevImageModal && prevImageModal.generatedImageUrl) {
-                  finalSourceImageUrl = prevImageModal.generatedImageUrl;
+                  extractedPreviousSceneImageUrl = prevImageModal.generatedImageUrl;
                   console.log(
                     `[Auto-Reference] ✅ Scene ${relatedScene.sceneNumber}: Automatically using Scene ${previousSceneNumber}'s image for consistency`,
-                    { imageUrl: finalSourceImageUrl.substring(0, 50) + '...' }
+                    { imageUrl: extractedPreviousSceneImageUrl.substring(0, 50) + '...' }
                   );
                 } else {
                   console.log(`[Auto-Reference] Previous scene ${previousSceneNumber} found but has no generated image`);
@@ -886,6 +1677,26 @@ export const Canvas: React.FC<CanvasProps> = ({
           } else {
             console.log(`[Auto-Reference] This is Scene 1, no previous scene to reference`);
           }
+
+          // 4. Build storyboard metadata from scene if not provided
+          if (!extractedStoryboardMetadata) {
+            const imageModal = imageModalStates.find(m => m.id === modalId);
+            if (imageModal && (imageModal as any).storyboardMetadata) {
+              extractedStoryboardMetadata = (imageModal as any).storyboardMetadata;
+            } else {
+              // Build metadata from scene frame
+              extractedStoryboardMetadata = {};
+              if ((relatedScene as any).characterNames && Array.isArray((relatedScene as any).characterNames)) {
+                extractedStoryboardMetadata.character = (relatedScene as any).characterNames.join(', ');
+              }
+              if ((relatedScene as any).locationName) {
+                extractedStoryboardMetadata.background = (relatedScene as any).locationName;
+              }
+              if ((relatedScene as any).mood) {
+                extractedStoryboardMetadata.mood = (relatedScene as any).mood;
+              }
+            }
+          }
         } else {
           console.log(`[Auto-Reference] Connection found but no related scene frame (ID: ${connection.from})`);
         }
@@ -894,22 +1705,53 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
     }
 
-    console.log('[handleImageGenerateWithAutoReference] Final call:', {
+    // CRITICAL: For Scene 1, use ONLY reference images (no previous scene)
+    // For Scene 2+, keep reference images separate from previous scene image
+    // The backend will handle combining them correctly for the API call
+    // But we keep them separate so backend knows which is which for storyboard generation
+    if (extractedSceneNumber === 1) {
+      // Scene 1: Only reference images (no previous scene)
+      console.log('[handleImageGenerateWithAutoReference] ✅ Scene 1: Using only reference images');
+    } else if (extractedSceneNumber && extractedSceneNumber > 1) {
+      // Scene 2+: Reference images + previous scene image (passed separately)
+      console.log('[handleImageGenerateWithAutoReference] ✅ Scene 2+: Reference images + previous scene image (separate)');
+    }
+
+    console.log('[handleImageGenerateWithAutoReference] ✅ STEP 4 COMPLETE: Final call to onImageGenerate:', {
+      modalId,
       hasFinalSourceImageUrl: !!finalSourceImageUrl,
-      willUseI2I: !!finalSourceImageUrl,
+      finalSourceImageUrl: finalSourceImageUrl || 'NONE',
+      finalSourceImageUrlFull: finalSourceImageUrl,
+      willUseI2I: !!finalSourceImageUrl || !!extractedPreviousSceneImageUrl,
+      sceneNumber: extractedSceneNumber,
+      hasPreviousSceneImage: !!extractedPreviousSceneImageUrl,
+      previousSceneImageUrl: extractedPreviousSceneImageUrl || 'NONE',
+      previousSceneImageUrlFull: extractedPreviousSceneImageUrl,
+      hasStoryboardMetadata: !!extractedStoryboardMetadata,
+      storyboardMetadata: extractedStoryboardMetadata,
     });
 
     // Call the original onImageGenerate with the auto-populated reference
     if (onImageGenerate) {
-      return await onImageGenerate(
+      console.log('[handleImageGenerateWithAutoReference] 📤 STEP 5: Calling onImageGenerate API...');
+      const result = await onImageGenerate(
         prompt,
         model,
         frame,
         aspectRatio,
         modalId,
         imageCount,
-        finalSourceImageUrl
+        finalSourceImageUrl,
+        extractedSceneNumber,
+        extractedPreviousSceneImageUrl,
+        extractedStoryboardMetadata
       );
+      console.log('[handleImageGenerateWithAutoReference] ✅ STEP 5 COMPLETE: API call returned:', {
+        hasResult: !!result,
+        resultUrl: result?.url ? result.url.substring(0, 100) + '...' : 'none',
+        imagesCount: result?.images?.length || 0,
+      });
+      return result;
     }
 
     return null;
@@ -1072,7 +1914,17 @@ export const Canvas: React.FC<CanvasProps> = ({
     // If externalImageModals is provided (even if empty), sync to it immediately
     if (externalImageModals !== undefined) {
       console.log('[Canvas] Syncing imageModalStates with externalImageModals', externalImageModals.length);
-      setImageModalStates(externalImageModals);
+      // Sanitize legacy sourceImageUrl values: remove comma-separated lists, keep stitched refs
+      const sanitized = externalImageModals.map(m => {
+        const src = (m as any).sourceImageUrl as string | undefined;
+        if (src && src.includes(',')) {
+          // Preserve stitched reference if present; otherwise clear to enforce text-to-image
+          const keep = src.includes('reference-stitched');
+          return { ...m, sourceImageUrl: keep ? src : undefined } as any;
+        }
+        return m as any;
+      });
+      setImageModalStates(sanitized);
       return;
     }
     // Treat missing projectId as a new project: do not load global/local storage
@@ -1081,9 +1933,18 @@ export const Canvas: React.FC<CanvasProps> = ({
       const key = `canvas:${projectId}:imageModals`;
       const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
       if (raw) {
-        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | undefined }>;
         if (Array.isArray(parsed)) {
-          setImageModalStates(parsed);
+          // Sanitize legacy comma-separated sourceImageUrl entries
+          const sanitized = parsed.map(m => {
+            const src = (m as any).sourceImageUrl as string | undefined;
+            if (src && src.includes(',')) {
+              const keep = src.includes('reference-stitched');
+              return { ...m, sourceImageUrl: keep ? src : undefined } as any;
+            }
+            return m as any;
+          });
+          setImageModalStates(sanitized as any);
         }
       }
     } catch (e) {
@@ -1591,72 +2452,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [JSON.stringify(externalEraseModals || [])]);
 
-  // Sync external replace modals from parent (for hydration/realtime)
-  useEffect(() => {
-    // Always hydrate from external (backend) first, even if empty
-    if (externalReplaceModals !== undefined) {
-      setReplaceModalStates(externalReplaceModals);
-      return;
-    }
-    // Treat missing projectId as a new project: do not load global/local storage
-    if (!projectId) return;
-    try {
-      const key = `canvas:${projectId}:replaceModals`;
-      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null }>;
-        if (Array.isArray(parsed)) {
-          setReplaceModalStates(parsed);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load persisted replace modals');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, JSON.stringify(externalReplaceModals || [])]);
-
-  // Also sync externalReplaceModals changes to internal state (for real-time updates)
-  // Only sync if externalReplaceModals is actually different to avoid overwriting local drag updates
-  useEffect(() => {
-    // Handle empty array - clear state immediately
-    if (externalReplaceModals !== undefined && externalReplaceModals.length === 0) {
-      console.log('[Canvas] Clearing replaceModalStates (external is empty)');
-      setReplaceModalStates([]);
-      return;
-    }
-    if (externalReplaceModals && externalReplaceModals.length > 0) {
-      setReplaceModalStates(prev => {
-        // Only update if the external state is actually different
-        const externalIds = new Set(externalReplaceModals.map(m => m.id));
-        const prevIds = new Set(prev.map(m => m.id));
-        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
-
-        if (idsMatch) {
-          // Merge: keep local position updates during drag, but update other properties from external
-          const merged = prev.map(prevModal => {
-            const externalModal = externalReplaceModals.find(m => m.id === prevModal.id);
-            if (externalModal) {
-              // During drag, keep local x, y if they're different (user is dragging)
-              // Otherwise, use external x, y (position was committed)
-              return {
-                ...prevModal,
-                ...externalModal,
-                // Only update position if it's significantly different (more than 1px) to avoid overwriting during drag
-                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
-                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
-              };
-            }
-            return prevModal;
-          });
-          return merged;
-        } else {
-          // IDs don't match, use external state
-          return externalReplaceModals;
-        }
-      });
-    }
-  }, [JSON.stringify(externalReplaceModals || [])]);
-
   // Sync external expand modals from parent (for hydration/realtime)
   useEffect(() => {
     if (externalExpandModals !== undefined) {
@@ -1925,16 +2720,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         };
         setViewportSize(newSize);
 
-        // Center the view on the canvas initially (only once)
+        // Don't center on canvas size, let the component-based centering handle it
         if (!initializedRef.current) {
           initializedRef.current = true;
-          const initialPos = {
-            x: (newSize.width - canvasSize.width) / 2,
-            y: (newSize.height - canvasSize.height) / 2,
-          };
-          setPosition(initialPos);
-          // Update viewport center after initial positioning
-          setTimeout(() => updateViewportCenter(initialPos, scale), 0);
         }
       }
     };
@@ -1944,10 +2732,141 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
+  // Center viewport on components after they are loaded (fixes refresh positioning)
+  // If no components exist, center on the infinite canvas center
+  const shouldCenterOnLoadRef = useRef(true);
+  const centeringTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const centeredOnEmptyRef = useRef(false);
+
+  useEffect(() => {
+    // Only run once after components are loaded
+    if (!shouldCenterOnLoadRef.current || !initializedRef.current) return;
+
+    // Clear any existing timeout
+    if (centeringTimeoutRef.current) {
+      clearTimeout(centeringTimeoutRef.current);
+    }
+
+    // Wait for all component states to be loaded (including all plugin modals)
+    const hasComponents = images.length > 0 ||
+      imageModalStates.length > 0 ||
+      videoModalStates.length > 0 ||
+      musicModalStates.length > 0 ||
+      textInputStates.length > 0 ||
+      storyboardModalStates.length > 0 ||
+      scriptFrameModalStates.length > 0 ||
+      sceneFrameModalStates.length > 0 ||
+      upscaleModalStates.length > 0 ||
+      removeBgModalStates.length > 0 ||
+      eraseModalStates.length > 0 ||
+      expandModalStates.length > 0 ||
+      vectorizeModalStates.length > 0;
+
+    // If no components, center on infinite canvas center (where dots are visible)
+    // The dots pattern is rendered from (0,0) to (INFINITE_CANVAS_SIZE, INFINITE_CANVAS_SIZE)
+    // So we center on INFINITE_CANVAS_SIZE / 2 = 500000 to show the dots
+    if (!hasComponents) {
+      if (centeredOnEmptyRef.current) {
+        return;
+      }
+      centeredOnEmptyRef.current = true;
+      const CANVAS_CENTER = INFINITE_CANVAS_SIZE / 2; // 500000 - center of the dot pattern area
+      const newPos = {
+        x: viewportSize.width / 2 - CANVAS_CENTER * scale,
+        y: viewportSize.height / 2 - CANVAS_CENTER * scale,
+      };
+
+      console.log('[Canvas] Empty canvas detected - centering on dot pattern area center', {
+        canvasCenter: CANVAS_CENTER,
+        infiniteCanvasSize: INFINITE_CANVAS_SIZE,
+        viewportSize,
+        scale,
+        newPos,
+      });
+
+      setPosition(newPos);
+      setTimeout(() => updateViewportCenter(newPos, scale), 0);
+      return;
+    }
+    centeredOnEmptyRef.current = false;
+
+    // Add a delay to ensure all external components are fully synced
+    centeringTimeoutRef.current = setTimeout(() => {
+      // Calculate bounding box of all components
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      const updateBounds = (x: number, y: number, width: number = 400, height: number = 400) => {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + width);
+        maxY = Math.max(maxY, y + height);
+      };
+
+      // Include all component types
+      images.forEach(img => updateBounds(img.x || 0, img.y || 0, img.width || 400, img.height || 400));
+      imageModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 600, modal.frameHeight || 400));
+      videoModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 600, modal.frameHeight || 400));
+      musicModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 600, modal.frameHeight || 300));
+      textInputStates.forEach(text => updateBounds(text.x, text.y, 300, 100));
+      storyboardModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 600));
+      scriptFrameModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 360, modal.frameHeight || 260));
+      sceneFrameModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 350, modal.frameHeight || 300));
+      upscaleModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 500));
+      removeBgModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 500));
+      eraseModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 500));
+      expandModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 500));
+      vectorizeModalStates.forEach(modal => updateBounds(modal.x, modal.y, modal.frameWidth || 400, modal.frameHeight || 500));
+
+      // If we have valid bounds, center the viewport on them
+      if (minX !== Infinity && minY !== Infinity) {
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        console.log('[Canvas] Centering viewport on components', {
+          bounds: { minX, minY, maxX, maxY },
+          center: { centerX, centerY },
+          componentCounts: {
+            images: images.length,
+            imageModals: imageModalStates.length,
+            videoModals: videoModalStates.length,
+            musicModals: musicModalStates.length,
+            textInputs: textInputStates.length,
+            storyboards: storyboardModalStates.length,
+            scriptFrames: scriptFrameModalStates.length,
+            sceneFrames: sceneFrameModalStates.length,
+            upscale: upscaleModalStates.length,
+            removeBg: removeBgModalStates.length,
+            erase: eraseModalStates.length,
+            expand: expandModalStates.length,
+            vectorize: vectorizeModalStates.length,
+          }
+        });
+
+        // Calculate position to center these components in viewport
+        const newPos = {
+          x: viewportSize.width / 2 - centerX * scale,
+          y: viewportSize.height / 2 - centerY * scale,
+        };
+
+        setPosition(newPos);
+        setTimeout(() => updateViewportCenter(newPos, scale), 0);
+
+        shouldCenterOnLoadRef.current = false; // Only do this once
+      }
+    }, 500); // 500ms delay to ensure all components are loaded
+
+    return () => {
+      if (centeringTimeoutRef.current) {
+        clearTimeout(centeringTimeoutRef.current);
+      }
+    };
+  }, [images, imageModalStates, videoModalStates, musicModalStates, textInputStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, viewportSize, scale]);
+
   // Create canvas pattern - updates based on theme
   useEffect(() => {
     const createPattern = () => {
       const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkTheme(isDark);
       const canvas = document.createElement('canvas');
       canvas.width = DOT_SPACING;
       canvas.height = DOT_SPACING;
@@ -2210,9 +3129,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           (selectedUpscaleModalIds?.length ?? 0) > 0 ||
           (selectedRemoveBgModalIds?.length ?? 0) > 0 ||
           (selectedEraseModalIds?.length ?? 0) > 0 ||
-          (selectedReplaceModalIds?.length ?? 0) > 0 ||
           (selectedVectorizeModalIds?.length ?? 0) > 0 ||
-          selectedExpandModalIds.length > 0;
+          selectedExpandModalIds.length > 0 ||
+          selectedStoryboardModalIds.length > 0 ||
+          selectedScriptFrameModalIds.length > 0 ||
+          selectedSceneFrameModalIds.length > 0;
 
         if (hasMultipleSelections) {
           // Delete all selected components in the region
@@ -2278,16 +3199,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             setEraseModalStates(prev => prev.filter(m => !selectedEraseModalIds.includes(m.id)));
           }
 
-          // Delete all selected replace modals
-          if (selectedReplaceModalIds.length > 0) {
-            selectedReplaceModalIds.forEach(id => {
-              if (onPersistReplaceModalDelete) {
-                Promise.resolve(onPersistReplaceModalDelete(id)).catch(console.error);
-              }
-            });
-            setReplaceModalStates(prev => prev.filter(m => !selectedReplaceModalIds.includes(m.id)));
-          }
-
           if (selectedExpandModalIds.length > 0) {
             selectedExpandModalIds.forEach(id => {
               if (onPersistExpandModalDelete) {
@@ -2295,6 +3206,29 @@ export const Canvas: React.FC<CanvasProps> = ({
               }
             });
             setExpandModalStates(prev => prev.filter(m => !selectedExpandModalIds.includes(m.id)));
+          }
+
+          if (selectedUpscaleModalIds.length > 0) {
+            selectedUpscaleModalIds.forEach(id => onPersistUpscaleModalDelete && Promise.resolve(onPersistUpscaleModalDelete(id)).catch(console.error));
+            setUpscaleModalStates(prev => prev.filter(m => !selectedUpscaleModalIds.includes(m.id)));
+          }
+          if (selectedRemoveBgModalIds.length > 0) {
+            selectedRemoveBgModalIds.forEach(id => onPersistRemoveBgModalDelete && Promise.resolve(onPersistRemoveBgModalDelete(id)).catch(console.error));
+            setRemoveBgModalStates(prev => prev.filter(m => !selectedRemoveBgModalIds.includes(m.id)));
+          }
+          if (selectedVectorizeModalIds.length > 0) {
+            selectedVectorizeModalIds.forEach(id => onPersistVectorizeModalDelete && Promise.resolve(onPersistVectorizeModalDelete(id)).catch(console.error));
+            setVectorizeModalStates(prev => prev.filter(m => !selectedVectorizeModalIds.includes(m.id)));
+          }
+          if (selectedStoryboardModalIds.length > 0) {
+            selectedStoryboardModalIds.forEach(id => onPersistStoryboardModalDelete && Promise.resolve(onPersistStoryboardModalDelete(id)).catch(console.error));
+            setStoryboardModalStates(prev => prev.filter(m => !selectedStoryboardModalIds.includes(m.id)));
+          }
+          if (selectedScriptFrameModalIds.length > 0) {
+            selectedScriptFrameModalIds.forEach(id => handleDeleteScriptFrame(id));
+          }
+          if (selectedSceneFrameModalIds.length > 0) {
+            selectedSceneFrameModalIds.forEach(id => handleDeleteSceneFrame(id));
           }
 
           // Clear all selections
@@ -2310,10 +3244,21 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedMusicModalId(null);
           setSelectedEraseModalIds([]);
           setSelectedEraseModalId(null);
-          setSelectedReplaceModalIds([]);
-          setSelectedReplaceModalId(null);
+          setSelectedExpandModalIds([]);
           setSelectedExpandModalIds([]);
           setSelectedExpandModalId(null);
+          setSelectedUpscaleModalIds([]);
+          setSelectedUpscaleModalId(null);
+          setSelectedRemoveBgModalIds([]);
+          setSelectedRemoveBgModalId(null);
+          setSelectedVectorizeModalIds([]);
+          setSelectedVectorizeModalId(null);
+          setSelectedStoryboardModalIds([]);
+          setSelectedStoryboardModalId(null);
+          setSelectedScriptFrameModalIds([]);
+          setSelectedScriptFrameModalId(null);
+          setSelectedSceneFrameModalIds([]);
+          setSelectedSceneFrameModalId(null);
         } else {
           // Single selection deletion (backward compatibility)
 
@@ -2368,21 +3313,42 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedEraseModalId(null);
           }
 
-          // Delete selected replace modal
-          if (selectedReplaceModalId !== null) {
-            if (onPersistReplaceModalDelete) {
-              Promise.resolve(onPersistReplaceModalDelete(selectedReplaceModalId)).catch(console.error);
-            }
-            setReplaceModalStates(prev => prev.filter(m => m.id !== selectedReplaceModalId));
-            setSelectedReplaceModalId(null);
-          }
-
           if (selectedExpandModalId !== null) {
             if (onPersistExpandModalDelete) {
               Promise.resolve(onPersistExpandModalDelete(selectedExpandModalId)).catch(console.error);
             }
             setExpandModalStates(prev => prev.filter(m => m.id !== selectedExpandModalId));
+            setExpandModalStates(prev => prev.filter(m => m.id !== selectedExpandModalId));
             setSelectedExpandModalId(null);
+          }
+
+          if (selectedUpscaleModalId !== null) {
+            if (onPersistUpscaleModalDelete) Promise.resolve(onPersistUpscaleModalDelete(selectedUpscaleModalId)).catch(console.error);
+            setUpscaleModalStates(prev => prev.filter(m => m.id !== selectedUpscaleModalId));
+            setSelectedUpscaleModalId(null);
+          }
+          if (selectedRemoveBgModalId !== null) {
+            if (onPersistRemoveBgModalDelete) Promise.resolve(onPersistRemoveBgModalDelete(selectedRemoveBgModalId)).catch(console.error);
+            setRemoveBgModalStates(prev => prev.filter(m => m.id !== selectedRemoveBgModalId));
+            setSelectedRemoveBgModalId(null);
+          }
+          if (selectedVectorizeModalId !== null) {
+            if (onPersistVectorizeModalDelete) Promise.resolve(onPersistVectorizeModalDelete(selectedVectorizeModalId)).catch(console.error);
+            setVectorizeModalStates(prev => prev.filter(m => m.id !== selectedVectorizeModalId));
+            setSelectedVectorizeModalId(null);
+          }
+          if (selectedStoryboardModalId !== null) {
+            if (onPersistStoryboardModalDelete) Promise.resolve(onPersistStoryboardModalDelete(selectedStoryboardModalId)).catch(console.error);
+            setStoryboardModalStates(prev => prev.filter(m => m.id !== selectedStoryboardModalId));
+            setSelectedStoryboardModalId(null);
+          }
+          if (selectedScriptFrameModalId !== null) {
+            handleDeleteScriptFrame(selectedScriptFrameModalId);
+            setSelectedScriptFrameModalId(null);
+          }
+          if (selectedSceneFrameModalId !== null) {
+            handleDeleteSceneFrame(selectedSceneFrameModalId);
+            setSelectedSceneFrameModalId(null);
           }
         }
 
@@ -2953,6 +3919,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           const selectedVideoModalIdsList: string[] = [];
           const selectedMusicModalIdsList: string[] = [];
           const selectedTextInputIdsList: string[] = [];
+          const selectedUpscaleModalIdsList: string[] = [];
+          const selectedRemoveBgModalIdsList: string[] = [];
+          const selectedEraseModalIdsList: string[] = [];
+          const selectedExpandModalIdsList: string[] = [];
+          const selectedVectorizeModalIdsList: string[] = [];
+          const selectedStoryboardModalIdsList: string[] = [];
+          const selectedScriptFrameModalIdsList: string[] = [];
+          const selectedSceneFrameModalIdsList: string[] = [];
 
           // Check images and videos (skip 3D models)
           images.forEach((img, index) => {
@@ -3120,6 +4094,94 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
+          // Check Upscale modals
+          upscaleModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth ?? 600;
+            const modalHeight = modal.frameHeight ?? 400;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedUpscaleModalIdsList.push(modal.id);
+          });
+
+          // Check RemoveBg modals
+          removeBgModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth ?? 600;
+            const modalHeight = modal.frameHeight ?? 400;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedRemoveBgModalIdsList.push(modal.id);
+          });
+
+          // Check Erase modals
+          eraseModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth ?? 600;
+            const modalHeight = modal.frameHeight ?? 400;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedEraseModalIdsList.push(modal.id);
+          });
+
+          // Check Expand modals
+          expandModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth ?? 600;
+            const modalHeight = modal.frameHeight ?? 400;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedExpandModalIdsList.push(modal.id);
+          });
+
+          // Check Vectorize modals
+          vectorizeModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth ?? 600;
+            const modalHeight = modal.frameHeight ?? 400;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedVectorizeModalIdsList.push(modal.id);
+          });
+
+          // Check Storyboard modals
+          storyboardModalStates.forEach((modal) => {
+            const modalX = modal.x ?? 0;
+            const modalY = modal.y ?? 0;
+            const modalWidth = modal.frameWidth ?? 400;
+            const modalHeight = modal.frameHeight ?? 500;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedStoryboardModalIdsList.push(modal.id);
+          });
+
+          // Check ScriptFrame modals
+          scriptFrameModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth;
+            const modalHeight = modal.frameHeight;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedScriptFrameModalIdsList.push(modal.id);
+          });
+
+          // Check SceneFrame modals
+          sceneFrameModalStates.forEach((modal) => {
+            const modalX = modal.x;
+            const modalY = modal.y;
+            const modalWidth = modal.frameWidth;
+            const modalHeight = modal.frameHeight;
+            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
+            if (overlaps) selectedSceneFrameModalIdsList.push(modal.id);
+          });
+
           // Handle selection with modifier keys (Shift/Ctrl/Cmd)
           const isModifierPressed = (window.event as MouseEvent)?.shiftKey ||
             (window.event as MouseEvent)?.ctrlKey ||
@@ -3135,6 +4197,14 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedVideoModalIds(prev => [...new Set([...prev, ...selectedVideoModalIdsList])]);
             setSelectedMusicModalIds(prev => [...new Set([...prev, ...selectedMusicModalIdsList])]);
             setSelectedTextInputIds(prev => [...new Set([...prev, ...selectedTextInputIdsList])]);
+            setSelectedUpscaleModalIds(prev => [...new Set([...prev, ...selectedUpscaleModalIdsList])]);
+            setSelectedRemoveBgModalIds(prev => [...new Set([...prev, ...selectedRemoveBgModalIdsList])]);
+            setSelectedEraseModalIds(prev => [...new Set([...prev, ...selectedEraseModalIdsList])]);
+            setSelectedExpandModalIds(prev => [...new Set([...prev, ...selectedExpandModalIdsList])]);
+            setSelectedVectorizeModalIds(prev => [...new Set([...prev, ...selectedVectorizeModalIdsList])]);
+            setSelectedStoryboardModalIds(prev => [...new Set([...prev, ...selectedStoryboardModalIdsList])]);
+            setSelectedScriptFrameModalIds(prev => [...new Set([...prev, ...selectedScriptFrameModalIdsList])]);
+            setSelectedSceneFrameModalIds(prev => [...new Set([...prev, ...selectedSceneFrameModalIdsList])]);
           } else {
             // Replace selection
             setSelectedImageIndices(selectedIndices);
@@ -3142,6 +4212,14 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedVideoModalIds(selectedVideoModalIdsList);
             setSelectedMusicModalIds(selectedMusicModalIdsList);
             setSelectedTextInputIds(selectedTextInputIdsList);
+            setSelectedUpscaleModalIds(selectedUpscaleModalIdsList);
+            setSelectedRemoveBgModalIds(selectedRemoveBgModalIdsList);
+            setSelectedEraseModalIds(selectedEraseModalIdsList);
+            setSelectedExpandModalIds(selectedExpandModalIdsList);
+            setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
+            setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
+            setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
+            setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
             if (selectedIndices.length > 0) {
               setSelectedImageIndex(selectedIndices[0]);
             } else {
@@ -3168,13 +4246,24 @@ export const Canvas: React.FC<CanvasProps> = ({
             } else {
               setSelectedTextInputId(null);
             }
+            if (selectedUpscaleModalIdsList.length > 0) setSelectedUpscaleModalId(selectedUpscaleModalIdsList[0]); else setSelectedUpscaleModalId(null);
+            if (selectedRemoveBgModalIdsList.length > 0) setSelectedRemoveBgModalId(selectedRemoveBgModalIdsList[0]); else setSelectedRemoveBgModalId(null);
+            if (selectedEraseModalIdsList.length > 0) setSelectedEraseModalId(selectedEraseModalIdsList[0]); else setSelectedEraseModalId(null);
+            if (selectedExpandModalIdsList.length > 0) setSelectedExpandModalId(selectedExpandModalIdsList[0]); else setSelectedExpandModalId(null);
+            if (selectedVectorizeModalIdsList.length > 0) setSelectedVectorizeModalId(selectedVectorizeModalIdsList[0]); else setSelectedVectorizeModalId(null);
+            if (selectedStoryboardModalIdsList.length > 0) setSelectedStoryboardModalId(selectedStoryboardModalIdsList[0]); else setSelectedStoryboardModalId(null);
+            if (selectedScriptFrameModalIdsList.length > 0) setSelectedScriptFrameModalId(selectedScriptFrameModalIdsList[0]); else setSelectedScriptFrameModalId(null);
+            if (selectedSceneFrameModalIdsList.length > 0) setSelectedSceneFrameModalId(selectedSceneFrameModalIdsList[0]); else setSelectedSceneFrameModalId(null);
           }
 
           // Compute tight bounding rect around selected items (remove extra area)
           // Include both canvas images and modals
           const totalSelected = selectedIndices.length + selectedImageModalIdsList.length +
             selectedVideoModalIdsList.length + selectedMusicModalIdsList.length +
-            selectedTextInputIdsList.length;
+            selectedTextInputIdsList.length + selectedUpscaleModalIdsList.length +
+            selectedRemoveBgModalIdsList.length + selectedEraseModalIdsList.length +
+            selectedVectorizeModalIdsList.length + selectedStoryboardModalIdsList.length +
+            selectedScriptFrameModalIdsList.length + selectedSceneFrameModalIdsList.length;
 
           if (totalSelected > 0) {
             let minX = Infinity;
@@ -3282,6 +4371,30 @@ export const Canvas: React.FC<CanvasProps> = ({
               }
             });
 
+            // Helper to update bounds for generic modals
+            const updateBounds = (id: string, list: any[], width: number, height: number) => {
+              const m = list.find(item => item.id === id);
+              if (m) {
+                const mx = m.x ?? 0;
+                const my = m.y ?? 0;
+                const mw = m.frameWidth ?? width;
+                const mh = m.frameHeight ?? height;
+                minX = Math.min(minX, mx);
+                minY = Math.min(minY, my);
+                maxX = Math.max(maxX, mx + mw);
+                maxY = Math.max(maxY, my + mh);
+              }
+            };
+
+            selectedUpscaleModalIdsList.forEach(id => updateBounds(id, upscaleModalStates, 600, 400));
+            selectedRemoveBgModalIdsList.forEach(id => updateBounds(id, removeBgModalStates, 600, 400));
+            selectedEraseModalIdsList.forEach(id => updateBounds(id, eraseModalStates, 600, 400));
+            selectedExpandModalIdsList.forEach(id => updateBounds(id, expandModalStates, 600, 400));
+            selectedVectorizeModalIdsList.forEach(id => updateBounds(id, vectorizeModalStates, 600, 400));
+            selectedStoryboardModalIdsList.forEach(id => updateBounds(id, storyboardModalStates, 400, 500));
+            selectedScriptFrameModalIdsList.forEach(id => updateBounds(id, scriptFrameModalStates, 360, 260));
+            selectedSceneFrameModalIdsList.forEach(id => updateBounds(id, sceneFrameModalStates, 350, 300));
+
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
               // Calculate tight rect - ensure we're using the actual bounds
               // The calculation should already be tight
@@ -3320,7 +4433,16 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedImageModalIds([]);
             setSelectedVideoModalIds([]);
             setSelectedMusicModalIds([]);
+            setSelectedMusicModalIds([]);
             setSelectedTextInputIds([]);
+            setSelectedUpscaleModalIds([]);
+            setSelectedRemoveBgModalIds([]);
+            setSelectedEraseModalIds([]);
+            setSelectedExpandModalIds([]);
+            setSelectedVectorizeModalIds([]);
+            setSelectedStoryboardModalIds([]);
+            setSelectedScriptFrameModalIds([]);
+            setSelectedSceneFrameModalIds([]);
             setSelectionTightRect(null);
             selectionDragOriginRef.current = null;
             setIsDragSelection(false);
@@ -3939,22 +5061,6 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setEraseModalStates(prev => [...prev, newErase]);
               Promise.resolve(onPersistEraseModalCreate(newErase)).catch(console.error);
-            } else if (data.plugin.id === 'replace' && onPersistReplaceModalCreate) {
-              const modalId = `replace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-              const newReplace = {
-                id: modalId,
-                x: canvasX,
-                y: canvasY,
-                replacedImageUrl: null,
-                sourceImageUrl: null,
-                localReplacedImageUrl: null,
-                model: 'bria/eraser',
-                frameWidth: 400,
-                frameHeight: 500,
-                isReplacing: false,
-              };
-              setReplaceModalStates(prev => [...prev, newReplace]);
-              Promise.resolve(onPersistReplaceModalCreate(newReplace)).catch(console.error);
             } else if (data.plugin.id === 'expand' && onPersistExpandModalCreate) {
               const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
               const newExpand = {
@@ -4043,10 +5149,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="w-full h-full bg-gray-100 overflow-hidden relative"
+      className="w-full h-full overflow-hidden relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      style={{
+        // Match the infinite canvas base color immediately to avoid white/bright flashes on refresh
+        backgroundColor: isDarkTheme ? '#121212' : '#f3f4f6',
+      }}
     >
       <Stage
         ref={stageRef}
@@ -4250,7 +5360,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         upscaleModalStates={upscaleModalStates}
         removeBgModalStates={removeBgModalStates}
         eraseModalStates={eraseModalStates}
-        replaceModalStates={replaceModalStates}
         expandModalStates={expandModalStates}
         vectorizeModalStates={vectorizeModalStates}
         storyboardModalStates={storyboardModalStates}
@@ -4270,8 +5379,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedRemoveBgModalIds={selectedRemoveBgModalIds}
         selectedEraseModalId={selectedEraseModalId}
         selectedEraseModalIds={selectedEraseModalIds}
-        selectedReplaceModalId={selectedReplaceModalId}
-        selectedReplaceModalIds={selectedReplaceModalIds}
         selectedExpandModalId={selectedExpandModalId}
         selectedExpandModalIds={selectedExpandModalIds}
         selectedVectorizeModalId={selectedVectorizeModalId}
@@ -4301,9 +5408,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         setEraseModalStates={setEraseModalStates}
         setSelectedEraseModalId={setSelectedEraseModalId}
         setSelectedEraseModalIds={setSelectedEraseModalIds}
-        setReplaceModalStates={setReplaceModalStates}
-        setSelectedReplaceModalId={setSelectedReplaceModalId}
-        setSelectedReplaceModalIds={setSelectedReplaceModalIds}
         setExpandModalStates={setExpandModalStates}
         setSelectedExpandModalId={setSelectedExpandModalId}
         setSelectedExpandModalIds={setSelectedExpandModalIds}
@@ -4314,14 +5418,18 @@ export const Canvas: React.FC<CanvasProps> = ({
         setScriptFrameModalStates={setScriptFrameModalStates}
         onScriptFramePositionChange={handleScriptFramePositionChange}
         onScriptFramePositionCommit={handleScriptFramePositionCommit}
+        onTextUpdate={handleScriptFrameTextUpdate}
         onGenerateScenes={handleGenerateScenes}
         onDeleteSceneFrame={handleDeleteSceneFrame}
+        onDuplicateSceneFrame={handleDuplicateSceneFrame}
+        onSceneFrameContentUpdate={handleSceneFrameContentUpdate}
         onSceneFramePositionChange={handleSceneFramePositionChange}
         onSceneFramePositionCommit={handleSceneFramePositionCommit}
         setSelectedStoryboardModalId={setSelectedStoryboardModalId}
         setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
         images={images}
         onTextCreate={onTextCreate}
+        onScriptGenerationStart={handleScriptGenerationStart}
         onTextScriptGenerated={handleTextScriptGenerated}
         onImageSelect={onImageSelect}
         onImageGenerate={handleImageGenerateWithAutoReference}
@@ -4359,10 +5467,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistEraseModalMove={onPersistEraseModalMove}
         onPersistEraseModalDelete={onPersistEraseModalDelete}
         onErase={onErase}
-        onPersistReplaceModalCreate={onPersistReplaceModalCreate}
-        onPersistReplaceModalMove={onPersistReplaceModalMove}
-        onPersistReplaceModalDelete={onPersistReplaceModalDelete}
-        onReplace={onReplace}
         onPersistExpandModalCreate={onPersistExpandModalCreate}
         onPersistExpandModalMove={onPersistExpandModalMove}
         onPersistExpandModalDelete={onPersistExpandModalDelete}
@@ -4380,6 +5484,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
         onPluginSidebarOpen={onPluginSidebarOpen}
+        onGenerateStoryboard={handleGenerateStoryboard}
       />
       {/* Action Icons for Uploaded Media */}
       {selectedImageIndex !== null && images[selectedImageIndex] && (

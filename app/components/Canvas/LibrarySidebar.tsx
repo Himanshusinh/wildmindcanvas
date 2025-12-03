@@ -26,6 +26,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+
   const [mediaLibrary, setMediaLibrary] = useState<{
     images: MediaItem[];
     videos: MediaItem[];
@@ -37,21 +38,55 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     music: [],
     uploaded: [],
   });
+
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchMediaLibrary = useCallback(async () => {
+  const fetchMediaLibrary = useCallback(async (pageNum: number, isRefresh = false) => {
+    if (loading && !isRefresh) return;
+
     setLoading(true);
     try {
-      const response = await getMediaLibrary();
+      const limit = 20;
+      const response = await getMediaLibrary(pageNum, limit);
+
       if (response.responseStatus === 'success' && response.data) {
-        setMediaLibrary({
-          images: response.data.images || [],
-          videos: response.data.videos || [],
-          music: response.data.music || [],
-          uploaded: response.data.uploaded || [],
+        setMediaLibrary(prev => {
+          if (pageNum === 1) {
+            return {
+              images: response.data?.images || [],
+              videos: response.data?.videos || [],
+              music: response.data?.music || [],
+              uploaded: response.data?.uploaded || [],
+            };
+          } else {
+            return {
+              images: [...prev.images, ...(response.data?.images || [])],
+              videos: [...prev.videos, ...(response.data?.videos || [])],
+              music: [...prev.music, ...(response.data?.music || [])],
+              uploaded: [...prev.uploaded, ...(response.data?.uploaded || [])],
+            };
+          }
         });
+
+        // Update hasMore based on the active category
+        // Note: Ideally backend should return hasMore per category, but for now we check if we got a full page
+        // Or use the pagination metadata if available
+        if (response.data.pagination) {
+          // We need to check hasMore based on the active category, but the API returns all categories paginated together
+          // This is a limitation of the current API design where all categories are fetched at once
+          // For now, we'll assume if any category has more, we can load more
+          const p = response.data.pagination;
+          setHasMore(p.hasMoreImages || p.hasMoreVideos || p.hasMoreUploaded);
+        } else {
+          // Fallback: if we got less than limit items in the active category, we probably reached the end
+          // This is imperfect because we fetch all categories at once
+          setHasMore(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching media library:', error);
@@ -60,17 +95,22 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
     if (isOpen) {
-      fetchMediaLibrary();
+      setPage(1);
+      setHasMore(true);
+      fetchMediaLibrary(1, true);
     }
   }, [isOpen, fetchMediaLibrary]);
 
-  // Listen for library refresh events (e.g., after upload)
+  // Listen for library refresh events
   useEffect(() => {
     const handleRefresh = () => {
       if (isOpen) {
-        fetchMediaLibrary();
+        setPage(1);
+        setHasMore(true);
+        fetchMediaLibrary(1, true);
       }
     };
 
@@ -79,6 +119,18 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       window.removeEventListener('library-refresh', handleRefresh);
     };
   }, [isOpen, fetchMediaLibrary]);
+
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+      // Load more when user is 50px from bottom
+      if (scrollTop + clientHeight >= scrollHeight - 50 && !loading && hasMore) {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchMediaLibrary(nextPage);
+      }
+    }
+  };
 
   const handleMediaClick = (media: MediaItem) => {
     // Don't trigger click if we just finished dragging
@@ -129,18 +181,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     const cardBg = isDark ? '#1a1a1a' : '#f3f4f6';
     const shadowColor = isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)';
 
-    if (loading) {
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p style={{ color: loadingTextColor, fontSize: '14px', transition: 'color 0.3s ease' }}>Loading media...</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (items.length === 0) {
+    if (items.length === 0 && !loading) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
           <p style={{ color: emptyTextColor, fontSize: '14px', transition: 'color 0.3s ease' }}>No {activeCategory} found</p>
@@ -149,71 +190,78 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     }
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px', padding: '16px' }}>
-        {items.map((item) => {
-          const mediaUrl = getMediaUrl(item);
-          const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
-          const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
+      <div style={{ padding: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+          {items.map((item) => {
+            const mediaUrl = getMediaUrl(item);
+            const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
+            const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
 
-          return (
-            <div
-              key={item.id}
-              draggable
-              onClick={() => handleMediaClick(item)}
-              onDragStart={(e) => handleDragStart(e, item)}
-              onDragEnd={handleDragEnd}
-              style={{
-                aspectRatio: '1',
-                overflow: 'hidden',
-                cursor: 'grab',
-                background: cardBg,
-                borderRadius: '16px', // Match canvas image generation frame border radius
-                transition: 'all 0.3s ease',
-                position: 'relative',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.boxShadow = `0 4px 12px ${shadowColor}`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {isVideo ? (
-                <video
-                  src={mediaUrl}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  muted
-                  onMouseEnter={(e) => {
-                    e.currentTarget.play().catch(() => {});
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.pause();
-                    e.currentTarget.currentTime = 0;
-                  }}
-                />
-              ) : isMusic ? (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                </div>
-              ) : (
-                <img
-                  src={mediaUrl}
-                  alt={item.prompt || 'Media'}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
+            return (
+              <div
+                key={item.id}
+                draggable
+                onClick={() => handleMediaClick(item)}
+                onDragStart={(e) => handleDragStart(e, item)}
+                onDragEnd={handleDragEnd}
+                style={{
+                  aspectRatio: '1',
+                  overflow: 'hidden',
+                  cursor: 'grab',
+                  background: cardBg,
+                  borderRadius: '16px', // Match canvas image generation frame border radius
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${shadowColor}`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {isVideo ? (
+                  <video
+                    src={mediaUrl}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    muted
+                    onMouseEnter={(e) => {
+                      e.currentTarget.play().catch(() => { });
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.pause();
+                      e.currentTarget.currentTime = 0;
+                    }}
+                  />
+                ) : isMusic ? (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" />
+                      <circle cx="18" cy="16" r="3" />
+                    </svg>
+                  </div>
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt={item.prompt || 'Media'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          </div>
+        )}
       </div>
     );
   };
@@ -264,100 +312,104 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
         e.stopPropagation();
       }}
     >
-        {/* Header */}
-        <div style={{ 
-          paddingLeft: '20px',
-          paddingRight: '20px', 
-          paddingTop: '-16px', 
-          borderBottom: `1px solid ${headerBorder}`, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          transition: 'border-color 0.3s ease'
-        }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontSize: '20px', 
-            fontWeight: 600, 
-            color: headerText,
-            transition: 'color 0.3s ease'
-          }}>Library</h2>
+      {/* Header */}
+      <div style={{
+        paddingLeft: '20px',
+        paddingRight: '20px',
+        paddingTop: '-16px',
+        borderBottom: `1px solid ${headerBorder}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        transition: 'border-color 0.3s ease'
+      }}>
+        <h2 style={{
+          margin: 0,
+          fontSize: '20px',
+          fontWeight: 600,
+          color: headerText,
+          transition: 'color 0.3s ease'
+        }}>Library</h2>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '20px',
+            color: closeIconColor,
+            padding: '6px 10px',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = closeHoverBg;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Category Tabs */}
+      <div style={{
+        display: 'flex',
+        borderBottom: `1px solid ${tabBorder}`,
+        padding: '0 16px',
+        transition: 'border-color 0.3s ease'
+      }}>
+        {[
+          { id: 'images' as MediaCategory, label: 'Images', count: mediaLibrary.images.length },
+          { id: 'videos' as MediaCategory, label: 'Videos', count: mediaLibrary.videos.length },
+          { id: 'music' as MediaCategory, label: 'Music', count: mediaLibrary.music.length },
+          { id: 'uploaded' as MediaCategory, label: 'My Uploads', count: mediaLibrary.uploaded.length },
+        ].map((category) => (
           <button
-            onClick={onClose}
+            key={category.id}
+            onClick={() => setActiveCategory(category.id)}
             style={{
-              background: 'transparent',
+              flex: 1,
+              padding: '12px 8px',
               border: 'none',
+              background: 'transparent',
+              borderBottom: activeCategory === category.id ? `2px solid ${activeTabColor}` : '2px solid transparent',
+              color: activeCategory === category.id ? activeTabColor : inactiveTabColor,
+              fontSize: '12px',
+              fontWeight: activeCategory === category.id ? 600 : 400,
               cursor: 'pointer',
-              fontSize: '20px',
-              color: closeIconColor,
-              padding: '6px 10px',
               transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = closeHoverBg;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
+              position: 'relative',
             }}
           >
-            ✕
+            {category.label}
+            {category.count > 0 && (
+              <span
+                style={{
+                  marginLeft: '6px',
+                  fontSize: '12px',
+                  color: activeCategory === category.id ? activeTabColor : inactiveCountColor,
+                  transition: 'color 0.3s ease',
+                }}
+              >
+                ({category.count})
+              </span>
+            )}
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Category Tabs */}
-        <div style={{ 
-          display: 'flex', 
-          borderBottom: `1px solid ${tabBorder}`, 
-          padding: '0 16px',
-          transition: 'border-color 0.3s ease'
-        }}>
-          {[
-            { id: 'images' as MediaCategory, label: 'Images', count: mediaLibrary.images.length },
-            { id: 'videos' as MediaCategory, label: 'Videos', count: mediaLibrary.videos.length },
-            { id: 'music' as MediaCategory, label: 'Music', count: mediaLibrary.music.length },
-            { id: 'uploaded' as MediaCategory, label: 'My Uploads', count: mediaLibrary.uploaded.length },
-          ].map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              style={{
-                flex: 1,
-                padding: '12px 8px',
-                border: 'none',
-                background: 'transparent',
-                borderBottom: activeCategory === category.id ? `2px solid ${activeTabColor}` : '2px solid transparent',
-                color: activeCategory === category.id ? activeTabColor : inactiveTabColor,
-                fontSize: '12px',
-                fontWeight: activeCategory === category.id ? 600 : 400,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-              }}
-            >
-              {category.label}
-              {category.count > 0 && (
-                <span
-                  style={{
-                    marginLeft: '6px',
-                    fontSize: '12px',
-                    color: activeCategory === category.id ? activeTabColor : inactiveCountColor,
-                    transition: 'color 0.3s ease',
-                  }}
-                >
-                  ({category.count})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Media Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          {activeCategory === 'images' && renderMediaGrid(mediaLibrary.images)}
-          {activeCategory === 'videos' && renderMediaGrid(mediaLibrary.videos)}
-          {activeCategory === 'music' && renderMediaGrid(mediaLibrary.music)}
-          {activeCategory === 'uploaded' && renderMediaGrid(mediaLibrary.uploaded)}
-        </div>
+      {/* Media Grid */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+      >
+        {activeCategory === 'images' && renderMediaGrid(mediaLibrary.images)}
+        {activeCategory === 'videos' && renderMediaGrid(mediaLibrary.videos)}
+        {activeCategory === 'music' && renderMediaGrid(mediaLibrary.music)}
+        {activeCategory === 'uploaded' && renderMediaGrid(mediaLibrary.uploaded)}
+      </div>
     </div>
   );
 };

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { ActiveSection } from './types';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface SettingsHeaderProps {
   activeSection: ActiveSection;
@@ -9,17 +10,7 @@ interface SettingsHeaderProps {
 }
 
 export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, onClose }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const getTitle = () => {
     switch (activeSection) {
@@ -27,8 +18,6 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
         return 'Profile';
       case 'canvas':
         return 'Canvas';
-      case 'theme':
-        return 'Theme';
       case 'keyboard':
         return 'Keyboard Shortcuts';
       case 'notification':

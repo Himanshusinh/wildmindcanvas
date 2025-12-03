@@ -9,6 +9,9 @@ interface ModalActionIconsProps {
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
+  onCopy?: () => void;
+  onEdit?: () => void;
+  editActive?: boolean;
   variant?: 'default' | 'text'; // 'text' variant has different styling (no backdrop blur)
 }
 
@@ -19,6 +22,9 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   onDelete,
   onDownload,
   onDuplicate,
+  onCopy,
+  onEdit,
+  editActive = false,
   variant = 'default',
 }) => {
   const [isDark, setIsDark] = useState(false);
@@ -171,6 +177,20 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     </svg>
   );
 
+  const EditIcon = (
+    <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+
+  const CopyIcon = (
+    <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
+      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+
   return (
     <div
       data-action-icons="true"
@@ -303,6 +323,83 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
           onMouseLeave={handleDuplicateMouseLeave}
         >
           {DuplicateIcon}
+        </button>
+      )}
+      {/* Copy Icon */}
+      {onCopy && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            onCopy();
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.15)';
+            e.currentTarget.style.color = '#b45309';
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            const defaultBg = isDark
+              ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+              : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+            const defaultColor = isDark ? '#cccccc' : '#4b5563';
+            e.currentTarget.style.backgroundColor = defaultBg;
+            e.currentTarget.style.color = defaultColor;
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }}
+          style={{
+            ...baseButtonStyle,
+          }}
+          title="Copy"
+        >
+          {CopyIcon}
+        </button>
+      )}
+      {/* Edit Icon */}
+      {onEdit && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            onEdit();
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.2)';
+            e.currentTarget.style.color = '#2563eb';
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            const defaultBg = isDark 
+              ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+              : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+            const defaultColor = isDark ? '#cccccc' : '#4b5563';
+            e.currentTarget.style.backgroundColor = editActive ? 'rgba(37, 99, 235, 0.2)' : defaultBg;
+            e.currentTarget.style.color = editActive ? '#2563eb' : defaultColor;
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }}
+          style={{
+            ...baseButtonStyle,
+            backgroundColor: editActive ? 'rgba(37, 99, 235, 0.2)' : (isDark ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)') : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)')),
+            color: editActive ? '#2563eb' : (isDark ? '#cccccc' : '#4b5563'),
+            opacity: 1,
+          }}
+          title={editActive ? 'Close editor' : 'Edit'}
+        >
+          {EditIcon}
         </button>
       )}
     </div>

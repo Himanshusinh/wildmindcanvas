@@ -46,7 +46,6 @@ export function useOpManagerIntegration({
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
         const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
         const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
-        const newReplaceGenerators: Array<{ id: string; x: number; y: number; replacedImageUrl?: string | null; sourceImageUrl?: string | null; localReplacedImageUrl?: string | null; model?: string }> = [];
         const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
         const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
         const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
@@ -87,18 +86,41 @@ export function useOpManagerIntegration({
               newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
             } else if (element.type === 'erase-plugin') {
               newEraseGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, erasedImageUrl: element.meta?.erasedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localErasedImageUrl: element.meta?.localErasedImageUrl || null, model: element.meta?.model });
-            } else if (element.type === 'replace-plugin') {
-              newReplaceGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, replacedImageUrl: element.meta?.replacedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localReplacedImageUrl: element.meta?.localReplacedImageUrl || null, model: element.meta?.model });
             } else if (element.type === 'expand-plugin') {
               newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
             } else if (element.type === 'vectorize-plugin') {
               newVectorizeGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' });
             } else if (element.type === 'storyboard-plugin') {
-              newStoryboardGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 500, scriptText: element.meta?.scriptText || null });
+              newStoryboardGenerators.push({ 
+                id: element.id, 
+                x: element.x || 0, 
+                y: element.y || 0, 
+                frameWidth: element.meta?.frameWidth || 400, 
+                frameHeight: element.meta?.frameHeight || 500, 
+                scriptText: element.meta?.scriptText || null,
+                characterNamesMap: element.meta?.characterNamesMap || {},
+                propsNamesMap: element.meta?.propsNamesMap || {},
+                backgroundNamesMap: element.meta?.backgroundNamesMap || {},
+                namedImages: element.meta?.namedImages || undefined,
+              } as any); // Type assertion needed due to optional fields
             } else if (element.type === 'script-frame') {
               newScriptFrames.push({ id: element.id, pluginId: element.meta?.pluginId || '', x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 300, text: element.meta?.text || '' });
             } else if (element.type === 'scene-frame') {
-              newSceneFrames.push({ id: element.id, scriptFrameId: element.meta?.scriptFrameId || '', sceneNumber: element.meta?.sceneNumber || 0, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 350, frameHeight: element.meta?.frameHeight || 300, content: element.meta?.content || '' });
+              newSceneFrames.push({ 
+                id: element.id, 
+                scriptFrameId: element.meta?.scriptFrameId || '', 
+                sceneNumber: element.meta?.sceneNumber || 0, 
+                x: element.x || 0, 
+                y: element.y || 0, 
+                frameWidth: element.meta?.frameWidth || 350, 
+                frameHeight: element.meta?.frameHeight || 300, 
+                content: element.meta?.content || '',
+                characterIds: element.meta?.characterIds || undefined,
+                locationId: element.meta?.locationId || undefined,
+                mood: element.meta?.mood || undefined,
+                characterNames: element.meta?.characterNames || undefined,
+                locationName: element.meta?.locationName || undefined,
+              } as any); // Type assertion needed due to optional fields
             }
           }
         });
@@ -116,7 +138,6 @@ export function useOpManagerIntegration({
         setters.setUpscaleGenerators(newUpscaleGenerators);
         setters.setRemoveBgGenerators(newRemoveBgGenerators);
         setters.setEraseGenerators(newEraseGenerators);
-        setters.setReplaceGenerators(newReplaceGenerators);
         setters.setExpandGenerators(newExpandGenerators);
         setters.setVectorizeGenerators(newVectorizeGenerators);
         console.log('[Snapshot] Loading storyboard generators:', newStoryboardGenerators.length, newStoryboardGenerators);
@@ -193,7 +214,21 @@ export function useOpManagerIntegration({
         } else if (element.type === 'scene-frame') {
           setters.setSceneFrameGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { id: element.id, scriptFrameId: element.meta?.scriptFrameId || '', sceneNumber: element.meta?.sceneNumber || 0, x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 350, frameHeight: element.meta?.frameHeight || 300, content: element.meta?.content || '' }];
+            return [...prev, { 
+              id: element.id, 
+              scriptFrameId: element.meta?.scriptFrameId || '', 
+              sceneNumber: element.meta?.sceneNumber || 0, 
+              x: element.x || 0, 
+              y: element.y || 0, 
+              frameWidth: element.meta?.frameWidth || 350, 
+              frameHeight: element.meta?.frameHeight || 300, 
+              content: element.meta?.content || '',
+              characterIds: element.meta?.characterIds || undefined,
+              locationId: element.meta?.locationId || undefined,
+              mood: element.meta?.mood || undefined,
+              characterNames: element.meta?.characterNames || undefined,
+              locationName: element.meta?.locationName || undefined,
+            } as any]; // Type assertion needed due to optional fields
           });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
@@ -223,7 +258,6 @@ export function useOpManagerIntegration({
         setters.setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-        setters.setReplaceGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));

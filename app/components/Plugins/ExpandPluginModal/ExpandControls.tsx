@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { CustomDimensionInput } from './CustomDimensionInput';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandControlsProps {
   aspectPreset: string;
@@ -18,6 +19,7 @@ interface ExpandControlsProps {
   customHeight: number;
   onCustomWidthChange: (width: number) => void;
   onCustomHeightChange: (height: number) => void;
+  imageSize?: { width: number; height: number } | null;
 }
 
 export const ExpandControls: React.FC<ExpandControlsProps> = ({
@@ -35,21 +37,30 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
   customHeight,
   onCustomWidthChange,
   onCustomHeightChange,
+  imageSize,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const [showCustomInput, setShowCustomInput] = useState(false);
   const customButtonRef = useRef<HTMLDivElement>(null);
+
+  // Calculate minimum frame dimensions based on image size
+  const minWidth = imageSize ? imageSize.width : 1024;
+  const minHeight = imageSize ? imageSize.height : 1024;
+
+  // Filter presets that are too small for the image
+  const availablePresets = useMemo(() => {
+    if (!imageSize) return aspectPresets;
+    
+    return Object.fromEntries(
+      Object.entries(aspectPresets).filter(([key, preset]) => {
+        if (key === 'custom') return true; // Always include custom
+        const presetWidth = preset.width || 0;
+        const presetHeight = preset.height || 0;
+        return presetWidth >= minWidth && presetHeight >= minHeight;
+      })
+    );
+  }, [aspectPresets, imageSize, minWidth, minHeight]);
 
   const inputBg = isDark ? (aspectPreset === 'custom' ? '#121212' : '#1a1a1a') : (aspectPreset === 'custom' ? 'white' : '#f3f4f6');
   const inputText = isDark ? (aspectPreset === 'custom' ? '#ffffff' : '#666666') : (aspectPreset === 'custom' ? '#111827' : '#9ca3af');
@@ -96,8 +107,19 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, justifyContent: 'center', minWidth: 0 }}>
         {/* Aspect Ratio Dropdown (without Custom) */}
         <select
-          value={aspectPreset === 'custom' ? '1:1' : aspectPreset}
-          onChange={(e) => onAspectPresetChange(e.target.value)}
+          value={aspectPreset === 'custom' ? (Object.keys(availablePresets).find(k => k !== 'custom') || '1:1') : aspectPreset}
+          onChange={(e) => {
+            const selectedPreset = e.target.value;
+            const preset = availablePresets[selectedPreset];
+            // Validate preset is large enough
+            if (preset && preset.width && preset.height) {
+              if (preset.width >= minWidth && preset.height >= minHeight) {
+                onAspectPresetChange(selectedPreset);
+              }
+            } else {
+              onAspectPresetChange(selectedPreset);
+            }
+          }}
           style={{
             padding: '6px 10px',
             borderRadius: '6px',
@@ -113,7 +135,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         >
-          {Object.entries(aspectPresets)
+          {Object.entries(availablePresets)
             .filter(([key]) => key !== 'custom')
             .map(([key, config]) => (
               <option key={key} value={key}>
@@ -128,12 +150,12 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           value={aspectPreset === 'custom' ? customWidth : aspectPresets[aspectPreset]?.width || 1500}
           onChange={(e) => {
             if (aspectPreset === 'custom') {
-              const value = parseInt(e.target.value) || 1024;
-              onCustomWidthChange(Math.max(1024, Math.min(5000, value)));
+              const value = parseInt(e.target.value) || minWidth;
+              onCustomWidthChange(Math.max(minWidth, Math.min(5000, value)));
             }
           }}
           disabled={aspectPreset !== 'custom'}
-          min={1024}
+          min={minWidth}
           max={5000}
           placeholder="Width"
           style={{
@@ -157,12 +179,12 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
           value={aspectPreset === 'custom' ? customHeight : aspectPresets[aspectPreset]?.height || 1500}
           onChange={(e) => {
             if (aspectPreset === 'custom') {
-              const value = parseInt(e.target.value) || 1024;
-              onCustomHeightChange(Math.max(1024, Math.min(5000, value)));
+              const value = parseInt(e.target.value) || minHeight;
+              onCustomHeightChange(Math.max(minHeight, Math.min(5000, value)));
             }
           }}
           disabled={aspectPreset !== 'custom'}
-          min={1024}
+          min={minHeight}
           max={5000}
           placeholder="Height"
           style={{
@@ -208,6 +230,8 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
               onWidthChange={onCustomWidthChange}
               onHeightChange={onCustomHeightChange}
               onClose={() => setShowCustomInput(false)}
+              minWidth={minWidth}
+              minHeight={minHeight}
             />
           )}
         </div>

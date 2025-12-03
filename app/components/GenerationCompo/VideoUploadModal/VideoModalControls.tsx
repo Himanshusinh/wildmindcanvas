@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, Fragment, useState } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import {
   getModelDurations,
   getModelDefaultDuration,
@@ -17,6 +18,7 @@ interface VideoModalControlsProps {
   isHovered: boolean;
   isPinned: boolean;
   isUploadedVideo: boolean;
+  isSelected?: boolean;
   prompt: string;
   isPromptDisabled?: boolean;
   selectedModel: string;
@@ -60,6 +62,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   isHovered,
   isPinned,
   isUploadedVideo,
+  isSelected = false,
   prompt,
   isPromptDisabled = false,
   selectedModel,
@@ -97,20 +100,11 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   onSetIsFrameOrderSwapped,
   onOptionsChange,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
+  const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
   const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
@@ -162,8 +156,6 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         maxWidth: '90vw',
         padding: `${16 * scale}px`,
         backgroundColor: controlsBg,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
         borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
         boxShadow: 'none',
         transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
@@ -175,10 +167,10 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
         overflow: 'visible',
         zIndex: 3,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease',
+        borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -305,10 +297,10 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
             <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isModelDropdownOpen && (
             <div
               style={{
@@ -335,27 +327,27 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onClick={(e) => {
                       e.stopPropagation();
                       onSetIsModelDropdownOpen(false);
-                      
+
                       // Get valid options for the new model
                       const defaultDuration = getModelDefaultDuration(model);
                       const defaultAspectRatio = getModelDefaultAspectRatio(model);
                       const defaultResolution = getModelDefaultResolution(model);
-                      
+
                       // Update duration if current is not valid
-                      const newDuration = isValidDurationForModel(model, selectedDuration) 
-                        ? selectedDuration 
+                      const newDuration = isValidDurationForModel(model, selectedDuration)
+                        ? selectedDuration
                         : defaultDuration;
-                      
+
                       // Update aspect ratio if current is not valid
                       const newAspectRatio = isValidAspectRatioForModel(model, selectedAspectRatio)
                         ? selectedAspectRatio
                         : defaultAspectRatio;
-                      
+
                       // Update resolution if current is not valid
                       const newResolution = isValidResolutionForModel(model, selectedResolution)
                         ? selectedResolution
                         : defaultResolution;
-                      
+
                       // Update state
                       if (newDuration !== selectedDuration) {
                         onDurationChange(newDuration);
@@ -366,10 +358,10 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                       if (newResolution !== selectedResolution) {
                         onResolutionChange(newResolution);
                       }
-                      
+
                       const [w, h] = newAspectRatio.split(':').map(Number);
                       const frameWidth = 600;
-                      const ar = w && h ? (w / h) : 16/9;
+                      const ar = w && h ? (w / h) : 16 / 9;
                       const rawHeight = Math.round(frameWidth / ar);
                       const frameHeight = Math.max(400, rawHeight);
                       onModelChange(model);
@@ -378,26 +370,26 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     style={{
                       padding: `${6 * scale}px ${12 * scale}px`,
                       fontSize: controlFontSize,
-                    color: dropdownText,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    backgroundColor: selectedModel === model ? selectedBg : 'transparent',
-                    transition: 'background-color 0.3s ease, color 0.3s ease',
+                      color: dropdownText,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      backgroundColor: selectedModel === model ? selectedBg : 'transparent',
+                      transition: 'background-color 0.3s ease, color 0.3s ease',
                       borderRadius: `${6 * scale}px`,
                       whiteSpace: 'nowrap',
                       minWidth: 'max-content',
                     }}
-                  onMouseEnter={(e) => {
-                    if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}
+                    onMouseEnter={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedModel !== model) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
                   >
                     {selectedModel === model && (
                       <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
@@ -445,7 +437,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isAspectRatioDropdownOpen && (
             <div
               style={{
@@ -474,7 +466,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsAspectRatioDropdownOpen(false);
                     const [w, h] = ratio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onAspectRatioChange(ratio);
@@ -513,7 +505,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             </div>
           )}
         </div>
-        
+
         {/* Duration Selector - Custom Dropdown */}
         <div ref={durationDropdownRef} style={{ position: 'relative', overflow: 'visible', zIndex: 3001 }}>
           <button
@@ -547,7 +539,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#34d399' : '#10b981'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isDurationDropdownOpen && (
             <div
               style={{
@@ -576,7 +568,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsDurationDropdownOpen(false);
                     const [w, h] = selectedAspectRatio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onDurationChange(dur);
@@ -649,7 +641,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#a78bfa' : '#8b5cf6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isResolutionDropdownOpen && (
             <div
               style={{
@@ -678,7 +670,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                     onSetIsResolutionDropdownOpen(false);
                     const [w, h] = selectedAspectRatio.split(':').map(Number);
                     const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 16/9;
+                    const ar = w && h ? (w / h) : 16 / 9;
                     const rawHeight = Math.round(frameWidth / ar);
                     const frameHeight = Math.max(400, rawHeight);
                     onResolutionChange(res);

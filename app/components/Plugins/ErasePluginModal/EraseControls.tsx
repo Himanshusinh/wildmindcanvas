@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { EraseModelDropdown } from './EraseModelDropdown';
 import { EraseButton } from './EraseButton';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface EraseControlsProps {
   scale: number;
@@ -29,17 +30,7 @@ export const EraseControls: React.FC<EraseControlsProps> = ({
   onErase,
   onHoverChange,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 

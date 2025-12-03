@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { CanvasSettings, CursorType, BackgroundType } from './types';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface CanvasSectionProps {
   canvasSettings: CanvasSettings;
@@ -9,17 +10,7 @@ interface CanvasSectionProps {
 }
 
 export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, setCanvasSettings }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const containerBg = isDark ? '#121212' : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#111827';
@@ -33,81 +24,187 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
         padding: '20px', 
         background: containerBg, 
         borderRadius: '12px',
-        border: `1px solid ${borderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease'
+        transition: 'background-color 0.3s ease'
       }}>
-        <h4 style={{ 
-          margin: '0 0 20px 0', 
-          fontSize: '16px', 
-          fontWeight: 600, 
-          color: textColor, 
-          paddingBottom: '8px',
-          transition: 'color 0.3s ease'
-        }}>
-          Canvas Settings
-        </h4>
+        
 
         {/* Cursor Type */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
           <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Cursor Type</div>
-          <select
-            value={canvasSettings.cursorType}
-            onChange={(e) => setCanvasSettings((prev) => ({ ...prev, cursorType: e.target.value as CursorType }))}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: `1px solid ${borderColor}`,
-              background: inputBg,
-              fontSize: '14px',
-              color: textColor,
-              cursor: 'pointer',
-              minWidth: '150px',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = hoverBorder;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = borderColor;
-            }}
-          >
-            <option value="default">Default</option>
-            <option value="crosshair">Crosshair</option>
-            <option value="pointer">Pointer</option>
-            <option value="grab">Grab</option>
-            <option value="text">Text</option>
-          </select>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Simple Pointer */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, cursorType: 'default' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.cursorType === 'default' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.cursorType === 'default' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Simple Pointer"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'default' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+              </svg>
+            </button>
+            
+            {/* Gaming Pointer (Crosshair) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, cursorType: 'crosshair' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.cursorType === 'crosshair' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.cursorType === 'crosshair' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Gaming Pointer (Crosshair)"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'crosshair' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Background Type */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
           <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Background Type</div>
-          <select
-            value={canvasSettings.backgroundType}
-            onChange={(e) => setCanvasSettings((prev) => ({ ...prev, backgroundType: e.target.value as BackgroundType }))}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: `1px solid ${borderColor}`,
-              background: inputBg,
-              fontSize: '14px',
-              color: textColor,
-              cursor: 'pointer',
-              minWidth: '150px',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = hoverBorder;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = borderColor;
-            }}
-          >
-            <option value="dots">Dots</option>
-            <option value="grid">Grid</option>
-            <option value="solid">Solid</option>
-            <option value="none">None</option>
-          </select>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Dots */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'dots' as BackgroundType }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.backgroundType === 'dots' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.backgroundType === 'dots' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Dots"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="6" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="12" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="18" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="6" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="12" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="18" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="6" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="12" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="18" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+              </svg>
+            </button>
+            
+            {/* None */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'none' as BackgroundType }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.backgroundType === 'none' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.backgroundType === 'none' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="None"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'none' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+              </svg>
+            </button>
+            
+            {/* Lines Vertical */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'lines-vertical' as BackgroundType }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.backgroundType === 'lines-vertical' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.backgroundType === 'lines-vertical' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Lines Vertical"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-vertical' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+                <line x1="6" y1="4" x2="6" y2="20" />
+                <line x1="12" y1="4" x2="12" y2="20" />
+                <line x1="18" y1="4" x2="18" y2="20" />
+              </svg>
+            </button>
+            
+            {/* Lines Horizontal */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'lines-horizontal' as BackgroundType }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.backgroundType === 'lines-horizontal' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.backgroundType === 'lines-horizontal' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Lines Horizontal"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-horizontal' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            </button>
+            
+            {/* Lines Both (Grid) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'grid' as BackgroundType }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.backgroundType === 'grid' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.backgroundType === 'grid' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Lines Both (Grid)"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'grid' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+                <line x1="6" y1="4" x2="6" y2="20" />
+                <line x1="12" y1="4" x2="12" y2="20" />
+                <line x1="18" y1="4" x2="18" y2="20" />
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Dot Color */}

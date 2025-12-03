@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ModelDropdown } from './ModelDropdown';
 import { ScaleInput } from './ScaleInput';
 import { UpscaleButton } from './UpscaleButton';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscaleControlsProps {
   scale: number;
@@ -18,6 +19,7 @@ interface UpscaleControlsProps {
   onScaleChange: (newScale: number) => void;
   onUpscale: () => void;
   onHoverChange: (hovered: boolean) => void;
+  extraTopPadding?: number;
 }
 
 export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
@@ -33,20 +35,13 @@ export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
   onScaleChange,
   onUpscale,
   onHoverChange,
+  extraTopPadding,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const basePadding = 16 * scale;
+  const computedTopPadding = Math.max(basePadding, extraTopPadding ?? basePadding);
 
   return (
     <div
@@ -67,7 +62,8 @@ export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        padding: `${16 * scale}px`,
+        padding: `${basePadding}px`,
+        paddingTop: `${computedTopPadding}px`,
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onHoverChange(true)}

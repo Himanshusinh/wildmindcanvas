@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ReplaceGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator } from '../types';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -10,9 +10,6 @@ export interface PluginHandlers {
   onPersistEraseModalCreate: (modal: EraseGenerator) => Promise<void>;
   onPersistEraseModalMove: (id: string, updates: Partial<EraseGenerator>) => Promise<void>;
   onPersistEraseModalDelete: (id: string) => Promise<void>;
-  onPersistReplaceModalCreate: (modal: ReplaceGenerator) => Promise<void>;
-  onPersistReplaceModalMove: (id: string, updates: Partial<ReplaceGenerator>) => Promise<void>;
-  onPersistReplaceModalDelete: (id: string) => Promise<void>;
   onPersistExpandModalCreate: (modal: ExpandGenerator) => Promise<void>;
   onPersistExpandModalMove: (id: string, updates: Partial<ExpandGenerator>) => Promise<void>;
   onPersistExpandModalDelete: (id: string) => Promise<void>;
@@ -31,7 +28,6 @@ export interface PluginHandlers {
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
-  onReplace: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onVectorize: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
 }
@@ -594,6 +590,20 @@ export function createPluginHandlers(
     }
   };
 
+  const convertBlobUrlToDataUrl = async (blobUrl: string): Promise<string> => {
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to read local image (status ${response.status}). Please reconnect the image and try again.`);
+    }
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string) || '');
+      reader.onerror = () => reject(new Error('Failed to convert local image to data URL.'));
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const onErase = async (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => {
     if (!sourceImageUrl || !projectId) {
       console.error('[onErase] Missing sourceImageUrl or projectId');
@@ -613,9 +623,14 @@ export function createPluginHandlers(
 
     try {
       const { eraseImageForCanvas } = await import('@/lib/api');
+      let imagePayload = sourceImageUrl;
+      if (imagePayload.startsWith('blob:')) {
+        console.log('[onErase] Converting blob URL to data URI for API compatibility');
+        imagePayload = await convertBlobUrlToDataUrl(imagePayload);
+      }
       // Pass composited image as image parameter, mask is optional (can be undefined)
       const result = await eraseImageForCanvas(
-        sourceImageUrl, // This is the composited image (original + white mask overlay)
+        imagePayload, // This is the composited image (original + white mask overlay)
         projectId,
         model,
         mask, // Optional - can be undefined since mask is composited into image
@@ -626,204 +641,6 @@ export function createPluginHandlers(
       return result.url || null;
     } catch (error: any) {
       console.error('[onErase] Error:', error);
-      throw error;
-    }
-  };
-
-  const onPersistReplaceModalCreate = async (modal: ReplaceGenerator) => {
-    // Optimistic update
-    setters.setReplaceGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-    // Broadcast via realtime
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast create replace', modal.id);
-      realtimeRef.current?.sendCreate({
-        id: modal.id,
-        type: 'replace',
-        x: modal.x,
-        y: modal.y,
-        replacedImageUrl: modal.replacedImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localReplacedImageUrl: modal.localReplacedImageUrl || null,
-        model: modal.model || 'bria/eraser',
-        frameWidth: modal.frameWidth,
-        frameHeight: modal.frameHeight,
-        isReplacing: modal.isReplacing,
-      });
-    }
-    // Always append op for undo/redo and persistence
-    if (projectId && opManagerInitialized) {
-      await appendOp({
-        type: 'create',
-        elementId: modal.id,
-        data: {
-          element: {
-            id: modal.id,
-            type: 'replace-plugin',
-            x: modal.x,
-            y: modal.y,
-            meta: {
-              replacedImageUrl: modal.replacedImageUrl || null,
-              sourceImageUrl: modal.sourceImageUrl || null,
-              localReplacedImageUrl: modal.localReplacedImageUrl || null,
-              model: modal.model || 'bria/eraser',
-              frameWidth: modal.frameWidth || 400,
-              frameHeight: modal.frameHeight || 500,
-              isReplacing: modal.isReplacing || false,
-            },
-          },
-        },
-        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
-      });
-    }
-  };
-
-  const onPersistReplaceModalMove = async (id: string, updates: Partial<ReplaceGenerator>) => {
-    // 1. Capture previous state (for inverse op)
-    const prev = state.replaceGenerators.find(m => m.id === id);
-
-    // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setReplaceGenerators(prevState =>
-      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
-    );
-
-    // 3. Broadcast via realtime
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast move replace', id);
-      realtimeRef.current?.sendUpdate(id, updates as any);
-    }
-
-    // 4. Append op for undo/redo
-    if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        replacedImageUrl: prev.replacedImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localReplacedImageUrl: prev.localReplacedImageUrl || null,
-        model: prev.model || 'bria/eraser',
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isReplacing: prev.isReplacing || false,
-      };
-
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
-        }
-      }
-      structuredUpdates.meta = metaUpdates;
-
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-      const inverseMeta: any = {};
-      if ('replacedImageUrl' in updates) inverseMeta.replacedImageUrl = prev.replacedImageUrl || null;
-      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-      if ('localReplacedImageUrl' in updates) inverseMeta.localReplacedImageUrl = prev.localReplacedImageUrl || null;
-      if ('model' in updates) inverseMeta.model = prev.model || 'bria/eraser';
-      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-      if ('isReplacing' in updates) inverseMeta.isReplacing = prev.isReplacing || false;
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
-
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
-          type: 'update',
-          elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
-      });
-    }
-  };
-
-  const onPersistReplaceModalDelete = async (id: string) => {
-    // 1. Capture previous state (for inverse op)
-    const prevItem = state.replaceGenerators.find(m => m.id === id);
-    // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
-    setters.setReplaceGenerators(prev => {
-      const filtered = prev.filter(m => m.id !== id);
-      console.log('[page.tsx] replaceGenerators updated, remaining:', filtered.length);
-      return filtered;
-    });
-    // Then do async operations
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast delete replace', id);
-      realtimeRef.current?.sendDelete(id);
-    }
-    // Remove connectors for this element
-    await removeAndPersistConnectorsForElement(id);
-    // Append op for undo/redo and persistence
-    if (projectId && opManagerInitialized && prevItem) {
-      await appendOp({
-        type: 'delete',
-        elementType: 'replace',
-        elementId: id,
-        data: null,
-        inverse: {
-          type: 'create',
-          elementType: 'replace',
-          elementId: id,
-          data: {
-            id: prevItem.id,
-            x: prevItem.x,
-            y: prevItem.y,
-            replacedImageUrl: prevItem.replacedImageUrl || null,
-            sourceImageUrl: prevItem.sourceImageUrl || null,
-            localReplacedImageUrl: prevItem.localReplacedImageUrl || null,
-            model: prevItem.model,
-            frameWidth: prevItem.frameWidth,
-            frameHeight: prevItem.frameHeight,
-            isReplacing: prevItem.isReplacing,
-          },
-        },
-      });
-    }
-  };
-
-  const onReplace = async (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => {
-    if (!sourceImageUrl || !projectId) {
-      console.error('[onReplace] Missing sourceImageUrl or projectId');
-      return null;
-    }
-
-    // Prompt is required for replace (unlike erase which has a default)
-    if (!prompt || !prompt.trim()) {
-      console.error('[onReplace] Prompt is required for replace');
-      throw new Error('Prompt is required for image replace. Please describe what you want to replace the selected area with.');
-    }
-
-    console.log('[onReplace] Starting replace:', {
-      model,
-      sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
-      hasMask: !!mask,
-      prompt: prompt || '(MISSING - will fail)',
-      note: 'Using composited image (mask is part of the image)'
-    });
-
-    try {
-      const { replaceImageForCanvas } = await import('@/lib/api');
-      // Pass composited image as image parameter, mask is optional (can be undefined)
-      const result = await replaceImageForCanvas(
-        sourceImageUrl, // This is the composited image (original + white mask overlay)
-        projectId,
-        model,
-        mask, // Optional - can be undefined since mask is composited into image
-        prompt // REQUIRED - what to replace the white area with
-      );
-
-      console.log('[onReplace] Replace completed:', result);
-      return result.url || null;
-    } catch (error: any) {
-      console.error('[onReplace] Error:', error);
       throw error;
     }
   };
@@ -1254,15 +1071,112 @@ export function createPluginHandlers(
               frameWidth: modal.frameWidth || 400,
               frameHeight: modal.frameHeight || 500,
               scriptText: (modal as StoryboardGenerator).scriptText || null,
+              characterNamesMap: (modal as any).characterNamesMap || {},
+              propsNamesMap: (modal as any).propsNamesMap || {},
+              backgroundNamesMap: (modal as any).backgroundNamesMap || {},
             },
           },
         },
         inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
       });
     }
+
+    // 4. Auto-create input nodes (Character, Background, Prompt)
+    // Only do this for new creations (not hydration), which is implied since this handler is called on drop
+    const createInputNode = async (label: string, yOffset: number, color: string, toAnchor: string) => {
+      const nodeId = `${label.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const nodeX = modal.x - 350; // Position to the left
+      const nodeY = modal.y + yOffset;
+
+      const textNode = {
+        id: nodeId,
+        x: nodeX,
+        y: nodeY,
+        value: label, // Pre-fill with label
+      };
+
+      // Optimistic update for text node
+      setters.setTextGenerators(prev => [...prev, textNode]);
+
+      // Broadcast text node
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({
+          id: nodeId,
+          type: 'text',
+          x: nodeX,
+          y: nodeY,
+          value: label,
+        });
+      }
+
+      // Persist text node
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create',
+          elementId: nodeId,
+          data: {
+            element: {
+              id: nodeId,
+              type: 'text-generator',
+              x: nodeX,
+              y: nodeY,
+              meta: { value: label },
+            },
+          },
+          inverse: { type: 'delete', elementId: nodeId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+
+      // Create connector
+      const connectorId = `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const connector = {
+        id: connectorId,
+        from: nodeId,
+        to: modal.id,
+        color: color,
+        fromAnchor: 'right',
+        toAnchor: toAnchor,
+      };
+
+      // Optimistic update for connector
+      setters.setConnectors(prev => [...prev, connector]);
+
+      // Persist connector (connectors are persisted as elements in this system)
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create',
+          elementId: connectorId,
+          data: {
+            element: {
+              id: connectorId,
+              type: 'connector',
+              from: nodeId,
+              to: modal.id,
+              meta: {
+                color: color,
+                fromAnchor: 'right',
+                toAnchor: toAnchor,
+              },
+            },
+          },
+          inverse: { type: 'delete', elementId: connectorId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    };
+
+    // Create the three nodes with slight delays to ensure unique IDs/timestamps if needed, 
+    // though Math.random should handle it.
+    // Character Node (Top)
+    await createInputNode('Character', 50, '#FF5733', 'receive-character');
+
+    // Background Node (Middle)
+    await createInputNode('Background', 200, '#33FF57', 'receive-background');
+
+    // Prompt Node (Bottom)
+    await createInputNode('Props', 350, '#3357FF', 'receive-props');
   };
 
-  const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>) => {
+  const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; stitchedImageUrl?: string }>) => {
     // 1. Capture previous state (for inverse op)
     const prev = state.storyboardGenerators.find(m => m.id === id);
 
@@ -1284,10 +1198,17 @@ export function createPluginHandlers(
         frameWidth: prev.frameWidth || 400,
         frameHeight: prev.frameHeight || 500,
         scriptText: (prev as StoryboardGenerator).scriptText || null,
+        characterNamesMap: (prev as any).characterNamesMap || {},
+        propsNamesMap: (prev as any).propsNamesMap || {},
+        backgroundNamesMap: (prev as any).backgroundNamesMap || {},
       } : {
         frameWidth: 400,
         frameHeight: 500,
         scriptText: null,
+        characterNamesMap: {},
+        propsNamesMap: {},
+        backgroundNamesMap: {},
+        stitchedImageUrl: undefined,
       };
 
       const metaUpdates = { ...existingMeta };
@@ -1309,6 +1230,9 @@ export function createPluginHandlers(
         if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
         if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
         if ('scriptText' in updates) inverseMeta.scriptText = (prev as StoryboardGenerator).scriptText || null;
+        if ('characterNamesMap' in updates) inverseMeta.characterNamesMap = (prev as any).characterNamesMap || {};
+        if ('propsNamesMap' in updates) inverseMeta.propsNamesMap = (prev as any).propsNamesMap || {};
+        if ('backgroundNamesMap' in updates) inverseMeta.backgroundNamesMap = (prev as any).backgroundNamesMap || {};
         if (Object.keys(inverseMeta).length > 0) {
           inverseUpdates.meta = inverseMeta;
         }
@@ -1556,6 +1480,11 @@ export function createPluginHandlers(
           frameWidth: modal.frameWidth,
           frameHeight: modal.frameHeight,
           content: modal.content,
+          characterIds: modal.characterIds,
+          locationId: modal.locationId,
+          mood: modal.mood,
+          characterNames: (modal as any).characterNames,
+          locationName: (modal as any).locationName,
         },
       });
     }
@@ -1576,6 +1505,9 @@ export function createPluginHandlers(
               frameWidth: modal.frameWidth,
               frameHeight: modal.frameHeight,
               content: modal.content,
+              characterIds: modal.characterIds,
+              locationId: modal.locationId,
+              mood: modal.mood,
             },
           },
         },
@@ -1632,6 +1564,9 @@ export function createPluginHandlers(
         if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
         if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
         if ('content' in updates) inverseMeta.content = prev.content;
+        if ('characterIds' in updates) inverseMeta.characterIds = (prev as any).characterIds;
+        if ('locationId' in updates) inverseMeta.locationId = (prev as any).locationId;
+        if ('mood' in updates) inverseMeta.mood = (prev as any).mood;
         if (Object.keys(inverseMeta).length > 0) {
           inverseUpdates.meta = inverseMeta;
         }
@@ -1714,13 +1649,9 @@ export function createPluginHandlers(
     onUpscale,
     onRemoveBg,
     onErase,
-    onPersistReplaceModalCreate,
-    onPersistReplaceModalMove,
-    onPersistReplaceModalDelete,
     onPersistExpandModalCreate,
     onPersistExpandModalMove,
     onPersistExpandModalDelete,
-    onReplace,
     onExpand,
     onVectorize,
     onPersistStoryboardModalCreate,

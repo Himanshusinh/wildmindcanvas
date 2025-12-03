@@ -48,6 +48,7 @@ export interface MusicGenerator {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  isGenerating?: boolean;
 }
 
 export interface UpscaleGenerator {
@@ -92,19 +93,6 @@ export interface EraseGenerator {
   isErasing?: boolean;
 }
 
-export interface ReplaceGenerator {
-  id: string;
-  x: number;
-  y: number;
-  replacedImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localReplacedImageUrl?: string | null;
-  model?: string;
-  frameWidth?: number;
-  frameHeight?: number;
-  isReplacing?: boolean;
-}
-
 export interface ExpandGenerator {
   id: string;
   x: number;
@@ -138,6 +126,15 @@ export interface StoryboardGenerator {
   frameWidth?: number;
   frameHeight?: number;
   scriptText?: string | null;
+  characterNamesMap?: Record<number, string>;
+  propsNamesMap?: Record<number, string>;
+  backgroundNamesMap?: Record<number, string>;
+  // Direct name -> image URL mappings (auto-updated from names maps + connections)
+  namedImages?: {
+    characters?: Record<string, string>; // "Aryan" -> imageUrl
+    backgrounds?: Record<string, string>; // "Restaurant" -> imageUrl
+    props?: Record<string, string>; // "Rose" -> imageUrl
+  };
 }
 
 export interface ScriptFrameGenerator {
@@ -159,6 +156,13 @@ export interface SceneFrameGenerator {
   frameWidth: number;
   frameHeight: number;
   content: string;
+  // Story World metadata for visual consistency
+  characterIds?: string[];       // IDs of characters present in this scene
+  locationId?: string;           // ID of the location where scene takes place
+  mood?: string;                 // Emotional tone of the scene
+  // Human-readable names (for display and prompts)
+  characterNames?: string[];     // Actual character names (e.g., ["Aryan", "Diya"])
+  locationName?: string;         // Actual location name (e.g., "Restaurant")
 }
 
 export interface TextGenerator {
@@ -189,7 +193,6 @@ export interface CanvasAppState {
   upscaleGenerators: UpscaleGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
   eraseGenerators: EraseGenerator[];
-  replaceGenerators: ReplaceGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
   storyboardGenerators: StoryboardGenerator[];
@@ -208,7 +211,6 @@ export interface CanvasAppSetters {
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
-  setReplaceGenerators: React.Dispatch<React.SetStateAction<ReplaceGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 const BACKGROUND_TYPES = [
   'green',
@@ -26,17 +27,7 @@ export const BackgroundTypeDropdown: React.FC<BackgroundTypeDropdownProps> = ({
   onToggle,
   onSelect,
 }) => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const checkTheme = () => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    };
-    checkTheme();
-    const observer = new MutationObserver(checkTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const isDark = useIsDarkTheme();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
@@ -64,9 +55,10 @@ export const BackgroundTypeDropdown: React.FC<BackgroundTypeDropdownProps> = ({
       ref={dropdownRef}
       style={{
         position: 'relative',
-        flex: '1 1 0',
-        minWidth: `${90 * scale}px`,
-        maxWidth: `${130 * scale}px`,
+        flex: '1 1 auto',
+        width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
         zIndex: 10002,
         overflow: 'visible',
       }}

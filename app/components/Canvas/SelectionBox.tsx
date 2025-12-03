@@ -54,7 +54,7 @@ interface SelectionBoxProps {
   setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMusicModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
