@@ -3494,7 +3494,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         return;
       }
       // Handle 'z' to zoom to selection or to all components
-      if (e.key === 'z' && !e.repeat) {
+      // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
+      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
         // Avoid when typing in inputs
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
