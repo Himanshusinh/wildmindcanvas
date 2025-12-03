@@ -55,7 +55,7 @@ export function useProfile() {
               const server = (user as any)?.isPublic;
               const next = (stored != null) ? (stored === 'true') : (server !== undefined ? Boolean(server) : false);
               setIsPublic(next);
-            } catch {}
+            } catch { }
           }
         }
 
@@ -91,7 +91,7 @@ export function useProfile() {
         document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=None; Secure`;
         document.cookie = `app_session=; ${expired}; SameSite=Lax`;
         document.cookie = `app_session=; Domain=.wildmindai.com; ${expired}; SameSite=Lax`;
-      } catch {}
+      } catch { }
       const isProd = typeof window !== 'undefined' && (window.location.hostname === 'wildmindai.com' || window.location.hostname === 'www.wildmindai.com' || window.location.hostname === 'studio.wildmindai.com');
       const mainProjectUrl = isProd ? 'https://wildmindai.com/view/Landingpage?toast=LOGOUT_SUCCESS' : 'http://localhost:3000/view/Landingpage?toast=LOGOUT_SUCCESS';
       window.location.replace(mainProjectUrl);

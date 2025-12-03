@@ -1,5 +1,4 @@
-
-export type Tab = 'tools' | 'text' | 'images' | 'videos' | 'audio' | 'uploads' | 'projects';
+export type Tab = 'text' | 'uploads' | 'images' | 'videos' | 'audio' | 'projects' | 'tools' | 'library';
 
 export interface Project {
     id: string;
@@ -9,6 +8,7 @@ export interface Project {
 }
 
 import React from 'react';
+import { Move, ArrowRight, ZoomIn, RotateCw, Layers, Maximize, Minimize, ArrowUp, MoveRight, Wind, Droplet, Zap, CircleDot, Tv, Activity, Circle, MoveHorizontal, MoveVertical, ArrowDown, ZoomOut, Expand, Triangle, Scissors, RefreshCw, Send, ArrowLeft, Rocket, Scale, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, CornerLeftUp, CornerRightUp, CornerLeftDown, CornerRightDown, ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, MousePointerClick, Target, Eye, EyeOff, Aperture, Focus, Scan, Crosshair, Disc, Globe, Sun, Moon, Cloud, Star, Heart, Sparkles } from 'lucide-react';
 export type ClipType = 'video' | 'audio' | 'image' | 'text' | 'color';
 
 export type TransitionType =
@@ -17,11 +17,24 @@ export type TransitionType =
     | 'iris-box' | 'iris-cross' | 'iris-diamond' | 'iris-round'
     | 'slide' | 'push' | 'split' | 'whip' | 'band-slide'
     | 'wipe' | 'band-wipe' | 'barn-doors' | 'checker-wipe' | 'clock-wipe' | 'radial-wipe' | 'venetian-blinds' | 'wedge-wipe' | 'zig-zag' | 'random-blocks'
-    | 'cross-zoom' | 'morph-cut' | 'zoom-in' | 'zoom-out' | 'gradient-wipe'
+    | 'cross-zoom' | 'morph-cut'
     | 'page-peel' | 'page-turn'
     | 'circle' | 'line-wipe' | 'match-move' | 'flow' | 'stack' | 'chop'
     | 'fade-dissolve' | 'flash-zoom-in' | 'flash-zoom-out' | 'film-roll'
-    | 'non-additive-dissolve' | 'ripple-dissolve' | 'smooth-wipe' | 'spin' | 'zoom-blur' | 'glitch' | 'rgb-split' | 'film-burn';
+    | 'non-additive-dissolve' | 'ripple-dissolve' | 'smooth-wipe' | 'spin' | 'zoom-blur' | 'glitch' | 'rgb-split' | 'film-burn'
+    // New Filmora-style Transitions
+    | 'luma-dissolve' | 'fade-color'
+    | 'simple-wipe' | 'multi-panel' | 'split-screen'
+    | 'zoom-in' | 'zoom-out' | 'warp-zoom'
+    | 'spin-3d'
+    | 'cube-rotate' | 'flip-3d' | 'page-curl'
+    | 'shape-circle' | 'shape-heart' | 'shape-triangle'
+    | 'chromatic-aberration' | 'pixelate' | 'datamosh'
+    | 'flash' | 'light-leak'
+    | 'ripple' | 'liquid' | 'stretch'
+    | 'tile-drop' | 'mosaic-grid'
+    | 'speed-blur' | 'whip-pan'
+    | 'brush-reveal' | 'ink-splash';
 
 export interface Transition {
     type: TransitionType;
@@ -34,10 +47,16 @@ export interface Transition {
 
 export interface Animation {
     type: string; // e.g., 'rise', 'pan', 'neon'
-    category: 'page' | 'photo' | 'element' | 'loop';
+    category: 'page' | 'photo' | 'element';
     duration?: number; // seconds
-    delay?: number; // seconds
     timing?: 'enter' | 'exit' | 'both';
+}
+
+export interface AnimationDefinition {
+    id: string;
+    name: string;
+    category: string;
+    icon: React.ReactNode;
 }
 
 export interface BorderStyle {
@@ -76,14 +95,13 @@ export interface Adjustments {
     sharpness: number; // -100 to 100
     clarity: number; // -100 to 100
     vignette: number; // 0 to 100
-    blur: number; // 0 to 100
 }
 
 export const DEFAULT_ADJUSTMENTS: Adjustments = {
     temperature: 0, tint: 0,
     brightness: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
     saturation: 0, vibrance: 0, hue: 0,
-    sharpness: 0, clarity: 0, vignette: 0, blur: 0
+    sharpness: 0, clarity: 0, vignette: 0
 };
 
 export interface Filter {
@@ -94,6 +112,26 @@ export interface Filter {
 
 export const FILTERS: Filter[] = [
     { id: 'none', name: 'None', style: '' },
+    { id: 'bw', name: 'Black & White', style: 'grayscale(100%)' },
+    { id: 'blockbuster', name: 'Blockbuster', style: 'contrast(120%) saturate(110%) sepia(20%) hue-rotate(-10deg)' },
+    { id: 'boost-color', name: 'Boost Color', style: 'saturate(150%) contrast(110%)' },
+    { id: 'brighten', name: 'Brighten', style: 'brightness(120%) contrast(105%)' },
+    { id: 'cool', name: 'Cool', style: 'saturate(90%) hue-rotate(10deg) brightness(105%)' },
+    { id: 'cool-max', name: 'Cool Max', style: 'saturate(80%) hue-rotate(20deg) brightness(110%) contrast(110%)' },
+    { id: 'darken', name: 'Darken', style: 'brightness(80%) contrast(120%)' },
+    { id: 'elegant', name: 'Elegant', style: 'sepia(10%) contrast(110%) brightness(105%) saturate(90%)' },
+    { id: 'epic', name: 'Epic', style: 'contrast(130%) saturate(120%) sepia(15%)' },
+    { id: 'fantasy', name: 'Fantasy', style: 'saturate(130%) brightness(110%) hue-rotate(-10deg) contrast(90%)' },
+    { id: 'far-east', name: 'Far East', style: 'sepia(20%) contrast(110%) brightness(105%) hue-rotate(5deg)' },
+    { id: 'film-stock', name: 'Film Stock', style: 'contrast(120%) saturate(90%) sepia(10%)' },
+    { id: 'jungle', name: 'Jungle', style: 'saturate(140%) hue-rotate(-10deg) brightness(95%)' },
+    { id: 'lomo', name: 'Lomo', style: 'contrast(130%) saturate(120%) sepia(10%)' }, // Vignette handled separately if needed, or approx with radial-gradient overlay (complex in CSS filter)
+    { id: 'old-film', name: 'Old Film', style: 'sepia(50%) contrast(110%) grayscale(20%)' },
+    { id: 'polaroid', name: 'Polaroid', style: 'contrast(110%) brightness(110%) sepia(20%) saturate(90%)' },
+    { id: 'tv', name: 'TV', style: 'contrast(120%) brightness(110%) saturate(110%) blur(0.5px)' },
+    { id: 'vignette-1', name: 'Vignette 1', style: 'brightness(90%) contrast(120%)' }, // Placeholder for vignette style
+    { id: 'warm', name: 'Warm', style: 'sepia(20%) saturate(120%) brightness(105%)' },
+    { id: 'warm-max', name: 'Warm Max', style: 'sepia(40%) saturate(140%) brightness(110%)' },
     { id: 'fresco', name: 'Fresco', style: 'sepia(30%) brightness(110%) contrast(110%)' },
     { id: 'belvedere', name: 'Belvedere', style: 'sepia(40%) contrast(90%)' },
     { id: 'flint', name: 'Flint', style: 'brightness(110%) contrast(90%) grayscale(20%)' },
@@ -413,11 +451,11 @@ export interface TimelineItem {
     // Timing
     start: number; // Start time on timeline (seconds)
     duration: number; // Duration on timeline (seconds)
-    offset?: number; // Start time within the source media (for trimming)
+    offset: number; // Start time within the source media (for trimming)
 
     // Visuals
     trackId: string;
-    layer?: number; // Z-index
+    layer: number; // Z-index
     isLocked?: boolean; // Cannot be moved/edited
     isBackground?: boolean; // Fills canvas, lowest z-index
 
@@ -462,6 +500,7 @@ export interface TimelineItem {
     maskImage?: string; // Data URL for alpha mask (eraser)
 
     // Image Editing
+    fit?: 'cover' | 'contain' | 'fill'; // Object fit mode
     adjustments?: Adjustments;
     filter?: string; // Filter ID
     filterIntensity?: number; // 0 to 100
@@ -480,7 +519,7 @@ export interface Track {
 }
 
 // Helper to generate CSS filter string for Adjustments ONLY
-export const getAdjustmentStyle = (item: TimelineItem) => {
+export const getAdjustmentStyle = (item: TimelineItem, scale: number = 1) => {
     const adj = item.adjustments || DEFAULT_ADJUSTMENTS;
 
     const filters: string[] = [];
@@ -521,7 +560,7 @@ export const getAdjustmentStyle = (item: TimelineItem) => {
     if (adj.tint !== 0) filters.push(`hue-rotate(${adj.tint}deg)`);
 
     // Texture (Approximation)
-    if (adj.sharpness < 0) filters.push(`blur(${-adj.sharpness * 0.05}px)`);
+    if (adj.sharpness < 0) filters.push(`blur(${-adj.sharpness * 0.05 * scale}px)`);
 
     return filters.join(' ');
 };
@@ -543,14 +582,14 @@ export const getComputedFilterStyle = (item: TimelineItem) => {
 }
 
 // Helper to generate CSS for Text Effects
-export const getTextEffectStyle = (effect: TextEffect, itemColor?: string): React.CSSProperties => {
+export const getTextEffectStyle = (effect: TextEffect, itemColor: string = '#000000', scale: number = 1): React.CSSProperties => {
     if (!effect || effect.type === 'none') return {};
 
     const { type, color = '#000000', intensity = 50, offset = 50 } = effect;
     const effColor = color;
 
-    const dist = (offset / 100) * 20; // 0 to 20px
-    const blur = (intensity / 100) * 20; // 0 to 20px
+    const dist = (offset / 100) * 20 * scale; // 0 to 20px * scale
+    const blur = (intensity / 100) * 20 * scale; // 0 to 20px * scale
 
     const shadowX = dist;
     const shadowY = dist;
@@ -559,21 +598,21 @@ export const getTextEffectStyle = (effect: TextEffect, itemColor?: string): Reac
         case 'shadow':
             return { textShadow: `${shadowX}px ${shadowY}px ${blur}px ${effColor}` };
         case 'lift':
-            return { textShadow: `0px ${dist * 0.5 + 4}px ${blur + 10}px rgba(0,0,0,0.5)` };
+            return { textShadow: `0px ${dist * 0.5 + 4 * scale}px ${blur + 10 * scale}px rgba(0,0,0,0.5)` };
         case 'hollow':
             return {
-                WebkitTextStroke: `${(intensity / 100) * 3 + 1}px ${itemColor}`,
+                WebkitTextStroke: `${((intensity / 100) * 3 + 1) * scale}px ${itemColor}`,
                 color: 'transparent'
             };
         case 'splice':
             return {
-                WebkitTextStroke: `${(intensity / 100) * 3 + 1}px ${itemColor}`,
+                WebkitTextStroke: `${((intensity / 100) * 3 + 1) * scale}px ${itemColor}`,
                 color: 'transparent',
-                textShadow: `${shadowX + 2}px ${shadowY + 2}px 0px ${effColor}`
+                textShadow: `${shadowX + 2 * scale}px ${shadowY + 2 * scale}px 0px ${effColor}`
             };
         case 'outline':
             return {
-                WebkitTextStroke: `${(intensity / 100) * 3 + 1}px ${effColor}`,
+                WebkitTextStroke: `${((intensity / 100) * 3 + 1) * scale}px ${effColor}`,
                 color: itemColor
             };
         case 'echo':
@@ -585,7 +624,7 @@ export const getTextEffectStyle = (effect: TextEffect, itemColor?: string): Reac
                 `
             };
         case 'glitch':
-            const gOff = (offset / 100) * 5 + 2;
+            const gOff = ((offset / 100) * 5 + 2) * scale;
             return {
                 textShadow: `
                     ${-gOff}px ${-gOff}px 0px #00ffff,
@@ -595,16 +634,16 @@ export const getTextEffectStyle = (effect: TextEffect, itemColor?: string): Reac
         case 'neon':
             return {
                 textShadow: `
-                    0 0 ${intensity * 0.1}px ${effColor},
-                    0 0 ${intensity * 0.2}px ${effColor},
-                    0 0 ${intensity * 0.4}px ${effColor}
+                    0 0 ${intensity * 0.1 * scale}px ${effColor},
+                    0 0 ${intensity * 0.2 * scale}px ${effColor},
+                    0 0 ${intensity * 0.4 * scale}px ${effColor}
                 `,
                 color: itemColor || '#ffffff'
             };
         case 'background':
             return {
                 backgroundColor: effColor,
-                padding: '4px 8px',
+                padding: `${4 * scale}px ${8 * scale}px`,
                 boxDecorationBreak: 'clone',
                 WebkitBoxDecorationBreak: 'clone'
             };
@@ -656,7 +695,121 @@ export const MOCK_AUDIO = [
     { id: 'a4', src: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg', name: 'Digital Alarm', duration: '0:06', category: 'Effects' },
 ];
 
+export const MOCK_TEXT_STYLES = [
+    { id: 'ts1', preview: 'Heading', fontSize: 60, fontWeight: 'bold' },
+    { id: 'ts2', preview: 'Subheading', fontSize: 40, fontWeight: 'bold' },
+    { id: 'ts3', preview: 'Body Text', fontSize: 24, fontWeight: 'normal' },
+    { id: 'ts4', preview: 'Caption', fontSize: 18, fontWeight: 'normal' },
+];
+
 export const MOCK_PROJECTS: Project[] = [
     { id: 'p1', name: 'Summer Vacation Reel', lastModified: '2 mins ago', thumbnail: 'https://picsum.photos/100/100?random=10' },
     { id: 'p2', name: 'Q3 Marketing Promo', lastModified: 'Yesterday', thumbnail: 'https://picsum.photos/100/100?random=11' },
+];
+
+export const DEFAULT_DOCUMENT_COLORS = [
+    '#ffffff', '#000000', '#ef4444', '#22c55e', '#3b82f6',
+    '#eab308', '#a855f7', '#ec4899', '#9ca3af', '#4b5563'
+];
+
+export const GRADIENT_COLORS = [
+    'linear-gradient(to right, #ff7e5f, #feb47b)',
+    'linear-gradient(to right, #6a11cb, #2575fc)',
+    'linear-gradient(to right, #ffecd2, #fcb69f)',
+    'linear-gradient(to right, #00c6ff, #0072ff)',
+    'linear-gradient(to right, #f093fb, #f5576c)'
+];
+
+export const ANIMATION_CATEGORIES = [
+    'Basic', 'Bounce', 'Rotation', 'Slide', 'Fade', 'Blur', 'Creative', 'Flip', 'Fly', 'Stretch', 'Zoom'
+];
+export const ANIMATIONS: AnimationDefinition[] = [
+    // ✅ BASIC
+    { id: 'fade-in', name: 'Fade In', category: 'Basic', icon: React.createElement(Eye, { size: 16 }) },
+    { id: 'boom', name: 'Boom', category: 'Basic', icon: React.createElement(Maximize, { size: 16 }) },
+
+    // ✅ BOUNCE
+    { id: 'bounce-left', name: 'Bounce Left', category: 'Bounce', icon: React.createElement(ArrowRight, { size: 16 }) },
+    { id: 'bounce-right', name: 'Bounce Right', category: 'Bounce', icon: React.createElement(ArrowLeft, { size: 16 }) },
+    { id: 'bounce-up', name: 'Bounce Up', category: 'Bounce', icon: React.createElement(ArrowUp, { size: 16 }) },
+    { id: 'bounce-down', name: 'Bounce Down', category: 'Bounce', icon: React.createElement(ArrowDown, { size: 16 }) },
+
+    // ✅ ROTATION
+    { id: 'rotate-cw-1', name: 'Rotate CW', category: 'Rotation', icon: React.createElement(RotateCw, { size: 16 }) },
+    { id: 'rotate-ccw', name: 'Rotate CCW', category: 'Rotation', icon: React.createElement(RotateCw, { size: 16, className: "-scale-x-100" }) },
+    { id: 'spin-open', name: 'Spin Open', category: 'Rotation', icon: React.createElement(Disc, { size: 16 }) },
+    { id: 'spin-1', name: 'Spin 1', category: 'Rotation', icon: React.createElement(RefreshCw, { size: 16 }) },
+
+    // ✅ SLIDE
+    { id: 'slide-down-up-1', name: 'Slide Up', category: 'Slide', icon: React.createElement(ArrowUp, { size: 16 }) },
+    { id: 'move-left', name: 'Move Left', category: 'Slide', icon: React.createElement(ChevronsLeft, { size: 16 }) },
+    { id: 'move-right', name: 'Move Right', category: 'Slide', icon: React.createElement(ChevronsRight, { size: 16 }) },
+    { id: 'move-top', name: 'Move Top', category: 'Slide', icon: React.createElement(ChevronsUp, { size: 16 }) },
+    { id: 'move-bottom', name: 'Move Bottom', category: 'Slide', icon: React.createElement(ChevronsDown, { size: 16 }) },
+
+    // ✅ FADE + MOVEMENT
+    { id: 'fade-slide-left', name: 'Fade Slide Left', category: 'Fade', icon: React.createElement(MoveHorizontal, { size: 16, className: "opacity-50" }) },
+    { id: 'fade-slide-right', name: 'Fade Slide Right', category: 'Fade', icon: React.createElement(MoveHorizontal, { size: 16, className: "opacity-50 scale-x-[-1]" }) },
+    { id: 'fade-slide-up', name: 'Fade Slide Up', category: 'Fade', icon: React.createElement(MoveVertical, { size: 16, className: "opacity-50" }) },
+    { id: 'fade-slide-down', name: 'Fade Slide Down', category: 'Fade', icon: React.createElement(MoveVertical, { size: 16, className: "opacity-50 scale-y-[-1]" }) },
+    { id: 'fade-zoom-in', name: 'Fade Zoom In', category: 'Fade', icon: React.createElement(ZoomIn, { size: 16, className: "opacity-50" }) },
+    { id: 'fade-zoom-out', name: 'Fade Zoom Out', category: 'Fade', icon: React.createElement(ZoomOut, { size: 16, className: "opacity-50" }) },
+
+    // ✅ BLUR / FLASH / DISTORTION
+    { id: 'motion-blur', name: 'Motion Blur', category: 'Blur', icon: React.createElement(Wind, { size: 16 }) },
+    { id: 'blur-in', name: 'Blur In', category: 'Blur', icon: React.createElement(Droplet, { size: 16 }) },
+    { id: 'blurry-eject', name: 'Blurry Eject', category: 'Blur', icon: React.createElement(Activity, { size: 16 }) },
+    { id: 'flash-drop', name: 'Flash Drop', category: 'Blur', icon: React.createElement(Zap, { size: 16 }) },
+    { id: 'flash-open', name: 'Flash Open', category: 'Blur', icon: React.createElement(Sun, { size: 16 }) },
+    { id: 'pulse-open', name: 'Pulse Open', category: 'Blur', icon: React.createElement(CircleDot, { size: 16 }) },
+    { id: 'screen-flicker', name: 'Screen Flicker', category: 'Blur', icon: React.createElement(Tv, { size: 16 }) },
+    { id: 'rgb-drop', name: 'RGB Drop', category: 'Blur', icon: React.createElement(Layers, { size: 16 }) },
+
+    // ✅ CREATIVE
+    { id: 'round-open', name: 'Round Open', category: 'Creative', icon: React.createElement(Circle, { size: 16 }) },
+    { id: 'expansion', name: 'Expansion', category: 'Creative', icon: React.createElement(Expand, { size: 16 }) },
+    { id: 'old-tv', name: 'Old TV', category: 'Creative', icon: React.createElement(Tv, { size: 16, className: "text-gray-400" }) },
+    { id: 'shard-roll', name: 'Shard Roll', category: 'Creative', icon: React.createElement(Triangle, { size: 16 }) },
+    { id: 'tear-paper', name: 'Tear Paper', category: 'Creative', icon: React.createElement(Scissors, { size: 16 }) },
+
+    // ✅ FLIP
+    { id: 'flip-down-1', name: 'Flip Down 1', category: 'Flip', icon: React.createElement(CornerRightDown, { size: 16 }) },
+    { id: 'flip-down-2', name: 'Flip Down 2', category: 'Flip', icon: React.createElement(CornerLeftDown, { size: 16 }) },
+    { id: 'flip-up-1', name: 'Flip Up 1', category: 'Flip', icon: React.createElement(CornerRightUp, { size: 16 }) },
+    { id: 'flip-up-2', name: 'Flip Up 2', category: 'Flip', icon: React.createElement(CornerLeftUp, { size: 16 }) },
+
+    // ✅ FLY / ROTATE / GROW
+    { id: 'fly-in-rotate', name: 'Fly In Rotate', category: 'Fly', icon: React.createElement(Send, { size: 16 }) },
+    { id: 'fly-in-flip', name: 'Fly In Flip', category: 'Fly', icon: React.createElement(Send, { size: 16, className: "-scale-x-100" }) },
+    { id: 'fly-to-zoom', name: 'Fly To Zoom', category: 'Fly', icon: React.createElement(Rocket, { size: 16 }) },
+    { id: 'grow-shrink', name: 'Grow Shrink', category: 'Fly', icon: React.createElement(Scale, { size: 16 }) },
+
+    // ✅ STRETCH
+    { id: 'stretch-in-left', name: 'Stretch Left', category: 'Stretch', icon: React.createElement(ArrowLeft, { size: 16, className: "scale-x-150" }) },
+    { id: 'stretch-in-right', name: 'Stretch Right', category: 'Stretch', icon: React.createElement(ArrowRight, { size: 16, className: "scale-x-150" }) },
+    { id: 'stretch-in-up', name: 'Stretch Up', category: 'Stretch', icon: React.createElement(ArrowUp, { size: 16, className: "scale-y-150" }) },
+    { id: 'stretch-in-down', name: 'Stretch Down', category: 'Stretch', icon: React.createElement(ArrowDown, { size: 16, className: "scale-y-150" }) },
+    { id: 'stretch-to-full', name: 'Stretch Full', category: 'Stretch', icon: React.createElement(Maximize, { size: 16, className: "scale-125" }) },
+
+    // ✅ POSITION
+    { id: 'to-left-1', name: 'To Left 1', category: 'Slide', icon: React.createElement(ArrowLeft, { size: 16 }) },
+    { id: 'to-left-2', name: 'To Left 2', category: 'Slide', icon: React.createElement(ArrowLeft, { size: 16, className: "opacity-70" }) },
+    { id: 'to-right-1', name: 'To Right 1', category: 'Slide', icon: React.createElement(ArrowRight, { size: 16 }) },
+    { id: 'to-right-2', name: 'To Right 2', category: 'Slide', icon: React.createElement(ArrowRight, { size: 16, className: "opacity-70" }) },
+    { id: 'up-down-1', name: 'Up Down 1', category: 'Slide', icon: React.createElement(MoveVertical, { size: 16 }) },
+    { id: 'up-down-2', name: 'Up Down 2', category: 'Slide', icon: React.createElement(MoveVertical, { size: 16, className: "opacity-70" }) },
+
+    // ✅ ZOOM
+    { id: 'tiny-zoom', name: 'Tiny Zoom', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "scale-75" }) },
+    { id: 'zoom-in-center', name: 'Zoom Center', category: 'Zoom', icon: React.createElement(Focus, { size: 16 }) },
+    { id: 'zoom-in-left', name: 'Zoom Left', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-left" }) },
+    { id: 'zoom-in-right', name: 'Zoom Right', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-right" }) },
+    { id: 'zoom-in-top', name: 'Zoom Top', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-top" }) },
+    { id: 'zoom-in-bottom', name: 'Zoom Bottom', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-bottom" }) },
+    { id: 'zoom-in-1', name: 'Zoom In 1', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16 }) },
+    { id: 'zoom-in-2', name: 'Zoom In 2', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "scale-125" }) },
+    { id: 'zoom-out-1', name: 'Zoom Out 1', category: 'Zoom', icon: React.createElement(ZoomOut, { size: 16 }) },
+    { id: 'zoom-out-2', name: 'Zoom Out 2', category: 'Zoom', icon: React.createElement(ZoomOut, { size: 16, className: "scale-125" }) },
+    { id: 'zoom-out-3', name: 'Zoom Out 3', category: 'Zoom', icon: React.createElement(Minimize, { size: 16 }) },
+    { id: 'wham', name: 'Wham', category: 'Zoom', icon: React.createElement(Target, { size: 16 }) },
 ];

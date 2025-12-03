@@ -34,7 +34,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
         console.log(logEntry);
-        
+
         // Add to state so it's visible on page
         setDebugLogs(prev => {
           const newLogs = [...prev, logEntry];
@@ -43,7 +43,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           debugLogsRef.current = trimmed; // Update ref too
           return trimmed;
         });
-        
+
         try {
           const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';
           const logs = JSON.parse(existingLogs);
@@ -58,9 +58,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
 
       try {
         // Detect if we're in development (localhost with different ports)
-        const isDev = typeof window !== 'undefined' && 
+        const isDev = typeof window !== 'undefined' &&
           (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-        
+
         logDebug('[AuthGuard] Starting auth check', {
           hostname: window.location.hostname,
           href: window.location.href,
@@ -129,7 +129,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
             // API check failed (connection refused, etc.) - in dev we allow access
             logDebug('[AuthGuard] Dev mode: API check failed', { error: String(apiError) });
           }
-          
+
           // API check failed (likely no cookie on this port), but in dev we allow access
           // User is already logged in on main project, so allow canvas access
           logDebug('[AuthGuard] Dev mode: Allowing access for development');
@@ -140,12 +140,12 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           // Production: Try API check first (even without cookie, in case cookie is on different subdomain)
           // The API will return 401 if no valid session, but we should still try
           logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain)');
-          
+
           try {
             logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API)');
             const isValid = await checkAuthStatus();
             logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
-            
+
             if (isValid) {
               // Fetch user info
               const user = await getCurrentUser();
@@ -167,7 +167,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
             });
             // Continue to redirect
           }
-          
+
           // Also check for cookie locally (for logging)
           const hasCookie = isAuthenticated();
           
@@ -190,25 +190,25 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               '5. If domain is www.wildmindai.com (no dot), COOKIE_DOMAIN env var is not set'
             ]
           });
-          
+
           if (!hasCookie) {
             logDebug('[AuthGuard] Prod mode: No cookie found locally - will redirect');
           }
         }
 
         // Not authenticated - redirect to main project signup/login page
-        const isProd = typeof window !== 'undefined' && 
-          (window.location.hostname === 'wildmindai.com' || 
-           window.location.hostname === 'www.wildmindai.com' ||
-           window.location.hostname === 'studio.wildmindai.com');
-        
-        const mainProjectUrl = isProd 
+        const isProd = typeof window !== 'undefined' &&
+          (window.location.hostname === 'wildmindai.com' ||
+            window.location.hostname === 'www.wildmindai.com' ||
+            window.location.hostname === 'studio.wildmindai.com');
+
+        const mainProjectUrl = isProd
           ? 'https://www.wildmindai.com/view/signup'
           : 'http://localhost:3000/view/signup';
-        
+
         // Redirect with return URL so user can come back after login
         const returnUrl = encodeURIComponent(window.location.href);
-        
+
         // Collect key debug info to pass in URL
         // Read current logs from ref (avoids dependency issue)
         const currentLogs = debugLogsRef.current;
@@ -219,18 +219,18 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           cookieCount: document.cookie.split(';').filter(c => c.trim()).length,
           lastLog: currentLogs[currentLogs.length - 1] || 'none'
         };
-        
+
         logDebug('[AuthGuard] NOT AUTHENTICATED - Will redirect to signup', {
           mainProjectUrl,
           returnUrl,
           reason: 'No valid session found',
           debugInfo
         });
-        
+
         // Add longer delay to allow logs to be read (10 seconds)
         logDebug('[AuthGuard] Waiting 10 seconds before redirect - check debug panel below');
         await new Promise(resolve => setTimeout(resolve, 10000));
-        
+
         logDebug('[AuthGuard] Executing redirect now');
         // Encode debug info in URL so it can be read on redirect page
         const debugParam = encodeURIComponent(JSON.stringify(debugInfo));
@@ -250,29 +250,29 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
             // Ignore localStorage errors
           }
         };
-        
+
         logDebug('[AuthGuard] Auth check threw error', {
           error: String(error),
           errorName: (error as Error)?.name,
           errorMessage: (error as Error)?.message,
           stack: (error as Error)?.stack
         });
-        
+
         // On error, redirect to signup page
-        const isProd = typeof window !== 'undefined' && 
-          (window.location.hostname === 'wildmindai.com' || 
-           window.location.hostname === 'www.wildmindai.com' ||
-           window.location.hostname === 'studio.wildmindai.com');
-        
-        const mainProjectUrl = isProd 
+        const isProd = typeof window !== 'undefined' &&
+          (window.location.hostname === 'wildmindai.com' ||
+            window.location.hostname === 'www.wildmindai.com' ||
+            window.location.hostname === 'studio.wildmindai.com');
+
+        const mainProjectUrl = isProd
           ? 'https://www.wildmindai.com/view/signup'
           : 'http://localhost:3000/view/signup';
-        
+
         logDebug('[AuthGuard] Redirecting due to error', { mainProjectUrl });
-        
+
         // Add delay to allow logs to be saved
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         window.location.href = mainProjectUrl;
       }
     };
@@ -303,7 +303,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-sm text-gray-500">Redirecting in 10 seconds... Check debug logs below</p>
           </div>
-          
+
           {/* Debug Panel - Visible on page */}
           <div className="bg-gray-900 text-green-400 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
             <h3 className="text-lg font-bold mb-2 text-white">Debug Logs (Last 30 entries):</h3>
@@ -319,7 +319,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               )}
             </div>
           </div>
-          
+
           {/* Copy logs button */}
           <button
             onClick={() => {

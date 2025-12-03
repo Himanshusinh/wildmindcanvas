@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Check, RotateCw } from 'lucide-react';
-import { TimelineItem, Track, CanvasDimension, Transition } from '../types';
+import { CanvasDimension, Track, TimelineItem, Transition, getAdjustmentStyle, getPresetFilterStyle, BorderStyle, FONTS, getTextEffectStyle } from '../types';
+import { Edit, Eraser, Scissors, Trash2, Crop, FlipHorizontal, FlipVertical, Droplets, Check, X, PaintBucket, Copy, CopyPlus, Lock, MoreHorizontal, Clipboard, ImageIcon, ImageMinus, MessageSquare, AlignCenter, AlignLeft, AlignRight, AlignJustify, AlignStartVertical, AlignEndVertical, AlignCenterVertical, RotateCw, MessageSquarePlus, Unlock, Sparkles, PlayCircle, Palette, Square, Circle, Minus, ChevronRight, ChevronLeft, Plus, Type, List, ListOrdered, Bold, Italic, Underline, Strikethrough, CaseUpper, Wand2 } from 'lucide-react';
 
 interface CanvasProps {
     dimension: CanvasDimension;
@@ -30,89 +30,353 @@ interface CanvasProps {
     onAlign: (trackId: string, itemId: string, align: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
     scalePercent: number;
     setScalePercent: (scale: number) => void;
+    className?: string;
+}
+
+const PRESET_COLORS = [
+    'transparent', '#ffffff', '#000000', '#ef4444', '#f97316', '#f59e0b',
+    '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6',
+    '#d946ef', '#f43f5e', '#71717a'
+];
+
+const MAX_RENDER_WIDTH = 1920;
+
+interface RenderItem {
+    item: TimelineItem;
+    role: 'main' | 'outgoing';
+    opacity?: number;
+    transition?: Transition;
+    transitionProgress?: number;
+    zIndexBase: number;
+    isBuffered?: boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
-    dimension, tracks, currentTime, isPlaying, previewTransition, previewTargetId, selectedItemId,
+    dimension, tracks, currentTime, isPlaying,
+    previewTransition, previewTargetId, selectedItemId,
     interactionMode, setInteractionMode, eraserSettings,
-    onSelectClip, onUpdateClip, onDeleteClip, onSplitClip, onOpenEditPanel, onOpenColorPanel,
+    onSelectClip, onUpdateClip, onDeleteClip, onSplitClip,
+    onOpenEditPanel, onOpenColorPanel,
     onCopy, onPaste, onDuplicate, onLock, onDetach, onAlign,
-    scalePercent, setScalePercent
+    scalePercent, setScalePercent, className
 }) => {
-    const canvasWrapperRef = useRef<HTMLDivElement>(null);
-    const mediaRefs = useRef<{ [key: string]: HTMLMediaElement | null }>({});
-    const [currentScale, setCurrentScale] = useState(1);
 
-    // Interaction State
-    const [isDraggingItem, setIsDraggingItem] = useState(false);
-    const [isResizing, setIsResizing] = useState(false);
-    const [isRotating, setIsRotating] = useState(false);
-    const [isDrawing, setIsDrawing] = useState(false); // For eraser
-    const dragStartRef = useRef<{ x: number, y: number } | null>(null);
-    const itemStartPosRef = useRef<{ x: number, y: number, width: number, height: number, rotation: number } | null>(null);
-    const resizeStartRef = useRef<{ x: number, y: number, direction: string } | null>(null);
-    const rotateCenterRef = useRef<{ x: number, y: number } | null>(null);
+    const [previewProgress, setPreviewProgress] = useState(0.5);
+
+    // Performance: Calculate render scale
+    // If project is 8K (7680px), renderScale will be 0.25 (1920/7680)
+    // The internal DOM will be 1920px wide, but displayed at full size via CSS transform
+    const renderScale = Math.min(1, MAX_RENDER_WIDTH / dimension.width);
+    const renderWidth = dimension.width * renderScale;
+    const renderHeight = dimension.height * renderScale;
+
+
+    // Crop State
+    const [cropState, setCropState] = useState<{ x: number, y: number, zoom: number }>({ x: 50, y: 50, zoom: 1 });
 
     // Text Editing State
     const [isEditingText, setIsEditingText] = useState(false);
-    const textInputRef = useRef<HTMLDivElement>(null);
+    const textInputRef = useRef<HTMLDivElement>(null); // Can be div, ul, or ol
 
     // Eraser State
     const eraserCanvasRef = useRef<HTMLCanvasElement>(null);
     const compositeCanvasRef = useRef<HTMLCanvasElement>(null);
+    const originalImageRef = useRef<HTMLImageElement | HTMLVideoElement | null>(null);
+    const [isDrawing, setIsDrawing] = useState(false);
     const [cursorPos, setCursorPos] = useState<{ x: number, y: number } | null>(null);
 
-    // Crop State
-    const [cropState, setCropState] = useState({ zoom: 1, x: 0, y: 0 });
+    // Drag State for Overlay Items
+    const [isDraggingItem, setIsDraggingItem] = useState(false);
+    const dragStartRef = useRef<{ x: number, y: number } | null>(null);
+    const itemStartPosRef = useRef<{ x: number, y: number } | null>(null);
 
-    // Auto-fit canvas to container on mount/resize
+    // Resize State
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeStartRef = useRef<{
+        startX: number;
+        startY: number;
+        originalWidth: number;
+        originalHeight: number;
+        originalX: number;
+        originalY: number;
+        rotation: number;
+        handle: string;
+    } | null>(null);
+
+    // Rotate State
+    const [isRotating, setIsRotating] = useState(false);
+    const rotateCenterRef = useRef<{ cx: number, cy: number } | null>(null);
+
+    // Refs for media elements
+    const mediaRefs = useRef<{ [key: string]: HTMLMediaElement | HTMLImageElement | null }>({});
+    const mainCanvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Refs for toolbars
+    const topToolbarRef = useRef<HTMLDivElement>(null);
+    const bottomToolbarRef = useRef<HTMLDivElement>(null);
+    const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close popups on outside click (checking all toolbars)
     useEffect(() => {
-        const updateScale = () => {
-            if (canvasWrapperRef.current && canvasWrapperRef.current.parentElement) {
-                const parent = canvasWrapperRef.current.parentElement;
-                const parentW = parent.clientWidth - 64; // Padding
-                const parentH = parent.clientHeight - 64;
-                const scaleW = parentW / dimension.width;
-                const scaleH = parentH / dimension.height;
-                // Use user defined scalePercent as a multiplier on top of "fit" scale or just absolute?
-                // For this UI, let's say scalePercent is relative to "100% = actual pixel size"
-                // But usually we want "fit" as default.
-                // Let's make scalePercent absolute: 1 = 100%.
-                // But we also want to fit initially.
-                // For now, let's respect the passed scalePercent prop.
-                setCurrentScale(scalePercent);
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
+            const inTop = topToolbarRef.current && topToolbarRef.current.contains(target);
+            const inBottom = bottomToolbarRef.current && bottomToolbarRef.current.contains(target);
+
+            if (!inTop && !inBottom) {
+                // setActivePopup(null); // Removed
             }
         };
-        updateScale();
-        window.addEventListener('resize', updateScale);
-        return () => window.removeEventListener('resize', updateScale);
-    }, [dimension, scalePercent]);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
-    // Sync Media Playback
+    // Initialize Crop State when entering crop mode
     useEffect(() => {
-        Object.values(mediaRefs.current).forEach(media => {
-            if (media) {
-                if (Math.abs(media.currentTime - currentTime / 1000) > 0.3) {
-                    media.currentTime = currentTime / 1000;
-                }
-                if (isPlaying) {
-                    media.play().catch(() => { });
+        if (interactionMode === 'crop' && selectedItemId) {
+            const track = tracks.find(t => t.items.some(i => i.id === selectedItemId));
+            const item = track?.items.find(i => i.id === selectedItemId);
+            if (item) {
+                setCropState(item.crop || { x: 50, y: 50, zoom: 1 });
+            }
+        }
+    }, [interactionMode, selectedItemId, tracks]);
+
+    useEffect(() => {
+        if (previewTransition) {
+            const start = Date.now();
+            const dur = (previewTransition.duration || 1) * 1000;
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - start;
+                const p = (elapsed % dur) / dur;
+                setPreviewProgress(p);
+            }, 16);
+            return () => clearInterval(interval);
+        }
+    }, [previewTransition]);
+
+    // --- Eraser Helpers ---
+    const handleEraserMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
+        if (interactionMode !== 'erase') return;
+        e.stopPropagation(); e.preventDefault(); setIsDrawing(true); drawEraser(e);
+    };
+    const handleEraserMouseMove = (e: React.MouseEvent) => {
+        if (interactionMode === 'erase') {
+            setCursorPos({ x: e.clientX, y: e.clientY });
+        }
+        if (!isDrawing || interactionMode !== 'erase') return;
+        drawEraser(e);
+    };
+    const handleEraserMouseUp = (trackId: string, item: TimelineItem) => {
+        if (interactionMode !== 'erase') return;
+        if (isDrawing) {
+            setIsDrawing(false);
+            if (eraserCanvasRef.current) {
+                onUpdateClip(trackId, { ...item, maskImage: eraserCanvasRef.current.toDataURL() });
+            }
+        }
+    };
+    const drawEraser = (e: React.MouseEvent) => {
+        const maskCanvas = eraserCanvasRef.current;
+        const compositeCanvas = compositeCanvasRef.current;
+        if (!maskCanvas || !compositeCanvas) return;
+        const rect = compositeCanvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (maskCanvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (maskCanvas.height / rect.height);
+        const radius = eraserSettings.size * (maskCanvas.width / rect.width);
+        const ctx = maskCanvas.getContext('2d');
+        if (ctx) {
+            ctx.globalCompositeOperation = eraserSettings.type === 'erase' ? 'destination-out' : 'source-over';
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(x, y, radius / 2, 0, Math.PI * 2); ctx.fill();
+            updateCompositeCanvas();
+        }
+    };
+    const updateCompositeCanvas = () => {
+        const maskCanvas = eraserCanvasRef.current;
+        const compositeCanvas = compositeCanvasRef.current;
+        const sourceMedia = originalImageRef.current;
+        if (!maskCanvas || !compositeCanvas || !sourceMedia) return;
+        const ctx = compositeCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+        ctx.globalCompositeOperation = 'source-over';
+        if (sourceMedia instanceof HTMLVideoElement) ctx.drawImage(sourceMedia, 0, 0, compositeCanvas.width, compositeCanvas.height);
+        else ctx.drawImage(sourceMedia as HTMLImageElement, 0, 0, compositeCanvas.width, compositeCanvas.height);
+        if (!eraserSettings.showOriginal) {
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.drawImage(maskCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height);
+        }
+    };
+    const initializeEraserCanvas = (item: TimelineItem) => {
+        const maskCanvas = eraserCanvasRef.current;
+        if (maskCanvas && item) {
+            const ctx = maskCanvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                if (item.maskImage) {
+                    const img = new Image();
+                    img.onload = () => { ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(img, 0, 0, maskCanvas.width, maskCanvas.height); updateCompositeCanvas(); };
+                    img.src = item.maskImage;
                 } else {
-                    media.pause();
+                    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'white'; ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height); updateCompositeCanvas();
                 }
             }
-        });
-    }, [currentTime, isPlaying, tracks]);
+            if (item.type === 'image') {
+                const img = new Image(); img.crossOrigin = "anonymous";
+                img.onload = () => { originalImageRef.current = img; updateCompositeCanvas(); }; img.src = item.src;
+            } else if (item.type === 'video') {
+                const vid = document.createElement('video'); vid.crossOrigin = "anonymous"; vid.currentTime = 0;
+                vid.onloadeddata = () => { originalImageRef.current = vid; updateCompositeCanvas(); }; vid.src = item.src;
+            }
+        }
+    };
+    useEffect(() => {
+        if (interactionMode === 'erase' && selectedItemId) {
+            const timer = setTimeout(() => {
+                const track = tracks.find(t => t.items.some(i => i.id === selectedItemId));
+                const item = track?.items.find(i => i.id === selectedItemId);
+                if (item) initializeEraserCanvas(item);
+            }, 50);
+            return () => clearTimeout(timer);
+        } else { setCursorPos(null); originalImageRef.current = null; }
+    }, [interactionMode, selectedItemId]);
+    useEffect(() => { if (interactionMode === 'erase') updateCompositeCanvas(); }, [eraserSettings.showOriginal]);
 
-    // --- Helper: Get Render Items (Handle Transitions & Layers) ---
-    const getRenderItems = () => {
-        const active: { item: TimelineItem, role: 'main' | 'outgoing', opacity?: number, transition?: Transition, transitionProgress?: number, zIndexBase: number }[] = [];
+    // --- Helpers for Crop, Drag & Resize ---
+    const handleCropDrag = (e: React.MouseEvent) => {
+        if (interactionMode !== 'crop' && e.buttons !== 1) return;
+        const deltaX = e.movementX; const deltaY = e.movementY; const speed = 0.2;
+        setCropState(prev => ({ ...prev, x: Math.max(0, Math.min(100, prev.x - deltaX * speed)), y: Math.max(0, Math.min(100, prev.y - deltaY * speed)) }));
+    };
+    const saveCrop = (trackId: string, item: TimelineItem) => { onUpdateClip(trackId, { ...item, crop: cropState }); setInteractionMode('none'); };
+
+    const handleItemMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
+        e.stopPropagation();
+        onSelectClip(item.trackId, item.id);
+        if (interactionMode === 'erase') { handleEraserMouseDown(e, item); return; }
+        if (item.isLocked || item.isBackground || isResizing || isRotating || isEditingText) return;
+
+        // Handle Double Click for Text to Edit
+        if (item.type === 'text' && e.detail === 2) {
+            setIsEditingText(true);
+            setTimeout(() => {
+                if (textInputRef.current) {
+                    textInputRef.current.focus();
+                    // Place cursor at end (simplified)
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(textInputRef.current);
+                    range.collapse(false);
+                    sel?.removeAllRanges();
+                    sel?.addRange(range);
+                }
+            }, 0);
+            return;
+        }
+
+        setIsDraggingItem(true); dragStartRef.current = { x: e.clientX, y: e.clientY }; itemStartPosRef.current = { x: item.x || 0, y: item.y || 0 };
+    };
+
+    const handleItemDrag = (e: React.MouseEvent) => {
+        if (!isDraggingItem || !dragStartRef.current || !itemStartPosRef.current || !selectedItemId || isResizing || isRotating) return;
+        const currentScaleVal = scalePercent === 0 ? (Math.min((window.innerWidth - 400) / dimension.width, (window.innerHeight - 400) / dimension.height) * 0.85) : scalePercent / 100;
+        const canvasWidthPx = dimension.width * currentScaleVal; const canvasHeightPx = dimension.height * currentScaleVal;
+        const deltaX_px = e.clientX - dragStartRef.current.x; const deltaY_px = e.clientY - dragStartRef.current.y;
+        const deltaX_pct = (deltaX_px / canvasWidthPx) * 100; const deltaY_pct = (deltaY_px / canvasHeightPx) * 100;
+        const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
+        if (item && track) { onUpdateClip(track.id, { ...item, x: (itemStartPosRef.current.x + deltaX_pct), y: (itemStartPosRef.current.y + deltaY_pct) }); }
+    };
+
+    const handleResizeMouseDown = (e: React.MouseEvent, item: TimelineItem, handle: string) => {
+        e.stopPropagation(); e.preventDefault(); if (item.isLocked) return; setIsResizing(true);
+        resizeStartRef.current = { startX: e.clientX, startY: e.clientY, originalWidth: item.width || 40, originalHeight: item.height || 22.5, originalX: item.x || 0, originalY: item.y || 0, rotation: item.rotation || 0, handle };
+    };
+
+    const handleResizeDrag = (e: React.MouseEvent) => {
+        if (!isResizing || !resizeStartRef.current || !selectedItemId || !canvasWrapperRef.current) return;
+        const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
+        if (!item || !track) return;
+        const { startX, startY, originalWidth, originalHeight, originalX, originalY, rotation, handle } = resizeStartRef.current;
+        const rect = canvasWrapperRef.current.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+
+        const rawDeltaX = e.clientX - startX; const rawDeltaY = e.clientY - startY;
+        const rad = rotation * (Math.PI / 180); const cos = Math.cos(rad); const sin = Math.sin(rad);
+
+        // Project mouse movement onto item axes (in pixels)
+        const localDeltaXPixels = (rawDeltaX * cos) + (rawDeltaY * sin);
+        const localDeltaYPixels = (rawDeltaY * cos) - (rawDeltaX * sin);
+
+        // Convert local delta to percentage of canvas dimensions
+        const deltaX = (localDeltaXPixels / rect.width) * 100;
+        const deltaY = (localDeltaYPixels / rect.height) * 100;
+
+        let newW = originalWidth; let newH = originalHeight;
+        let dCenterXPixels = 0; let dCenterYPixels = 0;
+
+        // Calculate new dimensions and center shift (in pixels) based on handle
+        if (handle.includes('e')) {
+            newW = Math.max(1, originalWidth + deltaX);
+            // We use the actual change in width (converted to pixels) to determine shift
+            const actualDeltaXPixels = ((newW - originalWidth) / 100) * rect.width;
+            dCenterXPixels = actualDeltaXPixels / 2;
+        } else if (handle.includes('w')) {
+            newW = Math.max(1, originalWidth - deltaX);
+            const actualDeltaXPixels = ((newW - originalWidth) / 100) * rect.width;
+            dCenterXPixels = -actualDeltaXPixels / 2;
+        }
+
+        if (handle.includes('s')) {
+            newH = Math.max(1, originalHeight + deltaY);
+            const actualDeltaYPixels = ((newH - originalHeight) / 100) * rect.height;
+            dCenterYPixels = actualDeltaYPixels / 2;
+        } else if (handle.includes('n')) {
+            newH = Math.max(1, originalHeight - deltaY);
+            const actualDeltaYPixels = ((newH - originalHeight) / 100) * rect.height;
+            dCenterYPixels = -actualDeltaYPixels / 2;
+        }
+
+        // Rotate the center shift vector back to world space (pixels)
+        const worldShiftXPixels = dCenterXPixels * cos - dCenterYPixels * sin;
+        const worldShiftYPixels = dCenterXPixels * sin + dCenterYPixels * cos;
+
+        // Convert world shift to percentage
+        const worldShiftX = (worldShiftXPixels / rect.width) * 100;
+        const worldShiftY = (worldShiftYPixels / rect.height) * 100;
+
+        // For text, if we resize height, we might want to unset auto-height behavior or just let it clip/scroll?
+        // Usually text boxes in design tools: width changes wrapping, height changes cropping or spacing.
+        // For now, we update height. If it was auto, it will now be fixed % which is fine.
+        onUpdateClip(track.id, { ...item, width: newW, height: item.type === 'text' ? undefined : newH, x: originalX + worldShiftX, y: originalY + worldShiftY });
+    };
+
+    const handleRotateMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
+        e.stopPropagation(); e.preventDefault(); if (item.isLocked) return; setIsRotating(true);
+        if (canvasWrapperRef.current) {
+            const rect = canvasWrapperRef.current.getBoundingClientRect();
+            rotateCenterRef.current = { cx: rect.left + rect.width / 2 + ((item.x || 0) / 100 * rect.width), cy: rect.top + rect.height / 2 + ((item.y || 0) / 100 * rect.height) };
+        }
+    };
+
+    const handleRotateDrag = (e: React.MouseEvent) => {
+        if (!isRotating || !rotateCenterRef.current || !selectedItemId) return;
+        const { cx, cy } = rotateCenterRef.current;
+        const dx = e.clientX - cx; const dy = e.clientY - cy;
+        const degs = Math.atan2(dy, dx) * (180 / Math.PI);
+        const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
+        if (item && track) { onUpdateClip(track.id, { ...item, rotation: degs - 90 }); }
+    };
+
+    // --- Rendering Logic ---
+    const renderItems = React.useMemo(() => {
+        const active: RenderItem[] = [];
 
         tracks.forEach((track, trackIndex) => {
             if (track.isHidden) return;
             const zIndexBase = trackIndex * 10;
 
-            if (track.type === 'video') {
+            if (track.type === 'video' || track.type === 'overlay') {
                 const sortedItems = [...track.items].sort((a, b) => a.start - b.start);
 
                 // 1. Find the item that *should* be playing at currentTime (Main Item)
@@ -213,11 +477,257 @@ const Canvas: React.FC<CanvasProps> = ({
             }
         });
         return active;
+    }, [tracks, currentTime, previewTransition, previewTargetId]);
+
+    // --- Buffered Items (Pre-mount nearby videos) ---
+    const bufferedItems = React.useMemo(() => {
+        const buffered: RenderItem[] = [];
+        const renderedIds = new Set(renderItems.map(r => r.item.id));
+
+        tracks.forEach((track, trackIndex) => {
+            if (track.type !== 'video' || track.isHidden) return;
+            track.items.forEach(item => {
+                if (item.type !== 'video' && item.type !== 'image') return; // Only buffer heavy media
+                if (renderedIds.has(item.id)) return;
+
+                // Buffer window: 2 seconds before and 2 seconds after
+                // This keeps the DOM element mounted so it doesn't have to re-initialize
+                if (currentTime >= item.start - 2 && currentTime < item.start + item.duration + 2) {
+                    buffered.push({ item, role: 'main', zIndexBase: trackIndex * 10, isBuffered: true });
+                }
+            });
+        });
+        return buffered;
+    }, [tracks, currentTime, renderItems]);
+    // Use a ref to store the latest renderItems to avoid re-running the effect every frame
+    const latestRenderItems = useRef(renderItems);
+    latestRenderItems.current = renderItems;
+
+    // Cache for video frames to prevent black screens/flickering when decoding lags
+    const videoCacheRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
+
+    // --- Canvas Rendering Engine ---
+    useEffect(() => {
+        let animationFrameId: number;
+
+        const render = () => {
+            const canvas = mainCanvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw items
+            latestRenderItems.current.forEach(obj => {
+                const { item, role, transition, transitionProgress } = obj;
+
+                // Skip audio and text (text is DOM overlay), and animated items (rendered in DOM)
+                // Optimization: Also skip video and image as they are rendered in the DOM to avoid double-rendering and improve performance for 4K/8K
+                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation || item.type === 'video' || item.type === 'image') return;
+
+                const mediaEl = mediaRefs.current[item.id];
+                if (!mediaEl) return;
+
+                // Check if media is ready
+                if (mediaEl instanceof HTMLImageElement && !mediaEl.complete) return;
+
+                ctx.save();
+
+                // 1. Calculate Position & Size
+                const cx = (canvas.width / 2) + ((item.x || 0) / 100 * canvas.width);
+                const cy = (canvas.height / 2) + ((item.y || 0) / 100 * canvas.height);
+
+                let w = 0;
+                let h = 0;
+
+                if (item.isBackground) {
+                    // Calculate Aspect Ratio
+                    let mediaAspect = 1;
+                    if (mediaEl instanceof HTMLVideoElement) {
+                        mediaAspect = mediaEl.videoWidth / mediaEl.videoHeight;
+                    } else if (mediaEl instanceof HTMLImageElement) {
+                        mediaAspect = mediaEl.naturalWidth / mediaEl.naturalHeight;
+                    }
+
+                    const canvasAspect = canvas.width / canvas.height;
+                    const fitMode = item.fit || 'cover';
+
+                    if (fitMode === 'contain') {
+                        if (mediaAspect > canvasAspect) {
+                            w = canvas.width;
+                            h = canvas.width / mediaAspect;
+                        } else {
+                            h = canvas.height;
+                            w = canvas.height * mediaAspect;
+                        }
+                    } else if (fitMode === 'fill') {
+                        w = canvas.width;
+                        h = canvas.height;
+                    } else { // cover (default)
+                        if (mediaAspect > canvasAspect) {
+                            h = canvas.height;
+                            w = canvas.height * mediaAspect;
+                        } else {
+                            w = canvas.width;
+                            h = canvas.width / mediaAspect;
+                        }
+                    }
+                } else {
+                    if (item.width) w = (item.width / 100) * canvas.width;
+                    else w = canvas.width; // Fallback
+
+                    if (item.height) h = (item.height / 100) * canvas.height;
+                    else {
+                        if (mediaEl instanceof HTMLVideoElement) {
+                            const aspect = mediaEl.videoWidth / mediaEl.videoHeight;
+                            h = w / aspect;
+                        } else if (mediaEl instanceof HTMLImageElement) {
+                            const aspect = mediaEl.naturalWidth / mediaEl.naturalHeight;
+                            h = w / aspect;
+                        } else {
+                            h = canvas.height;
+                        }
+                    }
+                }
+
+                // 2. Apply Transformations
+                ctx.translate(cx, cy);
+                ctx.rotate((item.rotation || 0) * Math.PI / 180);
+                ctx.scale(item.flipH ? -1 : 1, item.flipV ? -1 : 1);
+                if (item.crop && item.isBackground && item.crop.zoom > 1) {
+                    ctx.scale(item.crop.zoom, item.crop.zoom);
+                }
+
+                // 3. Apply Opacity & Filter
+                ctx.globalAlpha = (item.opacity ?? 100) / 100;
+
+                let filterStr = '';
+                if (item.filter && item.filter !== 'none') {
+                    const preset = getPresetFilterStyle(item.filter);
+                    if (preset) filterStr += preset + ' ';
+                }
+                if (item.adjustments) {
+                    const adjStyle = getAdjustmentStyle(item, renderScale);
+                    if (adjStyle) filterStr += adjStyle + ' ';
+                }
+                ctx.filter = filterStr.trim();
+
+                // 4. Draw
+                try {
+                    if (mediaEl instanceof HTMLVideoElement) {
+                        // --- Video Caching Logic ---
+                        let cacheCanvas = videoCacheRefs.current.get(item.id);
+                        if (!cacheCanvas) {
+                            cacheCanvas = document.createElement('canvas');
+                            cacheCanvas.width = canvas.width;
+                            cacheCanvas.height = canvas.height;
+                            videoCacheRefs.current.set(item.id, cacheCanvas);
+                        }
+
+                        if (cacheCanvas.width !== canvas.width || cacheCanvas.height !== canvas.height) {
+                            cacheCanvas.width = canvas.width;
+                            cacheCanvas.height = canvas.height;
+                        }
+
+                        const cacheCtx = cacheCanvas.getContext('2d');
+
+                        if (mediaEl.readyState >= 2 && cacheCtx) {
+                            cacheCtx.drawImage(mediaEl, 0, 0, cacheCanvas.width, cacheCanvas.height);
+                        }
+
+                        ctx.drawImage(cacheCanvas, -w / 2, -h / 2, w, h);
+
+                    } else {
+                        ctx.drawImage(mediaEl as CanvasImageSource, -w / 2, -h / 2, w, h);
+                    }
+                } catch (e) { }
+
+                ctx.restore();
+            });
+
+            animationFrameId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [renderScale, dimension]);
+
+    // --- Playback Synchronization ---
+    // --- Playback Synchronization ---
+    useEffect(() => {
+        [...renderItems, ...bufferedItems].forEach(({ item, role, isBuffered }) => {
+            if (item.type === 'video' || item.type === 'audio') {
+                const keys = [item.id]; if (item.type === 'video') keys.push(item.id + '_filter');
+                keys.forEach(key => {
+                    const mediaEl = mediaRefs.current[key];
+                    if (mediaEl && mediaEl instanceof HTMLMediaElement) {
+                        const speed = item.speed || 1;
+                        let mediaTime = role === 'main' ? ((currentTime - item.start) * speed) + item.offset : (item.duration * speed) + item.offset + ((currentTime - (item.start + item.duration)) * speed);
+
+                        // Clamp time
+                        if (mediaTime < 0) mediaTime = 0;
+                        if (Number.isFinite(mediaEl.duration) && mediaTime > mediaEl.duration) mediaTime = mediaEl.duration;
+
+                        // Sync Current Time
+                        if (Math.abs(mediaEl.currentTime - mediaTime) > 0.2) {
+                            mediaEl.currentTime = mediaTime;
+                        }
+
+                        if (item.type === 'video' || item.type === 'audio') {
+                            mediaEl.playbackRate = speed;
+                            mediaEl.volume = (item.volume ?? 100) / 100;
+                            mediaEl.muted = (item.volume === 0);
+                        }
+
+                        // Play/Pause Logic
+                        if (isPlaying && !isBuffered) {
+                            mediaEl.play().catch(e => { });
+                        } else {
+                            mediaEl.pause();
+                        }
+                    }
+                });
+            }
+        });
+    }, [currentTime, isPlaying, renderItems, bufferedItems, interactionMode, selectedItemId]);
+
+    const fitScale = Math.min((window.innerWidth - 400) / dimension.width, (window.innerHeight - 400) / dimension.height) * 0.85;
+    const currentScale = scalePercent === 0 ? Math.max(0.2, fitScale) : scalePercent / 100;
+
+    const getItemPositionAndTransform = (item: TimelineItem) => {
+        const crop = (interactionMode === 'crop' && selectedItemId === item.id) ? cropState : (item.crop || { x: 50, y: 50, zoom: 1 });
+
+        let left: string | number | undefined = item.isBackground ? 0 : `${50 + (item.x || 0)}%`;
+        let top: string | number | undefined = item.isBackground ? 0 : `${50 + (item.y || 0)}%`;
+        let right: string | number | undefined = undefined;
+        let bottom: string | number | undefined = undefined;
+        let tx = '-50%';
+        let ty = '-50%';
+
+        if (!item.isBackground && item.type === 'text') {
+            if (item.textAlign === 'left') tx = '0%';
+            else if (item.textAlign === 'right') { tx = '0%'; left = undefined; right = `${50 - (item.x || 0)}%`; }
+
+            if (item.verticalAlign === 'top') ty = '0%';
+            else if (item.verticalAlign === 'bottom') { ty = '0%'; top = undefined; bottom = `${50 - (item.y || 0)}%`; }
+        }
+
+        const transforms = [];
+        if (!item.isBackground) transforms.push(`translate(${tx}, ${ty})`);
+        if (item.flipH) transforms.push('scaleX(-1)');
+        if (item.flipV) transforms.push('scaleY(-1)');
+        if (item.rotation) transforms.push(`rotate(${item.rotation}deg)`);
+        // REMOVED: if (crop.zoom > 1 && item.isBackground) transforms.push(`scale(${crop.zoom})`);
+
+        return {
+            style: { left, top, right, bottom },
+            transform: transforms.join(' ')
+        };
     };
 
-    const renderItems = getRenderItems();
-
-    // --- Transition Styles ---
     const getTransitionStyle = (itemObj: typeof renderItems[0]) => {
         if (!itemObj.transition || itemObj.transitionProgress === undefined) return {};
         const { type, direction } = itemObj.transition;
@@ -236,8 +746,8 @@ const Canvas: React.FC<CanvasProps> = ({
             case 'film-dissolve': return { opacity: role === 'main' ? p : 1 - p }; // Similar to dissolve but usually linear light
             case 'additive-dissolve':
                 return role === 'main'
-                    ? { opacity: p, mixBlendMode: 'plus-lighter' }
-                    : { opacity: 1 - p, mixBlendMode: 'plus-lighter' };
+                    ? { opacity: p, mixBlendMode: 'plus-lighter' as any }
+                    : { opacity: 1 - p, mixBlendMode: 'plus-lighter' as any };
             case 'dip-to-black':
                 // Fade out outgoing to black, then fade in incoming from black
                 // p: 0 -> 0.5 (fade out), 0.5 -> 1 (fade in)
@@ -278,349 +788,330 @@ const Canvas: React.FC<CanvasProps> = ({
                 return role === 'main' ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)` } : {};
 
             // --- Iris Shapes ---
-            case 'iris-round':
-                // Circular reveal
-                return role === 'main'
-                    ? { clipPath: `circle(${p * 150}% at 50% 50%)`, zIndex: 20 }
-                    : { zIndex: 10 };
             case 'iris-box':
-                // Box reveal
-                return role === 'main'
-                    ? { clipPath: `inset(${50 * (1 - p)}%)`, zIndex: 20 }
-                    : { zIndex: 10 };
+                return role === 'main' ? { clipPath: `inset(${50 * (1 - p)}%)` } : {};
+            case 'iris-round':
+            case 'circle':
+                return role === 'main' ? { clipPath: `circle(${p * 75}% at 50% 50%)` } : {};
+            case 'iris-diamond':
+                return role === 'main' ? { clipPath: `polygon(50% ${50 - 50 * p}%, ${50 + 50 * p}% 50%, 50% ${50 + 50 * p}%, ${50 - 50 * p}% 50%)` } : {};
+            case 'iris-cross':
+                // Plus shape expanding
+                const w = 20 + (80 * p); // width of arms
+                return role === 'main' ? {
+                    clipPath: `polygon(
+                    ${50 - w / 2}% 0%, ${50 + w / 2}% 0%, ${50 + w / 2}% ${50 - w / 2}%, 
+                    100% ${50 - w / 2}%, 100% ${50 + w / 2}%, ${50 + w / 2}% ${50 + w / 2}%, 
+                    ${50 + w / 2}% 100%, ${50 - w / 2}% 100%, ${50 - w / 2}% ${50 + w / 2}%, 
+                    0% ${50 + w / 2}%, 0% ${50 - w / 2}%, ${50 - w / 2}% ${50 - w / 2}%
+                )` } : {};
 
             // --- Wipes ---
+
             case 'wipe':
-                // Simple linear wipe
-                // clip-path inset(top right bottom left)
-                // right wipe: reveal from left to right -> inset(0 100%->0 0 0)
-                if (direction === 'right') return role === 'main' ? { clipPath: `inset(0 ${100 * (1 - p)}% 0 0)`, zIndex: 20 } : {};
-                if (direction === 'left') return role === 'main' ? { clipPath: `inset(0 0 0 ${100 * (1 - p)}%)`, zIndex: 20 } : {};
-                if (direction === 'up') return role === 'main' ? { clipPath: `inset(${100 * (1 - p)}% 0 0 0)`, zIndex: 20 } : {};
-                if (direction === 'down') return role === 'main' ? { clipPath: `inset(0 0 ${100 * (1 - p)}% 0)`, zIndex: 20 } : {};
-                return {};
-            case 'gradient-wipe':
-                // Requires mask image, simplified to dissolve for now
-                return { opacity: role === 'main' ? p : 1 - p };
+                return role === 'main' ? { clipPath: `inset(${direction === 'right' ? `0 ${100 - (p * 100)}% 0 0` : direction === 'up' ? `${100 - (p * 100)}% 0 0 0` : direction === 'down' ? `0 0 ${100 - (p * 100)}% 0` : `0 0 0 ${100 - (p * 100)}%`})` } : {};
+            case 'barn-doors':
+                return role === 'main' ? {
+                    clipPath: direction === 'up' || direction === 'down'
+                        ? `inset(${50 * (1 - p)}% 0 ${50 * (1 - p)}% 0)`
+                        : `inset(0 ${50 * (1 - p)}% 0 ${50 * (1 - p)}%)`
+                } : {};
+            case 'wedge-wipe':
+                // Radial wipe from top center
+                const angle = p * 360;
+                return role === 'main' ? { clipPath: `conic-gradient(from 0deg at 50% 50%, black ${angle}deg, transparent ${angle}deg)` } : {}; // Note: clip-path doesn't support conic-gradient directly in all browsers, usually mask-image
             case 'clock-wipe':
-                // Conic gradient clip path
-                return role === 'main'
-                    ? { clipPath: `polygon(50% 50%, 50% 0%, ${p > 0.125 ? '100% 0%,' : ''} ${p > 0.375 ? '100% 100%,' : ''} ${p > 0.625 ? '0% 100%,' : ''} ${p > 0.875 ? '0% 0%,' : ''} ${50 + 50 * Math.sin(p * Math.PI * 2)}% ${50 - 50 * Math.cos(p * Math.PI * 2)}%)`, zIndex: 20 }
-                    : {};
+            case 'radial-wipe':
+                return role === 'main' ? {
+                    WebkitMaskImage: `conic-gradient(from 0deg at 50% 50%, black ${p * 360}deg, transparent ${p * 360}deg)`,
+                    maskImage: `conic-gradient(from 0deg at 50% 50%, black ${p * 360}deg, transparent ${p * 360}deg)`
+                } : {};
+            case 'venetian-blinds':
+                return role === 'main' ? {
+                    WebkitMaskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${p * 100}%, transparent ${p * 100}%)`,
+                    maskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${p * 100}%, transparent ${p * 100}%)`,
+                    WebkitMaskSize: direction === 'up' || direction === 'down' ? '100% 10%' : '10% 100%',
+                    maskSize: direction === 'up' || direction === 'down' ? '100% 10%' : '10% 100%',
+                    WebkitMaskRepeat: 'repeat',
+                    maskRepeat: 'repeat'
+                } : {};
+            case 'checker-wipe':
+                return role === 'main' ? {
+                    WebkitMaskImage: `conic-gradient(black 90deg, transparent 90deg, transparent 180deg, black 180deg, black 270deg, transparent 270deg)`,
+                    maskImage: `conic-gradient(black 90deg, transparent 90deg, transparent 180deg, black 180deg, black 270deg, transparent 270deg)`,
+                    WebkitMaskSize: `${200 * (1.1 - p)}% ${200 * (1.1 - p)}%`, // Zooming checkerboard effect
+                    maskSize: `${200 * (1.1 - p)}% ${200 * (1.1 - p)}%`,
+                    opacity: p
+                } : {};
+            case 'zig-zag':
+                return role === 'main' ? {
+                    WebkitMaskImage: `linear-gradient(135deg, black ${p * 100}%, transparent ${p * 100}%)`,
+                    maskImage: `linear-gradient(135deg, black ${p * 100}%, transparent ${p * 100}%)`,
+                    WebkitMaskSize: '10% 100%',
+                    maskSize: '10% 100%'
+                } : {};
 
             // --- Zooms ---
+            case 'cross-zoom':
+                // Zoom in outgoing, Zoom out incoming
+                // Outgoing: 1 -> 5, opacity 1 -> 0
+                // Incoming: 0.2 -> 1, opacity 0 -> 1
+                if (role === 'outgoing') return { transform: `scale(${1 + p * 4})`, opacity: 1 - p };
+                if (role === 'main') return { transform: `scale(${0.2 + p * 0.8})`, opacity: p };
+                return {};
+
+            // --- Page ---
+            case 'page-peel':
+                // Simulated with clip path and shadow
+                return role === 'main' ? {
+                    clipPath: `polygon(0 0, ${p * 200}% 0, 0 ${p * 200}%)`,
+                    filter: 'drop-shadow(10px 10px 20px rgba(0,0,0,0.5))',
+                    zIndex: 50
+                } : {};
+
+            // --- Legacy / Others ---
+            case 'stack': return role === 'main' ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)`, boxShadow: '0 0 50px rgba(0,0,0,0.5)' } : { transform: `scale(${1 - (p * 0.05)})`, filter: `brightness(${1 - (p * 0.5)})` };
+            case 'morph-cut': return { opacity: role === 'main' ? p : 1 - p, filter: `blur(${Math.sin(p * Math.PI) * 5}px)` }; // Simple blur approximation
+
+            // --- Advanced Transitions ---
+            case 'fade-dissolve':
+                // Fade to black then to new clip
+                if (role === 'outgoing') return { opacity: p < 0.5 ? 1 - (p * 2) : 0 };
+                if (role === 'main') return { opacity: p > 0.5 ? (p - 0.5) * 2 : 0 };
+                return {};
+
+            // --- New Filmora-style Transitions ---
+
+            // Basic
+            case 'luma-dissolve':
+                // Simulated with contrast threshold
+                return role === 'main' ? { filter: `contrast(${1 + p * 2}) brightness(${p})`, opacity: p } : { filter: `contrast(${1 + (1 - p) * 2}) brightness(${1 - p})`, opacity: 1 - p };
+            case 'fade-color':
+                // Fade to white/black (using brightness for simplicity)
+                if (role === 'outgoing') return { filter: `brightness(${1 - p})`, opacity: 1 - p };
+                if (role === 'main') return { filter: `brightness(${p})`, opacity: p };
+                return {};
+
+            // Wipes & Slides
+            case 'simple-wipe':
+                return role === 'main' ? { clipPath: `inset(${direction === 'right' ? `0 ${100 - (p * 100)}% 0 0` : direction === 'up' ? `${100 - (p * 100)}% 0 0 0` : direction === 'down' ? `0 0 ${100 - (p * 100)}% 0` : `0 0 0 ${100 - (p * 100)}%`})` } : {};
+            case 'multi-panel':
+                // Split into vertical strips
+                return role === 'main' ? { clipPath: `polygon(0 0, ${p * 100}% 0, ${p * 100}% 100%, 0 100%)`, transform: `scale(${0.8 + 0.2 * p})` } : {};
+            case 'split-screen':
+                return role === 'main' ? { clipPath: `inset(0 ${50 * (1 - p)}% 0 ${50 * (1 - p)}%)` } : {};
+
+            // Zooms
             case 'zoom-in':
-                // Incoming zooms in from 0 scale
-                return role === 'main'
-                    ? { transform: `scale(${p})`, opacity: p }
-                    : { transform: `scale(${1 + p})`, opacity: 1 - p };
+                return role === 'main' ? { transform: `scale(${0.5 + 0.5 * p})`, opacity: p } : { transform: `scale(${1 + p})`, opacity: 1 - p };
             case 'zoom-out':
-                // Outgoing zooms out to 0
+                return role === 'main' ? { transform: `scale(${1.5 - 0.5 * p})`, opacity: p } : { transform: `scale(${1 - 0.5 * p})`, opacity: 1 - p };
+            case 'warp-zoom':
+                return role === 'main' ? { transform: `scale(${p})`, filter: `blur(${(1 - p) * 10}px)` } : { transform: `scale(${1 + p})`, filter: `blur(${p * 10}px)`, opacity: 1 - p };
+
+            // Spin & 3D
+            case 'spin-3d':
+                return role === 'main' ? { transform: `perspective(1000px) rotateY(${(1 - p) * -90}deg)`, opacity: p } : { transform: `perspective(1000px) rotateY(${p * 90}deg)`, opacity: 1 - p };
+            case 'cube-rotate':
+                return role === 'main' ? { transform: `perspective(1000px) rotateY(${(1 - p) * -90}deg) translateZ(50px)`, opacity: p } : { transform: `perspective(1000px) rotateY(${p * 90}deg) translateZ(50px)`, opacity: 1 - p };
+            case 'flip-3d':
+                return role === 'main' ? { transform: `perspective(1000px) rotateX(${(1 - p) * -90}deg)`, opacity: p } : { transform: `perspective(1000px) rotateX(${p * 90}deg)`, opacity: 1 - p };
+            case 'page-curl':
+                return role === 'main' ? { clipPath: `polygon(0 0, ${p * 150}% 0, 0 ${p * 150}%)`, boxShadow: '-10px 10px 20px rgba(0,0,0,0.5)', zIndex: 50 } : {};
+
+            // Shapes
+            case 'shape-circle':
+                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)` } : {};
+            case 'shape-heart':
+                // Approximate heart shape or just diamond for now
+                return role === 'main' ? { clipPath: `polygon(50% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 - 20 * p}%, 50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 - 20 * p}%)` } : {};
+            case 'shape-triangle':
+                return role === 'main' ? { clipPath: `polygon(50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 + 50 * p}%)` } : {};
+
+            // Glitch & Digital
+            case 'chromatic-aberration':
+                return role === 'main' ? { filter: `drop-shadow(${Math.sin(p * 20) * 5}px 0 0 red) drop-shadow(${Math.sin(p * 20 + 2) * -5}px 0 0 blue)`, opacity: p } : { filter: `drop-shadow(${Math.sin(p * 20) * 5}px 0 0 red) drop-shadow(${Math.sin(p * 20 + 2) * -5}px 0 0 blue)`, opacity: 1 - p };
+            case 'pixelate':
+                // Simulated with blur as pixelate requires SVG filter or canvas manipulation
+                return role === 'main' ? { filter: `blur(${(1 - p) * 20}px)`, opacity: p } : { filter: `blur(${p * 20}px)`, opacity: 1 - p };
+            case 'datamosh':
+                // Simulated with distortion
+                return role === 'main' ? { transform: `scale(${1 + Math.sin(p * 10) * 0.1}) skew(${Math.sin(p * 20) * 10}deg)`, opacity: p } : { transform: `scale(${1 + Math.sin(p * 10) * 0.1}) skew(${Math.sin(p * 20) * 10}deg)`, opacity: 1 - p };
+
+            // Light
+            case 'flash':
+                return role === 'main' ? { filter: `brightness(${1 + (1 - p) * 5})`, opacity: p } : { filter: `brightness(${1 + p * 5})`, opacity: 1 - p };
+            case 'light-leak':
+                return role === 'main' ? { filter: `sepia(${1 - p}) brightness(${1 + (1 - p)})`, opacity: p } : { filter: `sepia(${p}) brightness(${1 + p})`, opacity: 1 - p };
+
+            // Distort
+            case 'ripple':
+                return role === 'main' ? { transform: `scale(${1 + Math.sin(p * 10) * 0.05})`, filter: `blur(${Math.abs(Math.sin(p * 10)) * 5}px)` } : {};
+            case 'liquid':
+                return role === 'main' ? { filter: `contrast(1.5) blur(${(1 - p) * 10}px)`, opacity: p } : { filter: `contrast(1.5) blur(${p * 10}px)`, opacity: 1 - p };
+            case 'stretch':
+                return role === 'main' ? { transform: `scaleX(${0.1 + 0.9 * p})`, opacity: p } : { transform: `scaleX(${1 + p})`, opacity: 1 - p };
+
+            // Tile
+            case 'tile-drop':
+                return role === 'main' ? { transform: `translateY(${(1 - p) * -100}%)`, opacity: p } : {};
+            case 'mosaic-grid':
+                return role === 'main' ? { clipPath: `inset(0 0 0 0 round ${50 * (1 - p)}%)`, transform: `scale(${0.5 + 0.5 * p})` } : {};
+
+            // Blur
+            case 'speed-blur':
+                return role === 'main' ? { transform: `scale(${1.2})`, filter: `blur(${(1 - p) * 20}px)`, opacity: p } : { transform: `scale(0.8)`, filter: `blur(${p * 20}px)`, opacity: 1 - p };
+            case 'whip-pan':
+                return role === 'main' ? { transform: `translateX(${(1 - p) * 100}%)`, filter: `blur(20px)` } : { transform: `translateX(${p * -100}%)`, filter: `blur(20px)` };
+
+            // Stylized
+            case 'brush-reveal':
+                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)`, filter: `contrast(1.2) sepia(0.2)` } : {};
+            case 'ink-splash':
+                return role === 'main' ? { clipPath: `circle(${p * 100}%)`, filter: `contrast(1.5)` } : {};
+            case 'flash-zoom-in':
+                // Bright flash + Zoom In
+                if (role === 'outgoing') return { transform: `scale(${1 + p})`, opacity: 1 - p, filter: `brightness(${1 + p * 5})` };
+                if (role === 'main') return { transform: `scale(${2 - p})`, opacity: p, filter: `brightness(${1 + (1 - p) * 5})` };
+                return {};
+            case 'flash-zoom-out':
+                // Bright flash + Zoom Out
+                if (role === 'outgoing') return { transform: `scale(${1 - p * 0.5})`, opacity: 1 - p, filter: `brightness(${1 + p * 5})` };
+                if (role === 'main') return { transform: `scale(${0.5 + p * 0.5})`, opacity: p, filter: `brightness(${1 + (1 - p) * 5})` };
+                return {};
+            case 'film-roll':
+                // Vertical slide with film strip effect (simulated)
                 return role === 'main'
-                    ? { transform: `scale(${2 - p})`, opacity: p }
-                    : { transform: `scale(${1 - p})`, opacity: 1 - p };
+                    ? { transform: `translateY(${(1 - p) * 100}%)`, filter: 'sepia(0.3)' }
+                    : { transform: `translateY(${-p * 100}%)`, filter: 'sepia(0.3)' };
+
+            // --- Premiere Pro Style Transitions ---
+
+            case 'spin':
+                // Spin / Rotation
+                const rotation = role === 'outgoing' ? -p * 180 : (1 - p) * 180;
+                const scaleSpin = 1 - Math.sin(p * Math.PI) * 0.5;
+                return {
+                    transform: `rotate(${rotation}deg) scale(${scaleSpin})`,
+                    opacity: role === 'outgoing' ? 1 - p : p
+                };
+
+            case 'zoom-blur':
+                // Zoom Blur
+                const scaleBlur = role === 'outgoing' ? 1 + p * 2 : 3 - p * 2;
+                const blurAmount = Math.sin(p * Math.PI) * 10;
+                return {
+                    transform: `scale(${scaleBlur})`,
+                    filter: `blur(${blurAmount}px)`,
+                    opacity: role === 'outgoing' ? 1 - p : p
+                };
+
+            case 'film-burn':
+                // Film Burn / Light Leak
+                const burnIntensity = Math.sin(p * Math.PI);
+                return {
+                    filter: `brightness(${1 + burnIntensity * 3}) sepia(${burnIntensity * 0.5}) saturate(${1 + burnIntensity}) contrast(${1 - burnIntensity * 0.2})`,
+                    opacity: role === 'outgoing' ? 1 - p : p,
+                    transform: `scale(${1 + burnIntensity * 0.1})`
+                };
+
+            case 'glitch':
+                // Glitch (Simplified)
+                const glitchOffset = Math.random() * 10 * (Math.sin(p * Math.PI));
+                return {
+                    transform: `translate(${glitchOffset}px, ${-glitchOffset}px)`,
+                    filter: `hue-rotate(${p * 90}deg) contrast(1.5)`,
+                    opacity: role === 'outgoing' ? (p > 0.5 ? 0 : 1) : (p > 0.5 ? 1 : 0) // Hard cut
+                };
+
+            case 'rgb-split':
+                // RGB Split (Simulated with Hue Rotate)
+                return {
+                    filter: `hue-rotate(${p * 360}deg)`,
+                    transform: `scale(${1 + Math.sin(p * Math.PI) * 0.1})`,
+                    opacity: role === 'outgoing' ? 1 - p : p
+                };
+
+            case 'non-additive-dissolve':
+                // Non-Additive Dissolve (Simulated with steeper curve)
+                // In NLEs, this maps luminance. Here we just do a sharper blend.
+                return { opacity: role === 'outgoing' ? Math.pow(1 - p, 2) : Math.pow(p, 2) };
+
+            case 'smooth-wipe':
+                // Smooth Wipe (Simulated with sliding mask)
+                // Note: Real smooth wipe needs mask-image which is complex in inline styles without assets.
+                // We'll simulate with a sliding opacity gradient effect using clip-path? No, clip-path is hard edge.
+                // Let's do a slide with fade.
+                return role === 'main'
+                    ? { transform: `translateX(${(1 - p) * 50}%)`, opacity: p }
+                    : { transform: `translateX(${-p * 50}%)`, opacity: 1 - p };
+
+            case 'ripple-dissolve':
+                // Ripple Dissolve (Simulated with scale/blur/opacity)
+                return {
+                    transform: `scale(${1 + Math.sin(p * Math.PI * 4) * 0.05})`,
+                    filter: `blur(${Math.sin(p * Math.PI) * 2}px)`,
+                    opacity: role === 'outgoing' ? 1 - p : p
+                };
 
             default: return {};
         }
     };
 
-    // --- Interaction Handlers ---
+    const renderItemContent = (obj: RenderItem, isOverlayPass: boolean) => {
+        const { item, role, zIndexBase, isBuffered } = obj;
+        const transitionStyle = getTransitionStyle(obj);
+        const { style: posStyle, transform: itemTransform } = getItemPositionAndTransform(item);
 
-    const handleItemMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
-        if (interactionMode !== 'none' && interactionMode !== 'crop') return;
-        e.stopPropagation();
-        onSelectClip(item.trackId, item.id);
+        // Calculate Crop Properties
+        const crop = (interactionMode === 'crop' && selectedItemId === item.id) ? cropState : (item.crop || { x: 50, y: 50, zoom: 1 });
+        const objectPosition = `${crop.x}% ${crop.y}%`;
+        const cropTransform = crop.zoom > 1 ? `scale(${crop.zoom})` : undefined;
 
-        if (item.isBackground) return;
+        const adjustmentStyle = getAdjustmentStyle(item, renderScale);
+        const presetFilterStyle = getPresetFilterStyle(item.filter || 'none');
+        const intensity = item.filterIntensity ?? 50;
+        const vignetteOpacity = (item.adjustments?.vignette || 0) / 100;
 
-        setIsDraggingItem(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        itemStartPosRef.current = {
-            x: item.x || 0,
-            y: item.y || 0,
-            width: item.width || 0,
-            height: item.height || 0,
-            rotation: item.rotation || 0
-        };
-    };
+        // Scale pixel values for preview optimization
+        const s = (val: number) => val * renderScale;
 
-    const handleItemDrag = (e: React.MouseEvent) => {
-        if (!isDraggingItem || !dragStartRef.current || !itemStartPosRef.current || !selectedItemId) return;
-        const item = tracks.find(t => t.items.some(i => i.id === selectedItemId))?.items.find(i => i.id === selectedItemId);
-        if (!item) return;
-
-        const deltaX = (e.clientX - dragStartRef.current.x) / currentScale;
-        const deltaY = (e.clientY - dragStartRef.current.y) / currentScale;
-
-        // Convert pixel delta to percentage delta relative to canvas size
-        const percentDeltaX = (deltaX / dimension.width) * 100;
-        const percentDeltaY = (deltaY / dimension.height) * 100;
-
-        onUpdateClip(item.trackId, {
-            ...item,
-            x: itemStartPosRef.current.x + percentDeltaX,
-            y: itemStartPosRef.current.y + percentDeltaY
-        });
-    };
-
-    const handleResizeMouseDown = (e: React.MouseEvent, item: TimelineItem, direction: string) => {
-        e.stopPropagation();
-        setIsResizing(true);
-        resizeStartRef.current = { x: e.clientX, y: e.clientY, direction };
-        itemStartPosRef.current = {
-            x: item.x || 0,
-            y: item.y || 0,
-            width: item.width || (item.type === 'text' ? 0 : 50), // Default width if missing
-            height: item.height || (item.type === 'text' ? 0 : 50),
-            rotation: item.rotation || 0
-        };
-    };
-
-    const handleResizeDrag = (e: React.MouseEvent) => {
-        if (!isResizing || !resizeStartRef.current || !itemStartPosRef.current || !selectedItemId) return;
-        const item = tracks.find(t => t.items.some(i => i.id === selectedItemId))?.items.find(i => i.id === selectedItemId);
-        if (!item) return;
-
-        const deltaX = (e.clientX - resizeStartRef.current.x) / currentScale;
-        const deltaY = (e.clientY - resizeStartRef.current.y) / currentScale;
-
-        // Convert to percentage
-        const pDeltaX = (deltaX / dimension.width) * 100;
-        const pDeltaY = (deltaY / dimension.height) * 100;
-
-        let newW = itemStartPosRef.current.width;
-        let newH = itemStartPosRef.current.height;
-        let newX = itemStartPosRef.current.x;
-        let newY = itemStartPosRef.current.y;
-
-        const { direction } = resizeStartRef.current;
-
-        // Aspect Ratio Lock (Shift key usually, but let's assume locked for images/video, unlocked for shape/text box)
-        // For simplicity, free resize for now unless corner
-        // Actually, let's just do simple resizing
-
-        if (direction.includes('e')) newW += pDeltaX;
-        if (direction.includes('w')) { newW -= pDeltaX; newX += pDeltaX; }
-        if (direction.includes('s')) newH += pDeltaY;
-        if (direction.includes('n')) { newH -= pDeltaY; newY += pDeltaY; }
-
-        // Min size check
-        if (newW < 5) newW = 5;
-        if (newH < 5) newH = 5;
-
-        onUpdateClip(item.trackId, { ...item, width: newW, height: newH, x: newX, y: newY });
-    };
-
-    const handleRotateMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
-        e.stopPropagation();
-        setIsRotating(true);
-        // Calculate center relative to screen for rotation
-        const element = document.getElementById(`item-${item.id}`); // We need to add ID to elements
-        if (element) {
-            const rect = element.getBoundingClientRect();
-            rotateCenterRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        }
-    };
-
-    const handleRotateDrag = (e: React.MouseEvent) => {
-        if (!isRotating || !rotateCenterRef.current || !selectedItemId) return;
-        const item = tracks.find(t => t.items.some(i => i.id === selectedItemId))?.items.find(i => i.id === selectedItemId);
-        if (!item) return;
-
-        const deltaX = e.clientX - rotateCenterRef.current.x;
-        const deltaY = e.clientY - rotateCenterRef.current.y;
-        const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-        // Snap to 45 degrees
-        const snappedAngle = e.shiftKey ? Math.round(angle / 45) * 45 : angle;
-
-        onUpdateClip(item.trackId, { ...item, rotation: snappedAngle + 90 }); // +90 to align with handle position (bottom)
-    };
-
-    // --- Eraser Handlers ---
-    const handleEraserMouseMove = (e: React.MouseEvent) => {
-        if (interactionMode !== 'erase' || !selectedItemId) return;
-        const rect = canvasWrapperRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const x = (e.clientX - rect.left); // Relative to canvas wrapper (scaled)
-        const y = (e.clientY - rect.top);
-
-        setCursorPos({ x: e.clientX, y: e.clientY }); // Global for cursor element
-
-        if (e.buttons === 1) { // Left click held
-            const ctx = eraserCanvasRef.current?.getContext('2d');
-            if (ctx) {
-                ctx.globalCompositeOperation = eraserSettings.type === 'erase' ? 'destination-out' : 'source-over';
-                ctx.beginPath();
-                ctx.arc(x / currentScale, y / currentScale, eraserSettings.size / 2, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0,0,0,1)';
-                ctx.fill();
-                setIsDrawing(true);
-            }
-        }
-    };
-
-    const handleEraserMouseUp = (trackId: string, item: TimelineItem) => {
-        if (isDrawing && eraserCanvasRef.current) {
-            const dataUrl = eraserCanvasRef.current.toDataURL();
-            onUpdateClip(trackId, { ...item, maskImage: dataUrl });
-            setIsDrawing(false);
-        }
-    };
-
-    // --- Crop Handlers ---
-    const handleCropDrag = (e: React.MouseEvent) => {
-        // Simplified pan for crop
-        if (interactionMode === 'crop') {
-            setCropState(prev => ({ ...prev, x: prev.x + e.movementX, y: prev.y + e.movementY }));
-        }
-    };
-
-    const saveCrop = (trackId: string, item: TimelineItem) => {
-        // Apply crop state to item (simplified)
-        onUpdateClip(trackId, { ...item, crop: cropState });
-        setInteractionMode('none');
-    };
-
-    // --- Render Helpers ---
-
-    const getTextEffectStyle = (effect: any, color: string) => {
-        switch (effect.type) {
-            case 'shadow': return { textShadow: `${effect.x}px ${effect.y}px ${effect.blur}px ${effect.color}` };
-            case 'outline': return { WebkitTextStroke: `${effect.width}px ${effect.color}` };
-            case 'neon': return { textShadow: `0 0 5px ${color}, 0 0 10px ${color}, 0 0 20px ${color}` };
-            case 'glitch': return { textShadow: `2px 0 red, -2px 0 blue` }; // Simplified
-            default: return {};
-        }
-    };
-
-    const renderItemContent = (itemObj: typeof renderItems[0], isOverlayPass: boolean) => {
-        const { item, role, transition, transitionProgress, zIndexBase } = itemObj;
-
-        // Calculate Position & Transform
-        const x = item.x || 0;
-        const y = item.y || 0;
-        const rotation = item.rotation || 0;
-
-        // For background items, we ignore x/y/rotation and fill the canvas
-        const posStyle: React.CSSProperties = item.isBackground
-            ? { top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }
-            : { top: `${y}%`, left: `${x}%`, width: `${item.width}%`, height: `${item.height}%` };
-
-        const transform = item.isBackground ? 'none' : `rotate(${rotation}deg)`;
-
-        // Apply Crop (Simplified: using object-position for images/video)
-        const objectPosition = item.crop ? `${50 + item.crop.x}px ${50 + item.crop.y}px` : 'center'; // Very rough approx
-
-        // Apply Filters
-        const filterStyle = item.filter ? `brightness(${100 + (item.adjustments?.brightness || 0)}%) contrast(${100 + (item.adjustments?.contrast || 0)}%) saturate(${100 + (item.adjustments?.saturation || 0)}%)` : undefined;
-        // Note: Real implementation would map filter ID to CSS filter string
-        const presetFilterStyle = item.filter ? (item.filter === 'grayscale' ? 'grayscale(100%)' : item.filter === 'sepia' ? 'sepia(100%)' : undefined) : undefined;
-        const intensity = item.filterIntensity || 100;
-
-        // Combined Filter
-        const adjustmentStyle = [
-            filterStyle,
-            presetFilterStyle ? `${presetFilterStyle} opacity(${intensity}%)` : '' // This is tricky in CSS, usually requires overlay or backdrop-filter.
-            // Simplified: Just apply adjustments for now.
-        ].filter(Boolean).join(' ');
-
-        // Apply Vignette
-        const vignetteOpacity = item.adjustments?.vignette || 0;
-
-        // Transition Styles
-        const transitionStyle = getTransitionStyle(itemObj);
-
-        // Animation Styles (CSS Keyframes - would need to inject styles or use a library like framer-motion)
-        // For now, we'll use simple inline styles or class names if defined
-        const animationStyle: React.CSSProperties = {};
+        // Animation Logic
+        let animationStyle: React.CSSProperties = {};
         if (item.animation) {
-            const { type, duration = 1000, delay = 0 } = item.animation;
-            // We would map 'type' to a CSS animation name defined in global CSS
-            // e.g. 'fade-in', 'slide-up'
-            // For this prototype, we'll assume classes exist or use a simple transform
-            if (isPlaying) {
-                // Only animate during playback
-                // We need to trigger reflow or use key to restart animation
-                // Key is already unique per item render
-                // We need to set animation properties
-                // animation: name duration easing delay fill-mode
-                // We'll use a data attribute or class and assume CSS handles it
-            }
-        }
+            const animType = item.animation.type;
+            const animDur = item.animation.duration || 1;
+            const clipDur = item.duration;
+            const timing = item.animation.timing || 'both'; // Default to both if not specified, though UI defaults to enter/both
 
-        // Apply item transform + transition transform
-        // Note: Order matters. Usually Item Transform (pos/rot) -> Transition Transform
-        // But since we use absolute positioning for x/y, transform is mostly rotation + scale
-        let itemTransform = transform;
-        if (item.type === 'text' || !item.isBackground) {
-            // Add scale if needed
-            // itemTransform += ` scale(${scale})`;
-        }
+            // We use the animation name directly as it matches the keyframes defined in index.html
+            // Note: We don't use the class anymore to allow full control over timing
 
-        if (item.animation && isPlaying) {
-            // Calculate animation progress or just apply class
-            // If we want to preview animation in editor without playing, we might need a 'hover' state or similar
-            // For now, let's just apply the class
-            if (item.animation.type === 'fade') {
-                animationStyle.animationName = 'fadeIn';
-                animationStyle.animationDuration = `${item.animation.duration}ms`;
-            }
-            // ... map other animations
-            // Let's use a helper for class names
-            // We'll assume Tailwind animate-in classes or custom ones
-            if (item.animation.type === 'fade') {
-                // animationStyle.opacity = 0; // Start hidden
-                // animationStyle.animation = `fadeIn ${item.animation.duration}ms forwards`;
-            }
-        }
-
-        // Fix for animations: We need to ensure they run when the item appears
-        // Since we mount/unmount items based on time, they will auto-play on mount.
-        // We just need to set the right CSS.
-        if (item.animation) {
-            const animDuration = item.animation.duration || 1000;
-            const isEnter = item.animation.timing === 'enter' || item.animation.timing === 'both' || !item.animation.timing;
-            const isExit = item.animation.timing === 'exit' || item.animation.timing === 'both';
-
-            // Calculate if we are in enter or exit phase relative to item start/end
-            const timeIn = currentTime - item.start;
-            const timeLeft = (item.start + item.duration) - currentTime;
-
-            if (isEnter && timeIn < animDuration / 1000) {
-                // Enter animation
-                // We can use a key to force re-render if needed, but mounting should be enough
-                animationStyle.animationName = `anim-${item.animation.type}-enter`;
-                animationStyle.animationDuration = `${animDuration}ms`;
-                animationStyle.animationFillMode = 'both';
-            } else if (isExit && timeLeft < animDuration / 1000) {
-                // Exit animation
-                animationStyle.animationName = `anim-${item.animation.type}-exit`;
-                animationStyle.animationDuration = `${animDuration}ms`;
-                animationStyle.animationFillMode = 'both';
-            } else {
-                // Static state (between enter and exit)
-                // If we have an enter animation, we want to maintain the final state (visible)
-                // If we have an exit animation, we want to maintain initial state (visible)
-                // Usually 'both' fill mode handles this if the animation is structured right.
-                // But if we are in the middle, we shouldn't be animating.
-                // We can just set no animation and ensure opacity is 1.
-                // Unless it's a continuous animation like 'pulse'.
-                if (item.animation.category === 'loop') {
-                    animationStyle.animationName = `anim-${item.animation.type}`;
-                    animationStyle.animationDuration = `${animDuration}ms`;
-                    animationStyle.animationIterationCount = 'infinite';
-                } else {
-                    // Ensure we are visible
-                    // animationStyle.opacity = 1;
-                }
-            }
-
-            // Hack for 'page' animations which are usually full transitions
-            if (item.animation.category === 'page') {
-                animationStyle.animationName = `anim-${item.animation.type}`;
-                animationStyle.animationDuration = `${animDuration}ms`;
-                animationStyle.animationFillMode = 'both, forwards';
-                animationStyle.animationTimingFunction = 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)';
+            if (timing === 'enter') {
+                animationStyle = {
+                    animationName: animType,
+                    animationDuration: `${animDur}s`,
+                    animationFillMode: 'both',
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                };
+            } else if (timing === 'exit') {
+                animationStyle = {
+                    animationName: animType,
+                    animationDuration: `${animDur}s`,
+                    animationDirection: 'reverse',
+                    animationDelay: `${Math.max(0, clipDur - animDur)}s`,
+                    animationFillMode: 'both',
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                };
+            } else if (timing === 'both') {
+                animationStyle = {
+                    animationName: `${animType}, ${animType}`,
+                    animationDuration: `${animDur}s, ${animDur}s`,
+                    animationDirection: 'normal, reverse',
+                    animationDelay: `0s, ${Math.max(0, clipDur - animDur)}s`,
+                    animationFillMode: 'both, forwards',
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)'
+                };
             }
         }
 
@@ -637,13 +1128,13 @@ const Canvas: React.FC<CanvasProps> = ({
         const isEditing = isSelected && isEditingText;
 
         const maskStyle = item.maskImage && !isErasing ? { WebkitMaskImage: `url(${item.maskImage})`, maskImage: `url(${item.maskImage})`, WebkitMaskSize: 'cover', maskSize: 'cover', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' } : {};
-        const borderStyle = item.border ? { border: `${item.border.width}px ${item.border.style} ${item.border.color}` } : {};
-        const borderRadiusStyle = item.borderRadius ? { borderRadius: `${item.borderRadius}px` } : {};
+        const borderStyle = item.border ? { border: `${s(item.border.width)}px ${item.border.style} ${item.border.color}` } : {};
+        const borderRadiusStyle = item.borderRadius ? { borderRadius: `${s(item.borderRadius)}px` } : {};
 
         // Text Specific Styles (Common for rendering and measuring)
         const textBaseStyle: React.CSSProperties = item.type === 'text' ? {
             fontFamily: item.fontFamily,
-            fontSize: `${item.fontSize}px`,
+            fontSize: `${s(item.fontSize || 40)}px`,
             fontWeight: item.fontWeight,
             fontStyle: item.fontStyle,
             textDecoration: item.textDecoration,
@@ -653,14 +1144,14 @@ const Canvas: React.FC<CanvasProps> = ({
             whiteSpace: 'pre-wrap',
             lineHeight: 1.4,
             // We add padding directly to the text container to create space from the border
-            padding: '8px',
+            padding: `${s(8)}px`,
             boxSizing: 'border-box', // Ensures border is outside content+padding
             wordBreak: 'break-word', // Ensure long words break
             overflowWrap: 'break-word', // Ensure text wraps
         } : {};
 
         const textEffectStyle: React.CSSProperties = item.type === 'text' && item.textEffect
-            ? getTextEffectStyle(item.textEffect, item.color || '#000000')
+            ? getTextEffectStyle(item.textEffect, item.color, renderScale)
             : {};
 
         const fullTextStyle = { ...textBaseStyle, ...textEffectStyle };
@@ -691,15 +1182,18 @@ const Canvas: React.FC<CanvasProps> = ({
             zIndex, inset: item.isBackground ? 0 : undefined,
             ...posStyle,
             width: item.isBackground ? '100%' : (item.width ? `${item.width}%` : 'auto'),
-            height: item.isBackground ? '100%' : (item.height ? `${item.height}%` : 'auto'),
-            transform: itemTransform, opacity: isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100,
+            height: item.isBackground ? '100%' : (item.type === 'text' ? 'auto' : (item.height ? `${item.height}%` : 'auto')),
+            transform: itemTransform, opacity: isBuffered ? 0 : (isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100),
             ...maskStyle, filter: adjustmentStyle, ...transitionStyle,
-            mixBlendMode: (transitionStyle.mixBlendMode as any)
+            mixBlendMode: (transitionStyle as any).mixBlendMode,
+            pointerEvents: isBuffered ? 'none' : 'auto'
         };
 
         if (transitionStyle.transform && itemTransform) finalStyle.transform = `${itemTransform} ${transitionStyle.transform}`;
         else if (transitionStyle.transform) finalStyle.transform = transitionStyle.transform;
         if (transitionStyle.opacity !== undefined) finalStyle.opacity = Number(transitionStyle.opacity) * (finalStyle.opacity as number);
+
+        const clipPathStyle = item.borderRadius ? { clipPath: `inset(0 round ${s(item.borderRadius)}px)` } : {};
 
         const contentJsx = (
             <div
@@ -715,30 +1209,36 @@ const Canvas: React.FC<CanvasProps> = ({
                     }
                 }}
             >
-                <div style={{ width: '100%', height: '100%', background: item.backgroundColor || 'transparent', ...borderStyle, ...borderRadiusStyle, ...animationStyle }} className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass}`}>
-                    {vignetteOpacity > 0 && <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: `radial-gradient(circle, transparent 50%, rgba(0,0,0,${vignetteOpacity}) 100%)` }}></div>}
+                <div style={{ width: '100%', height: '100%', background: 'transparent', ...animationStyle, ...borderRadiusStyle, ...clipPathStyle }} className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass}`}>
+                    {vignetteOpacity > 0 && <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: `radial-gradient(circle, transparent 50%, rgba(0,0,0,${vignetteOpacity}) 100%)`, ...borderRadiusStyle }}></div>}
                     {(!isErasing || item.type === 'text' || item.type === 'color') && (
                         <>
                             {item.type === 'video' && (
                                 <>
-                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ objectPosition: item.isBackground ? objectPosition : undefined }} playsInline crossOrigin="anonymous" />
-                                    {presetFilterStyle && <div className="absolute inset-0" style={{ opacity: intensity / 100 }}><video ref={(el) => { mediaRefs.current[item.id + '_filter'] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ filter: presetFilterStyle, objectPosition: item.isBackground ? objectPosition : undefined }} playsInline crossOrigin="anonymous" /></div>}
+                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} playsInline crossOrigin="anonymous" />
                                     {item.backgroundColor && (
-                                        <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'overlay', opacity: 0.5 }}></div>
+                                        <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
+                                    )}
+                                    {/* Border Overlay */}
+                                    {item.border && (
+                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
                                     )}
                                 </>
                             )}
                             {item.type === 'image' && (
                                 <>
-                                    <img src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ objectPosition: item.isBackground ? objectPosition : undefined }} />
-                                    {presetFilterStyle && <div className="absolute inset-0" style={{ opacity: intensity / 100 }}><img src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full object-cover' : 'w-full h-full object-cover shadow-sm'}`} style={{ filter: presetFilterStyle, objectPosition: item.isBackground ? objectPosition : undefined }} /></div>}
+                                    <img ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} />
                                     {/* Add Color Overlay for Tinting Images */}
                                     {item.backgroundColor && (
-                                        <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'overlay', opacity: 0.5 }}></div>
+                                        <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
+                                    )}
+                                    {/* Border Overlay */}
+                                    {item.border && (
+                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
                                     )}
                                 </>
                             )}
-                            {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src }}></div>}
+                            {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src, ...borderStyle, ...borderRadiusStyle }}></div>}
                             {item.type === 'text' && (
                                 isEditing ? (
                                     // Use correct tag for editing to show bullets/numbers natively
@@ -779,8 +1279,8 @@ const Canvas: React.FC<CanvasProps> = ({
                     )}
                     {isErasing && (item.type === 'image' || item.type === 'video') && (
                         <>
-                            <canvas ref={compositeCanvasRef} width={dimension.width} height={dimension.height} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition, mixBlendMode: (item.type === 'image' ? (item.opacity && item.opacity < 100 ? 'normal' : 'normal') : 'normal') as any }} />
-                            <canvas ref={eraserCanvasRef} width={dimension.width} height={dimension.height} className="absolute inset-0 hidden pointer-events-none" />
+                            <canvas ref={compositeCanvasRef} width={renderWidth} height={renderHeight} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition }} />
+                            <canvas ref={eraserCanvasRef} width={renderWidth} height={renderHeight} className="absolute inset-0 hidden pointer-events-none" />
                         </>
                     )}
                 </div>
@@ -846,9 +1346,26 @@ const Canvas: React.FC<CanvasProps> = ({
 
     const selectedItem = tracks.find(t => t.items.some(i => i.id === selectedItemId))?.items.find(i => i.id === selectedItemId) || null;
 
+    const getTopToolbarStyle = () => {
+        // Fixed position at the top of the canvas area (viewport), mimicking a main toolbar
+        return { top: '1rem', left: '50%', transform: 'translateX(-50%)' };
+    };
+
+    const getBottomToolbarStyle = () => {
+        if (!selectedItem || !canvasWrapperRef.current || selectedItem.isBackground) return {};
+        const canvasW = dimension.width * currentScale; const canvasH = dimension.height * currentScale;
+        const itemCenterX = (selectedItem.x || 0) / 100 * canvasW; const itemCenterY = (selectedItem.y || 0) / 100 * canvasH; const itemH = (selectedItem.height || 0) / 100 * canvasH;
+        const bottomOffset = itemCenterY + (itemH / 2) + 20;
+        return { top: `calc(50% + ${bottomOffset}px)`, left: `calc(50% + ${itemCenterX}px)`, transform: 'translateX(-50%)' };
+    };
+
+
+
+
+
     return (
         <div
-            className="flex-1 bg-gray-100 relative overflow-hidden flex items-center justify-center p-8"
+            className={`flex-1 relative overflow-hidden flex items-center justify-center ${className || 'bg-gray-100 p-8'}`}
             onClick={(e) => {
                 if (selectedItemId) {
                     onSelectClip('', null);
@@ -888,9 +1405,9 @@ const Canvas: React.FC<CanvasProps> = ({
                     ref={canvasWrapperRef}
                     className="bg-white shadow-2xl relative transition-transform duration-300 ease-in-out origin-center group"
                     style={{
-                        width: dimension.width,
-                        height: dimension.height,
-                        transform: `scale(${currentScale})`,
+                        width: renderWidth,
+                        height: renderHeight,
+                        transform: `scale(${currentScale / renderScale})`,
                         flexShrink: 0
                     }}
                     onClick={(e) => {
@@ -906,13 +1423,24 @@ const Canvas: React.FC<CanvasProps> = ({
                 >
                     {/* Layer 1: Content (Clipped) */}
                     <div className="absolute inset-0 overflow-hidden bg-white">
+                        <canvas
+                            ref={mainCanvasRef}
+                            width={renderWidth}
+                            height={renderHeight}
+                            className="absolute inset-0 pointer-events-none"
+                            style={{ width: '100%', height: '100%' }}
+                        />
                         {renderItems.length === 0 && (
                             <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-4xl">
                                 Empty
                             </div>
                         )}
 
+                        {/* Render Visible Items */}
                         {renderItems.filter(obj => obj.item.type !== 'audio').map((obj) => renderItemContent(obj, false))}
+
+                        {/* Render Buffered Items (Hidden but Mounted) */}
+                        {bufferedItems.map((obj) => renderItemContent(obj, false))}
 
                         {/* Cursor for Eraser - Moved outside to fixed position */}
                     </div>
@@ -975,3 +1503,4 @@ const Canvas: React.FC<CanvasProps> = ({
 };
 
 export default Canvas;
+

@@ -68,6 +68,7 @@ interface CanvasProps {
   projectId?: string | null;
   externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>;
   externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  externalVideoEditorModals?: Array<{ id: string; x: number; y: number }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
   externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
@@ -84,6 +85,10 @@ interface CanvasProps {
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistVideoModalDelete?: (id: string) => void | Promise<void>;
+  onPersistVideoEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
+  onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
+  onOpenVideoEditor?: () => void;
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
@@ -166,6 +171,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   projectId,
   externalImageModals,
   externalVideoModals,
+  externalVideoEditorModals,
   externalMusicModals,
   externalUpscaleModals,
   externalRemoveBgModals,
@@ -182,6 +188,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistVideoModalCreate,
   onPersistVideoModalMove,
   onPersistVideoModalDelete,
+  onPersistVideoEditorModalCreate,
+  onPersistVideoEditorModalMove,
+  onPersistVideoEditorModalDelete,
+  onOpenVideoEditor,
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
@@ -310,6 +320,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
   const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>>([]);
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [videoEditorModalStates, setVideoEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>>([]);
   const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
@@ -349,6 +360,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedImageModalIds, setSelectedImageModalIds] = useState<string[]>([]); // Multiple image modal selection
   const [selectedVideoModalId, setSelectedVideoModalId] = useState<string | null>(null);
   const [selectedVideoModalIds, setSelectedVideoModalIds] = useState<string[]>([]); // Multiple video modal selection
+  const [selectedVideoEditorModalId, setSelectedVideoEditorModalId] = useState<string | null>(null);
+  const [selectedVideoEditorModalIds, setSelectedVideoEditorModalIds] = useState<string[]>([]);
   const [selectedMusicModalId, setSelectedMusicModalId] = useState<string | null>(null);
   const [selectedMusicModalIds, setSelectedMusicModalIds] = useState<string[]>([]); // Multiple music modal selection
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -362,6 +375,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track last rect top-left for drag delta computation
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  useEffect(() => {
+    if (externalVideoEditorModals) {
+      setVideoEditorModalStates(externalVideoEditorModals);
+    }
+  }, [externalVideoEditorModals]);
+
   const sanitizeScriptOutput = (value?: string | null) => {
     if (!value) return '';
     let cleaned = value;
@@ -5356,6 +5376,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         textInputStates={textInputStates}
         imageModalStates={imageModalStates}
         videoModalStates={videoModalStates}
+        videoEditorModalStates={videoEditorModalStates}
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
         removeBgModalStates={removeBgModalStates}
@@ -5371,6 +5392,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedImageModalIds={selectedImageModalIds}
         selectedVideoModalId={selectedVideoModalId}
         selectedVideoModalIds={selectedVideoModalIds}
+        selectedVideoEditorModalId={selectedVideoEditorModalId}
+        selectedVideoEditorModalIds={selectedVideoEditorModalIds}
         selectedMusicModalId={selectedMusicModalId}
         selectedMusicModalIds={selectedMusicModalIds}
         selectedUpscaleModalId={selectedUpscaleModalId}
@@ -5396,6 +5419,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         setVideoModalStates={setVideoModalStates}
         setSelectedVideoModalId={setSelectedVideoModalId}
         setSelectedVideoModalIds={setSelectedVideoModalIds}
+        setVideoEditorModalStates={setVideoEditorModalStates}
+        setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
+        setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
         setMusicModalStates={setMusicModalStates}
         setSelectedMusicModalId={setSelectedMusicModalId}
         setSelectedMusicModalIds={setSelectedMusicModalIds}
@@ -5449,6 +5475,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistVideoModalCreate={onPersistVideoModalCreate}
         onPersistVideoModalMove={onPersistVideoModalMove}
         onPersistVideoModalDelete={onPersistVideoModalDelete}
+        onPersistVideoEditorModalCreate={onPersistVideoEditorModalCreate}
+        onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
+        onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
+        onOpenVideoEditor={onOpenVideoEditor}
         onPersistMusicModalCreate={onPersistMusicModalCreate}
         onPersistMusicModalMove={onPersistMusicModalMove}
         onPersistMusicModalDelete={onPersistMusicModalDelete}

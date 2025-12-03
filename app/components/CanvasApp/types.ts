@@ -37,6 +37,15 @@ export interface VideoGenerator {
   provider?: string;
 }
 
+export interface VideoEditorGenerator {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+}
+
 export interface MusicGenerator {
   id: string;
   x: number;
@@ -189,6 +198,7 @@ export interface CanvasAppState {
   images: ImageUpload[];
   imageGenerators: ImageGenerator[];
   videoGenerators: VideoGenerator[];
+  videoEditorGenerators: VideoEditorGenerator[];
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
@@ -207,6 +217,7 @@ export interface CanvasAppSetters {
   setImages: React.Dispatch<React.SetStateAction<ImageUpload[]>>;
   setImageGenerators: React.Dispatch<React.SetStateAction<ImageGenerator[]>>;
   setVideoGenerators: React.Dispatch<React.SetStateAction<VideoGenerator[]>>;
+  setVideoEditorGenerators: React.Dispatch<React.SetStateAction<VideoEditorGenerator[]>>;
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;

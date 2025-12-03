@@ -46,15 +46,15 @@ export function buildSnapshotElements(
 
   // Generators (image/video/music)
   state.imageGenerators.forEach((g) => {
-    const metaObj: any = { 
-      generatedImageUrl: g.generatedImageUrl || null, 
+    const metaObj: any = {
+      generatedImageUrl: g.generatedImageUrl || null,
       sourceImageUrl: (g as any).sourceImageUrl || null, // CRITICAL: Save sourceImageUrl to snapshot
-      frameWidth: g.frameWidth, 
-      frameHeight: g.frameHeight, 
-      model: g.model, 
-      frame: g.frame, 
-      aspectRatio: g.aspectRatio, 
-      prompt: g.prompt 
+      frameWidth: g.frameWidth,
+      frameHeight: g.frameHeight,
+      model: g.model,
+      frame: g.frame,
+      aspectRatio: g.aspectRatio,
+      prompt: g.prompt
     };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
     elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, meta: metaObj };
@@ -64,6 +64,12 @@ export function buildSnapshotElements(
     const metaObj: any = { generatedVideoUrl: g.generatedVideoUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt, taskId: (g as any).taskId, generationId: (g as any).generationId, status: (g as any).status };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
     elements[g.id] = { id: g.id, type: 'video-generator', x: g.x, y: g.y, meta: metaObj };
+  });
+
+  state.videoEditorGenerators.forEach((g) => {
+    const metaObj: any = {};
+    if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
+    elements[g.id] = { id: g.id, type: 'video-editor-trigger', x: g.x, y: g.y, meta: metaObj };
   });
 
   state.musicGenerators.forEach((g) => {
@@ -226,7 +232,7 @@ export function buildSnapshotElements(
     const characterConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-character');
     const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
     const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
-    
+
     console.log(`[buildSnapshotElements] Storyboard ${modal.id} connections:`, {
       totalConnections: storyboardConnections.length,
       characterConnections: characterConnections.length,
@@ -244,38 +250,38 @@ export function buildSnapshotElements(
           // Connection is FROM image TO storyboard, so imageId is c.from
           const imageId = characterConnections[index].from;
           let imageUrl: string | undefined = undefined;
-          
+
           // First, try to get URL from the elements we've already built (image generators are processed earlier)
           const imageElement = elements[imageId];
           if (imageElement && imageElement.type === 'image-generator') {
-            imageUrl = imageElement.meta?.generatedImageUrl || 
-                      imageElement.meta?.sourceImageUrl || 
-                      imageElement.meta?.generatedImageUrls?.[0] ||
-                      imageElement.meta?.url;
+            imageUrl = imageElement.meta?.generatedImageUrl ||
+              imageElement.meta?.sourceImageUrl ||
+              imageElement.meta?.generatedImageUrls?.[0] ||
+              imageElement.meta?.url;
           }
-          
+
           // Fallback to state if not found in elements
           if (!imageUrl) {
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             if (imageGen) {
-              imageUrl = imageGen.generatedImageUrl || 
-                        (imageGen as any)?.sourceImageUrl || 
-                        (imageGen as any)?.generatedImageUrls?.[0] ||
-                        (imageGen as any)?.url;
+              imageUrl = imageGen.generatedImageUrl ||
+                (imageGen as any)?.sourceImageUrl ||
+                (imageGen as any)?.generatedImageUrls?.[0] ||
+                (imageGen as any)?.url;
             }
           }
-          
+
           // Also try images array (uploaded images also have Zata URLs)
           if (!imageUrl) {
             const image = state.images.find(img => (img as any).elementId === imageId);
             imageUrl = image?.url || (image as any)?.firebaseUrl;
           }
-          
+
           // Also check if it's in the elements as a regular image
           if (!imageUrl && imageElement && imageElement.type === 'image') {
             imageUrl = imageElement.meta?.url;
           }
-          
+
           if (imageUrl) {
             // Store the Zata URL (url field contains the Zata publicUrl)
             characterMap[name as string] = imageUrl;
@@ -300,38 +306,38 @@ export function buildSnapshotElements(
           // Connection is FROM image TO storyboard, so imageId is c.from
           const imageId = backgroundConnections[index].from;
           let imageUrl: string | undefined = undefined;
-          
+
           // First, try to get URL from the elements we've already built (image generators are processed earlier)
           const imageElement = elements[imageId];
           if (imageElement && imageElement.type === 'image-generator') {
-            imageUrl = imageElement.meta?.generatedImageUrl || 
-                      imageElement.meta?.sourceImageUrl || 
-                      imageElement.meta?.generatedImageUrls?.[0] ||
-                      imageElement.meta?.url;
+            imageUrl = imageElement.meta?.generatedImageUrl ||
+              imageElement.meta?.sourceImageUrl ||
+              imageElement.meta?.generatedImageUrls?.[0] ||
+              imageElement.meta?.url;
           }
-          
+
           // Fallback to state if not found in elements
           if (!imageUrl) {
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             if (imageGen) {
-              imageUrl = imageGen.generatedImageUrl || 
-                        (imageGen as any)?.sourceImageUrl || 
-                        (imageGen as any)?.generatedImageUrls?.[0] ||
-                        (imageGen as any)?.url;
+              imageUrl = imageGen.generatedImageUrl ||
+                (imageGen as any)?.sourceImageUrl ||
+                (imageGen as any)?.generatedImageUrls?.[0] ||
+                (imageGen as any)?.url;
             }
           }
-          
+
           // Also try images array (uploaded images)
           if (!imageUrl) {
             const image = state.images.find(img => (img as any).elementId === imageId);
             imageUrl = image?.url || (image as any)?.firebaseUrl;
           }
-          
+
           // Also check if it's in the elements as a regular image
           if (!imageUrl && imageElement && imageElement.type === 'image') {
             imageUrl = imageElement.meta?.url;
           }
-          
+
           if (imageUrl) {
             backgroundMap[name as string] = imageUrl;
             console.log(`[buildSnapshotElements] Mapped background "${name}" to image URL: ${imageUrl.substring(0, 80)}...`);
@@ -353,16 +359,16 @@ export function buildSnapshotElements(
         const index = parseInt(indexStr, 10);
         console.log(`[buildSnapshotElements] Processing prop index ${index}, name: "${name}"`);
         console.log(`[buildSnapshotElements] propsConnections[${index}]:`, propsConnections[index]);
-        
+
         if (name && propsConnections[index]) {
           // Connection is FROM image TO storyboard, so imageId is c.from
           const imageId = propsConnections[index].from;
           console.log(`[buildSnapshotElements] Looking for image with ID: ${imageId}`);
           console.log(`[buildSnapshotElements] Available imageGenerators IDs:`, state.imageGenerators.map(g => g.id));
           console.log(`[buildSnapshotElements] Available elements keys:`, Object.keys(elements).filter(k => k.includes('image')));
-          
+
           let imageUrl: string | undefined = undefined;
-          
+
           // First, try to get URL from the elements we've already built (image generators are processed earlier)
           const imageElement = elements[imageId];
           if (imageElement) {
@@ -372,15 +378,15 @@ export function buildSnapshotElements(
               generatedImageUrl: imageElement.meta?.generatedImageUrl ? `${imageElement.meta.generatedImageUrl.substring(0, 80)}...` : 'null',
             });
             if (imageElement.type === 'image-generator') {
-              imageUrl = imageElement.meta?.generatedImageUrl || 
-                        imageElement.meta?.sourceImageUrl || 
-                        imageElement.meta?.generatedImageUrls?.[0] ||
-                        imageElement.meta?.url;
+              imageUrl = imageElement.meta?.generatedImageUrl ||
+                imageElement.meta?.sourceImageUrl ||
+                imageElement.meta?.generatedImageUrls?.[0] ||
+                imageElement.meta?.url;
             } else if (imageElement.type === 'image') {
               imageUrl = imageElement.meta?.url;
             }
           }
-          
+
           // Fallback to state if not found in elements
           if (!imageUrl) {
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
@@ -389,15 +395,15 @@ export function buildSnapshotElements(
                 id: imageGen.id,
                 generatedImageUrl: imageGen.generatedImageUrl ? `${imageGen.generatedImageUrl.substring(0, 80)}...` : 'null',
               });
-              imageUrl = imageGen.generatedImageUrl || 
-                        (imageGen as any)?.sourceImageUrl || 
-                        (imageGen as any)?.generatedImageUrls?.[0] ||
-                        (imageGen as any)?.url;
+              imageUrl = imageGen.generatedImageUrl ||
+                (imageGen as any)?.sourceImageUrl ||
+                (imageGen as any)?.generatedImageUrls?.[0] ||
+                (imageGen as any)?.url;
             } else {
               console.warn(`[buildSnapshotElements] ImageGen not found in state.imageGenerators, trying state.images`);
             }
           }
-          
+
           // Also try images array (uploaded images)
           if (!imageUrl) {
             const image = state.images.find(img => (img as any).elementId === imageId);
@@ -409,7 +415,7 @@ export function buildSnapshotElements(
             }
             imageUrl = image?.url || (image as any)?.firebaseUrl;
           }
-          
+
           if (imageUrl) {
             propsMap[name as string] = imageUrl;
             console.log(`[buildSnapshotElements] ✅ Mapped prop "${name}" to image URL: ${imageUrl.substring(0, 80)}...`);

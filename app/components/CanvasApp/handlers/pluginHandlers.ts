@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -25,6 +25,9 @@ export interface PluginHandlers {
   onPersistSceneFrameModalCreate: (modal: SceneFrameGenerator) => Promise<void>;
   onPersistSceneFrameModalMove: (id: string, updates: Partial<SceneFrameGenerator>) => Promise<void>;
   onPersistSceneFrameModalDelete: (id: string) => Promise<void>;
+  onPersistVideoEditorModalCreate: (modal: VideoEditorGenerator) => Promise<void>;
+  onPersistVideoEditorModalMove: (id: string, updates: Partial<VideoEditorGenerator>) => Promise<void>;
+  onPersistVideoEditorModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
@@ -780,6 +783,100 @@ export function createPluginHandlers(
             isExpanding: prevItem.isExpanding,
           },
         },
+      });
+    }
+  };
+
+  const onPersistVideoEditorModalCreate = async (modal: VideoEditorGenerator) => {
+    setters.setVideoEditorGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create video-editor', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'video-editor',
+        x: modal.x,
+        y: modal.y,
+      });
+    }
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'video-editor-trigger',
+            x: modal.x,
+            y: modal.y,
+            meta: {},
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistVideoEditorModalMove = async (id: string, updates: Partial<VideoEditorGenerator>) => {
+    const prev = state.videoEditorGenerators.find(m => m.id === id);
+    setters.setVideoEditorGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move video-editor', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      if ('x' in updates) structuredUpdates.x = updates.x;
+      if ('y' in updates) structuredUpdates.y = updates.y;
+
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistVideoEditorModalDelete = async (id: string) => {
+    const prevItem = state.videoEditorGenerators.find(m => m.id === id);
+    setters.setVideoEditorGenerators(prev => prev.filter(m => m.id !== id));
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete video-editor', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    await removeAndPersistConnectorsForElement(id);
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id: prevItem.id,
+              type: 'video-editor-trigger',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {},
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any,
       });
     }
   };
@@ -1663,6 +1760,9 @@ export function createPluginHandlers(
     onPersistSceneFrameModalCreate,
     onPersistSceneFrameModalMove,
     onPersistSceneFrameModalDelete,
+    onPersistVideoEditorModalCreate,
+    onPersistVideoEditorModalMove,
+    onPersistVideoEditorModalDelete,
   };
 }
 
