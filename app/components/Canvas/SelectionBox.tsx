@@ -12,7 +12,7 @@ const ARRANGE_ANIMATION_DURATION = 420;
 const BUTTON_OVERFLOW_PADDING = 72;
 
 interface SelectedComponent {
-  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal';
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
   id: number | string;
   key: string;
   width: number;
@@ -59,6 +59,46 @@ interface SelectionBoxProps {
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
+  selectedUpscaleModalIds: string[];
+  selectedRemoveBgModalIds: string[];
+  selectedEraseModalIds: string[];
+  selectedExpandModalIds: string[];
+  selectedVectorizeModalIds: string[];
+  selectedStoryboardModalIds: string[];
+  selectedScriptFrameModalIds: string[];
+  selectedSceneFrameModalIds: string[];
+  upscaleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  removeBgModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  eraseModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  vectorizeModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  storyboardModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  scriptFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
+  sceneFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
+  setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setVectorizeModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setStoryboardModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setScriptFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
+  setSceneFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
+  setSelectedUpscaleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedVectorizeModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedStoryboardModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedScriptFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedSceneFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistSceneFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -94,6 +134,46 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   onPersistMusicModalMove,
   onPersistTextModalMove,
   onImageUpdate,
+  selectedUpscaleModalIds,
+  selectedRemoveBgModalIds,
+  selectedEraseModalIds,
+  selectedExpandModalIds,
+  selectedVectorizeModalIds,
+  selectedStoryboardModalIds,
+  selectedScriptFrameModalIds,
+  selectedSceneFrameModalIds,
+  upscaleModalStates,
+  removeBgModalStates,
+  eraseModalStates,
+  expandModalStates,
+  vectorizeModalStates,
+  storyboardModalStates,
+  scriptFrameModalStates,
+  sceneFrameModalStates,
+  setUpscaleModalStates,
+  setRemoveBgModalStates,
+  setEraseModalStates,
+  setExpandModalStates,
+  setVectorizeModalStates,
+  setStoryboardModalStates,
+  setScriptFrameModalStates,
+  setSceneFrameModalStates,
+  setSelectedUpscaleModalIds,
+  setSelectedRemoveBgModalIds,
+  setSelectedEraseModalIds,
+  setSelectedExpandModalIds,
+  setSelectedVectorizeModalIds,
+  setSelectedStoryboardModalIds,
+  setSelectedScriptFrameModalIds,
+  setSelectedSceneFrameModalIds,
+  onPersistUpscaleModalMove,
+  onPersistRemoveBgModalMove,
+  onPersistEraseModalMove,
+  onPersistExpandModalMove,
+  onPersistVectorizeModalMove,
+  onPersistStoryboardModalMove,
+  onPersistScriptFrameModalMove,
+  onPersistSceneFrameModalMove,
 }) => {
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
@@ -102,6 +182,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     imageModals: Map<string, { x: number; y: number }>;
     videoModals: Map<string, { x: number; y: number }>;
     musicModals: Map<string, { x: number; y: number }>;
+    upscaleModals: Map<string, { x: number; y: number }>;
+    removeBgModals: Map<string, { x: number; y: number }>;
+    eraseModals: Map<string, { x: number; y: number }>;
+    expandModals: Map<string, { x: number; y: number }>;
+    vectorizeModals: Map<string, { x: number; y: number }>;
+    storyboardModals: Map<string, { x: number; y: number }>;
+    scriptFrameModals: Map<string, { x: number; y: number }>;
+    sceneFrameModals: Map<string, { x: number; y: number }>;
   } | null>(null);
 
   // Store original tight rect position
@@ -128,7 +216,15 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedImageModalIds.length +
     selectedVideoModalIds.length +
     selectedMusicModalIds.length +
-    selectedTextInputIds.length;
+    selectedTextInputIds.length +
+    selectedUpscaleModalIds.length +
+    selectedRemoveBgModalIds.length +
+    selectedEraseModalIds.length +
+    selectedExpandModalIds.length +
+    selectedVectorizeModalIds.length +
+    selectedStoryboardModalIds.length +
+    selectedScriptFrameModalIds.length +
+    selectedSceneFrameModalIds.length;
 
 
   // Keyboard handler for "G" key to trigger arrange
@@ -179,6 +275,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       `imgModal:${serializeStrings(selectedImageModalIds)}`,
       `vidModal:${serializeStrings(selectedVideoModalIds)}`,
       `musicModal:${serializeStrings(selectedMusicModalIds)}`,
+      `upscaleModal:${serializeStrings(selectedUpscaleModalIds)}`,
+      `removeBgModal:${serializeStrings(selectedRemoveBgModalIds)}`,
+      `eraseModal:${serializeStrings(selectedEraseModalIds)}`,
+      `expandModal:${serializeStrings(selectedExpandModalIds)}`,
+      `vectorizeModal:${serializeStrings(selectedVectorizeModalIds)}`,
+      `storyboardModal:${serializeStrings(selectedStoryboardModalIds)}`,
+      `scriptFrameModal:${serializeStrings(selectedScriptFrameModalIds)}`,
+      `sceneFrameModal:${serializeStrings(selectedSceneFrameModalIds)}`,
     ].join('|');
   };
 
@@ -255,6 +359,118 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       });
     });
 
+    selectedUpscaleModalIds.forEach((id) => {
+      const modal = upscaleModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'upscaleModal',
+        id,
+        key: `upscaleModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedRemoveBgModalIds.forEach((id) => {
+      const modal = removeBgModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'removeBgModal',
+        id,
+        key: `removeBgModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedEraseModalIds.forEach((id) => {
+      const modal = eraseModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'eraseModal',
+        id,
+        key: `eraseModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedExpandModalIds.forEach((id) => {
+      const modal = expandModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'expandModal',
+        id,
+        key: `expandModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedVectorizeModalIds.forEach((id) => {
+      const modal = vectorizeModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'vectorizeModal',
+        id,
+        key: `vectorizeModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedStoryboardModalIds.forEach((id) => {
+      const modal = storyboardModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'storyboardModal',
+        id,
+        key: `storyboardModal-${id}`,
+        width: modal.frameWidth || 400,
+        height: modal.frameHeight || 500,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedScriptFrameModalIds.forEach((id) => {
+      const modal = scriptFrameModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'scriptFrameModal',
+        id,
+        key: `scriptFrameModal-${id}`,
+        width: modal.frameWidth || 360,
+        height: modal.frameHeight || 260,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedSceneFrameModalIds.forEach((id) => {
+      const modal = sceneFrameModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'sceneFrameModal',
+        id,
+        key: `sceneFrameModal-${id}`,
+        width: modal.frameWidth || 350,
+        height: modal.frameHeight || 300,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
     return components;
   };
 
@@ -280,6 +496,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     const imageModalUpdates = new Map<string, { x: number; y: number }>();
     const videoModalUpdates = new Map<string, { x: number; y: number }>();
     const musicModalUpdates = new Map<string, { x: number; y: number }>();
+    const upscaleModalUpdates = new Map<string, { x: number; y: number }>();
+    const removeBgModalUpdates = new Map<string, { x: number; y: number }>();
+    const eraseModalUpdates = new Map<string, { x: number; y: number }>();
+    const expandModalUpdates = new Map<string, { x: number; y: number }>();
+    const vectorizeModalUpdates = new Map<string, { x: number; y: number }>();
+    const storyboardModalUpdates = new Map<string, { x: number; y: number }>();
+    const scriptFrameModalUpdates = new Map<string, { x: number; y: number }>();
+    const sceneFrameModalUpdates = new Map<string, { x: number; y: number }>();
 
     targets.forEach((target) => {
       const currentX = target.from.x + (target.to.x - target.from.x) * progress;
@@ -300,6 +524,30 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           break;
         case 'musicModal':
           musicModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'upscaleModal':
+          upscaleModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'removeBgModal':
+          removeBgModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'eraseModal':
+          eraseModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'expandModal':
+          expandModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'vectorizeModal':
+          vectorizeModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'storyboardModal':
+          storyboardModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'scriptFrameModal':
+          scriptFrameModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'sceneFrameModal':
+          sceneFrameModalUpdates.set(target.id as string, { x: currentX, y: currentY });
           break;
       }
     });
@@ -345,6 +593,78 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         })
       );
     }
+
+    if (upscaleModalUpdates.size) {
+      setUpscaleModalStates((prev) =>
+        prev.map((modal) => {
+          const update = upscaleModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (removeBgModalUpdates.size) {
+      setRemoveBgModalStates((prev) =>
+        prev.map((modal) => {
+          const update = removeBgModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (eraseModalUpdates.size) {
+      setEraseModalStates((prev) =>
+        prev.map((modal) => {
+          const update = eraseModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (expandModalUpdates.size) {
+      setExpandModalStates((prev) =>
+        prev.map((modal) => {
+          const update = expandModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (vectorizeModalUpdates.size) {
+      setVectorizeModalStates((prev) =>
+        prev.map((modal) => {
+          const update = vectorizeModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (storyboardModalUpdates.size) {
+      setStoryboardModalStates((prev) =>
+        prev.map((modal) => {
+          const update = storyboardModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (scriptFrameModalUpdates.size) {
+      setScriptFrameModalStates((prev) =>
+        prev.map((modal) => {
+          const update = scriptFrameModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
+
+    if (sceneFrameModalUpdates.size) {
+      setSceneFrameModalStates((prev) =>
+        prev.map((modal) => {
+          const update = sceneFrameModalUpdates.get(modal.id);
+          return update ? { ...modal, ...update } : modal;
+        })
+      );
+    }
   };
 
   const persistFinalPositions = (targets: ArrangeTarget[]) => {
@@ -372,6 +692,78 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         .forEach((target) => {
           Promise.resolve(
             onPersistMusicModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistUpscaleModalMove) {
+      targets
+        .filter((t) => t.type === 'upscaleModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistUpscaleModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistRemoveBgModalMove) {
+      targets
+        .filter((t) => t.type === 'removeBgModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistRemoveBgModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistEraseModalMove) {
+      targets
+        .filter((t) => t.type === 'eraseModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistEraseModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistExpandModalMove) {
+      targets
+        .filter((t) => t.type === 'expandModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistExpandModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistVectorizeModalMove) {
+      targets
+        .filter((t) => t.type === 'vectorizeModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistVectorizeModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistStoryboardModalMove) {
+      targets
+        .filter((t) => t.type === 'storyboardModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistStoryboardModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistScriptFrameModalMove) {
+      targets
+        .filter((t) => t.type === 'scriptFrameModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistScriptFrameModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+    if (onPersistSceneFrameModalMove) {
+      targets
+        .filter((t) => t.type === 'sceneFrameModal')
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistSceneFrameModalMove(target.id as string, { x: target.to.x, y: target.to.y })
           ).catch(console.error);
         });
     }
@@ -586,6 +978,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               imageModals: new Map<string, { x: number; y: number }>(),
               videoModals: new Map<string, { x: number; y: number }>(),
               musicModals: new Map<string, { x: number; y: number }>(),
+              upscaleModals: new Map<string, { x: number; y: number }>(),
+              removeBgModals: new Map<string, { x: number; y: number }>(),
+              eraseModals: new Map<string, { x: number; y: number }>(),
+              expandModals: new Map<string, { x: number; y: number }>(),
+              vectorizeModals: new Map<string, { x: number; y: number }>(),
+              storyboardModals: new Map<string, { x: number; y: number }>(),
+              scriptFrameModals: new Map<string, { x: number; y: number }>(),
+              sceneFrameModals: new Map<string, { x: number; y: number }>(),
             };
 
             // Store original image positions
@@ -625,6 +1025,70 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const modalState = musicModalStates.find(m => m.id === modalId);
               if (modalState) {
                 originalPositions.musicModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original upscale modal positions
+            selectedUpscaleModalIds.forEach(modalId => {
+              const modalState = upscaleModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.upscaleModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original remove bg modal positions
+            selectedRemoveBgModalIds.forEach(modalId => {
+              const modalState = removeBgModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.removeBgModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original erase modal positions
+            selectedEraseModalIds.forEach(modalId => {
+              const modalState = eraseModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.eraseModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original expand modal positions
+            selectedExpandModalIds.forEach(modalId => {
+              const modalState = expandModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.expandModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original vectorize modal positions
+            selectedVectorizeModalIds.forEach(modalId => {
+              const modalState = vectorizeModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.vectorizeModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original storyboard modal positions
+            selectedStoryboardModalIds.forEach(modalId => {
+              const modalState = storyboardModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.storyboardModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original script frame modal positions
+            selectedScriptFrameModalIds.forEach(modalId => {
+              const modalState = scriptFrameModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.scriptFrameModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original scene frame modal positions
+            selectedSceneFrameModalIds.forEach(modalId => {
+              const modalState = sceneFrameModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.sceneFrameModals.set(modalId, { x: modalState.x, y: modalState.y });
               }
             });
 
@@ -705,6 +1169,118 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               }
             });
 
+            // Move all selected upscale modals by delta in real-time
+            selectedUpscaleModalIds.forEach(modalId => {
+              const originalPos = originalPositions.upscaleModals.get(modalId);
+              if (originalPos) {
+                setUpscaleModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected remove bg modals by delta in real-time
+            selectedRemoveBgModalIds.forEach(modalId => {
+              const originalPos = originalPositions.removeBgModals.get(modalId);
+              if (originalPos) {
+                setRemoveBgModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected erase modals by delta in real-time
+            selectedEraseModalIds.forEach(modalId => {
+              const originalPos = originalPositions.eraseModals.get(modalId);
+              if (originalPos) {
+                setEraseModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected expand modals by delta in real-time
+            selectedExpandModalIds.forEach(modalId => {
+              const originalPos = originalPositions.expandModals.get(modalId);
+              if (originalPos) {
+                setExpandModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected vectorize modals by delta in real-time
+            selectedVectorizeModalIds.forEach(modalId => {
+              const originalPos = originalPositions.vectorizeModals.get(modalId);
+              if (originalPos) {
+                setVectorizeModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected storyboard modals by delta in real-time
+            selectedStoryboardModalIds.forEach(modalId => {
+              const originalPos = originalPositions.storyboardModals.get(modalId);
+              if (originalPos) {
+                setStoryboardModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected script frame modals by delta in real-time
+            selectedScriptFrameModalIds.forEach(modalId => {
+              const originalPos = originalPositions.scriptFrameModals.get(modalId);
+              if (originalPos) {
+                setScriptFrameModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected scene frame modals by delta in real-time
+            selectedSceneFrameModalIds.forEach(modalId => {
+              const originalPos = originalPositions.sceneFrameModals.get(modalId);
+              if (originalPos) {
+                setSceneFrameModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
             // Update tight rect position during drag so selection box moves with components
             // Calculate from original tight rect position to avoid accumulation errors
             const originalTightRect = originalTightRectRef.current;
@@ -766,6 +1342,78 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 const modalState = musicModalStates.find(m => m.id === modalId);
                 if (modalState) {
                   Promise.resolve(onPersistMusicModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for upscale modals
+            if (onPersistUpscaleModalMove) {
+              selectedUpscaleModalIds.forEach((modalId) => {
+                const modalState = upscaleModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistUpscaleModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for remove bg modals
+            if (onPersistRemoveBgModalMove) {
+              selectedRemoveBgModalIds.forEach((modalId) => {
+                const modalState = removeBgModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistRemoveBgModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for erase modals
+            if (onPersistEraseModalMove) {
+              selectedEraseModalIds.forEach((modalId) => {
+                const modalState = eraseModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistEraseModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for expand modals
+            if (onPersistExpandModalMove) {
+              selectedExpandModalIds.forEach((modalId) => {
+                const modalState = expandModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistExpandModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for vectorize modals
+            if (onPersistVectorizeModalMove) {
+              selectedVectorizeModalIds.forEach((modalId) => {
+                const modalState = vectorizeModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistVectorizeModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for storyboard modals
+            if (onPersistStoryboardModalMove) {
+              selectedStoryboardModalIds.forEach((modalId) => {
+                const modalState = storyboardModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistStoryboardModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for script frame modals
+            if (onPersistScriptFrameModalMove) {
+              selectedScriptFrameModalIds.forEach((modalId) => {
+                const modalState = scriptFrameModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistScriptFrameModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for scene frame modals
+            if (onPersistSceneFrameModalMove) {
+              selectedSceneFrameModalIds.forEach((modalId) => {
+                const modalState = sceneFrameModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistSceneFrameModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
                 }
               });
             }

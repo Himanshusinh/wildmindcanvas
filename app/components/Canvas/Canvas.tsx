@@ -3821,7 +3821,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [isSelecting, clearAllSelections]);
 
-  // Handle selection box mouse move
+  // Handle selection box mouse move - Freepik Spaces style
   useEffect(() => {
     if (!isSelecting || !selectionBox) return;
 
@@ -3845,6 +3845,161 @@ export const Canvas: React.FC<CanvasProps> = ({
         pendingUpdate = null;
       }
       rafId = null;
+    };
+
+    // Helper function to get accurate dimensions for each component type
+    // Accounts for hover states, open/closed states, and actual frame sizes
+    const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
+      switch (type) {
+        case 'image': {
+          const img = images[id as number];
+          if (!img) return { width: 0, height: 0 };
+
+          // Generation frames: 600px wide, height based on aspect ratio (min 400px)
+          // Add extra height for hover controls and UI elements
+          const baseWidth = img.width || 600;
+          const baseHeight = img.height || 400;
+
+          // For selection, add 100px to account for hover controls at bottom
+          // This ensures the selection area covers the entire component including controls
+          return { width: baseWidth, height: baseHeight + 100 };
+        }
+
+        case 'imageModal': {
+          const modal = imageModalStates.find(m => m.id === id);
+          if (!modal) return { width: 600, height: 600 };
+
+          // Image modals: 600px wide, height based on aspect ratio (min 400px)
+          // Add 100px for hover controls
+          return {
+            width: modal.frameWidth ?? 600,
+            height: (modal.frameHeight ?? 400) + 100
+          };
+        }
+
+        case 'videoModal': {
+          const modal = videoModalStates.find(m => m.id === id);
+          if (!modal) return { width: 600, height: 500 };
+
+          // Video modals: 600px wide, height based on aspect ratio (min 400px)
+          // Add 100px for hover controls
+          return {
+            width: modal.frameWidth ?? 600,
+            height: (modal.frameHeight ?? 400) + 100
+          };
+        }
+
+        case 'musicModal': {
+          const modal = musicModalStates.find(m => m.id === id);
+          if (!modal) return { width: 600, height: 400 };
+
+          // Music modals: 600px wide, 300px high (fixed)
+          // Add 100px for hover controls
+          return {
+            width: modal.frameWidth ?? 600,
+            height: (modal.frameHeight ?? 300) + 100
+          };
+        }
+
+        case 'textInput': {
+          // Text inputs: 400px min width, ~110-140px height
+          // Use conservative estimate for selection
+          return { width: 400, height: 110 };
+        }
+
+        case 'upscaleModal': {
+          const modal = upscaleModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // Upscale plugin: 400px wide when closed, 600px when open
+          // Height: 500px when closed, 600px when open (with expanded controls)
+          // Use frameWidth/frameHeight from state which reflects current open/closed state
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'removeBgModal': {
+          const modal = removeBgModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // RemoveBg plugin: similar to upscale
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'eraseModal': {
+          const modal = eraseModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // Erase plugin: similar to upscale
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'expandModal': {
+          const modal = expandModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // Expand plugin: similar to upscale
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'vectorizeModal': {
+          const modal = vectorizeModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // Vectorize plugin: similar to upscale
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'storyboardModal': {
+          const modal = storyboardModalStates.find(m => m.id === id);
+          if (!modal) return { width: 400, height: 500 };
+
+          // Storyboard plugin: 400px wide, 500px high
+          return {
+            width: modal.frameWidth ?? 400,
+            height: modal.frameHeight ?? 500
+          };
+        }
+
+        case 'scriptFrameModal': {
+          const modal = scriptFrameModalStates.find(m => m.id === id);
+          if (!modal) return { width: 360, height: 260 };
+
+          // Script frame: 360px wide, 260px high
+          return {
+            width: modal.frameWidth ?? 360,
+            height: modal.frameHeight ?? 260
+          };
+        }
+
+        case 'sceneFrameModal': {
+          const modal = sceneFrameModalStates.find(m => m.id === id);
+          if (!modal) return { width: 350, height: 300 };
+
+          // Scene frame: 350px wide, 300px high
+          return {
+            width: modal.frameWidth ?? 350,
+            height: modal.frameHeight ?? 300
+          };
+        }
+
+        default:
+          return { width: 0, height: 0 };
+      }
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -3874,6 +4029,178 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (rafId === null) {
           rafId = requestAnimationFrame(updateSelectionBox);
         }
+
+        // FREEPIK SPACES FEATURE: Real-time hit detection during drag
+        // Calculate current selection rectangle
+        const currentBox = {
+          startX: selectionBox.startX,
+          startY: selectionBox.startY,
+          currentX: canvasX,
+          currentY: canvasY,
+        };
+
+        const marqueeRect = {
+          x: Math.min(currentBox.startX, currentBox.currentX),
+          y: Math.min(currentBox.startY, currentBox.currentY),
+          width: Math.abs(currentBox.currentX - currentBox.startX),
+          height: Math.abs(currentBox.currentY - currentBox.startY),
+        };
+
+        // Perform real-time hit detection - check which elements are inside
+        const selectedIndices: number[] = [];
+        const selectedImageModalIdsList: string[] = [];
+        const selectedVideoModalIdsList: string[] = [];
+        const selectedMusicModalIdsList: string[] = [];
+        const selectedTextInputIdsList: string[] = [];
+        const selectedUpscaleModalIdsList: string[] = [];
+        const selectedRemoveBgModalIdsList: string[] = [];
+        const selectedEraseModalIdsList: string[] = [];
+        const selectedExpandModalIdsList: string[] = [];
+        const selectedVectorizeModalIdsList: string[] = [];
+        const selectedStoryboardModalIdsList: string[] = [];
+        const selectedScriptFrameModalIdsList: string[] = [];
+        const selectedSceneFrameModalIdsList: string[] = [];
+
+        // Helper function to check if element overlaps with selection (even 1%)
+        // Changed from "fully inside" to "any overlap" for better UX
+        const hasOverlap = (x: number, y: number, width: number, height: number) => {
+          const componentRight = x + width;
+          const componentBottom = y + height;
+          const marqueeRight = marqueeRect.x + marqueeRect.width;
+          const marqueeBottom = marqueeRect.y + marqueeRect.height;
+
+          // Check if rectangles overlap (any intersection)
+          // Returns true if there's ANY overlap, even 1%
+          return !(
+            componentRight <= marqueeRect.x ||  // Component is completely to the left
+            x >= marqueeRight ||                 // Component is completely to the right
+            componentBottom <= marqueeRect.y ||  // Component is completely above
+            y >= marqueeBottom                   // Component is completely below
+          );
+        };
+
+        // Check images
+        images.forEach((img, index) => {
+          if (img.type === 'model3d') return;
+          const imgX = img.x || 0;
+          const imgY = img.y || 0;
+          const dims = getComponentDimensions('image', index);
+
+          if (hasOverlap(imgX, imgY, dims.width, dims.height)) {
+            selectedIndices.push(index);
+          }
+        });
+
+        // Check image modals
+        imageModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('imageModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedImageModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check video modals
+        videoModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('videoModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedVideoModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check music modals
+        musicModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('musicModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedMusicModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check text inputs
+        textInputStates.forEach((textState) => {
+          const dims = getComponentDimensions('textInput', textState.id);
+          if (hasOverlap(textState.x, textState.y, dims.width, dims.height)) {
+            selectedTextInputIdsList.push(textState.id);
+          }
+        });
+
+        // Check upscale modals
+        upscaleModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('upscaleModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedUpscaleModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check removeBg modals
+        removeBgModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('removeBgModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedRemoveBgModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check erase modals
+        eraseModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('eraseModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedEraseModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check expand modals
+        expandModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('expandModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedExpandModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check vectorize modals
+        vectorizeModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('vectorizeModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedVectorizeModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check storyboard modals
+        storyboardModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('storyboardModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedStoryboardModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check script frame modals
+        scriptFrameModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('scriptFrameModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedScriptFrameModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check scene frame modals
+        sceneFrameModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('sceneFrameModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedSceneFrameModalIdsList.push(modal.id);
+          }
+        });
+
+        // Update selections in real-time (Freepik Spaces behavior)
+        setSelectedImageIndices(selectedIndices);
+        setSelectedImageModalIds(selectedImageModalIdsList);
+        setSelectedVideoModalIds(selectedVideoModalIdsList);
+        setSelectedMusicModalIds(selectedMusicModalIdsList);
+        setSelectedTextInputIds(selectedTextInputIdsList);
+        setSelectedUpscaleModalIds(selectedUpscaleModalIdsList);
+        setSelectedRemoveBgModalIds(selectedRemoveBgModalIdsList);
+        setSelectedEraseModalIds(selectedEraseModalIdsList);
+        setSelectedExpandModalIds(selectedExpandModalIdsList);
+        setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
+        setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
+        setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
+        setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
       }
     };
 
@@ -3914,7 +4241,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       }
 
-      // Use latest coordinates from ref for immediate processing
+      // FREEPIK SPACES: Finalize selection on mouse up
+      // Selection is already determined by real-time hit detection during drag
+      // Just need to hide the selection rectangle and show the tight rect
       const currentBox = selectionBox ? {
         ...selectionBox,
         currentX: latestCoordsRef.currentX,
@@ -3922,7 +4251,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       } : null;
 
       if (currentBox) {
-        // Selection box is already in canvas coordinates
         const marqueeRect = {
           x: Math.min(currentBox.startX, currentBox.currentX),
           y: Math.min(currentBox.startY, currentBox.currentY),
@@ -3931,542 +4259,216 @@ export const Canvas: React.FC<CanvasProps> = ({
         };
 
         // Check if selection box was actually dragged (not just clicked)
-        const boxWidth = marqueeRect.width;
-        const boxHeight = marqueeRect.height;
-        const wasDragged = boxWidth > 5 || boxHeight > 5;
+        const wasDragged = marqueeRect.width > 5 || marqueeRect.height > 5;
 
         if (wasDragged) {
-          // Optional smart selection over marquee region: compute tight mask bbox
-          try {
-            const stageCanvas = stage.toCanvas();
-            const ctx = (stageCanvas as any)?.getContext?.('2d');
-            if (ctx) {
-              const rx = Math.max(0, Math.min(marqueeRect.x, INFINITE_CANVAS_SIZE - 1));
-              const ry = Math.max(0, Math.min(marqueeRect.y, INFINITE_CANVAS_SIZE - 1));
-              const rw = Math.max(1, Math.min(marqueeRect.width, INFINITE_CANVAS_SIZE - rx));
-              const rh = Math.max(1, Math.min(marqueeRect.height, INFINITE_CANVAS_SIZE - ry));
-              // Read pixels via an offscreen canvas mapped to current layer transform
-              const off = document.createElement('canvas');
-              off.width = Math.ceil(rw * scale);
-              off.height = Math.ceil(rh * scale);
-              const offCtx = off.getContext('2d');
-              if (offCtx && containerRef.current) {
-                // Draw the visible area into offscreen using DOM canvas snapshot
-                // Best-effort: use HTMLCanvasElement copy if available
-                const domCanvas = containerRef.current.querySelector('canvas') as HTMLCanvasElement | null;
-                if (domCanvas) {
-                  // Compute screen-space selection rect
-                  const sx = (rx * scale) + position.x;
-                  const sy = (ry * scale) + position.y;
-                  offCtx.drawImage(domCanvas, sx, sy, rw * scale, rh * scale, 0, 0, rw * scale, rh * scale);
-                  const imgData = offCtx.getImageData(0, 0, off.width, off.height);
-                  import('@/lib/grabcut').then(({ grabCutRegion }) => {
-                    const res = grabCutRegion(imgData);
-                    if (res.bbox) {
-                      // Map bbox back to canvas coords
-                      const bx = rx + (res.bbox.x / scale);
-                      const by = ry + (res.bbox.y / scale);
-                      const bw = res.bbox.width / scale;
-                      const bh = res.bbox.height / scale;
-                      // Use smart bbox as initial tight rect; snapping to full components happens below
-                      setSelectionTightRect({ x: bx, y: by, width: Math.max(1, bw), height: Math.max(1, bh) });
-                      selectionDragOriginRef.current = { x: bx, y: by };
-                      setSelectionBox(null);
-                      setIsDragSelection(true);
-                    }
-                  }).catch(() => {/* ignore */ });
-                }
-              }
-            }
-          } catch {/* best-effort fallback to existing logic */ }
-          // Find all items that intersect with the marquee using Konva's intersection utility
-          const selectedIndices: number[] = [];
-          const selectedImageModalIdsList: string[] = [];
-          const selectedVideoModalIdsList: string[] = [];
-          const selectedMusicModalIdsList: string[] = [];
-          const selectedTextInputIdsList: string[] = [];
-          const selectedUpscaleModalIdsList: string[] = [];
-          const selectedRemoveBgModalIdsList: string[] = [];
-          const selectedEraseModalIdsList: string[] = [];
-          const selectedExpandModalIdsList: string[] = [];
-          const selectedVectorizeModalIdsList: string[] = [];
-          const selectedStoryboardModalIdsList: string[] = [];
-          const selectedScriptFrameModalIdsList: string[] = [];
-          const selectedSceneFrameModalIdsList: string[] = [];
+          // Calculate tight bounding box from selected elements
+          // This will be used for the selection box visualization
+          const allSelectedComponents: Array<{ x: number; y: number; width: number; height: number }> = [];
 
-          // Check images and videos (skip 3D models)
-          images.forEach((img, index) => {
-            if (img.type === 'model3d') return;
-
-            const imgX = img.x || 0;
-            const imgY = img.y || 0;
-            const imgWidth = img.width || 0;
-            const imgHeight = img.height || 0;
-
-            // For text, estimate dimensions
-            let width = imgWidth;
-            let height = imgHeight;
-            if (img.type === 'text') {
-              const fontSize = img.fontSize || 24;
-              width = (img.text || '').length * fontSize * 0.6;
-              height = fontSize * 1.2;
-            }
-
-            // Create bounding box for the item
-            const itemRect = {
-              x: imgX,
-              y: imgY,
-              width: width,
-              height: height,
-            };
-
-            // Check if component overlaps with selection box (even partially)
-            // Select if ANY part of the component is inside the selection box
-            const componentRight = itemRect.x + itemRect.width;
-            const componentBottom = itemRect.y + itemRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            // Check if rectangles overlap (any intersection)
-            // Treat edge-touch as overlap: include components that touch the marquee border
-            const overlaps = !(
-              componentRight <= marqueeRect.x ||
-              itemRect.x >= marqueeRight ||
-              componentBottom <= marqueeRect.y ||
-              itemRect.y >= marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedIndices.push(index);
+          // Collect all selected component positions and dimensions
+          selectedImageIndices.forEach(idx => {
+            const img = images[idx];
+            if (img && img.type !== 'model3d') {
+              const dims = getComponentDimensions('image', idx);
+              allSelectedComponents.push({
+                x: img.x || 0,
+                y: img.y || 0,
+                width: dims.width,
+                height: dims.height,
+              });
             }
           });
 
-          // Check image modals (600px wide, aspect ratio height, typically 400px+ min height)
-          imageModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedImageModalIdsList.push(modal.id);
+          selectedImageModalIds.forEach(id => {
+            const modal = imageModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('imageModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
             }
           });
 
-          // Check video modals (600px wide, aspect ratio height, typically 400px+ min height)
-          videoModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedVideoModalIdsList.push(modal.id);
+          selectedVideoModalIds.forEach(id => {
+            const modal = videoModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('videoModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
             }
           });
 
-          // Check music modals (600px wide, 300px high)
-          musicModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 300;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedMusicModalIdsList.push(modal.id);
+          selectedMusicModalIds.forEach(id => {
+            const modal = musicModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('musicModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
             }
           });
 
-          // Check text input modals (400px+ wide, variable height, typically 200px+ with controls)
-          textInputStates.forEach((textState) => {
-            const textX = textState.x;
-            const textY = textState.y;
-            const textWidth = 400; // Minimum width
-            const textHeight = 200; // Approximate height with controls
-            const textRect = {
-              x: textX,
-              y: textY,
-              width: textWidth,
-              height: textHeight,
-            };
-            // Check if text input overlaps with selection box (even partially)
-            const textRight = textRect.x + textRect.width;
-            const textBottom = textRect.y + textRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              textRight <= marqueeRect.x ||
-              textRect.x >= marqueeRight ||
-              textBottom <= marqueeRect.y ||
-              textRect.y >= marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedTextInputIdsList.push(textState.id);
+          selectedTextInputIds.forEach(id => {
+            const text = textInputStates.find(t => t.id === id);
+            if (text) {
+              const dims = getComponentDimensions('textInput', id);
+              allSelectedComponents.push({
+                x: text.x,
+                y: text.y,
+                width: dims.width,
+                height: dims.height,
+              });
             }
           });
 
-          // Check Upscale modals
-          upscaleModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedUpscaleModalIdsList.push(modal.id);
-          });
-
-          // Check RemoveBg modals
-          removeBgModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedRemoveBgModalIdsList.push(modal.id);
-          });
-
-          // Check Erase modals
-          eraseModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedEraseModalIdsList.push(modal.id);
-          });
-
-          // Check Expand modals
-          expandModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedExpandModalIdsList.push(modal.id);
-          });
-
-          // Check Vectorize modals
-          vectorizeModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedVectorizeModalIdsList.push(modal.id);
-          });
-
-          // Check Storyboard modals
-          storyboardModalStates.forEach((modal) => {
-            const modalX = modal.x ?? 0;
-            const modalY = modal.y ?? 0;
-            const modalWidth = modal.frameWidth ?? 400;
-            const modalHeight = modal.frameHeight ?? 500;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedStoryboardModalIdsList.push(modal.id);
-          });
-
-          // Check ScriptFrame modals
-          scriptFrameModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth;
-            const modalHeight = modal.frameHeight;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedScriptFrameModalIdsList.push(modal.id);
-          });
-
-          // Check SceneFrame modals
-          sceneFrameModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth;
-            const modalHeight = modal.frameHeight;
-            const modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-            const overlaps = !(modalRect.x + modalRect.width < marqueeRect.x || modalRect.x > marqueeRect.x + marqueeRect.width || modalRect.y + modalRect.height < marqueeRect.y || modalRect.y > marqueeRect.y + marqueeRect.height);
-            if (overlaps) selectedSceneFrameModalIdsList.push(modal.id);
-          });
-
-          // Handle selection with modifier keys (Shift/Ctrl/Cmd)
-          const isModifierPressed = (window.event as MouseEvent)?.shiftKey ||
-            (window.event as MouseEvent)?.ctrlKey ||
-            (window.event as MouseEvent)?.metaKey;
-
-          if (isModifierPressed) {
-            // Union: add to existing selection
-            setSelectedImageIndices(prev => {
-              const combined = [...new Set([...prev, ...selectedIndices])];
-              return combined;
-            });
-            setSelectedImageModalIds(prev => [...new Set([...prev, ...selectedImageModalIdsList])]);
-            setSelectedVideoModalIds(prev => [...new Set([...prev, ...selectedVideoModalIdsList])]);
-            setSelectedMusicModalIds(prev => [...new Set([...prev, ...selectedMusicModalIdsList])]);
-            setSelectedTextInputIds(prev => [...new Set([...prev, ...selectedTextInputIdsList])]);
-            setSelectedUpscaleModalIds(prev => [...new Set([...prev, ...selectedUpscaleModalIdsList])]);
-            setSelectedRemoveBgModalIds(prev => [...new Set([...prev, ...selectedRemoveBgModalIdsList])]);
-            setSelectedEraseModalIds(prev => [...new Set([...prev, ...selectedEraseModalIdsList])]);
-            setSelectedExpandModalIds(prev => [...new Set([...prev, ...selectedExpandModalIdsList])]);
-            setSelectedVectorizeModalIds(prev => [...new Set([...prev, ...selectedVectorizeModalIdsList])]);
-            setSelectedStoryboardModalIds(prev => [...new Set([...prev, ...selectedStoryboardModalIdsList])]);
-            setSelectedScriptFrameModalIds(prev => [...new Set([...prev, ...selectedScriptFrameModalIdsList])]);
-            setSelectedSceneFrameModalIds(prev => [...new Set([...prev, ...selectedSceneFrameModalIdsList])]);
-          } else {
-            // Replace selection
-            setSelectedImageIndices(selectedIndices);
-            setSelectedImageModalIds(selectedImageModalIdsList);
-            setSelectedVideoModalIds(selectedVideoModalIdsList);
-            setSelectedMusicModalIds(selectedMusicModalIdsList);
-            setSelectedTextInputIds(selectedTextInputIdsList);
-            setSelectedUpscaleModalIds(selectedUpscaleModalIdsList);
-            setSelectedRemoveBgModalIds(selectedRemoveBgModalIdsList);
-            setSelectedEraseModalIds(selectedEraseModalIdsList);
-            setSelectedExpandModalIds(selectedExpandModalIdsList);
-            setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
-            setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
-            setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
-            setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
-            if (selectedIndices.length > 0) {
-              setSelectedImageIndex(selectedIndices[0]);
-            } else {
-              setSelectedImageIndex(null);
+          selectedUpscaleModalIds.forEach(id => {
+            const modal = upscaleModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('upscaleModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
             }
-            // Set single selection IDs for backward compatibility
-            if (selectedImageModalIdsList.length > 0) {
-              setSelectedImageModalId(selectedImageModalIdsList[0]);
-            } else {
-              setSelectedImageModalId(null);
-            }
-            if (selectedVideoModalIdsList.length > 0) {
-              setSelectedVideoModalId(selectedVideoModalIdsList[0]);
-            } else {
-              setSelectedVideoModalId(null);
-            }
-            if (selectedMusicModalIdsList.length > 0) {
-              setSelectedMusicModalId(selectedMusicModalIdsList[0]);
-            } else {
-              setSelectedMusicModalId(null);
-            }
-            if (selectedTextInputIdsList.length > 0) {
-              setSelectedTextInputId(selectedTextInputIdsList[0]);
-            } else {
-              setSelectedTextInputId(null);
-            }
-            if (selectedUpscaleModalIdsList.length > 0) setSelectedUpscaleModalId(selectedUpscaleModalIdsList[0]); else setSelectedUpscaleModalId(null);
-            if (selectedRemoveBgModalIdsList.length > 0) setSelectedRemoveBgModalId(selectedRemoveBgModalIdsList[0]); else setSelectedRemoveBgModalId(null);
-            if (selectedEraseModalIdsList.length > 0) setSelectedEraseModalId(selectedEraseModalIdsList[0]); else setSelectedEraseModalId(null);
-            if (selectedExpandModalIdsList.length > 0) setSelectedExpandModalId(selectedExpandModalIdsList[0]); else setSelectedExpandModalId(null);
-            if (selectedVectorizeModalIdsList.length > 0) setSelectedVectorizeModalId(selectedVectorizeModalIdsList[0]); else setSelectedVectorizeModalId(null);
-            if (selectedStoryboardModalIdsList.length > 0) setSelectedStoryboardModalId(selectedStoryboardModalIdsList[0]); else setSelectedStoryboardModalId(null);
-            if (selectedScriptFrameModalIdsList.length > 0) setSelectedScriptFrameModalId(selectedScriptFrameModalIdsList[0]); else setSelectedScriptFrameModalId(null);
-            if (selectedSceneFrameModalIdsList.length > 0) setSelectedSceneFrameModalId(selectedSceneFrameModalIdsList[0]); else setSelectedSceneFrameModalId(null);
-          }
+          });
 
-          // Compute tight bounding rect around selected items (remove extra area)
-          // Include both canvas images and modals
-          const totalSelected = selectedIndices.length + selectedImageModalIdsList.length +
-            selectedVideoModalIdsList.length + selectedMusicModalIdsList.length +
-            selectedTextInputIdsList.length + selectedUpscaleModalIdsList.length +
-            selectedRemoveBgModalIdsList.length + selectedEraseModalIdsList.length +
-            selectedVectorizeModalIdsList.length + selectedStoryboardModalIdsList.length +
-            selectedScriptFrameModalIdsList.length + selectedSceneFrameModalIdsList.length;
+          selectedRemoveBgModalIds.forEach(id => {
+            const modal = removeBgModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('removeBgModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
 
-          if (totalSelected > 0) {
+          selectedEraseModalIds.forEach(id => {
+            const modal = eraseModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('eraseModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedExpandModalIds.forEach(id => {
+            const modal = expandModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('expandModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedVectorizeModalIds.forEach(id => {
+            const modal = vectorizeModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('vectorizeModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedStoryboardModalIds.forEach(id => {
+            const modal = storyboardModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('storyboardModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedScriptFrameModalIds.forEach(id => {
+            const modal = scriptFrameModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('scriptFrameModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedSceneFrameModalIds.forEach(id => {
+            const modal = sceneFrameModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('sceneFrameModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          // Calculate tight bounding box
+          if (allSelectedComponents.length > 0) {
             let minX = Infinity;
             let minY = Infinity;
             let maxX = -Infinity;
             let maxY = -Infinity;
 
-            // Include canvas images
-            selectedIndices.forEach((idx) => {
-              const it = images[idx];
-              if (!it) return;
-              const ix = it.x || 0;
-              const iy = it.y || 0;
-              let iw = it.width || 0;
-              let ih = it.height || 0;
-              if (it.type === 'text') {
-                const fontSize = it.fontSize || 24;
-                iw = (it.text || '').length * fontSize * 0.6;
-                ih = fontSize * 1.2;
-              }
-              minX = Math.min(minX, ix);
-              minY = Math.min(minY, iy);
-              maxX = Math.max(maxX, ix + iw);
-              maxY = Math.max(maxY, iy + ih);
+            allSelectedComponents.forEach(comp => {
+              minX = Math.min(minX, comp.x);
+              minY = Math.min(minY, comp.y);
+              maxX = Math.max(maxX, comp.x + comp.width);
+              maxY = Math.max(maxY, comp.y + comp.height);
             });
-
-            // Helper to update bounds for any modal-like component.
-            // Uses the component's actual frameWidth / frameHeight when available,
-            // falling back to the provided defaults only if size is not set.
-            const updateBounds = (id: string, list: any[], defaultWidth: number, defaultHeight: number) => {
-              const m = list.find(item => item.id === id);
-              if (m) {
-                const mx = m.x ?? 0;
-                const my = m.y ?? 0;
-                const mw = m.frameWidth ?? defaultWidth;
-                const mh = m.frameHeight ?? defaultHeight;
-                minX = Math.min(minX, mx);
-                minY = Math.min(minY, my);
-                maxX = Math.max(maxX, mx + mw);
-                maxY = Math.max(maxY, my + mh);
-              }
-            };
-
-            // Include image / video / music modals using their actual frame sizes
-            selectedImageModalIdsList.forEach(id => updateBounds(id, imageModalStates, 600, 400));
-            selectedVideoModalIdsList.forEach(id => updateBounds(id, videoModalStates, 600, 400));
-            selectedMusicModalIdsList.forEach(id => updateBounds(id, musicModalStates, 600, 300));
-
-            // Include text input modals
-            // Text inputs: min 400px width, height is variable based on content
-            // Structure: drag handle (~4px) + padding top (~12px) + textarea (min 80px) + padding bottom (~12px) + buttons (~32px)
-            // Total: ~140px minimum, but can grow with content
-            // Use minimum height for tight bounding box
-            selectedTextInputIdsList.forEach((id) => {
-              const textState = textInputStates.find(t => t.id === id);
-              if (textState) {
-                const textWidth = 400; // Minimum width
-                // Use minimum height: handle (4px) + top padding (12px) + textarea min (80px) + bottom padding (12px) + buttons (32px) = 140px
-                // But to be more accurate, let's use a slightly smaller estimate to ensure tight fit
-                // Use a tighter estimate to ensure no extra space at bottom
-                // Actual height is ~140px minimum, but we use 110px to ensure tight fit
-                const textHeight = 110; // Tighter estimate to remove extra bottom space
-                minX = Math.min(minX, textState.x);
-                minY = Math.min(minY, textState.y);
-                maxX = Math.max(maxX, textState.x + textWidth);
-                maxY = Math.max(maxY, textState.y + textHeight);
-              }
-            });
-
-            // Include other plugin modals
-            selectedUpscaleModalIdsList.forEach(id => updateBounds(id, upscaleModalStates, 600, 400));
-            selectedRemoveBgModalIdsList.forEach(id => updateBounds(id, removeBgModalStates, 600, 400));
-            selectedEraseModalIdsList.forEach(id => updateBounds(id, eraseModalStates, 600, 400));
-            selectedExpandModalIdsList.forEach(id => updateBounds(id, expandModalStates, 600, 400));
-            selectedVectorizeModalIdsList.forEach(id => updateBounds(id, vectorizeModalStates, 600, 400));
-            selectedStoryboardModalIdsList.forEach(id => updateBounds(id, storyboardModalStates, 400, 500));
-            selectedScriptFrameModalIdsList.forEach(id => updateBounds(id, scriptFrameModalStates, 360, 260));
-            selectedSceneFrameModalIdsList.forEach(id => updateBounds(id, sceneFrameModalStates, 350, 300));
 
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-              // Calculate tight rect - ensure we're using the actual bounds
-              // The calculation should already be tight
-              const width = maxX - minX;
-              const height = maxY - minY;
-
               setSelectionTightRect({
                 x: minX,
                 y: minY,
-                width: Math.max(1, width),
-                height: Math.max(1, height),
+                width: Math.max(1, maxX - minX),
+                height: Math.max(1, maxY - minY),
               });
               selectionDragOriginRef.current = { x: minX, y: minY };
-              // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
-              setSelectionBox(null);
-              // Mark this as a drag selection so icons will show
-              setIsDragSelection(true);
-            } else {
-              setSelectionTightRect(null);
-              selectionDragOriginRef.current = null;
-              setIsDragSelection(false);
             }
-          } else {
-            setSelectionTightRect(null);
-            selectionDragOriginRef.current = null;
-            setIsDragSelection(false);
           }
-        } else {
-          // Just a click, clear selection if not clicking on an element and no modifier
-          const isModifierPressed = (window.event as MouseEvent)?.shiftKey ||
-            (window.event as MouseEvent)?.ctrlKey ||
-            (window.event as MouseEvent)?.metaKey;
-          if (!isModifierPressed) {
-            setSelectedImageIndices([]);
-            setSelectedImageIndex(null);
-            setSelectedImageModalIds([]);
-            setSelectedVideoModalIds([]);
-            setSelectedMusicModalIds([]);
-            setSelectedMusicModalIds([]);
-            setSelectedTextInputIds([]);
-            setSelectedUpscaleModalIds([]);
-            setSelectedRemoveBgModalIds([]);
-            setSelectedEraseModalIds([]);
-            setSelectedExpandModalIds([]);
-            setSelectedVectorizeModalIds([]);
-            setSelectedStoryboardModalIds([]);
-            setSelectedScriptFrameModalIds([]);
-            setSelectedSceneFrameModalIds([]);
-            setSelectionTightRect(null);
-            selectionDragOriginRef.current = null;
-            setIsDragSelection(false);
-          }
+
+          // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+          setSelectionBox(null);
+          setIsDragSelection(true);
         }
       }
 
+      // End selection mode
       setIsSelecting(false);
-      // Keep selection box visible after mouse up - it will be cleared when Delete is pressed or when starting a new selection
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -4481,7 +4483,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         rafId = null;
       }
     };
-  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates]);
+  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
 
   // Attach Transformer to selected nodes
   useEffect(() => {
@@ -5327,6 +5329,47 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistImageModalMove={onPersistImageModalMove}
             onPersistTextModalMove={onPersistTextModalMove}
             onImageUpdate={onImageUpdate}
+            // Pass all other modal states and setters for full selection support
+            selectedUpscaleModalIds={selectedUpscaleModalIds}
+            selectedRemoveBgModalIds={selectedRemoveBgModalIds}
+            selectedEraseModalIds={selectedEraseModalIds}
+            selectedExpandModalIds={selectedExpandModalIds}
+            selectedVectorizeModalIds={selectedVectorizeModalIds}
+            selectedStoryboardModalIds={selectedStoryboardModalIds}
+            selectedScriptFrameModalIds={selectedScriptFrameModalIds}
+            selectedSceneFrameModalIds={selectedSceneFrameModalIds}
+            upscaleModalStates={upscaleModalStates}
+            removeBgModalStates={removeBgModalStates}
+            eraseModalStates={eraseModalStates}
+            expandModalStates={expandModalStates}
+            vectorizeModalStates={vectorizeModalStates}
+            storyboardModalStates={storyboardModalStates}
+            scriptFrameModalStates={scriptFrameModalStates}
+            sceneFrameModalStates={sceneFrameModalStates}
+            setUpscaleModalStates={setUpscaleModalStates}
+            setRemoveBgModalStates={setRemoveBgModalStates}
+            setEraseModalStates={setEraseModalStates}
+            setExpandModalStates={setExpandModalStates}
+            setVectorizeModalStates={setVectorizeModalStates}
+            setStoryboardModalStates={setStoryboardModalStates}
+            setScriptFrameModalStates={setScriptFrameModalStates}
+            setSceneFrameModalStates={setSceneFrameModalStates}
+            setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+            setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
+            setSelectedEraseModalIds={setSelectedEraseModalIds}
+            setSelectedExpandModalIds={setSelectedExpandModalIds}
+            setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+            setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
+            setSelectedScriptFrameModalIds={setSelectedScriptFrameModalIds}
+            setSelectedSceneFrameModalIds={setSelectedSceneFrameModalIds}
+            onPersistUpscaleModalMove={onPersistUpscaleModalMove}
+            onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
+            onPersistEraseModalMove={onPersistEraseModalMove}
+            onPersistExpandModalMove={onPersistExpandModalMove}
+            onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+            onPersistStoryboardModalMove={onPersistStoryboardModalMove}
+            onPersistScriptFrameModalMove={onPersistScriptFrameModalMove}
+            onPersistSceneFrameModalMove={onPersistSceneFrameModalMove}
           />
           {/* Transformer for selected nodes - only for non-uploaded images */}
           {selectedImageIndices.length > 0 && (() => {
