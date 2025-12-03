@@ -6,7 +6,6 @@ interface TextModalFrameProps {
   id: string;
   scale: number;
   isHovered: boolean;
-  isPinned: boolean;
   isSelected: boolean;
   isDragging: boolean;
   frameBorderColor: string;
@@ -20,7 +19,6 @@ interface TextModalFrameProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onConfirm: (text: string, model: string) => void;
   selectedModel: string;
-  onSetIsPinned: (pinned: boolean) => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onScriptGenerated?: (script: string) => void;
   connections?: Array<{ from: string; to: string }>;
@@ -32,7 +30,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   id,
   scale,
   isHovered,
-  isPinned,
   isSelected,
   isDragging,
   frameBorderColor,
@@ -46,7 +43,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   onKeyDown,
   onConfirm,
   selectedModel,
-  onSetIsPinned,
   onMouseDown,
   onScriptGenerated,
   connections = [],
@@ -136,9 +132,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   const inputBg = isDark ? '#121212' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const inputText = isDark ? '#ffffff' : '#1f2937';
-  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
-  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
-  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
+
   const handleBg = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)';
 
   return (

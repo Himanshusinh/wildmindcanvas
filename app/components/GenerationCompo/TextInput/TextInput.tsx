@@ -269,11 +269,11 @@ export const TextInput: React.FC<TextInputProps> = ({
         gap: `${1 * scale}px`,
         padding: `${12 * scale}px`,
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: (isHovered || isPinned) ? '0px' : `${12 * scale}px`,
+        borderRadius: isHovered ? '0px' : `${12 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: isHovered ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
@@ -293,6 +293,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         onDelete={onDelete}
         onDuplicate={onDuplicate}
         variant="default"
+        isPinned={isPinned}
+        onPin={() => setIsPinned(!isPinned)}
       />
 
       <div style={{ position: 'relative' }}>
@@ -300,7 +302,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           id={id}
           scale={scale}
           isHovered={isHovered}
-          isPinned={isPinned}
           isSelected={!!isSelected}
           isDragging={isDragging}
           frameBorderColor={frameBorderColor}
@@ -317,7 +318,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           onKeyDown={handleKeyDown}
           onConfirm={handleConfirm}
           selectedModel={selectedModel}
-          onSetIsPinned={setIsPinned}
           onMouseDown={handleMouseDown}
           onScriptGenerated={(script) => {
             if (onScriptGenerated) {
@@ -330,56 +330,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         />
 
         {/* Pin Icon Button - Below Input Box */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsPinned(!isPinned);
-          }}
-          style={{
-            position: 'absolute',
-            bottom: `${-32 * scale}px`,
-            right: `${8 * scale}px`,
-            width: `${28 * scale}px`,
-            height: `${28 * scale}px`,
-            borderRadius: `${6 * scale}px`,
-            backgroundColor: isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff'),
-            border: `1px solid ${isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)')}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 20,
-            opacity: isHovered ? 1 : 0,
-            transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
-            pointerEvents: 'auto',
-            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-          }}
-          onMouseEnter={(e) => {
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = pinBg;
-            }
-          }}
-          title={isPinned ? 'Unpin controls' : 'Pin controls'}
-        >
-          <svg
-            width={16 * scale}
-            height={16 * scale}
-            viewBox="0 0 24 24"
-            fill={isPinned ? '#437eb5' : 'none'}
-            stroke={isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563')}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-          </svg>
-        </button>
+
 
         <TextModalNodes
           id={id}
@@ -406,7 +357,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           setSelectedModel(model);
         }}
         onSetIsHovered={requestHoverState}
-        onSetIsPinned={setIsPinned}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}
         onEnhance={handleEnhance}

@@ -6,6 +6,7 @@ interface TextModalControlsProps {
   scale: number;
   isHovered: boolean;
   isPinned: boolean;
+
   selectedModel: string;
   isModelDropdownOpen: boolean;
   isModelHovered: boolean;
@@ -16,7 +17,7 @@ interface TextModalControlsProps {
   enhanceStatus: string;
   onModelChange: (model: string) => void;
   onSetIsHovered: (hovered: boolean) => void;
-  onSetIsPinned: (pinned: boolean) => void;
+
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsModelHovered: (hovered: boolean) => void;
   onEnhance: () => void;
@@ -26,6 +27,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   scale,
   isHovered,
   isPinned,
+
   selectedModel,
   isModelDropdownOpen,
   isModelHovered,
@@ -36,7 +38,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   enhanceStatus,
   onModelChange,
   onSetIsHovered,
-  onSetIsPinned,
+
   onSetIsModelDropdownOpen,
   onSetIsModelHovered,
   onEnhance,
@@ -76,7 +78,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         width: `${400 * scale}px`,
         padding: `${12 * scale}px`,
         backgroundColor: controlsBg,
-        
+
         border: 'none',
         borderTop: 'none',
         borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
@@ -100,100 +102,100 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
     >
       {/* Model Selector and Enhance Button - Side by Side */}
       <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', width: '100%' }}>
-      {/* Model Selector - Custom Dropdown */}
+        {/* Model Selector - Custom Dropdown */}
         <div ref={modelDropdownRef} style={{ position: 'relative', flex: 1, overflow: 'visible', zIndex: 3002 }} onMouseEnter={() => onSetIsModelHovered(true)} onMouseLeave={() => onSetIsModelHovered(false)}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSetIsModelDropdownOpen(!isModelDropdownOpen);
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            width: '100%',
-              padding: `${14 * scale}px ${28 * scale}px ${14 * scale}px ${14 * scale}px`,
-              minHeight: `${40 * scale}px`,
-            backgroundColor: controlsBg,
-            border: `1px solid ${dropdownBorderColor}`,
-            borderRadius: `${9999 * scale}px`,
-            fontSize: controlFontSize,
-            fontWeight: '500',
-            color: dropdownText,
-            outline: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            textAlign: 'left',
-            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
-          }}
-        >
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
-          <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-            <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        
-        {isModelDropdownOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: `${4 * scale}px`,
-              backgroundColor: controlsBg,
-              border: `1px solid ${dropdownBorderColor}`,
-              borderRadius: `${12 * scale}px`,
-              boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
-              maxHeight: `${200 * scale}px`,
-              overflowY: 'auto',
-              zIndex: 3003,
-              padding: `${4 * scale}px 0`,
-              transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetIsModelDropdownOpen(!isModelDropdownOpen);
             }}
             onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              padding: `${14 * scale}px ${28 * scale}px ${14 * scale}px ${14 * scale}px`,
+              minHeight: `${40 * scale}px`,
+              backgroundColor: controlsBg,
+              border: `1px solid ${dropdownBorderColor}`,
+              borderRadius: `${9999 * scale}px`,
+              fontSize: controlFontSize,
+              fontWeight: '500',
+              color: dropdownText,
+              outline: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              textAlign: 'left',
+              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+            }}
           >
-            {['GPT-4', 'GPT-3.5', 'Claude 3', 'Gemini Pro', 'Llama 2'].map((model) => (
-              <div
-                key={model}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onModelChange(model);
-                  onSetIsModelDropdownOpen(false);
-                }}
-                style={{
-                  padding: `${8 * scale}px ${16 * scale}px`,
-                  fontSize: controlFontSize,
-                  color: dropdownText,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: selectedModel === model ? selectedBg : 'transparent',
-                  borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
-                  transition: 'background-color 0.3s ease, color 0.3s ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedModel !== model) {
-                    e.currentTarget.style.backgroundColor = dropdownHoverBg;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedModel !== model) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                {selectedModel === model && (
-                  <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
-                <span>{model}</span>
-              </div>
-            ))}
-          </div>
-        )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
+            <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {isModelDropdownOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: `${4 * scale}px`,
+                backgroundColor: controlsBg,
+                border: `1px solid ${dropdownBorderColor}`,
+                borderRadius: `${12 * scale}px`,
+                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                maxHeight: `${200 * scale}px`,
+                overflowY: 'auto',
+                zIndex: 3003,
+                padding: `${4 * scale}px 0`,
+                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {['GPT-4', 'GPT-3.5', 'Claude 3', 'Gemini Pro', 'Llama 2'].map((model) => (
+                <div
+                  key={model}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onModelChange(model);
+                    onSetIsModelDropdownOpen(false);
+                  }}
+                  style={{
+                    padding: `${8 * scale}px ${16 * scale}px`,
+                    fontSize: controlFontSize,
+                    color: dropdownText,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: selectedModel === model ? selectedBg : 'transparent',
+                    borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
+                    transition: 'background-color 0.3s ease, color 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedModel !== model) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {selectedModel === model && (
+                    <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                  <span>{model}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Enhance Button */}

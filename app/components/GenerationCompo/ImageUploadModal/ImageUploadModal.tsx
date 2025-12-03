@@ -392,14 +392,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         setGeneratingState(true);
         didSetCurrentFrameGenerating = true;
       }
-      
+
       console.log('[ImageUploadModal] 🎯 Generation state management:', {
         hasExistingImage,
         generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
         willCreateNewFrame,
         didSetCurrentFrameGenerating,
       });
-      
+
       try {
         // Calculate width and height based on resolution and aspect ratio
         let width: number | undefined;
@@ -810,21 +810,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
         // Determine final reference: prefer stitched reference exclusively when present
         let allReferenceImageUrls: string[] = [];
-        
+
         console.log('[Image Generation] 🔍 STEP 1: Before building allReferenceImageUrls:', {
           stitchedOnly,
           finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NULL/UNDEFINED',
           referenceImageUrls: referenceImageUrls.map(url => url.substring(0, 100) + '...'),
           referenceImageUrlsLength: referenceImageUrls.length,
         });
-        
+
         if (stitchedOnly && finalSourceImageUrl) {
           allReferenceImageUrls = [finalSourceImageUrl];
           console.log('[Image Generation] 🔍 STEP 2a: Using stitched-only path');
         } else {
           allReferenceImageUrls = [...referenceImageUrls];
           console.log('[Image Generation] 🔍 STEP 2b: Copied referenceImageUrls, length:', allReferenceImageUrls.length);
-          
+
           if (finalSourceImageUrl && !allReferenceImageUrls.includes(finalSourceImageUrl)) {
             console.log('[Image Generation] 🔍 STEP 3: Adding finalSourceImageUrl to allReferenceImageUrls');
             allReferenceImageUrls.push(finalSourceImageUrl);
@@ -835,7 +835,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             });
           }
         }
-        
+
         console.log('[Image Generation] 🔍 STEP 4: After building allReferenceImageUrls:', {
           allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
           allReferenceImageUrlsLength: allReferenceImageUrls.length,
@@ -844,10 +844,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // CRITICAL: When creating a new frame for image-to-image (hasExistingImage is true),
         // we MUST pass the source image URL explicitly because the new frame doesn't have it yet
         // The finalSourceImageUrl contains the current frame's generatedImageUrl which should be used as the source
-        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl 
-          ? finalSourceImageUrl 
+        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl
+          ? finalSourceImageUrl
           : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined);
-        
+
         console.log('[Image Generation] 🎯 Source image determination:', {
           hasExistingImage,
           generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
@@ -872,7 +872,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           width,
           height,
         });
-        
+
         console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
           'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
           'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
@@ -880,7 +880,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
         });
-        
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
@@ -1290,6 +1290,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onPin={() => setIsPinned(!isPinned)}
       />
 
       <div style={{ position: 'relative' }}>
@@ -1454,7 +1456,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onGenerate={handleGenerate}
         getAvailableAspectRatios={getAvailableAspectRatios}
         onSetIsHovered={setIsHovered}
-        onSetIsPinned={setIsPinned}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
         onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}

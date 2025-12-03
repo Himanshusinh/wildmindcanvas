@@ -6,6 +6,7 @@ interface MusicModalControlsProps {
   scale: number;
   isHovered: boolean;
   isPinned: boolean;
+
   isSelected?: boolean;
   prompt: string;
   selectedModel: string;
@@ -22,7 +23,7 @@ interface MusicModalControlsProps {
   onAspectRatioChange: (ratio: string) => void;
   onGenerate: () => void;
   onSetIsHovered: (hovered: boolean) => void;
-  onSetIsPinned: (pinned: boolean) => void;
+
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsAspectRatioDropdownOpen: (open: boolean) => void;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
@@ -32,6 +33,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   scale,
   isHovered,
   isPinned,
+
   isSelected = false,
   prompt,
   selectedModel,
@@ -48,7 +50,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   onAspectRatioChange,
   onGenerate,
   onSetIsHovered,
-  onSetIsPinned,
+
   onSetIsModelDropdownOpen,
   onSetIsAspectRatioDropdownOpen,
   onOptionsChange,
@@ -236,7 +238,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isModelDropdownOpen && (
             <div
               style={{
@@ -334,7 +336,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isAspectRatioDropdownOpen && (
             <div
               style={{

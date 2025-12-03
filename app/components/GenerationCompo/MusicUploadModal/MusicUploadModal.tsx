@@ -87,8 +87,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -128,7 +128,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   // Listen for frame dim events (when dragging connection near disallowed frame)
   useEffect(() => {
     if (!id) return;
-    
+
     const handleFrameDim = (e: Event) => {
       const ce = e as CustomEvent;
       const { frameId, dimmed } = ce.detail || {};
@@ -136,7 +136,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         setIsDimmed(dimmed === true);
       }
     };
-    
+
     window.addEventListener('canvas-frame-dim', handleFrameDim as any);
     return () => {
       window.removeEventListener('canvas-frame-dim', handleFrameDim as any);
@@ -152,12 +152,12 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isAudio = target.tagName === 'AUDIO';
     const isControls = target.closest('.controls-overlay');
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     if (onSelect && !isInput && !isButton && !isControls) {
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isAudio && !isControls) {
       setIsDraggingContainer(true);
@@ -241,6 +241,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onPin={() => setIsPinned(!isPinned)}
       />
 
       <div style={{ position: 'relative' }}>
@@ -249,7 +251,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           scale={scale}
           selectedAspectRatio={selectedAspectRatio}
           isHovered={isHovered}
-          isPinned={isPinned}
           isSelected={!!isSelected}
           isDraggingContainer={isDraggingContainer}
           generatedMusicUrl={generatedMusicUrl}
@@ -258,7 +259,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           frameBorderWidth={frameBorderWidth}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          onSetIsPinned={setIsPinned}
         />
 
         <MusicModalNodes
@@ -297,7 +297,6 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         }}
         onGenerate={handleGenerate}
         onSetIsHovered={setIsHovered}
-        onSetIsPinned={setIsPinned}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
         onOptionsChange={onOptionsChange}
