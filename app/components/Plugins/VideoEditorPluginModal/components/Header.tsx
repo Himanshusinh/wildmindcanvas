@@ -81,12 +81,7 @@ const Header: React.FC<HeaderProps> = ({
         <header className="h-14 bg-[#18181b] text-gray-200 flex items-center justify-between px-4 pr-16 select-none z-50 relative border-b border-gray-800">
             {/* Left Section */}
             <div className="flex items-center gap-4">
-                <button
-                    onClick={onToggleProjectMenu}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                >
-                    <Menu size={20} />
-                </button>
+
 
                 <div className="relative" ref={fileMenuRef}>
                     <button
@@ -140,15 +135,6 @@ const Header: React.FC<HeaderProps> = ({
                                     onClick={() => { onLoadProject(); setIsFileMenuOpen(false); }}
                                 >
                                     <FolderOpen size={16} /> Open project
-                                </button>
-                                <button
-                                    className="px-4 py-2 text-sm hover:bg-white/5 flex items-center gap-3 text-left"
-                                    onClick={() => { onOpenProject(); setIsFileMenuOpen(false); }}
-                                >
-                                    <FolderOpen size={16} /> Open Recent
-                                </button>
-                                <button className="px-4 py-2 text-sm hover:bg-white/5 flex items-center gap-3 text-left">
-                                    <FolderOpen size={16} /> Import files
                                 </button>
                                 <div className="h-px bg-gray-700 my-1"></div>
                                 <button

@@ -17,7 +17,7 @@ interface CanvasProps {
     eraserSettings: { size: number; type: 'erase' | 'restore'; showOriginal: boolean };
 
     onSelectClip: (trackId: string, itemId: string | null) => void;
-    onUpdateClip: (trackId: string, item: TimelineItem) => void;
+    onUpdateClip: (trackId: string, item: TimelineItem, skipHistory?: boolean) => void;
     onDeleteClip: (trackId: string, itemId: string) => void;
     onSplitClip: () => void;
     onOpenEditPanel?: (view?: 'main' | 'adjust' | 'eraser' | 'color' | 'animate' | 'text-effects' | 'font') => void;
@@ -285,7 +285,7 @@ const Canvas: React.FC<CanvasProps> = ({
         const deltaX_px = e.clientX - dragStartRef.current.x; const deltaY_px = e.clientY - dragStartRef.current.y;
         const deltaX_pct = (deltaX_px / canvasWidthPx) * 100; const deltaY_pct = (deltaY_px / canvasHeightPx) * 100;
         const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
-        if (item && track) { onUpdateClip(track.id, { ...item, x: (itemStartPosRef.current.x + deltaX_pct), y: (itemStartPosRef.current.y + deltaY_pct) }); }
+        if (item && track) { onUpdateClip(track.id, { ...item, x: (itemStartPosRef.current.x + deltaX_pct), y: (itemStartPosRef.current.y + deltaY_pct) }, true); }
     };
 
     const handleResizeMouseDown = (e: React.MouseEvent, item: TimelineItem, handle: string) => {
@@ -348,7 +348,7 @@ const Canvas: React.FC<CanvasProps> = ({
         // For text, if we resize height, we might want to unset auto-height behavior or just let it clip/scroll?
         // Usually text boxes in design tools: width changes wrapping, height changes cropping or spacing.
         // For now, we update height. If it was auto, it will now be fixed % which is fine.
-        onUpdateClip(track.id, { ...item, width: newW, height: item.type === 'text' ? undefined : newH, x: originalX + worldShiftX, y: originalY + worldShiftY });
+        onUpdateClip(track.id, { ...item, width: newW, height: item.type === 'text' ? undefined : newH, x: originalX + worldShiftX, y: originalY + worldShiftY }, true);
     };
 
     const handleRotateMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
@@ -365,7 +365,7 @@ const Canvas: React.FC<CanvasProps> = ({
         const dx = e.clientX - cx; const dy = e.clientY - cy;
         const degs = Math.atan2(dy, dx) * (180 / Math.PI);
         const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
-        if (item && track) { onUpdateClip(track.id, { ...item, rotation: degs - 90 }); }
+        if (item && track) { onUpdateClip(track.id, { ...item, rotation: degs - 90 }, true); }
     };
 
     // --- Rendering Logic ---
@@ -490,9 +490,9 @@ const Canvas: React.FC<CanvasProps> = ({
                 if (item.type !== 'video' && item.type !== 'image') return; // Only buffer heavy media
                 if (renderedIds.has(item.id)) return;
 
-                // Buffer window: 2 seconds before and 2 seconds after
+                // Buffer window: 3 seconds before and 2 seconds after for smoother pre-loading
                 // This keeps the DOM element mounted so it doesn't have to re-initialize
-                if (currentTime >= item.start - 2 && currentTime < item.start + item.duration + 2) {
+                if (currentTime >= item.start - 3 && currentTime < item.start + item.duration + 2) {
                     buffered.push({ item, role: 'main', zIndexBase: trackIndex * 10, isBuffered: true });
                 }
             });
@@ -505,6 +505,10 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // Cache for video frames to prevent black screens/flickering when decoding lags
     const videoCacheRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
+
+    // Use a ref to store the latest bufferedItems
+    const latestBufferedItems = useRef(bufferedItems);
+    latestBufferedItems.current = bufferedItems;
 
     // --- Canvas Rendering Engine ---
     useEffect(() => {
@@ -519,13 +523,96 @@ const Canvas: React.FC<CanvasProps> = ({
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Combine active and buffered items for processing
+            // We process buffered items ONLY to update their cache, not to draw to main canvas
+            const allItems = [
+                ...latestRenderItems.current.map(i => ({ ...i, isBuffered: false })),
+                ...latestBufferedItems.current.map(i => ({ ...i, isBuffered: true }))
+            ];
+
             // Draw items
-            latestRenderItems.current.forEach(obj => {
-                const { item, role, transition, transitionProgress } = obj;
+            allItems.forEach(obj => {
+                const { item, role, transition, transitionProgress, isBuffered } = obj;
 
                 // Skip audio and text (text is DOM overlay), and animated items (rendered in DOM)
                 // Optimization: Also skip video and image as they are rendered in the DOM to avoid double-rendering and improve performance for 4K/8K
-                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation || item.type === 'video' || item.type === 'image') return;
+                // EXCEPTION: We MUST process video items to update their cache, even if we don't draw them to main canvas
+                const type = item.type as string;
+                if (type === 'audio' || type === 'text' || type === 'color' || item.animation) return;
+
+                // For DOM-rendered items (video/image without animation), we usually skip drawing to canvas
+                // BUT for the "Blank Canvas" fix, we need to ensure the video cache is populated.
+                // So we proceed for videos, but maybe skip the final draw if it's handled by DOM?
+                // Actually, the current logic seems to draw videos to canvas?
+                // Line 528 says: "Optimization: Also skip video and image...". 
+                // If we skip them here, then the canvas is empty and we rely on the DOM elements (lines 1223+).
+                // IF we rely on DOM elements, then the blank canvas is a DOM issue, not a canvas issue!
+
+                // WAIT. If line 528 returns, then lines 530-648 are SKIPPED.
+                // This means the canvas is NOT drawing videos. The DOM is.
+                // Let's re-read line 528 carefully in the original file.
+
+                // Original Line 528: if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation || item.type === 'video' || item.type === 'image') return;
+
+                // If this is true, then the entire caching logic below (lines 620+) is NEVER executed for videos!
+                // So `videoCacheRefs` is completely unused for standard video playback?
+                // If so, my previous hypothesis about cache was wrong. The issue is purely DOM video element.
+
+                // However, if the user sees "Blank Canvas", it might be the DOM element taking time to appear.
+                // The DOM elements are rendered in `renderItemContent` (line 1205).
+                // `bufferedItems` are rendered with `opacity: 0` (line 1199) and `pointerEvents: 'none'` (line 1202).
+
+                // If we rely on DOM, then `videoCacheRefs` is irrelevant unless we are using it for something else?
+                // Wait, if `item.animation` is present, we skip.
+                // If `item.type === 'video'` is present, we skip.
+                // So we ALWAYS skip video drawing to canvas?
+                // Then `videoCacheRefs` is dead code?
+
+                // Let's check if I missed something.
+                // If I remove 'video' from the skip list, we draw to canvas.
+                // If the DOM element is also there, we have double rendering.
+
+                // The user says "Blank Canvas".
+                // If we are using DOM elements, maybe the `bufferedItems` are not being created correctly?
+                // Or maybe `isBuffered` opacity 0 is sticking?
+
+                // Let's look at `bufferedItems` logic again.
+                // It renders `renderItemContent(obj, false)`.
+                // `finalStyle` has `opacity: isBuffered ? 0 : ...`.
+
+                // When item moves from buffered to active:
+                // 1. It is in `renderItems`.
+                // 2. `isBuffered` becomes false (or undefined).
+                // 3. Opacity becomes 1.
+
+                // If the video element is the SAME (React key is item.id), it should just change opacity.
+                // If the video was pre-seeked (my previous fix), it should be at the right frame.
+
+                // Why would it be blank?
+                // Maybe `opacity` transition?
+                // Or maybe the video element is being re-created?
+                // `key={item.id}`. The ID shouldn't change.
+
+                // Wait, `renderItems` creates NEW objects every render?
+                // `const active: RenderItem[] = [];`
+                // But the React Component `renderItemContent` uses `key={item.id}`.
+                // So React reconciliation should keep the DOM node.
+
+                // Is it possible that `item.src` changes? No.
+
+                // Let's try to FORCE draw the video to the canvas as a fallback?
+                // If we remove `item.type === 'video'` from the skip list in `render`, we draw the video to the canvas.
+                // This might cover up the blank DOM element while it's loading/seeking.
+                // This is a robust "belt and suspenders" approach.
+                // If the DOM is blank, the Canvas (underneath) shows the frame.
+
+                // So, the plan is:
+                // 1. Enable video drawing in `render` (remove `item.type === 'video'` from skip).
+                // 2. Implement the pre-caching logic I planned, so the Canvas drawing is actually ready.
+
+                // Let's modify the skip condition.
+                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation) return;
+                // We allow 'video' and 'image' to pass through to be drawn on canvas as backup/base layer.
 
                 const mediaEl = mediaRefs.current[item.id];
                 if (!mediaEl) return;
@@ -592,6 +679,74 @@ const Canvas: React.FC<CanvasProps> = ({
                     }
                 }
 
+                // --- CANVAS TRANSITION HANDLING ---
+                if (transition && transitionProgress !== undefined) {
+                    const p = transitionProgress;
+                    const { type: tType, direction } = transition;
+
+                    // Direction Multipliers
+                    let xMult = 1; let yMult = 0;
+                    if (direction === 'right') { xMult = -1; yMult = 0; }
+                    else if (direction === 'up') { xMult = 0; yMult = 1; }
+                    else if (direction === 'down') { xMult = 0; yMult = -1; }
+
+                    // Apply Transition Effects
+                    switch (tType) {
+                        // Dissolves
+                        case 'dissolve':
+                        case 'film-dissolve':
+                        case 'cross-zoom': // Fallback to dissolve for complex zoom
+                        case 'fade-dissolve':
+                        case 'luma-dissolve':
+                        case 'fade-color':
+                            ctx.globalAlpha *= (role === 'main' ? p : 1 - p);
+                            break;
+
+                        case 'dip-to-black':
+                            if (role === 'outgoing') ctx.globalAlpha *= (p < 0.5 ? 1 - (p * 2) : 0);
+                            if (role === 'main') ctx.globalAlpha *= (p > 0.5 ? (p - 0.5) * 2 : 0);
+                            break;
+
+                        // Slides & Pushes
+                        case 'slide':
+                        case 'push':
+                        case 'whip':
+                        case 'band-slide':
+                        case 'smooth-wipe': // Fallback
+                            if (role === 'main') {
+                                ctx.translate(xMult * canvas.width * (1 - p), yMult * canvas.height * (1 - p));
+                            } else if (tType === 'push' || tType === 'whip') {
+                                // Push moves outgoing too
+                                ctx.translate(xMult * -canvas.width * p, yMult * -canvas.height * p);
+                            }
+                            break;
+
+                        // Wipes (Clipping)
+                        case 'wipe':
+                        case 'simple-wipe':
+                            const wipeP = p;
+                            ctx.beginPath();
+                            if (direction === 'right') ctx.rect(0, 0, canvas.width * wipeP, canvas.height); // Wipe Right (Left to Right?) - wait, direction usually means "Wipe TO Right" or "From Left"?
+                            // Standard Wipe Right: Reveals from Left to Right.
+                            // If direction='right', it usually means the line moves right.
+                            // Let's assume standard:
+                            else if (direction === 'left') ctx.rect(canvas.width * (1 - wipeP), 0, canvas.width * wipeP, canvas.height);
+                            else if (direction === 'down') ctx.rect(0, 0, canvas.width, canvas.height * wipeP);
+                            else if (direction === 'up') ctx.rect(0, canvas.height * (1 - wipeP), canvas.width, canvas.height * wipeP);
+                            else ctx.rect(0, 0, canvas.width * wipeP, canvas.height); // Default
+
+                            if (role === 'main') ctx.clip();
+                            // For outgoing, we don't clip, it just stays underneath? Or we clip inverse?
+                            // Usually Main is on top. If Main is clipped, Outgoing shows below.
+                            break;
+
+                        // Fallback for others (Dissolve)
+                        default:
+                            ctx.globalAlpha *= (role === 'main' ? p : 1 - p);
+                            break;
+                    }
+                }
+
                 // 2. Apply Transformations
                 ctx.translate(cx, cy);
                 ctx.rotate((item.rotation || 0) * Math.PI / 180);
@@ -601,7 +756,12 @@ const Canvas: React.FC<CanvasProps> = ({
                 }
 
                 // 3. Apply Opacity & Filter
-                ctx.globalAlpha = (item.opacity ?? 100) / 100;
+                // For buffered items, we want to update cache but NOT draw to main canvas
+                if (isBuffered) {
+                    ctx.globalAlpha = 0; // Don't draw to main canvas
+                } else {
+                    ctx.globalAlpha = (item.opacity ?? 100) / 100;
+                }
 
                 let filterStr = '';
                 if (item.filter && item.filter !== 'none') {
@@ -633,14 +793,20 @@ const Canvas: React.FC<CanvasProps> = ({
 
                         const cacheCtx = cacheCanvas.getContext('2d');
 
+                        // Always try to update cache if we have data
                         if (mediaEl.readyState >= 2 && cacheCtx) {
                             cacheCtx.drawImage(mediaEl, 0, 0, cacheCanvas.width, cacheCanvas.height);
                         }
 
-                        ctx.drawImage(cacheCanvas, -w / 2, -h / 2, w, h);
+                        // Draw from cache to main canvas (unless buffered/invisible)
+                        if (!isBuffered) {
+                            ctx.drawImage(cacheCanvas, -w / 2, -h / 2, w, h);
+                        }
 
                     } else {
-                        ctx.drawImage(mediaEl as CanvasImageSource, -w / 2, -h / 2, w, h);
+                        if (!isBuffered) {
+                            ctx.drawImage(mediaEl as CanvasImageSource, -w / 2, -h / 2, w, h);
+                        }
                     }
                 } catch (e) { }
 
@@ -656,43 +822,91 @@ const Canvas: React.FC<CanvasProps> = ({
     }, [renderScale, dimension]);
 
     // --- Playback Synchronization ---
-    // --- Playback Synchronization ---
+    // Sync video elements with currentTime when it changes
     useEffect(() => {
         [...renderItems, ...bufferedItems].forEach(({ item, role, isBuffered }) => {
             if (item.type === 'video' || item.type === 'audio') {
-                const keys = [item.id]; if (item.type === 'video') keys.push(item.id + '_filter');
+                const keys = [item.id];
+                if (item.type === 'video') keys.push(item.id + '_filter');
+
                 keys.forEach(key => {
                     const mediaEl = mediaRefs.current[key];
-                    if (mediaEl && mediaEl instanceof HTMLMediaElement) {
-                        const speed = item.speed || 1;
-                        let mediaTime = role === 'main' ? ((currentTime - item.start) * speed) + item.offset : (item.duration * speed) + item.offset + ((currentTime - (item.start + item.duration)) * speed);
+                    if (!(mediaEl instanceof HTMLMediaElement)) return;
 
-                        // Clamp time
-                        if (mediaTime < 0) mediaTime = 0;
-                        if (Number.isFinite(mediaEl.duration) && mediaTime > mediaEl.duration) mediaTime = mediaEl.duration;
+                    const speed = item.speed || 1;
+                    let mediaTime;
 
-                        // Sync Current Time
-                        if (Math.abs(mediaEl.currentTime - mediaTime) > 0.2) {
-                            mediaEl.currentTime = mediaTime;
+                    // Calculate target time
+                    if (isBuffered && currentTime < item.start) {
+                        mediaTime = item.offset;
+                    } else {
+                        mediaTime = role === 'main'
+                            ? ((currentTime - item.start) * speed) + item.offset
+                            : (item.duration * speed) + item.offset + ((currentTime - (item.start + item.duration)) * speed);
+                    }
+
+                    // Clamp time
+                    if (mediaTime < 0) mediaTime = 0;
+                    if (Number.isFinite(mediaEl.duration) && mediaTime >= mediaEl.duration) {
+                        mediaTime = Math.max(0, mediaEl.duration - 0.01);
+                    }
+
+                    // Sync with appropriate threshold
+                    const drift = Math.abs(mediaEl.currentTime - mediaTime);
+                    const syncThreshold = isPlaying ? 0.15 : 0.05;
+
+                    if (drift > syncThreshold) {
+                        mediaEl.currentTime = mediaTime;
+                    }
+
+                    // Playback rate
+                    if (Math.abs(mediaEl.playbackRate - speed) > 0.01) {
+                        mediaEl.playbackRate = speed;
+                    }
+
+                    // Volume
+                    mediaEl.muted = item.muteVideo || (item.volume === 0);
+                    mediaEl.volume = item.muteVideo ? 0 : ((item.volume ?? 100) / 100);
+
+                    // Play/Pause
+                    const isAtEnd = Number.isFinite(mediaEl.duration) && Math.abs(mediaEl.currentTime - mediaEl.duration) < 0.1;
+
+                    if (isPlaying && !isBuffered && !isAtEnd) {
+                        if (mediaEl.paused) {
+                            mediaEl.play().catch(() => { });
                         }
-
-                        if (item.type === 'video' || item.type === 'audio') {
-                            mediaEl.playbackRate = speed;
-                            mediaEl.volume = (item.volume ?? 100) / 100;
-                            mediaEl.muted = (item.volume === 0);
-                        }
-
-                        // Play/Pause Logic
-                        if (isPlaying && !isBuffered) {
-                            mediaEl.play().catch(e => { });
-                        } else {
+                    } else {
+                        if (!mediaEl.paused) {
                             mediaEl.pause();
                         }
                     }
                 });
             }
         });
-    }, [currentTime, isPlaying, renderItems, bufferedItems, interactionMode, selectedItemId]);
+    }, [currentTime, isPlaying, renderItems, bufferedItems]);
+
+    // --- Auto-Calculate Height for Aspect Ratio ---
+    useEffect(() => {
+        tracks.forEach(track => {
+            track.items.forEach(item => {
+                if ((item.type === 'video' || item.type === 'image') && !item.isBackground && item.width && !item.height) {
+                    const el = mediaRefs.current[item.id];
+                    if (el) {
+                        let aspect = 0;
+                        if (el instanceof HTMLVideoElement && el.videoWidth) aspect = el.videoWidth / el.videoHeight;
+                        if (el instanceof HTMLImageElement && el.naturalWidth) aspect = el.naturalWidth / el.naturalHeight;
+
+                        if (aspect) {
+                            const canvasAspect = dimension.width / dimension.height;
+                            const hPct = item.width * canvasAspect / aspect;
+                            // Update without history to avoid undo stack pollution for auto-calc
+                            onUpdateClip(track.id, { ...item, height: hPct }, true);
+                        }
+                    }
+                }
+            });
+        });
+    }, [tracks, dimension]);
 
     const fitScale = Math.min((window.innerWidth - 400) / dimension.width, (window.innerHeight - 400) / dimension.height) * 0.85;
     const currentScale = scalePercent === 0 ? Math.max(0.2, fitScale) : scalePercent / 100;
@@ -1070,8 +1284,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
         const adjustmentStyle = getAdjustmentStyle(item, renderScale);
         const presetFilterStyle = getPresetFilterStyle(item.filter || 'none');
-        const intensity = item.filterIntensity ?? 50;
+        const intensity = item.filterIntensity ?? 100;
         const vignetteOpacity = (item.adjustments?.vignette || 0) / 100;
+
+        // Combine adjustment filters and preset filters with intensity
+        const combinedFilterStyle = [adjustmentStyle, presetFilterStyle].filter(Boolean).join(' ').trim();
 
         // Scale pixel values for preview optimization
         const s = (val: number) => val * renderScale;
@@ -1092,25 +1309,30 @@ const Canvas: React.FC<CanvasProps> = ({
                     animationName: animType,
                     animationDuration: `${animDur}s`,
                     animationFillMode: 'both',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             } else if (timing === 'exit') {
                 animationStyle = {
                     animationName: animType,
                     animationDuration: `${animDur}s`,
                     animationDirection: 'reverse',
-                    animationDelay: `${Math.max(0, clipDur - animDur)}s`,
+                    // Allow negative delay so the animation ends exactly at the end of the clip
+                    animationDelay: `${clipDur - animDur}s`,
                     animationFillMode: 'both',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             } else if (timing === 'both') {
                 animationStyle = {
                     animationName: `${animType}, ${animType}`,
                     animationDuration: `${animDur}s, ${animDur}s`,
                     animationDirection: 'normal, reverse',
-                    animationDelay: `0s, ${Math.max(0, clipDur - animDur)}s`,
+                    // Allow negative delay for the exit phase
+                    animationDelay: `0s, ${clipDur - animDur}s`,
                     animationFillMode: 'both, forwards',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             }
         }
@@ -1184,7 +1406,7 @@ const Canvas: React.FC<CanvasProps> = ({
             width: item.isBackground ? '100%' : (item.width ? `${item.width}%` : 'auto'),
             height: item.isBackground ? '100%' : (item.type === 'text' ? 'auto' : (item.height ? `${item.height}%` : 'auto')),
             transform: itemTransform, opacity: isBuffered ? 0 : (isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100),
-            ...maskStyle, filter: adjustmentStyle, ...transitionStyle,
+            ...maskStyle, filter: combinedFilterStyle, ...transitionStyle,
             mixBlendMode: (transitionStyle as any).mixBlendMode,
             pointerEvents: isBuffered ? 'none' : 'auto'
         };
@@ -1209,82 +1431,105 @@ const Canvas: React.FC<CanvasProps> = ({
                     }
                 }}
             >
-                <div style={{ width: '100%', height: '100%', background: 'transparent', ...animationStyle, ...borderRadiusStyle, ...clipPathStyle }} className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass}`}>
+                <div style={{ width: '100%', height: '100%', background: 'transparent', ...animationStyle, ...borderRadiusStyle, ...clipPathStyle }} className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass} ${!item.isBackground ? 'flex items-center justify-center' : ''}`}>
                     {vignetteOpacity > 0 && <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: `radial-gradient(circle, transparent 50%, rgba(0,0,0,${vignetteOpacity}) 100%)`, ...borderRadiusStyle }}></div>}
                     {(!isErasing || item.type === 'text' || item.type === 'color') && (
                         <>
                             {item.type === 'video' && (
                                 <>
-                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} playsInline crossOrigin="anonymous" />
+                                    <video
+                                        ref={(el) => { mediaRefs.current[item.id] = el; }}
+                                        src={item.src}
+                                        className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-auto h-auto max-w-full max-h-full shadow-sm'}`}
+                                        style={{
+                                            objectFit: item.isBackground ? (item.fit || 'cover') : 'contain',
+                                            objectPosition,
+                                            transform: cropTransform,
+                                            boxSizing: 'border-box',
+                                            ...borderStyle,
+                                            ...borderRadiusStyle
+                                        }}
+                                        playsInline
+                                        crossOrigin="anonymous"
+                                        preload="auto"
+                                        disablePictureInPicture
+                                    />
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
-                                    )}
-                                    {/* Border Overlay */}
-                                    {item.border && (
-                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
                                     )}
                                 </>
                             )}
                             {item.type === 'image' && (
                                 <>
-                                    <img ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} />
+                                    <img
+                                        ref={(el) => { mediaRefs.current[item.id] = el; }}
+                                        src={item.src}
+                                        className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-auto h-auto max-w-full max-h-full shadow-sm'}`}
+                                        style={{
+                                            objectFit: item.isBackground ? (item.fit || 'cover') : 'contain',
+                                            objectPosition,
+                                            transform: cropTransform,
+                                            boxSizing: 'border-box',
+                                            ...borderStyle,
+                                            ...borderRadiusStyle
+                                        }}
+                                    />
                                     {/* Add Color Overlay for Tinting Images */}
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
                                     )}
-                                    {/* Border Overlay */}
-                                    {item.border && (
-                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
-                                    )}
                                 </>
                             )}
-                            {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src, ...borderStyle, ...borderRadiusStyle }}></div>}
-                            {item.type === 'text' && (
-                                isEditing ? (
-                                    // Use correct tag for editing to show bullets/numbers natively
-                                    React.createElement(
-                                        item.listType === 'bullet' ? 'ul' : item.listType === 'number' ? 'ol' : 'div',
-                                        {
-                                            ref: textInputRef,
-                                            contentEditable: true,
-                                            suppressContentEditableWarning: true,
-                                            className: `outline-none pointer-events-auto cursor-text ${item.listType === 'bullet' ? 'list-disc list-inside' : item.listType === 'number' ? 'list-decimal list-inside' : ''}`,
-                                            style: {
-                                                ...fullTextStyle, // Apply full styling (including padding) to input
-                                                width: '100%',
-                                                height: '100%',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                overflow: 'visible',
-                                                display: 'inline-block',
-                                                minWidth: '10px'
-                                            },
-                                            onBlur: (e: React.FocusEvent<HTMLElement>) => {
-                                                onUpdateClip(item.trackId, { ...item, name: e.currentTarget.innerText });
-                                                setIsEditingText(false);
-                                            },
-                                            onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
-                                            children: item.listType !== 'none'
-                                                ? item.name.split('\n').map((line, i) => <li key={i}>{line}</li>)
-                                                : item.name
-                                        }
-                                    )
-                                ) : (
-                                    <div className="whitespace-pre-wrap" style={fullTextStyle}>
-                                        {renderTextContent()}
-                                    </div>
-                                )
-                            )}
                         </>
                     )}
-                    {isErasing && (item.type === 'image' || item.type === 'video') && (
-                        <>
-                            <canvas ref={compositeCanvasRef} width={renderWidth} height={renderHeight} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition }} />
-                            <canvas ref={eraserCanvasRef} width={renderWidth} height={renderHeight} className="absolute inset-0 hidden pointer-events-none" />
-                        </>
+                    {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src, ...borderStyle, ...borderRadiusStyle }}></div>}
+                    {item.type === 'text' && (
+                        isEditing ? (
+                            // Use correct tag for editing to show bullets/numbers natively
+                            React.createElement(
+                                item.listType === 'bullet' ? 'ul' : item.listType === 'number' ? 'ol' : 'div',
+                                {
+                                    ref: textInputRef,
+                                    contentEditable: true,
+                                    suppressContentEditableWarning: true,
+                                    className: `outline-none pointer-events-auto cursor-text ${item.listType === 'bullet' ? 'list-disc list-inside' : item.listType === 'number' ? 'list-decimal list-inside' : ''}`,
+                                    style: {
+                                        ...fullTextStyle, // Apply full styling (including padding) to input
+                                        width: '100%',
+                                        height: '100%',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        overflow: 'visible',
+                                        display: 'inline-block',
+                                        minWidth: '10px'
+                                    },
+                                    onBlur: (e: React.FocusEvent<HTMLElement>) => {
+                                        onUpdateClip(item.trackId, { ...item, name: e.currentTarget.innerText });
+                                        setIsEditingText(false);
+                                    },
+                                    onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
+                                    children: item.listType !== 'none'
+                                        ? item.name.split('\n').map((line, i) => <li key={i}>{line}</li>)
+                                        : item.name
+                                }
+                            )
+                        ) : (
+                            <div className="whitespace-pre-wrap" style={fullTextStyle}>
+                                {renderTextContent()}
+                            </div>
+                        )
                     )}
-                </div>
-            </div>
+
+                    {
+                        isErasing && (item.type === 'image' || item.type === 'video') && (
+                            <>
+                                <canvas ref={compositeCanvasRef} width={renderWidth} height={renderHeight} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition }} />
+                                <canvas ref={eraserCanvasRef} width={renderWidth} height={renderHeight} className="absolute inset-0 hidden pointer-events-none" />
+                            </>
+                        )
+                    }
+                </div >
+            </div >
         );
 
         if (!isOverlayPass) { if (isDragging && !item.isBackground) return null; return contentJsx; }
@@ -1386,7 +1631,13 @@ const Canvas: React.FC<CanvasProps> = ({
                     const deleteThreshold = 65;
                     if (Math.abs(selectedItem.x || 0) > deleteThreshold || Math.abs(selectedItem.y || 0) > deleteThreshold) {
                         onDeleteClip(selectedItem.trackId, selectedItem.id);
+                    } else {
+                        // Commit Drag to History
+                        onUpdateClip(selectedItem.trackId, selectedItem, false);
                     }
+                } else if ((isResizing || isRotating) && selectedItem) {
+                    // Commit Resize/Rotate to History
+                    onUpdateClip(selectedItem.trackId, selectedItem, false);
                 }
 
                 setIsDraggingItem(false);
@@ -1503,4 +1754,3 @@ const Canvas: React.FC<CanvasProps> = ({
 };
 
 export default Canvas;
-

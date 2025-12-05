@@ -29,10 +29,10 @@ const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate,
         { id: 'film-dissolve', label: 'Film Dissolve', icon: Film, category: 'Dissolve' },
         { id: 'additive-dissolve', label: 'Additive', icon: Sun, category: 'Dissolve' },
         { id: 'dip-to-black', label: 'Dip to Black', icon: Moon, category: 'Dissolve' },
-        { id: 'dip-to-white', label: 'Dip to White', icon: Sun, category: 'Dissolve' },
+        { id: 'dip-to-white', label: 'Dip to White', icon: Maximize, category: 'Dissolve' },
 
         // Slides
-        { id: 'slide', label: 'Slide', icon: MoveRight, category: 'Slide' },
+        { id: 'slide', label: 'Slide', icon: Shuffle, category: 'Slide' },
         { id: 'push', label: 'Push', icon: ArrowRight, category: 'Slide' },
         { id: 'whip', label: 'Whip', icon: Zap, category: 'Slide' },
         { id: 'split', label: 'Split', icon: Columns, category: 'Slide' },
@@ -44,22 +44,20 @@ const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate,
         { id: 'iris-cross', label: 'Iris Cross', icon: Plus, category: 'Iris' },
 
         // Wipes
-        { id: 'wipe', label: 'Wipe', icon: ArrowRight, category: 'Wipe' },
+        { id: 'wipe', label: 'Wipe', icon: Eraser, category: 'Wipe' },
         { id: 'barn-doors', label: 'Barn Doors', icon: LayoutGrid, category: 'Wipe' },
         { id: 'clock-wipe', label: 'Clock Wipe', icon: Clock, category: 'Wipe' },
         { id: 'venetian-blinds', label: 'Venetian', icon: AlignJustify, category: 'Wipe' },
-        { id: 'checker-wipe', label: 'Checker', icon: Grid, category: 'Wipe' },
-        { id: 'zig-zag', label: 'Zig Zag', icon: Zap, category: 'Wipe' },
+        { id: 'checker-wipe', label: 'Checker', icon: CheckCircle2, category: 'Wipe' },
+        { id: 'zig-zag', label: 'Zig Zag', icon: Wind, category: 'Wipe' },
 
         // Zoom & Page
-        // Zoom & Page
-        { id: 'cross-zoom', label: 'Cross Zoom', icon: MoveRight, category: 'Zoom' },
+        { id: 'cross-zoom', label: 'Cross Zoom', icon: MoveDiagonal, category: 'Zoom' },
         { id: 'zoom-in', label: 'Zoom In', icon: Maximize, category: 'Zoom' },
         { id: 'zoom-out', label: 'Zoom Out', icon: Minimize, category: 'Zoom' },
-        { id: 'warp-zoom', label: 'Warp Zoom', icon: MoveDiagonal, category: 'Zoom' },
-        { id: 'morph-cut', label: 'Morph Cut', icon: Wand2, category: 'Zoom' },
+        { id: 'warp-zoom', label: 'Warp Zoom', icon: Wand2, category: 'Zoom' },
+        { id: 'morph-cut', label: 'Morph Cut', icon: Shuffle, category: 'Zoom' },
         { id: 'page-peel', label: 'Page Peel', icon: BookOpen, category: 'Page' },
-        { id: 'page-curl', label: 'Page Curl', icon: BookOpen, category: 'Page' },
 
         // Legacy
         { id: 'stack', label: 'Stack', icon: Layers, category: 'Other' },
@@ -70,12 +68,10 @@ const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate,
         // 3D & Perspective
         { id: 'cube-rotate', label: 'Cube Rotate', icon: Box, category: '3D' },
         { id: 'flip-3d', label: '3D Flip', icon: RotateCw, category: '3D' },
-        { id: 'spin-3d', label: '3D Spin', icon: RotateCw, category: '3D' },
 
         // Glitch & Digital
         { id: 'glitch', label: 'Glitch', icon: ZapOff, category: 'Digital' },
         { id: 'rgb-split', label: 'RGB Split', icon: Split, category: 'Digital' },
-        { id: 'chromatic-aberration', label: 'Chromatic', icon: Split, category: 'Digital' },
         { id: 'pixelate', label: 'Pixelate', icon: Grid, category: 'Digital' },
         { id: 'datamosh', label: 'Datamosh', icon: Monitor, category: 'Digital' },
 
@@ -83,7 +79,7 @@ const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate,
         { id: 'film-burn', label: 'Film Burn', icon: Flame, category: 'Light' },
         { id: 'flash', label: 'Flash', icon: Zap, category: 'Light' },
         { id: 'light-leak', label: 'Light Leak', icon: Sun, category: 'Light' },
-        { id: 'luma-dissolve', label: 'Luma Dissolve', icon: Sun, category: 'Light' },
+        { id: 'luma-dissolve', label: 'Luma Dissolve', icon: ScanLine, category: 'Light' },
         { id: 'fade-color', label: 'Fade Color', icon: Palette, category: 'Light' },
 
         // Distort & Liquid
@@ -98,25 +94,20 @@ const TransitionPanel: React.FC<TransitionPanelProps> = ({ transition, onUpdate,
 
         // Tile & Grid
         { id: 'tile-drop', label: 'Tile Drop', icon: LayoutGrid, category: 'Tile' },
-        { id: 'mosaic-grid', label: 'Mosaic', icon: Grid, category: 'Tile' },
-        { id: 'multi-panel', label: 'Multi Panel', icon: Columns, category: 'Tile' },
+        { id: 'mosaic-grid', label: 'Mosaic', icon: Image, category: 'Tile' },
         { id: 'split-screen', label: 'Split Screen', icon: Columns, category: 'Tile' },
 
         // Blur & Speed
         { id: 'speed-blur', label: 'Speed Blur', icon: Wind, category: 'Blur' },
-        { id: 'whip-pan', label: 'Whip Pan', icon: MoveRight, category: 'Blur' },
+        { id: 'whip-pan', label: 'Whip Pan', icon: Grip, category: 'Blur' },
         { id: 'zoom-blur', label: 'Zoom Blur', icon: MoveDiagonal, category: 'Blur' },
 
         // Stylized
         { id: 'brush-reveal', label: 'Brush', icon: Brush, category: 'Stylized' },
         { id: 'ink-splash', label: 'Ink Splash', icon: Droplet, category: 'Stylized' },
 
-        // Previous Advanced
-        { id: 'fade-dissolve', label: 'Fade Dissolve', icon: Moon, category: 'Advanced' },
-        { id: 'flash-zoom-in', label: 'Flash Zoom In', icon: Zap, category: 'Advanced' },
-        { id: 'flash-zoom-out', label: 'Flash Zoom Out', icon: Zap, category: 'Advanced' },
+        // Advanced
         { id: 'film-roll', label: 'Film Roll', icon: Film, category: 'Advanced' },
-        { id: 'ripple-dissolve', label: 'Ripple Dissolve', icon: Waves, category: 'Distortion' },
         { id: 'smooth-wipe', label: 'Smooth Wipe', icon: Eraser, category: 'Cinematic' },
         { id: 'spin', label: 'Spin', icon: RotateCw, category: 'Trendy' },
     ];

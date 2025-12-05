@@ -8,7 +8,7 @@ export interface Project {
 }
 
 import React from 'react';
-import { Move, ArrowRight, ZoomIn, RotateCw, Layers, Maximize, Minimize, ArrowUp, MoveRight, Wind, Droplet, Zap, CircleDot, Tv, Activity, Circle, MoveHorizontal, MoveVertical, ArrowDown, ZoomOut, Expand, Triangle, Scissors, RefreshCw, Send, ArrowLeft, Rocket, Scale, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, CornerLeftUp, CornerRightUp, CornerLeftDown, CornerRightDown, ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, MousePointerClick, Target, Eye, EyeOff, Aperture, Focus, Scan, Crosshair, Disc, Globe, Sun, Moon, Cloud, Star, Heart, Sparkles } from 'lucide-react';
+import { Move, ArrowRight, ZoomIn, RotateCw, Layers, Maximize, Minimize, ArrowUp, MoveRight, Wind, Droplet, Zap, CircleDot, Tv, Activity, Circle, MoveHorizontal, MoveVertical, ArrowDown, ZoomOut, Expand, Triangle, Scissors, RefreshCw, Send, ArrowLeft, Rocket, Scale, ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight, CornerLeftUp, CornerRightUp, CornerLeftDown, CornerRightDown, ChevronsLeft, ChevronsRight, ChevronsUp, ChevronsDown, MousePointerClick, Target, Eye, EyeOff, Aperture, Focus, Scan, Crosshair, Disc, Globe, Sun, Moon, Cloud, Star, Heart, Sparkles, Monitor, ArrowUpFromLine } from 'lucide-react';
 export type ClipType = 'video' | 'audio' | 'image' | 'text' | 'color';
 
 export type TransitionType =
@@ -153,7 +153,6 @@ export const FONTS = [
     { name: 'Futura', family: 'Futura, "Trebuchet MS", Arial, sans-serif' },
     { name: 'Avenir', family: 'Avenir, "Segoe UI", sans-serif' },
     { name: 'Proxima Nova', family: '"Proxima Nova", sans-serif' },
-    { name: 'Gotham', family: 'Gotham, "Montserrat", sans-serif' },
     { name: 'Segoe UI', family: '"Segoe UI", sans-serif' },
     { name: 'Ubuntu', family: 'Ubuntu, sans-serif' },
     { name: 'Noto Sans', family: '"Noto Sans", sans-serif' },
@@ -162,7 +161,6 @@ export const FONTS = [
     { name: 'Raleway', family: 'Raleway, sans-serif' },
     { name: 'Oswald', family: 'Oswald, sans-serif' },
     { name: 'Bebas Neue', family: '"Bebas Neue", sans-serif' },
-    { name: 'DIN', family: 'DIN, "Roboto", sans-serif' },
     { name: 'SF Pro', family: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif' },
     { name: 'Arimo', family: 'Arimo, sans-serif' },
     { name: 'DM Sans', family: '"DM Sans", sans-serif' },
@@ -183,7 +181,6 @@ export const FONTS = [
     { name: 'Lora', family: 'Lora, serif' },
     { name: 'Crimson Text', family: '"Crimson Text", serif' },
     { name: 'Spectral', family: 'Spectral, serif' },
-    { name: 'Charter', family: 'Charter, "Bitstream Charter", serif' },
     { name: 'Constantia', family: 'Constantia, serif' },
 
     // --- Slab Serif ---
@@ -192,7 +189,6 @@ export const FONTS = [
     { name: 'Arvo', family: 'Arvo, serif' },
     { name: 'Egyptienne', family: '"Courier New", serif' },
     { name: 'Clarendon', family: 'Clarendon, serif' },
-    { name: 'Memphis', family: 'Memphis, serif' },
 
     // --- Monospace ---
     { name: 'Courier New', family: '"Courier New", monospace' },
@@ -212,13 +208,7 @@ export const FONTS = [
     { name: 'Great Vibes', family: '"Great Vibes", cursive' },
     { name: 'Dancing Script', family: '"Dancing Script", cursive' },
     { name: 'Brush Script', family: '"Brush Script MT", cursive' },
-    { name: 'Brittany', family: 'cursive' },
-    { name: 'Halimun', family: 'cursive' },
-    { name: 'Allura', family: 'Allura, cursive' },
-    { name: 'Satisfy', family: 'Satisfy, cursive' },
-    { name: 'Alex Brush', family: '"Alex Brush", cursive' },
     { name: 'Parisienne', family: 'Parisienne, cursive' },
-    { name: 'Moontime', family: 'cursive' },
 
     // --- Display ---
     { name: 'Impact', family: 'Impact, sans-serif' },
@@ -226,8 +216,6 @@ export const FONTS = [
     { name: 'League Spartan', family: '"League Spartan", sans-serif' },
     { name: 'Cooper Black', family: '"Cooper Black", serif' },
     { name: 'Blackletter', family: '"UnifrakturMaguntia", cursive' },
-    { name: 'Norwester', family: 'Norwester, sans-serif' },
-    { name: 'Avenir Next Heavy', family: 'AvenirNext-Heavy, sans-serif' },
     { name: 'Archivo Black', family: '"Archivo Black", sans-serif' },
     { name: 'Abril Fatface', family: '"Abril Fatface", display' },
     { name: 'Alfa Slab One', family: '"Alfa Slab One", display' },
@@ -245,7 +233,6 @@ export const FONTS = [
     { name: 'Gill Sans', family: '"Gill Sans", sans-serif' },
     { name: 'Franklin Gothic', family: '"Franklin Gothic Medium", sans-serif' },
     { name: 'Lucida Sans', family: '"Lucida Sans", sans-serif' },
-    { name: 'Myriad Pro', family: '"Myriad Pro", sans-serif' },
 ];
 
 export interface FontCombination {
@@ -494,6 +481,8 @@ export interface TimelineItem {
     // Audio & Speed
     volume?: number; // 0 to 100
     speed?: number; // 0.1 to 5.0 (multiplier)
+    muteVideo?: boolean; // Completely mute video audio
+
 
     // Crop & Mask
     crop?: { x: number; y: number; zoom: number }; // x,y in % (0-100), zoom multiplier (>=1)
@@ -689,10 +678,8 @@ export const MOCK_VIDEOS = [
 ];
 
 export const MOCK_AUDIO = [
-    { id: 'a1', src: 'https://actions.google.com/sounds/v1/science_fiction/scifi_drone_low.ogg', name: 'Sci-Fi Drone', duration: '0:23', category: 'Cinematic' },
     { id: 'a2', src: 'https://actions.google.com/sounds/v1/water/waves_crashing_on_rock_beach.ogg', name: 'Ocean Waves', duration: '0:45', category: 'Nature' },
     { id: 'a3', src: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg', name: 'Heavy Rain', duration: '0:30', category: 'Nature' },
-    { id: 'a4', src: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg', name: 'Digital Alarm', duration: '0:06', category: 'Effects' },
 ];
 
 export const MOCK_TEXT_STYLES = [
@@ -741,7 +728,7 @@ export const ANIMATIONS: AnimationDefinition[] = [
     { id: 'spin-1', name: 'Spin 1', category: 'Rotation', icon: React.createElement(RefreshCw, { size: 16 }) },
 
     // ✅ SLIDE
-    { id: 'slide-down-up-1', name: 'Slide Up', category: 'Slide', icon: React.createElement(ArrowUp, { size: 16 }) },
+    { id: 'slide-down-up-1', name: 'Slide Up', category: 'Slide', icon: React.createElement(ArrowUpFromLine, { size: 16 }) },
     { id: 'move-left', name: 'Move Left', category: 'Slide', icon: React.createElement(ChevronsLeft, { size: 16 }) },
     { id: 'move-right', name: 'Move Right', category: 'Slide', icon: React.createElement(ChevronsRight, { size: 16 }) },
     { id: 'move-top', name: 'Move Top', category: 'Slide', icon: React.createElement(ChevronsUp, { size: 16 }) },
@@ -768,7 +755,7 @@ export const ANIMATIONS: AnimationDefinition[] = [
     // ✅ CREATIVE
     { id: 'round-open', name: 'Round Open', category: 'Creative', icon: React.createElement(Circle, { size: 16 }) },
     { id: 'expansion', name: 'Expansion', category: 'Creative', icon: React.createElement(Expand, { size: 16 }) },
-    { id: 'old-tv', name: 'Old TV', category: 'Creative', icon: React.createElement(Tv, { size: 16, className: "text-gray-400" }) },
+    { id: 'old-tv', name: 'Old TV', category: 'Creative', icon: React.createElement(Monitor, { size: 16 }) },
     { id: 'shard-roll', name: 'Shard Roll', category: 'Creative', icon: React.createElement(Triangle, { size: 16 }) },
     { id: 'tear-paper', name: 'Tear Paper', category: 'Creative', icon: React.createElement(Scissors, { size: 16 }) },
 
@@ -780,36 +767,25 @@ export const ANIMATIONS: AnimationDefinition[] = [
 
     // ✅ FLY / ROTATE / GROW
     { id: 'fly-in-rotate', name: 'Fly In Rotate', category: 'Fly', icon: React.createElement(Send, { size: 16 }) },
-    { id: 'fly-in-flip', name: 'Fly In Flip', category: 'Fly', icon: React.createElement(Send, { size: 16, className: "-scale-x-100" }) },
-    { id: 'fly-to-zoom', name: 'Fly To Zoom', category: 'Fly', icon: React.createElement(Rocket, { size: 16 }) },
+    { id: 'fly-in-flip', name: 'Fly In Flip', category: 'Fly', icon: React.createElement(Rocket, { size: 16 }) },
+    { id: 'fly-to-zoom', name: 'Fly To Zoom', category: 'Fly', icon: React.createElement(MousePointerClick, { size: 16 }) },
     { id: 'grow-shrink', name: 'Grow Shrink', category: 'Fly', icon: React.createElement(Scale, { size: 16 }) },
 
     // ✅ STRETCH
-    { id: 'stretch-in-left', name: 'Stretch Left', category: 'Stretch', icon: React.createElement(ArrowLeft, { size: 16, className: "scale-x-150" }) },
-    { id: 'stretch-in-right', name: 'Stretch Right', category: 'Stretch', icon: React.createElement(ArrowRight, { size: 16, className: "scale-x-150" }) },
-    { id: 'stretch-in-up', name: 'Stretch Up', category: 'Stretch', icon: React.createElement(ArrowUp, { size: 16, className: "scale-y-150" }) },
-    { id: 'stretch-in-down', name: 'Stretch Down', category: 'Stretch', icon: React.createElement(ArrowDown, { size: 16, className: "scale-y-150" }) },
+    { id: 'stretch-in-left', name: 'Stretch Left', category: 'Stretch', icon: React.createElement(ArrowLeft, { size: 20, strokeWidth: 3 }) },
+    { id: 'stretch-in-right', name: 'Stretch Right', category: 'Stretch', icon: React.createElement(MoveRight, { size: 16 }) },
+    { id: 'stretch-in-up', name: 'Stretch Up', category: 'Stretch', icon: React.createElement(ArrowUp, { size: 20, strokeWidth: 3 }) },
+    { id: 'stretch-in-down', name: 'Stretch Down', category: 'Stretch', icon: React.createElement(ArrowDown, { size: 20, strokeWidth: 3 }) },
     { id: 'stretch-to-full', name: 'Stretch Full', category: 'Stretch', icon: React.createElement(Maximize, { size: 16, className: "scale-125" }) },
 
-    // ✅ POSITION
-    { id: 'to-left-1', name: 'To Left 1', category: 'Slide', icon: React.createElement(ArrowLeft, { size: 16 }) },
-    { id: 'to-left-2', name: 'To Left 2', category: 'Slide', icon: React.createElement(ArrowLeft, { size: 16, className: "opacity-70" }) },
-    { id: 'to-right-1', name: 'To Right 1', category: 'Slide', icon: React.createElement(ArrowRight, { size: 16 }) },
-    { id: 'to-right-2', name: 'To Right 2', category: 'Slide', icon: React.createElement(ArrowRight, { size: 16, className: "opacity-70" }) },
-    { id: 'up-down-1', name: 'Up Down 1', category: 'Slide', icon: React.createElement(MoveVertical, { size: 16 }) },
-    { id: 'up-down-2', name: 'Up Down 2', category: 'Slide', icon: React.createElement(MoveVertical, { size: 16, className: "opacity-70" }) },
-
     // ✅ ZOOM
-    { id: 'tiny-zoom', name: 'Tiny Zoom', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "scale-75" }) },
+    { id: 'tiny-zoom', name: 'Tiny Zoom', category: 'Zoom', icon: React.createElement(Scan, { size: 16 }) },
     { id: 'zoom-in-center', name: 'Zoom Center', category: 'Zoom', icon: React.createElement(Focus, { size: 16 }) },
-    { id: 'zoom-in-left', name: 'Zoom Left', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-left" }) },
-    { id: 'zoom-in-right', name: 'Zoom Right', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-right" }) },
-    { id: 'zoom-in-top', name: 'Zoom Top', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-top" }) },
-    { id: 'zoom-in-bottom', name: 'Zoom Bottom', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "origin-bottom" }) },
-    { id: 'zoom-in-1', name: 'Zoom In 1', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16 }) },
-    { id: 'zoom-in-2', name: 'Zoom In 2', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16, className: "scale-125" }) },
-    { id: 'zoom-out-1', name: 'Zoom Out 1', category: 'Zoom', icon: React.createElement(ZoomOut, { size: 16 }) },
-    { id: 'zoom-out-2', name: 'Zoom Out 2', category: 'Zoom', icon: React.createElement(ZoomOut, { size: 16, className: "scale-125" }) },
-    { id: 'zoom-out-3', name: 'Zoom Out 3', category: 'Zoom', icon: React.createElement(Minimize, { size: 16 }) },
+    { id: 'zoom-in-left', name: 'Zoom Left', category: 'Zoom', icon: React.createElement(ArrowUpLeft, { size: 16 }) },
+    { id: 'zoom-in-right', name: 'Zoom Right', category: 'Zoom', icon: React.createElement(ArrowUpRight, { size: 16 }) },
+    { id: 'zoom-in-top', name: 'Zoom Top', category: 'Zoom', icon: React.createElement(ArrowDownLeft, { size: 16 }) },
+    { id: 'zoom-in-bottom', name: 'Zoom Bottom', category: 'Zoom', icon: React.createElement(ArrowDownRight, { size: 16 }) },
+    { id: 'zoom-in-1', name: 'Zoom In', category: 'Zoom', icon: React.createElement(ZoomIn, { size: 16 }) },
+    { id: 'zoom-out-1', name: 'Zoom Out', category: 'Zoom', icon: React.createElement(ZoomOut, { size: 16 }) },
     { id: 'wham', name: 'Wham', category: 'Zoom', icon: React.createElement(Target, { size: 16 }) },
 ];

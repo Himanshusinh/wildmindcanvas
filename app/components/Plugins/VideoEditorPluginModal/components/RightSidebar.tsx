@@ -4,7 +4,7 @@ import {
     SquarePen, CirclePlay, Eraser, Crop, FlipHorizontal, FlipVertical, Droplets,
     Square, Circle, MessageSquare, Lock, CopyPlus, Trash2, MoreHorizontal,
     Type, PaintBucket, Plus, Check, X, Minus, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Wand2,
-    Palette, Frame
+    Palette, Frame, XCircle
 } from 'lucide-react';
 import { TimelineItem, BorderStyle } from '../types';
 
@@ -21,7 +21,7 @@ interface RightSidebarProps {
     onCopy: () => void;
     onPaste: () => void;
     onSplit: () => void;
-    onDetach: () => void;
+    onDetach: (trackId: string, itemId: string) => void;
     onFont: () => void;
     onTextEffects: () => void;
 }
@@ -140,7 +140,11 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                 {/* Border - Moved Up */}
                 {(isImage || isVideo || isColor) && (
                     <div className="relative w-full">
-                        <button onClick={(e) => togglePopup('border', e)} className={`flex flex-col items-center justify-center py-3 w-full transition-all relative shrink-0 hover:text-gray-100 hover:bg-[#1f2021] ${activePopup === 'border' ? 'bg-[#1f2021] text-gray-100' : ''}`}>
+                        <button
+                            onClick={(e) => !selectedItem.isBackground && togglePopup('border', e)}
+                            disabled={selectedItem.isBackground}
+                            className={`flex flex-col items-center justify-center py-3 w-full transition-all relative shrink-0 ${selectedItem.isBackground ? 'opacity-30 cursor-not-allowed' : 'hover:text-gray-100 hover:bg-[#1f2021]'} ${activePopup === 'border' ? 'bg-[#1f2021] text-gray-100' : ''}`}
+                        >
                             <Frame size={20} className="mb-1.5" />
                             <span className="text-[10px] font-medium">Border</span>
                         </button>
@@ -298,7 +302,7 @@ const RightSidebar: React.FC<RightSidebarProps> = ({
                                 <span className="rotate-90"><MoreHorizontal size={16} /></span> Split
                             </button>
                             <div className="h-px bg-gray-100 my-1"></div>
-                            <button onClick={() => { onDetach(); setActivePopup(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3">
+                            <button onClick={() => { onDetach(selectedItem.trackId, selectedItem.id); setActivePopup(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3">
                                 {selectedItem.isBackground ? <Eraser size={16} /> : <Square size={16} />}
                                 {selectedItem.isBackground ? 'Detach from background' : 'Set as background'}
                             </button>

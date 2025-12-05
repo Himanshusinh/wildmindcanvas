@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, VideoEditorGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [imageGenerators, setImageGenerators] = useState<ImageGenerator[]>([]);
   const [videoGenerators, setVideoGenerators] = useState<VideoGenerator[]>([]);
+  const [videoEditorGenerators, setVideoEditorGenerators] = useState<VideoEditorGenerator[]>([]);
   const [musicGenerators, setMusicGenerators] = useState<MusicGenerator[]>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<UpscaleGenerator[]>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<RemoveBgGenerator[]>([]);
@@ -24,6 +25,7 @@ export function useCanvasState() {
     images,
     imageGenerators,
     videoGenerators,
+    videoEditorGenerators,
     musicGenerators,
     upscaleGenerators,
     removeBgGenerators,
@@ -42,6 +44,7 @@ export function useCanvasState() {
     setImages,
     setImageGenerators,
     setVideoGenerators,
+    setVideoEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
     setRemoveBgGenerators,
