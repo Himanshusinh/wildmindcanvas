@@ -1565,8 +1565,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedVectorizeModalIds([]);
     setSelectedStoryboardModalId(null);
     setSelectedStoryboardModalIds([]);
-    setSelectedVideoEditorModalId(null);
-    setSelectedVideoEditorModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -3494,8 +3492,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         return;
       }
       // Handle 'z' to zoom to selection or to all components
-      // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
-      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
+      if (e.key === 'z' && !e.repeat) {
         // Avoid when typing in inputs
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
@@ -3936,49 +3933,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         const wasDragged = boxWidth > 5 || boxHeight > 5;
 
         if (wasDragged) {
-          // Optional smart selection over marquee region: compute tight mask bbox
-          try {
-            const stageCanvas = stage.toCanvas();
-            const ctx = (stageCanvas as any)?.getContext?.('2d');
-            if (ctx) {
-              const rx = Math.max(0, Math.min(marqueeRect.x, INFINITE_CANVAS_SIZE - 1));
-              const ry = Math.max(0, Math.min(marqueeRect.y, INFINITE_CANVAS_SIZE - 1));
-              const rw = Math.max(1, Math.min(marqueeRect.width, INFINITE_CANVAS_SIZE - rx));
-              const rh = Math.max(1, Math.min(marqueeRect.height, INFINITE_CANVAS_SIZE - ry));
-              // Read pixels via an offscreen canvas mapped to current layer transform
-              const off = document.createElement('canvas');
-              off.width = Math.ceil(rw * scale);
-              off.height = Math.ceil(rh * scale);
-              const offCtx = off.getContext('2d');
-              if (offCtx && containerRef.current) {
-                // Draw the visible area into offscreen using DOM canvas snapshot
-                // Best-effort: use HTMLCanvasElement copy if available
-                const domCanvas = containerRef.current.querySelector('canvas') as HTMLCanvasElement | null;
-                if (domCanvas) {
-                  // Compute screen-space selection rect
-                  const sx = (rx * scale) + position.x;
-                  const sy = (ry * scale) + position.y;
-                  offCtx.drawImage(domCanvas, sx, sy, rw * scale, rh * scale, 0, 0, rw * scale, rh * scale);
-                  const imgData = offCtx.getImageData(0, 0, off.width, off.height);
-                  import('@/lib/grabcut').then(({ grabCutRegion }) => {
-                    const res = grabCutRegion(imgData);
-                    if (res.bbox) {
-                      // Map bbox back to canvas coords
-                      const bx = rx + (res.bbox.x / scale);
-                      const by = ry + (res.bbox.y / scale);
-                      const bw = res.bbox.width / scale;
-                      const bh = res.bbox.height / scale;
-                      // Use smart bbox as initial tight rect; snapping to full components happens below
-                      setSelectionTightRect({ x: bx, y: by, width: Math.max(1, bw), height: Math.max(1, bh) });
-                      selectionDragOriginRef.current = { x: bx, y: by };
-                      setSelectionBox(null);
-                      setIsDragSelection(true);
-                    }
-                  }).catch(() => {/* ignore */ });
-                }
-              }
-            }
-          } catch {/* best-effort fallback to existing logic */ }
           // Find all items that intersect with the marquee using Konva's intersection utility
           const selectedIndices: number[] = [];
           const selectedImageModalIdsList: string[] = [];
@@ -4028,12 +3982,11 @@ export const Canvas: React.FC<CanvasProps> = ({
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
 
             // Check if rectangles overlap (any intersection)
-            // Treat edge-touch as overlap: include components that touch the marquee border
             const overlaps = !(
-              componentRight <= marqueeRect.x ||
-              itemRect.x >= marqueeRight ||
-              componentBottom <= marqueeRect.y ||
-              itemRect.y >= marqueeBottom
+              componentRight < marqueeRect.x ||
+              itemRect.x > marqueeRight ||
+              componentBottom < marqueeRect.y ||
+              itemRect.y > marqueeBottom
             );
 
             if (overlaps) {
@@ -4060,10 +4013,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
 
             const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
             );
 
             if (overlaps) {
@@ -4090,10 +4043,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
 
             const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
             );
 
             if (overlaps) {
@@ -4120,10 +4073,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
 
             const overlaps = !(
-              modalRight <= marqueeRect.x ||
-              modalRect.x >= marqueeRight ||
-              modalBottom <= marqueeRect.y ||
-              modalRect.y >= marqueeBottom
+              modalRight < marqueeRect.x ||
+              modalRect.x > marqueeRight ||
+              modalBottom < marqueeRect.y ||
+              modalRect.y > marqueeBottom
             );
 
             if (overlaps) {
@@ -4150,10 +4103,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const marqueeBottom = marqueeRect.y + marqueeRect.height;
 
             const overlaps = !(
-              textRight <= marqueeRect.x ||
-              textRect.x >= marqueeRight ||
-              textBottom <= marqueeRect.y ||
-              textRect.y >= marqueeBottom
+              textRight < marqueeRect.x ||
+              textRect.x > marqueeRight ||
+              textBottom < marqueeRect.y ||
+              textRect.y > marqueeBottom
             );
 
             if (overlaps) {
@@ -4357,27 +4310,65 @@ export const Canvas: React.FC<CanvasProps> = ({
               maxY = Math.max(maxY, iy + ih);
             });
 
-            // Helper to update bounds for any modal-like component.
-            // Uses the component's actual frameWidth / frameHeight when available,
-            // falling back to the provided defaults only if size is not set.
-            const updateBounds = (id: string, list: any[], defaultWidth: number, defaultHeight: number) => {
-              const m = list.find(item => item.id === id);
-              if (m) {
-                const mx = m.x ?? 0;
-                const my = m.y ?? 0;
-                const mw = m.frameWidth ?? defaultWidth;
-                const mh = m.frameHeight ?? defaultHeight;
-                minX = Math.min(minX, mx);
-                minY = Math.min(minY, my);
-                maxX = Math.max(maxX, mx + mw);
-                maxY = Math.max(maxY, my + mh);
+            // Include image modals
+            // Image modals: 600px wide, height = max(400px, 600px / aspectRatio)
+            // The frame has minHeight: 400px, but actual height varies by aspect ratio
+            // For tight bounding box, we need to use the actual visible frame height
+            // Since we can't know the exact aspect ratio, use a conservative estimate
+            // Most common: 1:1 = 600px, 16:9 = 400px (clamped), 9:16 = 1066px
+            // To ensure tight fit and avoid extra space, use a value that works for common cases
+            // Using 400px ensures we don't overestimate for 16:9, but may underestimate for 1:1
+            selectedImageModalIdsList.forEach((id) => {
+              const modal = imageModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600; // Fixed width
+                // Use minimum frame height to ensure tight bounding box
+                // This matches the CSS minHeight and works for most aspect ratios
+                // Use a slightly smaller estimate to ensure tight fit at bottom
+                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
+                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                // Calculate bottom edge: modal.y + modalHeight
+                // This gives us the actual bottom border of this component
+                maxY = Math.max(maxY, modal.y + modalHeight);
               }
-            };
+            });
 
-            // Include image / video / music modals using their actual frame sizes
-            selectedImageModalIdsList.forEach(id => updateBounds(id, imageModalStates, 600, 400));
-            selectedVideoModalIdsList.forEach(id => updateBounds(id, videoModalStates, 600, 400));
-            selectedMusicModalIdsList.forEach(id => updateBounds(id, musicModalStates, 600, 300));
+            // Include video modals
+            // Video modals: 600px wide, height = max(400px, 600px / aspectRatio)
+            // Default aspect ratio is 16:9, so height = max(400px, 600/(16/9)) = max(400px, 337.5px) = 400px
+            // Use the minimum frame height to ensure tight bounding box
+            selectedVideoModalIdsList.forEach((id) => {
+              const modal = videoModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600; // Fixed width
+                // Use a slightly smaller estimate to ensure tight fit at bottom
+                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
+                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                // Calculate bottom edge: modal.y + modalHeight
+                // This gives us the actual bottom border of this component
+                maxY = Math.max(maxY, modal.y + modalHeight);
+              }
+            });
+
+            // Include music modals
+            // Music modals: 600px wide, 300px height (fixed) - this is the frame height
+            selectedMusicModalIdsList.forEach((id) => {
+              const modal = musicModalStates.find(m => m.id === id);
+              if (modal) {
+                const modalWidth = 600; // Fixed width
+                const modalHeight = 300; // Fixed frame height
+                minX = Math.min(minX, modal.x);
+                minY = Math.min(minY, modal.y);
+                maxX = Math.max(maxX, modal.x + modalWidth);
+                maxY = Math.max(maxY, modal.y + modalHeight);
+              }
+            });
 
             // Include text input modals
             // Text inputs: min 400px width, height is variable based on content
@@ -4400,7 +4391,21 @@ export const Canvas: React.FC<CanvasProps> = ({
               }
             });
 
-            // Include other plugin modals
+            // Helper to update bounds for generic modals
+            const updateBounds = (id: string, list: any[], width: number, height: number) => {
+              const m = list.find(item => item.id === id);
+              if (m) {
+                const mx = m.x ?? 0;
+                const my = m.y ?? 0;
+                const mw = m.frameWidth ?? width;
+                const mh = m.frameHeight ?? height;
+                minX = Math.min(minX, mx);
+                minY = Math.min(minY, my);
+                maxX = Math.max(maxX, mx + mw);
+                maxY = Math.max(maxY, my + mh);
+              }
+            };
+
             selectedUpscaleModalIdsList.forEach(id => updateBounds(id, upscaleModalStates, 600, 400));
             selectedRemoveBgModalIdsList.forEach(id => updateBounds(id, removeBgModalStates, 600, 400));
             selectedEraseModalIdsList.forEach(id => updateBounds(id, eraseModalStates, 600, 400));
@@ -4887,25 +4892,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedImageModalIds.length > 0 ||
         selectedVideoModalIds.length > 0 ||
         selectedMusicModalIds.length > 0 ||
-        selectedTextInputIds.length > 0 ||
-        selectedUpscaleModalId !== null ||
-        selectedUpscaleModalIds.length > 0 ||
-        selectedExpandModalId !== null ||
-        selectedExpandModalIds.length > 0 ||
-        selectedEraseModalId !== null ||
-        selectedEraseModalIds.length > 0 ||
-        selectedRemoveBgModalId !== null ||
-        selectedRemoveBgModalIds.length > 0 ||
-        selectedVectorizeModalId !== null ||
-        selectedVectorizeModalIds.length > 0 ||
-        selectedStoryboardModalId !== null ||
-        selectedStoryboardModalIds.length > 0 ||
-        selectedVideoEditorModalId !== null ||
-        selectedVideoEditorModalIds.length > 0 ||
-        selectedScriptFrameModalId !== null ||
-        selectedScriptFrameModalIds.length > 0 ||
-        selectedSceneFrameModalId !== null ||
-        selectedSceneFrameModalIds.length > 0;
+        selectedTextInputIds.length > 0;
 
       if (hasSelections) {
         clearAllSelections(true);

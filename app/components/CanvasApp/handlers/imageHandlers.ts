@@ -271,25 +271,18 @@ export function createImageHandlers(
       // Parse aspect ratio to get width/height if needed
       const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
       const aspectRatioValue = widthRatio / heightRatio;
-
-      // Use passed width/height if available, otherwise calculate from base size
+      const baseSize = 1024; // Base size for generation
       let genWidth: number;
       let genHeight: number;
 
-      if (width && height) {
-        genWidth = width;
-        genHeight = height;
+      if (aspectRatioValue >= 1) {
+        // Landscape or square
+        genWidth = Math.round(baseSize * aspectRatioValue);
+        genHeight = baseSize;
       } else {
-        const baseSize = 1024; // Base size for generation
-        if (aspectRatioValue >= 1) {
-          // Landscape or square
-          genWidth = Math.round(baseSize * aspectRatioValue);
-          genHeight = baseSize;
-        } else {
-          // Portrait
-          genWidth = baseSize;
-          genHeight = Math.round(baseSize / aspectRatioValue);
-        }
+        // Portrait
+        genWidth = baseSize;
+        genHeight = Math.round(baseSize / aspectRatioValue);
       }
 
       // Resolve stitched reference from snapshot metadata (belt-and-suspenders override)
@@ -301,7 +294,6 @@ export function createImageHandlers(
           const stitchedMeta = (current?.snapshot?.metadata as any)?.stitchedimage as any;
           let stitchedUrl: string | undefined;
           if (stitchedMeta) {
-
             if (typeof stitchedMeta === 'string') {
               stitchedUrl = stitchedMeta;
             } else if (typeof stitchedMeta === 'object') {

@@ -7,7 +7,6 @@ import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { UpscaleControls } from './UpscaleControls';
 import { UpscaleImageFrame } from './UpscaleImageFrame';
 import { ConnectionNodes } from './ConnectionNodes';
-import { UpscaleComparisonModal } from './UpscaleComparisonModal';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscalePluginModalProps {
@@ -86,7 +85,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
@@ -97,20 +95,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
-
-  // Detect if this is an upscaled image result (media-like, no controls)
-  // The plugin itself should always show controls (model is 'Crystal Upscaler' or undefined)
-  // Only result frames (with model 'Upscale') should be media-like
-  const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
-
-  console.log('[UpscalePluginModal] Render', {
-    id,
-    localUpscaledImageUrl,
-    sourceImageUrl,
-    isComparisonOpen,
-    isPopupOpen,
-    isUpscaledImage
-  });
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -123,6 +107,11 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
   const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
   const frameBorderWidth = 2;
+
+  // Detect if this is an upscaled image result (media-like, no controls)
+  // The plugin itself should always show controls (model is 'Crystal Upscaler' or undefined)
+  // Only result frames (with model 'Upscale') should be media-like
+  const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
 
   // Detect connected image nodes
   const connectedImageSource = useMemo(() => {
@@ -497,7 +486,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
-            position: 'relative',
             marginBottom: `${8 * scale}px`,
             fontSize: `${12 * scale}px`,
             fontWeight: 500,
@@ -509,70 +497,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
           }}
         >
           Upscale
-
-          {/* Delete button - always visible */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (onDelete) {
-                onDelete();
-              }
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.color = '#ef4444';
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              const defaultBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-              const defaultColor = isDark ? '#cccccc' : '#4b5563';
-              e.currentTarget.style.backgroundColor = defaultBg;
-              e.currentTarget.style.color = defaultColor;
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-            }}
-            style={{
-              position: 'absolute',
-              top: `${-36 * scale}px`,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              padding: 0,
-              backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'}`,
-              borderRadius: `${8 * scale}px`,
-              color: isDark ? '#cccccc' : '#4b5563',
-              cursor: 'pointer',
-              boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'}`,
-              zIndex: 3001,
-              pointerEvents: 'auto',
-            }}
-            title="Delete plugin"
-          >
-            <svg
-              width={`${16 * scale}px`}
-              height={`${16 * scale}px`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-          </button>
         </div>
 
         {/* Main plugin container - Circular */}
@@ -680,8 +604,6 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
                 isHovered={isHovered}
                 isSelected={isSelected || false}
                 sourceImageUrl={sourceImageUrl}
-                localUpscaledImageUrl={localUpscaledImageUrl}
-                onPreview={() => setIsComparisonOpen(true)}
                 onMouseDown={handleMouseDown}
                 onSelect={onSelect}
               />
@@ -690,18 +612,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         )}
       </div>
 
-
-      {
-        isComparisonOpen && sourceImageUrl && localUpscaledImageUrl && (
-          <UpscaleComparisonModal
-            originalImageUrl={sourceImageUrl}
-            upscaledImageUrl={localUpscaledImageUrl}
-            onClose={() => setIsComparisonOpen(false)}
-            scale={scale}
-          />
-        )
-      }
-    </div >
+    </div>
   );
 };
 

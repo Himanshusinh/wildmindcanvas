@@ -48,6 +48,7 @@ interface VideoModalControlsProps {
   onResolutionChange: (resolution: string) => void;
   onGenerate: () => void;
   onSetIsHovered: (hovered: boolean) => void;
+  onSetIsPinned: (pinned: boolean) => void;
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsAspectRatioDropdownOpen: (open: boolean) => void;
   onSetIsDurationDropdownOpen: (open: boolean) => void;
@@ -91,6 +92,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
   onResolutionChange,
   onGenerate,
   onSetIsHovered,
+  onSetIsPinned,
   onSetIsModelDropdownOpen,
   onSetIsAspectRatioDropdownOpen,
   onSetIsDurationDropdownOpen,

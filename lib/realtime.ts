@@ -65,8 +65,6 @@ export type RealtimeEvent =
   | { type: 'media.create'; media: MediaElement }
   | { type: 'media.update'; id: string; updates: Partial<MediaElement> }
   | { type: 'media.delete'; id: string }
-  | { type: 'undo' }
-  | { type: 'redo' }
 
 export class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -142,12 +140,6 @@ export class RealtimeClient {
               this.emit({ type: 'media.update', id: msg.id, updates: msg.updates });
             } else if (msg.type === 'media.delete' && msg.id) {
               this.emit({ type: 'media.delete', id: msg.id });
-            } else if (msg.type === 'undo') {
-              console.log('[Realtime] Received undo event, emitting to subscribers');
-              this.emit({ type: 'undo' });
-            } else if (msg.type === 'redo') {
-              console.log('[Realtime] Received redo event, emitting to subscribers');
-              this.emit({ type: 'redo' });
             }
           }
         } catch (e) {
@@ -206,16 +198,6 @@ export class RealtimeClient {
   }
   sendMediaDelete(id: string) {
     this.send({ type: 'media.delete', id, projectId: this.projectId });
-  }
-
-  // Undo/Redo helpers
-  sendUndo() {
-    console.log('[Realtime] Sending undo broadcast');
-    this.send({ type: 'undo', projectId: this.projectId });
-  }
-  sendRedo() {
-    console.log('[Realtime] Sending redo broadcast');
-    this.send({ type: 'redo', projectId: this.projectId });
   }
 
 

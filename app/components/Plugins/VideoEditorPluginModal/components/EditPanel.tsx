@@ -645,7 +645,7 @@ const EditPanel: React.FC<EditPanelProps> = ({
             </div>
 
             {/* Scale */}
-            <div className="space-y-2 mb-3">
+            <div className={`space-y-2 mb-3 ${itemToRender?.isBackground ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                 <div className="space-y-1">
                     <div className="flex justify-between text-xs text-gray-600">
                         <span>Scale</span>
@@ -677,7 +677,7 @@ const EditPanel: React.FC<EditPanelProps> = ({
             </div>
 
             {/* Position */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className={`grid grid-cols-2 gap-2 mb-3 ${itemToRender?.isBackground ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                 <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">Position X</label>
                     <div className="relative">
@@ -780,6 +780,20 @@ const EditPanel: React.FC<EditPanelProps> = ({
                             onChange={(e) => itemToRender && onUpdate({ ...itemToRender, volume: Number(e.target.value) })}
                             className="w-full accent-violet-600 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                         />
+                    </div>
+
+                    {/* Remove Audio Toggle */}
+                    <div className="flex items-center justify-between mb-3 p-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 text-xs font-bold text-gray-700">
+                            <Volume2 size={14} className="text-violet-600" />
+                            Remove Audio
+                        </div>
+                        <button
+                            onClick={() => itemToRender && onUpdate({ ...itemToRender, muteVideo: !itemToRender.muteVideo })}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${itemToRender.muteVideo ? 'bg-violet-600' : 'bg-gray-300'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${itemToRender.muteVideo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        </button>
                     </div>
 
                     {/* Speed */}

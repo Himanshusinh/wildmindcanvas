@@ -5,7 +5,7 @@ import {
     Trash2, Plus, Video, Music, Type, Settings,
     GripVertical, Sparkles, ChevronRight, Zap, ZapOff,
     MoreHorizontal, Copy, Clipboard, CopyPlus, Lock, Unlock,
-    ImageMinus, MessageSquare, Image, Film
+    ImageMinus, MessageSquare, Image, Film, XCircle, SkipBack, SkipForward
 } from 'lucide-react';
 
 interface TimelineProps {
@@ -19,6 +19,7 @@ interface TimelineProps {
     onUpdateClip: (trackId: string, item: TimelineItem) => void;
     onDeleteClip: (trackId: string, itemId: string) => void;
     onSplitClip: () => void;
+    onClearAll: () => void;
     onAddTrackItem: (type: 'video' | 'image' | 'color') => void;
     onSelectTransition: (trackId: string, itemId: string) => void;
     onSelectClip: (trackId: string, itemId: string | null) => void;
@@ -39,13 +40,14 @@ const MAX_ZOOM = 200;
 
 const Timeline: React.FC<TimelineProps> = ({
     tracks, currentTime, totalDuration, isPlaying, selectedItemId,
-    onPlayPause, onSeek, onUpdateClip, onDeleteClip, onSplitClip,
+    onPlayPause, onSeek, onUpdateClip, onDeleteClip, onSplitClip, onClearAll,
     onAddTrackItem, onSelectTransition, onSelectClip,
     onCopy, onPaste, onDuplicate, onLock, onDetach, onMoveClip, onDropClip, onClipDragEnd
 }) => {
     const [zoom, setZoom] = useState(40); // pixels per second
     const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
     const [hoveredTrackId, setHoveredTrackId] = useState<string | null>(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     // Context Menu State
     const [activeClipMenu, setActiveClipMenu] = useState<{ trackId: string, itemId: string, x: number, y: number } | null>(null);
@@ -347,6 +349,15 @@ const Timeline: React.FC<TimelineProps> = ({
                             <span className="hidden sm:inline">Delete</span>
                         </button>
                     )}
+
+                    <button
+                        onClick={() => setShowClearConfirm(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Clear all clips"
+                    >
+                        <XCircle size={18} className="text-gray-500" />
+                        <span className="hidden sm:inline">Clear All</span>
+                    </button>
                 </div>
 
                 {/* Center: Playback Controls */}
@@ -355,16 +366,45 @@ const Timeline: React.FC<TimelineProps> = ({
                         {formatTime(currentTime)}
                     </span>
 
-                    <button
-                        onClick={onPlayPause}
-                        className="w-12 h-12 flex items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:scale-105 active:scale-95 transition-all border border-gray-100 z-10"
-                    >
-                        {isPlaying ? (
-                            <Pause size={20} className="text-gray-900 fill-gray-900" />
-                        ) : (
-                            <Play size={20} className="text-gray-900 fill-gray-900 ml-1" />
-                        )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                onSeek(0);
+                                if (scrollContainerRef.current) {
+                                    scrollContainerRef.current.scrollLeft = 0;
+                                }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors border border-gray-200"
+                            title="Jump to Start"
+                        >
+                            <SkipBack size={14} className="fill-current" />
+                        </button>
+
+                        <button
+                            onClick={onPlayPause}
+                            className="w-12 h-12 flex items-center justify-center rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.15)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:scale-105 active:scale-95 transition-all border border-gray-100 z-10"
+                        >
+                            {isPlaying ? (
+                                <Pause size={20} className="text-gray-900 fill-gray-900" />
+                            ) : (
+                                <Play size={20} className="text-gray-900 fill-gray-900 ml-1" />
+                            )}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                onSeek(totalDuration);
+                                if (scrollContainerRef.current) {
+                                    // Scroll to end (approximate based on zoom)
+                                    scrollContainerRef.current.scrollLeft = totalDuration * zoom;
+                                }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors border border-gray-200"
+                            title="Jump to End"
+                        >
+                            <SkipForward size={14} className="fill-current" />
+                        </button>
+                    </div>
 
                     <span className="text-lg font-medium text-gray-400 w-[50px] tabular-nums tracking-tight">
                         {formatTime(totalDuration)}
@@ -396,9 +436,7 @@ const Timeline: React.FC<TimelineProps> = ({
                         </button>
                         {isAddMenuOpen && (
                             <div className="absolute bottom-full right-0 mb-2 w-40 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50 py-1">
-                                <button onClick={() => { onAddTrackItem('video'); setIsAddMenuOpen(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
-                                    <Video size={14} /> Video Track
-                                </button>
+
                                 <button onClick={() => { onAddTrackItem('image'); setIsAddMenuOpen(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
                                     <Sparkles size={14} /> Overlay
                                 </button>
@@ -567,10 +605,7 @@ const Timeline: React.FC<TimelineProps> = ({
                                                 )}
 
                                                 {track.type === 'video' && (
-                                                    <div className="absolute bottom-0.5 left-1 right-1 flex justify-between items-end pointer-events-none">
-                                                        <div className="text-[9px] font-bold text-white drop-shadow-md truncate max-w-[70%]">
-                                                            {item.name}
-                                                        </div>
+                                                    <div className="absolute bottom-0.5 left-1 right-1 flex justify-end items-end pointer-events-none">
                                                         <div className="text-[8px] font-medium text-white/90 drop-shadow-md bg-black/40 px-1 rounded">
                                                             {item.duration.toFixed(1)}s
                                                         </div>
@@ -701,15 +736,60 @@ const Timeline: React.FC<TimelineProps> = ({
                                             <ZapOff size={16} /> Remove Transition
                                         </button>
                                     )}
+                                    {item.animation && (
+                                        <button onClick={() => { onUpdateClip(track.id, { ...item, animation: undefined }); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-3 text-red-600">
+                                            <XCircle size={16} /> Remove Animation
+                                        </button>
+                                    )}
 
                                 </>
                             );
                         })()}
                     </div>
                 )}
+
+                {/* Clear All Confirmation Dialog */}
+                {showClearConfirm && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]" onClick={() => setShowClearConfirm(false)}>
+                        <div
+                            className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all animate-in fade-in zoom-in-95 duration-200"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                    <XCircle size={20} className="text-red-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Clear All Clips?</h3>
+                                    <p className="text-sm text-gray-600">
+                                        Are you sure you want to clear all clips from the timeline? This action cannot be undone.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 mt-6 justify-end">
+                                <button
+                                    onClick={() => setShowClearConfirm(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onClearAll();
+                                        setShowClearConfirm(false);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors shadow-sm"
+                                >
+                                    Clear All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
+
 
 export default Timeline;

@@ -6,10 +6,8 @@ import { RemoveBgLabel } from './RemoveBgLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { RemoveBgControls } from './RemoveBgControls';
 import { RemoveBgImageFrame } from './RemoveBgImageFrame';
-import { RemoveBgComparisonModal } from './RemoveBgComparisonModal';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
-import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
@@ -92,7 +90,6 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localRemovedBgImageUrl, setLocalRemovedBgImageUrl] = useState<string | null>(initialLocalRemovedBgImageUrl ?? null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
@@ -157,7 +154,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   useEffect(() => {
     if (localRemovedBgImageUrl || removedBgImageUrl) {
       const img = new Image();
-      // img.crossOrigin = 'anonymous'; // Removed to avoid CORS issues just for resolution check
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
         setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
       };
@@ -390,33 +387,10 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       const result = await onRemoveBg(selectedModel, selectedBackgroundType, scaleValue, imageUrl || undefined);
       console.log('[RemoveBgPluginModal] onRemoveBg returned:', result);
 
-      // Extract URL from result (result should be a string URL, but handle both string and object)
-      const removedBgUrl = typeof result === 'string' ? result : ((result as any)?.url || (result as any)?.data?.url || null);
-
-      if (!removedBgUrl) {
-        console.error('[RemoveBgPluginModal] No URL in result:', result);
-        throw new Error('Remove BG completed but no image URL was returned');
-      }
-
-      console.log('[RemoveBgPluginModal] Extracted removed BG URL:', removedBgUrl);
-
-      // Ensure URL is proxied and cache-busted to avoid CORS issues
-      let finalUrl = removedBgUrl;
-      if (finalUrl && !finalUrl.includes('/api/proxy/')) {
-        finalUrl = buildProxyResourceUrl(finalUrl);
-      }
-      // Append timestamp to bust cache
-      if (finalUrl) {
-        const separator = finalUrl.includes('?') ? '&' : '?';
-        finalUrl = `${finalUrl}${separator}t=${Date.now()}`;
-      }
-
-      console.log('[RemoveBgPluginModal] Final processed URL:', finalUrl);
-
       // Update the image generation frame with the result
-      if (finalUrl && onUpdateImageModalState) {
+      if (result && onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
-          generatedImageUrl: finalUrl,
+          generatedImageUrl: result,
           model: 'Remove BG',
           frame: 'Frame',
           aspectRatio: '1:1',
@@ -428,16 +402,16 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       }
 
       // Also store the removed bg image in the plugin
-      if (finalUrl) {
-        setLocalRemovedBgImageUrl(finalUrl);
+      if (result) {
+        setLocalRemovedBgImageUrl(result);
         // Update the modal state with removedBgImageUrl so it displays in the frame
         if (onUpdateModalState && id) {
-          onUpdateModalState(id, { removedBgImageUrl: finalUrl });
+          onUpdateModalState(id, { removedBgImageUrl: result });
         }
         // Persist the local removed bg image URL (only if it changed from initial)
-        if (onOptionsChangeRef.current && finalUrl !== initialLocalRemovedBgImageUrl) {
+        if (onOptionsChangeRef.current && result !== initialLocalRemovedBgImageUrl) {
           onOptionsChangeRef.current({
-            localRemovedBgImageUrl: finalUrl
+            localRemovedBgImageUrl: result
           });
         }
       }
@@ -501,7 +475,6 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
-            position: 'relative',
             marginBottom: `${8 * scale}px`,
             fontSize: `${12 * scale}px`,
             fontWeight: 500,
@@ -513,70 +486,6 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
           }}
         >
           Remove BG
-
-          {/* Delete button - always visible */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (onDelete) {
-                onDelete();
-              }
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.color = '#ef4444';
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              const defaultBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-              const defaultColor = isDark ? '#cccccc' : '#4b5563';
-              e.currentTarget.style.backgroundColor = defaultBg;
-              e.currentTarget.style.color = defaultColor;
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-            }}
-            style={{
-              position: 'absolute',
-              top: `${-36 * scale}px`,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              padding: 0,
-              backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'}`,
-              borderRadius: `${8 * scale}px`,
-              color: isDark ? '#cccccc' : '#4b5563',
-              cursor: 'pointer',
-              boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'}`,
-              zIndex: 3001,
-              pointerEvents: 'auto',
-            }}
-            title="Delete plugin"
-          >
-            <svg
-              width={`${16 * scale}px`}
-              height={`${16 * scale}px`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-          </button>
         </div>
 
         {/* Main plugin container - Circular */}
@@ -691,8 +600,6 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
                 isHovered={isHovered}
                 isSelected={isSelected || false}
                 sourceImageUrl={sourceImageUrl}
-                localRemovedBgImageUrl={localRemovedBgImageUrl}
-                onPreview={() => setIsComparisonOpen(true)}
                 onMouseDown={handleMouseDown}
                 onSelect={onSelect}
               />
@@ -700,17 +607,6 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
           </div>
         )}
       </div>
-
-      {
-        isComparisonOpen && sourceImageUrl && localRemovedBgImageUrl && (
-          <RemoveBgComparisonModal
-            originalImageUrl={sourceImageUrl}
-            removedBgImageUrl={localRemovedBgImageUrl}
-            onClose={() => setIsComparisonOpen(false)}
-            scale={scale}
-          />
-        )
-      }
 
     </div>
   );

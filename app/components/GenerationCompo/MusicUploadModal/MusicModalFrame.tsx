@@ -8,6 +8,7 @@ interface MusicModalFrameProps {
   scale: number;
   selectedAspectRatio: string;
   isHovered: boolean;
+  isPinned: boolean;
   isSelected: boolean;
   isDraggingContainer: boolean;
   generatedMusicUrl?: string | null;
@@ -16,6 +17,7 @@ interface MusicModalFrameProps {
   frameBorderWidth: number;
   onSelect?: () => void;
   getAspectRatio: (ratio: string) => string;
+  onSetIsPinned: (pinned: boolean) => void;
 }
 
 export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
@@ -23,6 +25,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   scale,
   selectedAspectRatio,
   isHovered,
+  isPinned,
   isSelected,
   isDraggingContainer,
   generatedMusicUrl,
@@ -31,6 +34,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   frameBorderWidth,
   onSelect,
   getAspectRatio,
+  onSetIsPinned,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -46,7 +50,9 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
   const progressBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const timeColor = isDark ? (generatedMusicUrl ? '#cccccc' : '#666666') : (generatedMusicUrl ? '#6b7280' : '#9ca3af');
-
+  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
+  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
+  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
   const handleBg = isDark ? '#121212' : '#ffffff';
 
   useEffect(() => {
@@ -109,12 +115,12 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   // Handle progress bar click
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!audioElementRef.current || !progressBarRef.current || !duration) return;
-
+    
     const rect = progressBarRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const progress = Math.max(0, Math.min(1, clickX / rect.width));
     const newTime = progress * duration;
-
+    
     audioElementRef.current.currentTime = newTime;
     setCurrentTime(newTime);
   };
@@ -130,12 +136,12 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!audioElementRef.current || !progressBarRef.current || !duration) return;
-
+      
       const rect = progressBarRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const progress = Math.max(0, Math.min(1, mouseX / rect.width));
       const newTime = progress * duration;
-
+      
       setCurrentTime(newTime);
     };
 
@@ -171,11 +177,11 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         height: `${300 * scale}px`,
         minHeight: `${200 * scale}px`,
         backgroundColor: frameBg,
-        borderRadius: isHovered ? '0px' : `${16 * scale}px`,
+        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: isHovered ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',
@@ -201,7 +207,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             style={{ display: 'none' }}
           />
         )}
-
+        
         {/* Music Icon (when no music generated) */}
         {!generatedMusicUrl && (
           <div style={{ textAlign: 'center', color: placeholderColor, marginBottom: `${8 * scale}px`, transition: 'color 0.3s ease' }}>
@@ -222,7 +228,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             </svg>
           </div>
         )}
-
+        
         {/* Play/Pause Button */}
         <button
           onClick={handlePlayPause}
@@ -318,11 +324,11 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
           </div>
 
           {/* Time Display */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: `${12 * scale}px`,
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            fontSize: `${12 * scale}px`, 
             color: timeColor,
             transition: 'color 0.3s ease'
           }}>
@@ -335,7 +341,55 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         )}
       </div>
       {/* Pin Icon Button - Bottom Right */}
-
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSetIsPinned(!isPinned);
+        }}
+        style={{
+          position: 'absolute',
+          bottom: `${8 * scale}px`,
+          right: `${8 * scale}px`,
+          width: `${28 * scale}px`,
+          height: `${28 * scale}px`,
+          borderRadius: `${6 * scale}px`,
+          backgroundColor: pinBg,
+          border: `1px solid ${pinBorder}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 20,
+          opacity: isHovered ? 1 : 0,
+          transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
+          pointerEvents: 'auto',
+          boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
+        }}
+        onMouseEnter={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isPinned) {
+            e.currentTarget.style.backgroundColor = pinBg;
+          }
+        }}
+        title={isPinned ? 'Unpin controls' : 'Pin controls'}
+      >
+        <svg
+          width={16 * scale}
+          height={16 * scale}
+          viewBox="0 0 24 24"
+          fill={isPinned ? '#437eb5' : 'none'}
+          stroke={pinIconColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
+        </svg>
+      </button>
     </div>
   );
 };

@@ -12,8 +12,6 @@ interface ModalActionIconsProps {
   onCopy?: () => void;
   onEdit?: () => void;
   editActive?: boolean;
-  onPin?: () => void;
-  isPinned?: boolean;
   variant?: 'default' | 'text'; // 'text' variant has different styling (no backdrop blur)
 }
 
@@ -27,8 +25,6 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   onCopy,
   onEdit,
   editActive = false,
-  onPin,
-  isPinned = false,
   variant = 'default',
 }) => {
   const [isDark, setIsDark] = useState(false);
@@ -46,7 +42,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   if (!isSelected) return null;
 
   const isTextVariant = variant === 'text';
-  const bgColor = isDark
+  const bgColor = isDark 
     ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
     : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
@@ -85,12 +81,12 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDeleteMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
     const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
-
+    
     if (isTextVariant) {
       e.currentTarget.style.backgroundColor = defaultBg;
       e.currentTarget.style.color = defaultColor;
@@ -111,11 +107,11 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDownloadMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
-
+    
     e.currentTarget.style.backgroundColor = defaultBg;
     e.currentTarget.style.color = defaultColor;
     if (!isTextVariant) {
@@ -136,12 +132,12 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   };
 
   const handleDuplicateMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const defaultBg = isDark
+    const defaultBg = isDark 
       ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
       : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
     const defaultColor = isDark ? '#cccccc' : '#4b5563';
     const defaultShadow = isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`;
-
+    
     if (isTextVariant) {
       e.currentTarget.style.backgroundColor = defaultBg;
       e.currentTarget.style.color = defaultColor;
@@ -253,11 +249,11 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
             if (e.nativeEvent) {
               e.nativeEvent.stopImmediatePropagation();
             }
-
+            
             // Call delete immediately, don't defer
             console.log('[ModalActionIcons] Calling onDelete callback immediately');
             if (onDelete) {
-              onDelete();
+            onDelete();
               console.log('[ModalActionIcons] onDelete callback completed');
             }
           }}
@@ -385,7 +381,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
             }
           }}
           onMouseLeave={(e) => {
-            const defaultBg = isDark
+            const defaultBg = isDark 
               ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
               : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
             const defaultColor = isDark ? '#cccccc' : '#4b5563';
@@ -404,50 +400,6 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
           title={editActive ? 'Close editor' : 'Edit'}
         >
           {EditIcon}
-        </button>
-      )}
-
-      {/* Pin Icon */}
-      {onPin && (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.nativeEvent) {
-              e.nativeEvent.stopImmediatePropagation();
-            }
-            onPin();
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(250, 204, 21, 0.15)';
-            e.currentTarget.style.color = '#b45309';
-            if (!isTextVariant) {
-              e.currentTarget.style.transform = 'scale(1.1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            const defaultBg = isDark
-              ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
-              : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
-            const defaultColor = isDark ? '#cccccc' : '#4b5563';
-            e.currentTarget.style.backgroundColor = isPinned ? 'rgba(250, 204, 21, 0.15)' : defaultBg;
-            e.currentTarget.style.color = isPinned ? '#b45309' : defaultColor;
-            if (!isTextVariant) {
-              e.currentTarget.style.transform = 'scale(1)';
-            }
-          }}
-          style={{
-            ...baseButtonStyle,
-            backgroundColor: isPinned ? 'rgba(250, 204, 21, 0.15)' : (isDark ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)') : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)')),
-            color: isPinned ? '#b45309' : (isDark ? '#cccccc' : '#4b5563'),
-            opacity: 1,
-          }}
-          title={isPinned ? 'Unpin' : 'Pin'}
-        >
-          <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="17" x2="12" y2="22" />
-            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-          </svg>
         </button>
       )}
     </div>

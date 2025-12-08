@@ -7,7 +7,6 @@ interface ImageModalTooltipProps {
   isUploadedImage: boolean;
   imageResolution: { width: number; height: number } | null;
   scale: number;
-  modelName?: string;
 }
 
 export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
@@ -15,7 +14,6 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
   isUploadedImage,
   imageResolution,
   scale,
-  modelName,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -23,20 +21,6 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
 
   const tooltipBg = isDark ? '#1a1a1a' : '#ffffff';
   const tooltipText = isDark ? '#ffffff' : '#1f2937';
-
-  // Determine display label based on model name
-  const getDisplayLabel = () => {
-    if (!modelName) return isUploadedImage ? 'Media' : 'Image Generator';
-
-    // Check if this is a plugin-generated image
-    const pluginModels = ['Upscale', 'Expand', 'Erase', 'Remove BG', 'Vectorize'];
-    if (pluginModels.includes(modelName)) {
-      return modelName;
-    }
-
-    // For uploaded images or other cases
-    return isUploadedImage ? 'Media' : 'Image Generator';
-  };
 
   return (
     <div
@@ -62,7 +46,7 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
       }}
     >
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span>{getDisplayLabel()}</span>
+        <span>{isUploadedImage ? 'Media' : 'Image Generator'}</span>
         {imageResolution && (
           <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
             {imageResolution.width} × {imageResolution.height}

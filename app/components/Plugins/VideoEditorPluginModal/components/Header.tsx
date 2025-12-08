@@ -25,6 +25,7 @@ interface HeaderProps {
     onMakeCopy: () => void;
     onMoveToTrash: () => void;
     onPreview: () => void;
+    onExport: () => void;
 }
 
 const PRESET_DIMENSIONS = [
@@ -55,7 +56,8 @@ const Header: React.FC<HeaderProps> = ({
     onLoadProject,
     onMakeCopy,
     onMoveToTrash,
-    onPreview
+    onPreview,
+    onExport
 }) => {
     const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
     const [isResizeMenuOpen, setIsResizeMenuOpen] = useState(false);
@@ -81,12 +83,7 @@ const Header: React.FC<HeaderProps> = ({
         <header className="h-14 bg-[#18181b] text-gray-200 flex items-center justify-between px-4 pr-16 select-none z-50 relative border-b border-gray-800">
             {/* Left Section */}
             <div className="flex items-center gap-4">
-                <button
-                    onClick={onToggleProjectMenu}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                >
-                    <Menu size={20} />
-                </button>
+
 
                 <div className="relative" ref={fileMenuRef}>
                     <button
@@ -140,15 +137,6 @@ const Header: React.FC<HeaderProps> = ({
                                     onClick={() => { onLoadProject(); setIsFileMenuOpen(false); }}
                                 >
                                     <FolderOpen size={16} /> Open project
-                                </button>
-                                <button
-                                    className="px-4 py-2 text-sm hover:bg-white/5 flex items-center gap-3 text-left"
-                                    onClick={() => { onOpenProject(); setIsFileMenuOpen(false); }}
-                                >
-                                    <FolderOpen size={16} /> Open Recent
-                                </button>
-                                <button className="px-4 py-2 text-sm hover:bg-white/5 flex items-center gap-3 text-left">
-                                    <FolderOpen size={16} /> Import files
                                 </button>
                                 <div className="h-px bg-gray-700 my-1"></div>
                                 <button
@@ -291,8 +279,11 @@ const Header: React.FC<HeaderProps> = ({
                     <Play size={14} fill="currentColor" /> Preview
                 </button>
 
-                <button className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
-                    Export
+                <button
+                    onClick={onExport}
+                    className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm flex items-center gap-2"
+                >
+                    <Download size={14} /> Export
                 </button>
             </div>
         </header>

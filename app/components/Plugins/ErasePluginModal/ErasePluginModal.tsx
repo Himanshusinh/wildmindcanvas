@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import '../../common/canvasCaptureGuard';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
-import { EraseComparisonModal } from './EraseComparisonModal';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
@@ -82,7 +81,6 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   const [isErasing, setIsErasing] = useState(false);
   const [isDimmed, setIsDimmed] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [erasePrompt, setErasePrompt] = useState<string>('');
   const [brushSize, setBrushSize] = useState<number>(20);
@@ -857,7 +855,6 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
-            position: 'relative',
             marginBottom: `${8 * scale}px`,
             fontSize: `${12 * scale}px`,
             fontWeight: 500,
@@ -868,71 +865,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             letterSpacing: '0.2px',
           }}
         >
-          Erase / Replace
-
-          {/* Delete button - always visible */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (onDelete) {
-                onDelete();
-              }
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.color = '#ef4444';
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              const defaultBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-              const defaultColor = isDark ? '#cccccc' : '#4b5563';
-              e.currentTarget.style.backgroundColor = defaultBg;
-              e.currentTarget.style.color = defaultColor;
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-            }}
-            style={{
-              position: 'absolute',
-              top: `${-36 * scale}px`,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              padding: 0,
-              backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'}`,
-              borderRadius: `${8 * scale}px`,
-              color: isDark ? '#cccccc' : '#4b5563',
-              cursor: 'pointer',
-              boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'}`,
-              zIndex: 3001,
-              pointerEvents: 'auto',
-            }}
-            title="Delete plugin"
-          >
-            <svg
-              width={`${16 * scale}px`}
-              height={`${16 * scale}px`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-          </button>
+        Erase / Replace
         </div>
 
         {/* Main plugin container - Circular */}
@@ -1017,59 +950,59 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           }}
         >
           {hasSourceImage ? (
+          <div
+            style={{
+              backgroundColor: isDark ? '#121212' : 'white',
+              borderRadius: '16px',
+              border: `2px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+              padding: '24px',
+              width: '90vw',
+              maxWidth: '1200px',
+              height: '85vh',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+              overflow: 'hidden',
+              transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => {
+              e.stopPropagation();
+            }}
+            onTouchMove={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            {/* Header with Erase Button */}
             <div
               style={{
-                backgroundColor: isDark ? '#121212' : 'white',
-                borderRadius: '16px',
-                border: `2px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
-                padding: '24px',
-                width: '90vw',
-                maxWidth: '1200px',
-                height: '85vh',
-                maxHeight: '90vh',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
-                overflow: 'hidden',
-                transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onWheel={(e) => {
-                e.stopPropagation();
-              }}
-              onTouchMove={(e) => {
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'nowrap',
+                gap: '10px',
+                marginBottom: '8px',
               }}
             >
-              {/* Header with Erase Button */}
-              <div
+              <h3
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'nowrap',
-                  gap: '10px',
-                  marginBottom: '8px',
+                  margin: 0,
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: isDark ? '#ffffff' : '#111827',
+                  transition: 'color 0.3s ease',
+                  flex: '0 0 12%',
+                  minWidth: '90px',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: isDark ? '#ffffff' : '#111827',
-                    transition: 'color 0.3s ease',
-                    flex: '0 0 12%',
-                    minWidth: '90px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Erase / Replace
-                </h3>
+                Erase / Replace
+              </h3>
                 <div
                   onMouseEnter={() => {
                     setIsBrushHovering(true);
@@ -1098,20 +1031,20 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       updateBrushPreviewPosition(touch.clientX, touch.clientY);
                     }
                   }}
-                  style={{
-                    flex: '0 0 33%',
-                    minWidth: '150px',
-                    height: '38px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 8px',
-                    borderRadius: '8px',
-                    border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e5e7eb',
-                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                  }}
-                >
-
+                style={{
+                  flex: '0 0 33%',
+                  minWidth: '150px',
+                  height: '38px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #e5e7eb',
+                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                }}
+              >
+                
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
                     <button
                       onClick={() => {
@@ -1142,7 +1075,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       value={brushSize}
                       onChange={(e) => setBrushSize(Number(e.target.value))}
                       onKeyDown={(e) => {
-                        if (e.key === '+' || e.key === '=') {
+                        if (e.key === '+' || e.key === '=' ) {
                           e.preventDefault();
                           const newSize = Math.min(100, brushSize + 5);
                           setBrushSize(newSize);
@@ -1203,393 +1136,393 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                     </span>
                   </div>
                 </div>
-                <div style={{ flex: '1 1 auto', minWidth: '240px', marginRight: '12px' }}>
-                  <input
-                    type="text"
-                    value={erasePrompt}
-                    onChange={(e) => setErasePrompt(e.target.value)}
-                    placeholder="Prompt for Replace"
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e5e7eb',
-                      backgroundColor: isDark ? '#121212' : '#ffffff',
-                      color: isDark ? '#ffffff' : '#111827',
-                      fontSize: '13px',
-                      outline: 'none',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
-                      height: '40px',
-                    }}
-                  />
-                </div>
-                <div
+              <div style={{ flex: '1 1 auto', minWidth: '240px', marginRight: '12px' }}>
+                <input
+                  type="text"
+                  value={erasePrompt}
+                  onChange={(e) => setErasePrompt(e.target.value)}
+                  placeholder="Prompt for Replace"
                   style={{
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #e5e7eb',
+                    backgroundColor: isDark ? '#121212' : '#ffffff',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: '13px',
+                    outline: 'none',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+                    height: '40px',
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'center',
+                  flex: '0 0 auto',
+                  minWidth: '120px',
+                  justifyContent: 'flex-start',
+                  marginLeft: 'auto',
+                  paddingRight: '8px',
+                }}
+              >
+                <button
+                  onClick={handleErase}
+                  disabled={isErasing || externalIsErasing}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: isErasing || externalIsErasing ? '#9ca3af' : '#437eb5',
+                    color: 'white',
+                    cursor: isErasing || externalIsErasing ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 500,
                     display: 'flex',
-                    gap: '8px',
                     alignItems: 'center',
-                    flex: '0 0 auto',
-                    minWidth: '120px',
-                    justifyContent: 'flex-start',
-                    marginLeft: 'auto',
-                    paddingRight: '8px',
+                    justifyContent: 'center',
+                    minWidth: '56px',
                   }}
                 >
-                  <button
-                    onClick={handleErase}
-                    disabled={isErasing || externalIsErasing}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      backgroundColor: isErasing || externalIsErasing ? '#9ca3af' : '#437eb5',
-                      color: 'white',
-                      cursor: isErasing || externalIsErasing ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minWidth: '56px',
-                    }}
-                  >
-                    {isErasing || externalIsErasing ? (
-                      'Erasing...'
-                    ) : (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M5 12h14" />
-                        <path d="M12 5l7 7-7 7" />
-                      </svg>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setIsPopupOpen(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '24px',
-                      color: isDark ? '#cccccc' : '#666',
-                      padding: 0,
-                      width: '32px',
-                      height: '32px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'color 0.3s ease',
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
+                  {isErasing || externalIsErasing ? (
+                    'Erasing...'
+                  ) : (
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="M12 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => setIsPopupOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '24px',
+                    color: isDark ? '#cccccc' : '#666',
+                    padding: 0,
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.3s ease',
+                  }}
+                >
+                  ×
+                </button>
               </div>
+            </div>
 
-              {/* Image with Drawing Canvas Overlay - Fixed Frame */}
+            {/* Image with Drawing Canvas Overlay - Fixed Frame */}
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                flex: 1,
+                minHeight: 0,
+                height: '100%',
+                overflow: 'hidden',
+                borderRadius: '8px',
+                border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
+                backgroundColor: isDark ? '#000000' : '#f9fafb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.3s ease, border-color 0.3s ease',
+              }}
+            >
               <div
                 style={{
                   position: 'relative',
                   width: '100%',
-                  flex: 1,
-                  minHeight: 0,
                   height: '100%',
-                  overflow: 'hidden',
-                  borderRadius: '8px',
-                  border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
-                  backgroundColor: isDark ? '#000000' : '#f9fafb',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'background-color 0.3s ease, border-color 0.3s ease',
+                  overflow: 'hidden',
                 }}
               >
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {sourceImageUrl ? (
-                    <img
-                      ref={imageRef}
-                      src={
-                        // Apply proxy for Zata URLs if not already proxied
-                        // connectedImageSource already applies proxy, but initialSourceImageUrl might not
-                        (sourceImageUrl.includes('zata.ai') || sourceImageUrl.includes('zata')) && !sourceImageUrl.includes('/api/proxy/')
-                          ? buildProxyResourceUrl(sourceImageUrl)
-                          : sourceImageUrl
-                      }
-                      alt="Preview"
-                      crossOrigin="anonymous"
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        width: 'auto',
-                        height: 'auto',
-                        display: 'block',
-                        userSelect: 'none',
-                        pointerEvents: 'none',
-                        objectFit: 'contain',
-                        objectPosition: 'center',
-                        flexShrink: 0,
-                        opacity: 1,
-                        filter: 'none',
-                        position: 'relative',
-                        zIndex: 0,
-                      }}
-                      onError={(e) => {
-                        console.error('[ErasePluginModal] Failed to load image:', sourceImageUrl);
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                      onLoad={() => {
-                        console.log('[ErasePluginModal] Image loaded successfully:', sourceImageUrl);
-                        // Initialize canvas when image loads
-                        if (imageRef.current && canvasRef.current && maskCanvasRef.current) {
-                          const img = imageRef.current;
-                          const canvas = canvasRef.current;
-                          const maskCanvas = maskCanvasRef.current;
-
-                          // Wait for next frame to ensure image is fully rendered and fits
-                          requestAnimationFrame(() => {
-                            // Preview canvas matches displayed size (actual rendered size after objectFit: contain)
-                            const displayedWidth = img.clientWidth || img.offsetWidth;
-                            const displayedHeight = img.clientHeight || img.offsetHeight;
-                            canvas.width = displayedWidth;
-                            canvas.height = displayedHeight;
-
-                            // Update canvas style to match image size exactly
-                            canvas.style.width = `${displayedWidth}px`;
-                            canvas.style.height = `${displayedHeight}px`;
-
-                            // Mask canvas matches natural image size (for API)
-                            maskCanvas.width = img.naturalWidth;
-                            maskCanvas.height = img.naturalHeight;
-
-                            // Clear both canvases
-                            const maskCtx = maskCanvas.getContext('2d');
-                            const previewCtx = canvas.getContext('2d');
-                            if (maskCtx) {
-                              // Initialize mask canvas with black background (black = keep, white = remove)
-                              maskCtx.fillStyle = 'black';
-                              maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-                            }
-                            if (previewCtx) {
-                              previewCtx.clearRect(0, 0, canvas.width, canvas.height);
-                            }
-
-                            // Reset brush drawing when image loads
-                            setLastPoint(null);
-                            setIsDrawing(false);
-                          });
-                        }
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        height: '100%',
-                        color: '#9ca3af',
-                        fontSize: '14px',
-                      }}
-                    >
-                      <p style={{ color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>No image connected</p>
-                      <p style={{ fontSize: '12px', marginTop: '8px', color: isDark ? '#cccccc' : '#6b7280', transition: 'color 0.3s ease' }}>Connect an image to the erase plugin</p>
-                    </div>
-                  )}
-                  <canvas
-                    ref={canvasRef}
+                {sourceImageUrl ? (
+                  <img
+                    ref={imageRef}
+                    src={
+                      // Apply proxy for Zata URLs if not already proxied
+                      // connectedImageSource already applies proxy, but initialSourceImageUrl might not
+                      (sourceImageUrl.includes('zata.ai') || sourceImageUrl.includes('zata')) && !sourceImageUrl.includes('/api/proxy/')
+                        ? buildProxyResourceUrl(sourceImageUrl)
+                        : sourceImageUrl
+                    }
+                    alt="Preview"
+                    crossOrigin="anonymous"
                     style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      cursor: 'crosshair',
-                      touchAction: 'none',
-                      pointerEvents: 'auto',
-                      backgroundColor: 'transparent !important' as any,
-                      zIndex: 1,
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      display: 'block',
+                      userSelect: 'none',
+                      pointerEvents: 'none',
+                      objectFit: 'contain',
+                      objectPosition: 'center',
+                      flexShrink: 0,
+                      opacity: 1,
+                      filter: 'none',
+                      position: 'relative',
+                      zIndex: 0,
                     }}
-                    className="erase-preview-canvas"
-                    onMouseDown={(e) => {
-                      updateBrushPreviewPosition(e.clientX, e.clientY);
-                      if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
-                      const img = imageRef.current;
-                      const imgRectBounds = img.getBoundingClientRect();
-
-                      // Get coordinates relative to image
-                      const relativeX = e.clientX - imgRectBounds.left;
-                      const relativeY = e.clientY - imgRectBounds.top;
-
-                      // Check if click is within image bounds
-                      if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
-                        return;
-                      }
-
-                      setIsDrawing(true);
-                      setLastPoint({ x: relativeX, y: relativeY });
-
-                      // Draw initial brush stroke
-                      const canvas = canvasRef.current;
-                      const maskCanvas = maskCanvasRef.current;
-                      const ctx = canvas.getContext('2d');
-                      const maskCtx = maskCanvas.getContext('2d');
-
-                      if (ctx && maskCtx) {
-                        const scaleX = img.naturalWidth / img.clientWidth;
-                        const scaleY = img.naturalHeight / img.clientHeight;
-                        drawBrushStroke(ctx, maskCtx, relativeX, relativeY, null, null, brushSize, scaleX, scaleY);
-                      }
+                    onError={(e) => {
+                      console.error('[ErasePluginModal] Failed to load image:', sourceImageUrl);
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
                     }}
-                    onMouseMove={(e) => {
-                      updateBrushPreviewPosition(e.clientX, e.clientY);
-                      if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
-                      const img = imageRef.current;
-                      const imgRectBounds = img.getBoundingClientRect();
+                    onLoad={() => {
+                      console.log('[ErasePluginModal] Image loaded successfully:', sourceImageUrl);
+                      // Initialize canvas when image loads
+                      if (imageRef.current && canvasRef.current && maskCanvasRef.current) {
+                        const img = imageRef.current;
+                        const canvas = canvasRef.current;
+                        const maskCanvas = maskCanvasRef.current;
 
-                      // Get coordinates relative to image
-                      const relativeX = e.clientX - imgRectBounds.left;
-                      const relativeY = e.clientY - imgRectBounds.top;
+                        // Wait for next frame to ensure image is fully rendered and fits
+                        requestAnimationFrame(() => {
+                          // Preview canvas matches displayed size (actual rendered size after objectFit: contain)
+                          const displayedWidth = img.clientWidth || img.offsetWidth;
+                          const displayedHeight = img.clientHeight || img.offsetHeight;
+                          canvas.width = displayedWidth;
+                          canvas.height = displayedHeight;
 
-                      // Clamp to image bounds
-                      const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
-                      const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
+                          // Update canvas style to match image size exactly
+                          canvas.style.width = `${displayedWidth}px`;
+                          canvas.style.height = `${displayedHeight}px`;
 
-                      // Draw brush stroke
-                      const canvas = canvasRef.current;
-                      const maskCanvas = maskCanvasRef.current;
-                      const ctx = canvas.getContext('2d');
-                      const maskCtx = maskCanvas.getContext('2d');
+                          // Mask canvas matches natural image size (for API)
+                          maskCanvas.width = img.naturalWidth;
+                          maskCanvas.height = img.naturalHeight;
 
-                      if (ctx && maskCtx) {
-                        const scaleX = img.naturalWidth / img.clientWidth;
-                        const scaleY = img.naturalHeight / img.clientHeight;
-                        drawBrushStroke(ctx, maskCtx, clampedX, clampedY, lastPoint.x, lastPoint.y, brushSize, scaleX, scaleY);
-                        setLastPoint({ x: clampedX, y: clampedY });
+                          // Clear both canvases
+                          const maskCtx = maskCanvas.getContext('2d');
+                          const previewCtx = canvas.getContext('2d');
+                          if (maskCtx) {
+                            // Initialize mask canvas with black background (black = keep, white = remove)
+                            maskCtx.fillStyle = 'black';
+                            maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+                          }
+                          if (previewCtx) {
+                            previewCtx.clearRect(0, 0, canvas.width, canvas.height);
+                          }
+
+                          // Reset brush drawing when image loads
+                          setLastPoint(null);
+                          setIsDrawing(false);
+                        });
                       }
-                    }}
-                    onMouseUp={() => {
-                      if (isDrawing) {
-                        setIsDrawing(false);
-                        setLastPoint(null);
-                      }
-                      hideBrushPreviewIfIdle();
-                    }}
-                    onMouseLeave={() => {
-                      if (isDrawing) {
-                        setIsDrawing(false);
-                        setLastPoint(null);
-                      }
-                      hideBrushPreviewIfIdle();
-                    }}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      const touch = e.touches[0];
-                      updateBrushPreviewPosition(touch.clientX, touch.clientY);
-                      if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
-                      const img = imageRef.current;
-                      const imgRectBounds = img.getBoundingClientRect();
-
-                      const relativeX = touch.clientX - imgRectBounds.left;
-                      const relativeY = touch.clientY - imgRectBounds.top;
-
-                      if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
-                        return;
-                      }
-
-                      setIsDrawing(true);
-                      setLastPoint({ x: relativeX, y: relativeY });
-
-                      const canvas = canvasRef.current;
-                      const maskCanvas = maskCanvasRef.current;
-                      const ctx = canvas.getContext('2d');
-                      const maskCtx = maskCanvas.getContext('2d');
-
-                      if (ctx && maskCtx) {
-                        const scaleX = img.naturalWidth / img.clientWidth;
-                        const scaleY = img.naturalHeight / img.clientHeight;
-                        drawBrushStroke(ctx, maskCtx, relativeX, relativeY, null, null, brushSize, scaleX, scaleY);
-                      }
-                    }}
-                    onTouchMove={(e) => {
-                      e.preventDefault();
-                      const touch = e.touches[0];
-                      updateBrushPreviewPosition(touch.clientX, touch.clientY);
-                      if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
-                      const img = imageRef.current;
-                      const imgRectBounds = img.getBoundingClientRect();
-
-                      const relativeX = touch.clientX - imgRectBounds.left;
-                      const relativeY = touch.clientY - imgRectBounds.top;
-
-                      const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
-                      const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
-
-                      const canvas = canvasRef.current;
-                      const maskCanvas = maskCanvasRef.current;
-                      const ctx = canvas.getContext('2d');
-                      const maskCtx = maskCanvas.getContext('2d');
-
-                      if (ctx && maskCtx) {
-                        const scaleX = img.naturalWidth / img.clientWidth;
-                        const scaleY = img.naturalHeight / img.clientHeight;
-                        drawBrushStroke(ctx, maskCtx, clampedX, clampedY, lastPoint.x, lastPoint.y, brushSize, scaleX, scaleY);
-                        setLastPoint({ x: clampedX, y: clampedY });
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      if (isDrawing) {
-                        setIsDrawing(false);
-                        setLastPoint(null);
-                      }
-                      hideBrushPreviewIfIdle();
                     }}
                   />
-                  {/* Hidden mask canvas for API */}
-                  <canvas
-                    ref={maskCanvasRef}
-                    style={{ display: 'none' }}
-                  />
-                </div>
-              </div>
-              {sourceImageUrl && brushPreview.visible && (
-                <div
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: '100%',
+                      color: '#9ca3af',
+                      fontSize: '14px',
+                    }}
+                  >
+                    <p style={{ color: isDark ? '#ffffff' : '#111827', transition: 'color 0.3s ease' }}>No image connected</p>
+                    <p style={{ fontSize: '12px', marginTop: '8px', color: isDark ? '#cccccc' : '#6b7280', transition: 'color 0.3s ease' }}>Connect an image to the erase plugin</p>
+                  </div>
+                )}
+                <canvas
+                  ref={canvasRef}
                   style={{
-                    position: 'fixed',
-                    top: `${brushPreview.y}px`,
-                    left: `${brushPreview.x}px`,
-                    width: `${brushSize}px`,
-                    height: `${brushSize}px`,
-                    borderRadius: '50%',
-                    border: isDark ? '1px solid rgba(247,247,247,0.5)' : '1px solid rgba(247,247,247,0.9)',
-                    backgroundColor: 'rgba(247,247,247,0.2)',
-                    pointerEvents: 'none',
-                    zIndex: 10006,
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    transition: 'width 0.15s ease, height 0.15s ease',
+                    cursor: 'crosshair',
+                    touchAction: 'none',
+                    pointerEvents: 'auto',
+                    backgroundColor: 'transparent !important' as any,
+                    zIndex: 1,
+                  }}
+                  className="erase-preview-canvas"
+                  onMouseDown={(e) => {
+                    updateBrushPreviewPosition(e.clientX, e.clientY);
+                    if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
+                    const img = imageRef.current;
+                    const imgRectBounds = img.getBoundingClientRect();
+
+                    // Get coordinates relative to image
+                    const relativeX = e.clientX - imgRectBounds.left;
+                    const relativeY = e.clientY - imgRectBounds.top;
+
+                    // Check if click is within image bounds
+                    if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
+                      return;
+                    }
+
+                    setIsDrawing(true);
+                    setLastPoint({ x: relativeX, y: relativeY });
+
+                    // Draw initial brush stroke
+                    const canvas = canvasRef.current;
+                    const maskCanvas = maskCanvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const maskCtx = maskCanvas.getContext('2d');
+
+                    if (ctx && maskCtx) {
+                      const scaleX = img.naturalWidth / img.clientWidth;
+                      const scaleY = img.naturalHeight / img.clientHeight;
+                      drawBrushStroke(ctx, maskCtx, relativeX, relativeY, null, null, brushSize, scaleX, scaleY);
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    updateBrushPreviewPosition(e.clientX, e.clientY);
+                    if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
+                    const img = imageRef.current;
+                    const imgRectBounds = img.getBoundingClientRect();
+
+                    // Get coordinates relative to image
+                    const relativeX = e.clientX - imgRectBounds.left;
+                    const relativeY = e.clientY - imgRectBounds.top;
+
+                    // Clamp to image bounds
+                    const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
+                    const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
+
+                    // Draw brush stroke
+                    const canvas = canvasRef.current;
+                    const maskCanvas = maskCanvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const maskCtx = maskCanvas.getContext('2d');
+
+                    if (ctx && maskCtx) {
+                      const scaleX = img.naturalWidth / img.clientWidth;
+                      const scaleY = img.naturalHeight / img.clientHeight;
+                      drawBrushStroke(ctx, maskCtx, clampedX, clampedY, lastPoint.x, lastPoint.y, brushSize, scaleX, scaleY);
+                      setLastPoint({ x: clampedX, y: clampedY });
+                    }
+                  }}
+                  onMouseUp={() => {
+                    if (isDrawing) {
+                      setIsDrawing(false);
+                      setLastPoint(null);
+                    }
+                    hideBrushPreviewIfIdle();
+                  }}
+                  onMouseLeave={() => {
+                    if (isDrawing) {
+                      setIsDrawing(false);
+                      setLastPoint(null);
+                    }
+                    hideBrushPreviewIfIdle();
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    updateBrushPreviewPosition(touch.clientX, touch.clientY);
+                    if (!canvasRef.current || !imageRef.current || !maskCanvasRef.current) return;
+                    const img = imageRef.current;
+                    const imgRectBounds = img.getBoundingClientRect();
+
+                    const relativeX = touch.clientX - imgRectBounds.left;
+                    const relativeY = touch.clientY - imgRectBounds.top;
+
+                    if (relativeX < 0 || relativeY < 0 || relativeX > imgRectBounds.width || relativeY > imgRectBounds.height) {
+                      return;
+                    }
+
+                    setIsDrawing(true);
+                    setLastPoint({ x: relativeX, y: relativeY });
+
+                    const canvas = canvasRef.current;
+                    const maskCanvas = maskCanvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const maskCtx = maskCanvas.getContext('2d');
+
+                    if (ctx && maskCtx) {
+                      const scaleX = img.naturalWidth / img.clientWidth;
+                      const scaleY = img.naturalHeight / img.clientHeight;
+                      drawBrushStroke(ctx, maskCtx, relativeX, relativeY, null, null, brushSize, scaleX, scaleY);
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    updateBrushPreviewPosition(touch.clientX, touch.clientY);
+                    if (!isDrawing || !canvasRef.current || !imageRef.current || !maskCanvasRef.current || !lastPoint) return;
+                    const img = imageRef.current;
+                    const imgRectBounds = img.getBoundingClientRect();
+
+                    const relativeX = touch.clientX - imgRectBounds.left;
+                    const relativeY = touch.clientY - imgRectBounds.top;
+
+                    const clampedX = Math.max(0, Math.min(relativeX, imgRectBounds.width));
+                    const clampedY = Math.max(0, Math.min(relativeY, imgRectBounds.height));
+
+                    const canvas = canvasRef.current;
+                    const maskCanvas = maskCanvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const maskCtx = maskCanvas.getContext('2d');
+
+                    if (ctx && maskCtx) {
+                      const scaleX = img.naturalWidth / img.clientWidth;
+                      const scaleY = img.naturalHeight / img.clientHeight;
+                      drawBrushStroke(ctx, maskCtx, clampedX, clampedY, lastPoint.x, lastPoint.y, brushSize, scaleX, scaleY);
+                      setLastPoint({ x: clampedX, y: clampedY });
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    if (isDrawing) {
+                      setIsDrawing(false);
+                      setLastPoint(null);
+                    }
+                    hideBrushPreviewIfIdle();
                   }}
                 />
-              )}
+                {/* Hidden mask canvas for API */}
+                <canvas
+                  ref={maskCanvasRef}
+                  style={{ display: 'none' }}
+                />
+              </div>
             </div>
+          {sourceImageUrl && brushPreview.visible && (
+            <div
+              style={{
+                position: 'fixed',
+                top: `${brushPreview.y}px`,
+                left: `${brushPreview.x}px`,
+                width: `${brushSize}px`,
+                height: `${brushSize}px`,
+                borderRadius: '50%',
+                border: isDark ? '1px solid rgba(247,247,247,0.5)' : '1px solid rgba(247,247,247,0.9)',
+                backgroundColor: 'rgba(247,247,247,0.2)',
+                pointerEvents: 'none',
+                zIndex: 10006,
+                transform: 'translate(-50%, -50%)',
+                transition: 'width 0.15s ease, height 0.15s ease',
+              }}
+            />
+          )}
+          </div>
           ) : (
             <div
               style={{
@@ -1637,3 +1570,5 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
     </div>
   );
 };
+
+

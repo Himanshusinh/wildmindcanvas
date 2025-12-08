@@ -489,25 +489,20 @@ export function createPluginHandlers(
     if (projectId && opManagerInitialized) {
       await appendOp({
         type: 'create',
+        elementType: 'erase',
         elementId: modal.id,
         data: {
-          element: {
-            id: modal.id,
-            type: 'erase-plugin',
-            x: modal.x,
-            y: modal.y,
-            meta: {
-              erasedImageUrl: modal.erasedImageUrl || null,
-              sourceImageUrl: modal.sourceImageUrl || null,
-              localErasedImageUrl: modal.localErasedImageUrl || null,
-              model: modal.model,
-              frameWidth: modal.frameWidth,
-              frameHeight: modal.frameHeight,
-              isErasing: modal.isErasing,
-            },
-          },
+          id: modal.id,
+          x: modal.x,
+          y: modal.y,
+          erasedImageUrl: modal.erasedImageUrl || null,
+          sourceImageUrl: modal.sourceImageUrl || null,
+          localErasedImageUrl: modal.localErasedImageUrl || null,
+          model: modal.model,
+          frameWidth: modal.frameWidth,
+          frameHeight: modal.frameHeight,
+          isErasing: modal.isErasing,
         },
-        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
       });
     }
   };
@@ -529,55 +524,27 @@ export function createPluginHandlers(
 
     // 4. Append op for undo/redo and persistence
     if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        erasedImageUrl: prev.erasedImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localErasedImageUrl: prev.localErasedImageUrl || null,
-        model: prev.model,
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isErasing: prev.isErasing || false,
-      };
-
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
-        }
-      }
-      structuredUpdates.meta = metaUpdates;
-
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-
-      const inverseMeta: any = {};
-      if ('erasedImageUrl' in updates) inverseMeta.erasedImageUrl = prev.erasedImageUrl || null;
-      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-      if ('localErasedImageUrl' in updates) inverseMeta.localErasedImageUrl = prev.localErasedImageUrl || null;
-      if ('model' in updates) inverseMeta.model = prev.model;
-      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-      if ('isErasing' in updates) inverseMeta.isErasing = prev.isErasing || false;
-
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
-
       await appendOp({
-        type: 'update',
+        type: 'move',
+        elementType: 'erase',
         elementId: id,
-        data: { updates: structuredUpdates },
+        data: updates,
         inverse: {
-          type: 'update',
+          type: 'move',
+          elementType: 'erase',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: {
+            x: prev.x,
+            y: prev.y,
+            erasedImageUrl: prev.erasedImageUrl || null,
+            sourceImageUrl: prev.sourceImageUrl || null,
+            localErasedImageUrl: prev.localErasedImageUrl || null,
+            model: prev.model,
+            frameWidth: prev.frameWidth,
+            frameHeight: prev.frameHeight,
+            isErasing: prev.isErasing,
+          },
+        },
       });
     }
   };
@@ -602,31 +569,26 @@ export function createPluginHandlers(
     if (projectId && opManagerInitialized && prevItem) {
       await appendOp({
         type: 'delete',
+        elementType: 'erase',
         elementId: id,
-        data: {},
+        data: null,
         inverse: {
           type: 'create',
+          elementType: 'erase',
           elementId: id,
           data: {
-            element: {
-              id: prevItem.id,
-              type: 'erase-plugin',
-              x: prevItem.x,
-              y: prevItem.y,
-              meta: {
-                erasedImageUrl: prevItem.erasedImageUrl || null,
-                sourceImageUrl: prevItem.sourceImageUrl || null,
-                localErasedImageUrl: prevItem.localErasedImageUrl || null,
-                model: prevItem.model,
-                frameWidth: prevItem.frameWidth,
-                frameHeight: prevItem.frameHeight,
-                isErasing: prevItem.isErasing,
-              },
-            },
+            id: prevItem.id,
+            x: prevItem.x,
+            y: prevItem.y,
+            erasedImageUrl: prevItem.erasedImageUrl || null,
+            sourceImageUrl: prevItem.sourceImageUrl || null,
+            localErasedImageUrl: prevItem.localErasedImageUrl || null,
+            model: prevItem.model,
+            frameWidth: prevItem.frameWidth,
+            frameHeight: prevItem.frameHeight,
+            isErasing: prevItem.isErasing,
           },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+        },
       });
     }
   };

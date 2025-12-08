@@ -12,7 +12,9 @@ import ProjectDrawer from './components/ProjectDrawer';
 import TransitionPanel from './components/TransitionPanel';
 import RightSidebar from './components/RightSidebar';
 import PreviewModal from './components/PreviewModal';
+import ExportModal from './components/ExportModal';
 import { Tab, CanvasDimension, Track, TimelineItem, RESIZE_OPTIONS, MOCK_VIDEOS, MOCK_IMAGES, Transition, TransitionType } from './types';
+import './animations.css';
 
 interface VideoEditorPluginModalProps {
     isOpen: boolean;
@@ -20,6 +22,20 @@ interface VideoEditorPluginModalProps {
 }
 
 const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen, onClose }) => {
+    // --- Font Loading ---
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const linkId = 'video-editor-fonts';
+        if (!document.getElementById(linkId)) {
+            const link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = 'https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Alex+Brush&family=Alfa+Slab+One&family=Allura&family=Anton&family=Archivo+Black&family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Arvo:ital,wght@0,400;0,700;1,400;1,700&family=Bebas+Neue&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Dancing+Script:wght@400..700&family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Fira+Code:wght@300..700&family=Great+Vibes&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Inconsolata:wght@200..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=League+Spartan:wght@100..900&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Lobster&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Oswald:wght@200..700&family=Pacifico&family=Parisienne&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Quicksand:wght@300..700&family=Raleway:ital,wght@0,100..900;1,100..900&family=Roboto+Slab:wght@100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Rye&family=Satisfy&family=Shrikhand&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&family=Source+Sans+Pro:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,200;1,300;1,400;1,600;1,700;1,900&family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&family=Stardos+Stencil:wght@400;700&family=Tilt+Neon&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&family=UnifrakturMaguntia&display=swap';
+            document.head.appendChild(link);
+        }
+    }, [isOpen]);
+
     // --- State ---
     const [projectName, setProjectName] = useState('Untitled Video Design');
     const [activeTab, setActiveTab] = useState<Tab>('text');
@@ -33,6 +49,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
 
     const [scalePercent, setScalePercent] = useState(0); // 0 means "Fit"
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
     // Interaction Modes
     const [interactionMode, setInteractionMode] = useState<'none' | 'crop' | 'erase'>('none');
@@ -314,6 +331,10 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
         input.click();
     };
 
+    const handleRemoveUpload = (id: string) => {
+        setUploads(prev => prev.filter(upload => upload.id !== id));
+    };
+
     const handleUndo = () => {
         if (past.length === 0) return;
         const previous = past[past.length - 1];
@@ -566,6 +587,25 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
         }
     };
 
+    const handleClearAll = () => {
+        addToHistory();
+        setTracks(prev => {
+            // Clear all items from all tracks
+            const clearedTracks = prev.map(track => ({
+                ...track,
+                items: []
+            }));
+
+            // Remove empty overlay tracks (keep main-video and audio even if empty)
+            return clearedTracks.filter(t => {
+                if (t.id === 'main-video' || t.id === 'audio') return true;
+                return t.items.length > 0;
+            });
+        });
+        // Clear selection
+        handleClipSelect('', null);
+    };
+
     // --- Clip Actions (Context Menu) ---
 
     const handleCopyClip = (item: TimelineItem) => {
@@ -753,7 +793,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     trackId: newTrackId,
                     isBackground: false,
                     width: 50,
-                    height: 50,
+                    height: undefined,
                     x: 0,
                     y: 0,
                     layer: 10
@@ -776,8 +816,9 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
 
             } else {
                 // Attach: Move to Main Video (End)
-                const mainTrack = newTracks.find(t => t.id === 'main-video');
-                if (mainTrack) {
+                const mainTrackIndex = newTracks.findIndex(t => t.id === 'main-video');
+                if (mainTrackIndex !== -1) {
+                    const mainTrack = newTracks[mainTrackIndex];
                     const lastItem = mainTrack.items[mainTrack.items.length - 1];
                     const newItem: TimelineItem = {
                         ...item,
@@ -786,13 +827,23 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                         x: 0, y: 0, width: 100, height: 100, rotation: 0,
                         start: lastItem ? lastItem.start + lastItem.duration : 0,
                         crop: { x: 50, y: 50, zoom: 1 },
-                        layer: 0
+                        layer: 0,
+                        border: undefined // Clear border when setting as background
                     };
-                    mainTrack.items.push(newItem);
+
+                    // Immutable update: Create new main track with new item
+                    // Ensure we don't add duplicates if something went wrong
+                    if (!mainTrack.items.some(i => i.id === newItem.id)) {
+                        newTracks[mainTrackIndex] = {
+                            ...mainTrack,
+                            items: [...mainTrack.items, newItem]
+                        };
+                    }
 
                     // Remove empty source track if it was an overlay track
                     if (sourceTrack.id !== 'main-video' && sourceTrack.id !== 'audio') {
                         const idx = newTracks.findIndex(t => t.id === sourceTrack.id);
+                        // Check if the track in newTracks (which has the item removed) is now empty
                         if (idx !== -1 && newTracks[idx].items.length === 0) {
                             newTracks.splice(idx, 1);
                         }
@@ -974,7 +1025,8 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     trackId: 'main-video',
                     layer: 0,
                     isBackground: true,
-                    width: 100, height: 100, x: 0, y: 0
+                    width: 100, height: 100, x: 0, y: 0,
+                    fit: itemData.type === 'image' ? 'contain' : 'cover'
                 };
                 addToHistory();
                 setTracks(prev => prev.map(t => t.id === 'main-video' ? { ...t, items: [...t.items, newItem] } : t));
@@ -991,7 +1043,8 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     trackId: trackId,
                     layer: 1,
                     isBackground: false,
-                    width: 100, height: 100, x: 0, y: 0
+                    width: 100, height: 100, x: 0, y: 0,
+                    fit: itemData.type === 'image' ? 'contain' : 'cover'
                 };
                 addToHistory();
                 setTracks(prev => prev.map(t => t.id === trackId ? { ...t, items: [...t.items, newItem] } : t));
@@ -1009,7 +1062,8 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     trackId: newTrackId,
                     layer: 1,
                     isBackground: false,
-                    width: 100, height: 100, x: 0, y: 0
+                    width: 100, height: 100, x: 0, y: 0,
+                    fit: itemData.type === 'image' ? 'contain' : 'cover'
                 };
                 const newTrack: Track = {
                     id: newTrackId,
@@ -1199,20 +1253,46 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
         return track?.items.find(i => i.id === transitionEditTarget.itemId)?.transition;
     };
 
+    // High-fidelity playback using requestAnimationFrame
+    // OPTIMIZED: Throttle React state updates to ~30fps to prevent excessive re-renders
+    // The actual video elements play at native framerate independently
     useEffect(() => {
-        let interval: number;
-        if (isPlaying) {
-            interval = window.setInterval(() => {
-                setCurrentTime((prev) => {
-                    if (prev >= totalDuration) {
-                        setIsPlaying(false);
-                        return 0;
-                    }
-                    return prev + 0.05;
-                });
-            }, 50);
-        }
-        return () => clearInterval(interval);
+        if (!isPlaying) return;
+
+        let animationFrameId: number;
+        let lastTimestamp = performance.now();
+        let lastStateUpdate = performance.now();
+        let accumulatedTime = currentTime;
+
+        const loop = (timestamp: number) => {
+            const delta = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            // Accumulate time internally (not in React state)
+            accumulatedTime += delta;
+
+            // Check for end
+            if (accumulatedTime >= totalDuration) {
+                setCurrentTime(0);
+                setIsPlaying(false);
+                return;
+            }
+
+            // Throttle React state updates to ~10fps (every 100ms)
+            // The video plays at native framerate via DOM - React only updates the timeline scrubber position
+            // This DRAMATICALLY reduces re-renders for smooth 4K/8K playback
+            const timeSinceLastUpdate = timestamp - lastStateUpdate;
+            if (timeSinceLastUpdate >= 100) {
+                lastStateUpdate = timestamp;
+                setCurrentTime(accumulatedTime);
+            }
+
+            animationFrameId = requestAnimationFrame(loop);
+        };
+
+        animationFrameId = requestAnimationFrame(loop);
+
+        return () => cancelAnimationFrame(animationFrameId);
     }, [isPlaying, totalDuration]);
 
     useEffect(() => {
@@ -1314,6 +1394,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                     onMakeCopy={handleMakeCopy}
                     onMoveToTrash={handleMoveToTrash}
                     onPreview={() => setIsPreviewOpen(true)}
+                    onExport={() => setIsExportModalOpen(true)}
                 />
 
                 <div className="flex-1 flex overflow-hidden relative">
@@ -1329,6 +1410,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                         onAlign={(align) => selectedTrackId && selectedItemId && handleAlignClip(selectedTrackId, selectedItemId, align)}
                         uploads={uploads}
                         onUpload={handleUpload}
+                        onRemoveUpload={handleRemoveUpload}
                     />
 
                     {/* Edit Panel (Includes Eraser View) */}
@@ -1412,6 +1494,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                                 onUpdateClip={handleUpdateClip}
                                 onDeleteClip={handleDeleteClip}
                                 onSplitClip={handleSplitClip}
+                                onClearAll={handleClearAll}
                                 onAddTrackItem={handleTimelineAdd}
                                 onSelectTransition={(trackId, itemId) => setTransitionEditTarget({ trackId, itemId })}
                                 selectedItemId={selectedItemId}
@@ -1441,7 +1524,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                         onCopy={() => selectedItem && handleCopyClip(selectedItem)}
                         onPaste={() => selectedTrackId && handlePasteClip(selectedTrackId, currentTime)}
                         onSplit={handleSplitClip}
-                        onDetach={() => selectedTrackId && selectedItemId && handleDetachBackground(selectedTrackId, selectedItemId)}
+                        onDetach={handleDetachBackground}
                         onFont={() => handleOpenEditPanel('font')}
                         onTextEffects={() => handleOpenEditPanel('text-effects')}
                     />
@@ -1460,6 +1543,16 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
                 dimension={currentDimension}
                 totalDuration={totalDuration}
                 onDimensionChange={handleDimensionChange}
+            />
+
+            {/* Export Modal */}
+            <ExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                tracks={tracks}
+                duration={totalDuration}
+                dimension={currentDimension}
+                projectName={projectName}
             />
         </div>
     );

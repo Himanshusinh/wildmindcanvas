@@ -1,5 +1,14 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CanvasDimension, Track, TimelineItem, Transition, getAdjustmentStyle, getPresetFilterStyle, BorderStyle, FONTS, getTextEffectStyle } from '../types';
+// GPU-accelerated playback engine
+import {
+    gpuCompositor,
+    frameCache,
+    hardwareAccel,
+    playbackController,
+    initializeEngine,
+    calculateMediaTime
+} from '../core';
 import { Edit, Eraser, Scissors, Trash2, Crop, FlipHorizontal, FlipVertical, Droplets, Check, X, PaintBucket, Copy, CopyPlus, Lock, MoreHorizontal, Clipboard, ImageIcon, ImageMinus, MessageSquare, AlignCenter, AlignLeft, AlignRight, AlignJustify, AlignStartVertical, AlignEndVertical, AlignCenterVertical, RotateCw, MessageSquarePlus, Unlock, Sparkles, PlayCircle, Palette, Square, Circle, Minus, ChevronRight, ChevronLeft, Plus, Type, List, ListOrdered, Bold, Italic, Underline, Strikethrough, CaseUpper, Wand2 } from 'lucide-react';
 
 interface CanvasProps {
@@ -17,7 +26,7 @@ interface CanvasProps {
     eraserSettings: { size: number; type: 'erase' | 'restore'; showOriginal: boolean };
 
     onSelectClip: (trackId: string, itemId: string | null) => void;
-    onUpdateClip: (trackId: string, item: TimelineItem) => void;
+    onUpdateClip: (trackId: string, item: TimelineItem, skipHistory?: boolean) => void;
     onDeleteClip: (trackId: string, itemId: string) => void;
     onSplitClip: () => void;
     onOpenEditPanel?: (view?: 'main' | 'adjust' | 'eraser' | 'color' | 'animate' | 'text-effects' | 'font') => void;
@@ -115,6 +124,51 @@ const Canvas: React.FC<CanvasProps> = ({
     const topToolbarRef = useRef<HTMLDivElement>(null);
     const bottomToolbarRef = useRef<HTMLDivElement>(null);
     const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+    // GPU Compositor State
+    const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
+    const [gpuReady, setGpuReady] = useState(false);
+    const [gpuInfo, setGpuInfo] = useState<{ name: string; can8K: boolean } | null>(null);
+
+    // Initialize GPU compositor on mount
+    useEffect(() => {
+        let mounted = true;
+
+        const init = async () => {
+            try {
+                const result = await initializeEngine();
+                if (!mounted) return;
+
+                console.log('[Canvas] GPU Engine initialized:', result);
+                setGpuInfo({ name: result.gpuName, can8K: result.can8K });
+
+                // Initialize compositor with GPU canvas if available
+                if (gpuCanvasRef.current && result.webgl2) {
+                    const success = await gpuCompositor.initialize(gpuCanvasRef.current);
+                    if (success) {
+                        gpuCompositor.setResolution(renderWidth, renderHeight);
+                        setGpuReady(true);
+                        console.log('[Canvas] GPU Compositor ready');
+                    }
+                }
+            } catch (error) {
+                console.warn('[Canvas] GPU initialization failed, using 2D fallback:', error);
+            }
+        };
+
+        init();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    // Update compositor resolution when dimensions change
+    useEffect(() => {
+        if (gpuReady) {
+            gpuCompositor.setResolution(renderWidth, renderHeight);
+        }
+    }, [renderWidth, renderHeight, gpuReady]);
 
     // Close popups on outside click (checking all toolbars)
     useEffect(() => {
@@ -285,7 +339,7 @@ const Canvas: React.FC<CanvasProps> = ({
         const deltaX_px = e.clientX - dragStartRef.current.x; const deltaY_px = e.clientY - dragStartRef.current.y;
         const deltaX_pct = (deltaX_px / canvasWidthPx) * 100; const deltaY_pct = (deltaY_px / canvasHeightPx) * 100;
         const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
-        if (item && track) { onUpdateClip(track.id, { ...item, x: (itemStartPosRef.current.x + deltaX_pct), y: (itemStartPosRef.current.y + deltaY_pct) }); }
+        if (item && track) { onUpdateClip(track.id, { ...item, x: (itemStartPosRef.current.x + deltaX_pct), y: (itemStartPosRef.current.y + deltaY_pct) }, true); }
     };
 
     const handleResizeMouseDown = (e: React.MouseEvent, item: TimelineItem, handle: string) => {
@@ -348,7 +402,7 @@ const Canvas: React.FC<CanvasProps> = ({
         // For text, if we resize height, we might want to unset auto-height behavior or just let it clip/scroll?
         // Usually text boxes in design tools: width changes wrapping, height changes cropping or spacing.
         // For now, we update height. If it was auto, it will now be fixed % which is fine.
-        onUpdateClip(track.id, { ...item, width: newW, height: item.type === 'text' ? undefined : newH, x: originalX + worldShiftX, y: originalY + worldShiftY });
+        onUpdateClip(track.id, { ...item, width: newW, height: item.type === 'text' ? undefined : newH, x: originalX + worldShiftX, y: originalY + worldShiftY }, true);
     };
 
     const handleRotateMouseDown = (e: React.MouseEvent, item: TimelineItem) => {
@@ -365,7 +419,7 @@ const Canvas: React.FC<CanvasProps> = ({
         const dx = e.clientX - cx; const dy = e.clientY - cy;
         const degs = Math.atan2(dy, dx) * (180 / Math.PI);
         const track = tracks.find(t => t.items.some(i => i.id === selectedItemId)); const item = track?.items.find(i => i.id === selectedItemId);
-        if (item && track) { onUpdateClip(track.id, { ...item, rotation: degs - 90 }); }
+        if (item && track) { onUpdateClip(track.id, { ...item, rotation: degs - 90 }, true); }
     };
 
     // --- Rendering Logic ---
@@ -414,7 +468,8 @@ const Canvas: React.FC<CanvasProps> = ({
                         else if (timing === 'prefix') transStart = -t.duration;
 
                         // Check if we are in the transition window
-                        if (timeIntoClip >= transStart && timeIntoClip < transStart + t.duration) {
+                        // CRITICAL: Using <= to include exact end moment (p=1.0)
+                        if (timeIntoClip >= transStart && timeIntoClip <= transStart + t.duration) {
                             isTransitioning = true;
                             transition = t;
                             progress = (timeIntoClip - transStart) / t.duration;
@@ -468,6 +523,10 @@ const Canvas: React.FC<CanvasProps> = ({
                 } else if (mainItem) {
                     // No transition, just render main item
                     active.push({ item: mainItem, role: 'main', zIndexBase });
+                } else if (nextItem && currentTime >= nextItem.start - 0.05) {
+                    // FALLBACK: If approaching next clip but no main item, show next clip early
+                    // This prevents black/white gaps at transition boundaries
+                    active.push({ item: nextItem, role: 'main', zIndexBase });
                 }
 
             } else {
@@ -490,9 +549,9 @@ const Canvas: React.FC<CanvasProps> = ({
                 if (item.type !== 'video' && item.type !== 'image') return; // Only buffer heavy media
                 if (renderedIds.has(item.id)) return;
 
-                // Buffer window: 2 seconds before and 2 seconds after
-                // This keeps the DOM element mounted so it doesn't have to re-initialize
-                if (currentTime >= item.start - 2 && currentTime < item.start + item.duration + 2) {
+                // Buffer window: 10 seconds before and 3 seconds after for aggressive pre-loading
+                // Increased from 5s to 10s to prevent pauses after transitions
+                if (currentTime >= item.start - 10 && currentTime < item.start + item.duration + 3) {
                     buffered.push({ item, role: 'main', zIndexBase: trackIndex * 10, isBuffered: true });
                 }
             });
@@ -506,6 +565,10 @@ const Canvas: React.FC<CanvasProps> = ({
     // Cache for video frames to prevent black screens/flickering when decoding lags
     const videoCacheRefs = useRef<Map<string, HTMLCanvasElement>>(new Map());
 
+    // Use a ref to store the latest bufferedItems
+    const latestBufferedItems = useRef(bufferedItems);
+    latestBufferedItems.current = bufferedItems;
+
     // --- Canvas Rendering Engine ---
     useEffect(() => {
         let animationFrameId: number;
@@ -516,16 +579,84 @@ const Canvas: React.FC<CanvasProps> = ({
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            // Clear canvas
+            // Clear 2D canvas (used for overlay/fallback)
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw items
-            latestRenderItems.current.forEach(obj => {
-                const { item, role, transition, transitionProgress } = obj;
+            // Combine active and buffered items for processing
+            const allItems = [
+                ...latestRenderItems.current.map(i => ({ ...i, isBuffered: false })),
+                ...latestBufferedItems.current.map(i => ({ ...i, isBuffered: true }))
+            ];
 
-                // Skip audio and text (text is DOM overlay), and animated items (rendered in DOM)
-                // Optimization: Also skip video and image as they are rendered in the DOM to avoid double-rendering and improve performance for 4K/8K
-                if (item.type === 'audio' || item.type === 'text' || item.type === 'color' || item.animation || item.type === 'video' || item.type === 'image') return;
+            // --- GPU Compositor Rendering ---
+            // If GPU compositor is ready, render video/image layers via GPU for smooth playback
+            if (gpuReady) {
+                // Clear GPU canvas at start of frame
+                gpuCompositor.clear();
+
+                // Render each video/image layer through GPU
+                allItems.forEach(obj => {
+                    const { item, isBuffered } = obj;
+                    if (isBuffered) return;
+                    if (item.type !== 'video' && item.type !== 'image') return;
+
+                    // Skip animated items - they need DOM for CSS animations
+                    if (item.animation) return;
+
+                    // Skip transitioning items - they need DOM for CSS transitions
+                    if ('transition' in obj && obj.transition) return;
+
+                    const mediaEl = mediaRefs.current[item.id];
+                    if (!mediaEl) return;
+
+                    // Check if media is ready
+                    if (mediaEl instanceof HTMLVideoElement && mediaEl.readyState < 2) return;
+                    if (mediaEl instanceof HTMLImageElement && !mediaEl.complete) return;
+
+                    // Calculate transform for this item
+                    const transform = {
+                        x: (item.x || 0) / 100 * canvas.width,
+                        y: (item.y || 0) / 100 * canvas.height,
+                        scaleX: item.flipH ? -1 : 1,
+                        scaleY: item.flipV ? -1 : 1,
+                        rotation: item.rotation || 0,
+                        opacity: (item.opacity ?? 100) / 100,
+                        anchorX: 0.5,
+                        anchorY: 0.5,
+                    };
+
+                    // Render layer through GPU compositor
+                    gpuCompositor.renderLayer(
+                        mediaEl as HTMLVideoElement | HTMLImageElement,
+                        transform,
+                        transform.opacity
+                    );
+
+                    // Cache frame for seeking (prevents black screens)
+                    if (mediaEl instanceof HTMLVideoElement) {
+                        frameCache.warmCache(item.id, mediaEl.currentTime, mediaEl);
+                    }
+                });
+            }
+
+            // --- 2D Canvas Rendering (Non-GPU items and fallback) ---
+            // When GPU is ready, video/image items are rendered via WebGL - skip them in 2D canvas
+            // This prevents double-rendering and improves performance
+
+            // Draw items
+            allItems.forEach(obj => {
+                const { item, role, transition, transitionProgress, isBuffered } = obj;
+                const type = item.type as string;
+
+                // Always skip audio, text, color (rendered via DOM)
+                if (type === 'audio' || type === 'text' || type === 'color') return;
+
+                // Skip animated items (rendered via DOM with CSS animations)
+                if (item.animation) return;
+
+                // PERFORMANCE: When GPU is ready, skip NON-ANIMATED, NON-TRANSITIONING video/image - they're rendered via WebGL
+                // IMPORTANT: Animated or transitioning videos/images stay in DOM so CSS effects work
+                if (gpuReady && !item.animation && !transition && (type === 'video' || type === 'image')) return;
 
                 const mediaEl = mediaRefs.current[item.id];
                 if (!mediaEl) return;
@@ -592,6 +723,74 @@ const Canvas: React.FC<CanvasProps> = ({
                     }
                 }
 
+                // --- CANVAS TRANSITION HANDLING ---
+                if (transition && transitionProgress !== undefined) {
+                    const p = transitionProgress;
+                    const { type: tType, direction } = transition;
+
+                    // Direction Multipliers
+                    let xMult = 1; let yMult = 0;
+                    if (direction === 'right') { xMult = -1; yMult = 0; }
+                    else if (direction === 'up') { xMult = 0; yMult = 1; }
+                    else if (direction === 'down') { xMult = 0; yMult = -1; }
+
+                    // Apply Transition Effects
+                    switch (tType) {
+                        // Dissolves
+                        case 'dissolve':
+                        case 'film-dissolve':
+                        case 'cross-zoom': // Fallback to dissolve for complex zoom
+                        case 'fade-dissolve':
+                        case 'luma-dissolve':
+                        case 'fade-color':
+                            ctx.globalAlpha *= (role === 'main' ? p : 1 - p);
+                            break;
+
+                        case 'dip-to-black':
+                            if (role === 'outgoing') ctx.globalAlpha *= (p < 0.5 ? 1 - (p * 2) : 0);
+                            if (role === 'main') ctx.globalAlpha *= (p > 0.5 ? (p - 0.5) * 2 : 0);
+                            break;
+
+                        // Slides & Pushes
+                        case 'slide':
+                        case 'push':
+                        case 'whip':
+                        case 'band-slide':
+                        case 'smooth-wipe': // Fallback
+                            if (role === 'main') {
+                                ctx.translate(xMult * canvas.width * (1 - p), yMult * canvas.height * (1 - p));
+                            } else if (tType === 'push' || tType === 'whip') {
+                                // Push moves outgoing too
+                                ctx.translate(xMult * -canvas.width * p, yMult * -canvas.height * p);
+                            }
+                            break;
+
+                        // Wipes (Clipping)
+                        case 'wipe':
+                        case 'simple-wipe':
+                            const wipeP = p;
+                            ctx.beginPath();
+                            if (direction === 'right') ctx.rect(0, 0, canvas.width * wipeP, canvas.height); // Wipe Right (Left to Right?) - wait, direction usually means "Wipe TO Right" or "From Left"?
+                            // Standard Wipe Right: Reveals from Left to Right.
+                            // If direction='right', it usually means the line moves right.
+                            // Let's assume standard:
+                            else if (direction === 'left') ctx.rect(canvas.width * (1 - wipeP), 0, canvas.width * wipeP, canvas.height);
+                            else if (direction === 'down') ctx.rect(0, 0, canvas.width, canvas.height * wipeP);
+                            else if (direction === 'up') ctx.rect(0, canvas.height * (1 - wipeP), canvas.width, canvas.height * wipeP);
+                            else ctx.rect(0, 0, canvas.width * wipeP, canvas.height); // Default
+
+                            if (role === 'main') ctx.clip();
+                            // For outgoing, we don't clip, it just stays underneath? Or we clip inverse?
+                            // Usually Main is on top. If Main is clipped, Outgoing shows below.
+                            break;
+
+                        // Fallback for others (Dissolve)
+                        default:
+                            ctx.globalAlpha *= (role === 'main' ? p : 1 - p);
+                            break;
+                    }
+                }
+
                 // 2. Apply Transformations
                 ctx.translate(cx, cy);
                 ctx.rotate((item.rotation || 0) * Math.PI / 180);
@@ -601,7 +800,12 @@ const Canvas: React.FC<CanvasProps> = ({
                 }
 
                 // 3. Apply Opacity & Filter
-                ctx.globalAlpha = (item.opacity ?? 100) / 100;
+                // For buffered items, we want to update cache but NOT draw to main canvas
+                if (isBuffered) {
+                    ctx.globalAlpha = 0; // Don't draw to main canvas
+                } else {
+                    ctx.globalAlpha = (item.opacity ?? 100) / 100;
+                }
 
                 let filterStr = '';
                 if (item.filter && item.filter !== 'none') {
@@ -633,14 +837,20 @@ const Canvas: React.FC<CanvasProps> = ({
 
                         const cacheCtx = cacheCanvas.getContext('2d');
 
+                        // Always try to update cache if we have data
                         if (mediaEl.readyState >= 2 && cacheCtx) {
                             cacheCtx.drawImage(mediaEl, 0, 0, cacheCanvas.width, cacheCanvas.height);
                         }
 
-                        ctx.drawImage(cacheCanvas, -w / 2, -h / 2, w, h);
+                        // Draw from cache to main canvas (unless buffered/invisible)
+                        if (!isBuffered) {
+                            ctx.drawImage(cacheCanvas, -w / 2, -h / 2, w, h);
+                        }
 
                     } else {
-                        ctx.drawImage(mediaEl as CanvasImageSource, -w / 2, -h / 2, w, h);
+                        if (!isBuffered) {
+                            ctx.drawImage(mediaEl as CanvasImageSource, -w / 2, -h / 2, w, h);
+                        }
                     }
                 } catch (e) { }
 
@@ -656,43 +866,181 @@ const Canvas: React.FC<CanvasProps> = ({
     }, [renderScale, dimension]);
 
     // --- Playback Synchronization ---
-    // --- Playback Synchronization ---
-    useEffect(() => {
+    // Optimized: During playback, let video elements play natively without constant seeking
+    // Only sync on: initial play, pause, scrub, or clip change
+    const lastSyncTimeRef = useRef<number>(0);
+    const isPlayingRef = useRef(isPlaying);
+    isPlayingRef.current = isPlaying;
+
+    // Sync video elements (called sparingly, not every frame)
+    const syncMediaElements = useCallback((targetTime: number, forceSeek: boolean = false) => {
         [...renderItems, ...bufferedItems].forEach(({ item, role, isBuffered }) => {
-            if (item.type === 'video' || item.type === 'audio') {
-                const keys = [item.id]; if (item.type === 'video') keys.push(item.id + '_filter');
+            if (item.type !== 'video' && item.type !== 'audio') return;
+
+            const keys = [item.id];
+            if (item.type === 'video') keys.push(item.id + '_filter');
+
+            keys.forEach(key => {
+                const mediaEl = mediaRefs.current[key];
+                if (!(mediaEl instanceof HTMLMediaElement)) return;
+
+                const speed = item.speed || 1;
+                let mediaTime: number;
+
+                // Calculate target time
+                if (isBuffered && targetTime < item.start) {
+                    mediaTime = item.offset;
+                } else {
+                    mediaTime = role === 'main'
+                        ? ((targetTime - item.start) * speed) + item.offset
+                        : (item.duration * speed) + item.offset + ((targetTime - (item.start + item.duration)) * speed);
+                }
+
+                // Clamp time
+                if (mediaTime < 0) mediaTime = 0;
+                if (Number.isFinite(mediaEl.duration) && mediaTime >= mediaEl.duration) {
+                    mediaTime = Math.max(0, mediaEl.duration - 0.01);
+                }
+
+                // Only seek if drift is significant, or if forced
+                const drift = Math.abs(mediaEl.currentTime - mediaTime);
+                const syncThreshold = forceSeek ? 0.033 : (isPlayingRef.current ? 0.25 : 0.05);
+
+                if (drift > syncThreshold) {
+                    mediaEl.currentTime = mediaTime;
+                }
+
+                // Playback rate
+                if (Math.abs(mediaEl.playbackRate - speed) > 0.01) {
+                    mediaEl.playbackRate = speed;
+                }
+
+                // Volume
+                mediaEl.muted = item.muteVideo || (item.volume === 0);
+                mediaEl.volume = item.muteVideo ? 0 : ((item.volume ?? 100) / 100);
+            });
+        });
+    }, [renderItems, bufferedItems]);
+
+    // Handle play/pause state changes - this is the key optimization
+    useEffect(() => {
+        const activeVideoItems = [...renderItems, ...bufferedItems].filter(
+            ({ item, isBuffered }) => (item.type === 'video' || item.type === 'audio') && !isBuffered
+        );
+
+        if (isPlaying) {
+            // Starting playback: sync once, then let videos play
+            syncMediaElements(currentTime, true);
+
+            // Start all active videos
+            activeVideoItems.forEach(({ item }) => {
+                const keys = [item.id];
+                if (item.type === 'video') keys.push(item.id + '_filter');
+
                 keys.forEach(key => {
                     const mediaEl = mediaRefs.current[key];
-                    if (mediaEl && mediaEl instanceof HTMLMediaElement) {
+                    if (mediaEl instanceof HTMLMediaElement && mediaEl.paused) {
+                        mediaEl.play().catch(() => { });
+                    }
+                });
+            });
+        } else {
+            // Pause all videos
+            activeVideoItems.forEach(({ item }) => {
+                const keys = [item.id];
+                if (item.type === 'video') keys.push(item.id + '_filter');
+
+                keys.forEach(key => {
+                    const mediaEl = mediaRefs.current[key];
+                    if (mediaEl instanceof HTMLMediaElement && !mediaEl.paused) {
+                        mediaEl.pause();
+                    }
+                });
+            });
+        }
+    }, [isPlaying]); // Only trigger on play/pause change
+
+    // Handle time changes when NOT playing (scrubbing)
+    useEffect(() => {
+        if (!isPlaying) {
+            // When scrubbing, sync immediately
+            syncMediaElements(currentTime, true);
+        }
+    }, [currentTime, isPlaying, syncMediaElements]);
+
+    // Handle clip changes during playback (e.g., new clip comes into view)
+    useEffect(() => {
+        if (isPlaying) {
+            // New render items appeared - start playing them
+            renderItems.forEach(({ item, role }) => {
+                if (item.type !== 'video' && item.type !== 'audio') return;
+
+                // OPTIMIZATION: During transitions, only sync the main (incoming) video
+                // This prevents pause/stutter when both videos try to sync simultaneously
+                if (role === 'outgoing') {
+                    // Outgoing video just keeps playing, no sync needed
+                    const keys = [item.id];
+                    if (item.type === 'video') keys.push(item.id + '_filter');
+                    keys.forEach(key => {
+                        const mediaEl = mediaRefs.current[key];
+                        if (mediaEl instanceof HTMLMediaElement && mediaEl.paused) {
+                            mediaEl.play().catch(() => { });
+                        }
+                    });
+                    return;
+                }
+
+                const keys = [item.id];
+                if (item.type === 'video') keys.push(item.id + '_filter');
+
+                keys.forEach(key => {
+                    const mediaEl = mediaRefs.current[key];
+                    if (mediaEl instanceof HTMLMediaElement) {
+                        // Sync position - increased threshold to 0.2s to prevent constant seeking
+                        // Lower threshold was causing playback interruptions
                         const speed = item.speed || 1;
-                        let mediaTime = role === 'main' ? ((currentTime - item.start) * speed) + item.offset : (item.duration * speed) + item.offset + ((currentTime - (item.start + item.duration)) * speed);
-
-                        // Clamp time
-                        if (mediaTime < 0) mediaTime = 0;
-                        if (Number.isFinite(mediaEl.duration) && mediaTime > mediaEl.duration) mediaTime = mediaEl.duration;
-
-                        // Sync Current Time
+                        const mediaTime = ((currentTime - item.start) * speed) + item.offset;
                         if (Math.abs(mediaEl.currentTime - mediaTime) > 0.2) {
-                            mediaEl.currentTime = mediaTime;
+                            mediaEl.currentTime = Math.max(0, mediaTime);
                         }
-
-                        if (item.type === 'video' || item.type === 'audio') {
+                        // Start playing if not already - AGGRESSIVE playback to prevent pauses
+                        if (mediaEl.paused) {
                             mediaEl.playbackRate = speed;
-                            mediaEl.volume = (item.volume ?? 100) / 100;
-                            mediaEl.muted = (item.volume === 0);
+                            mediaEl.play().catch(() => { });
                         }
-
-                        // Play/Pause Logic
-                        if (isPlaying && !isBuffered) {
-                            mediaEl.play().catch(e => { });
-                        } else {
-                            mediaEl.pause();
+                        // CRITICAL: Ensure playback continues even if already playing
+                        // This prevents post-transition pauses
+                        if (mediaEl.readyState >= 2 && mediaEl.paused === false && mediaEl.playbackRate !== speed) {
+                            mediaEl.playbackRate = speed;
                         }
                     }
                 });
-            }
+            });
+        }
+    }, [renderItems.map(r => r.item.id).join(',')]); // Trigger when visible clips change
+
+    // --- Auto-Calculate Height for Aspect Ratio ---
+    useEffect(() => {
+        tracks.forEach(track => {
+            track.items.forEach(item => {
+                if ((item.type === 'video' || item.type === 'image') && !item.isBackground && item.width && !item.height) {
+                    const el = mediaRefs.current[item.id];
+                    if (el) {
+                        let aspect = 0;
+                        if (el instanceof HTMLVideoElement && el.videoWidth) aspect = el.videoWidth / el.videoHeight;
+                        if (el instanceof HTMLImageElement && el.naturalWidth) aspect = el.naturalWidth / el.naturalHeight;
+
+                        if (aspect) {
+                            const canvasAspect = dimension.width / dimension.height;
+                            const hPct = item.width * canvasAspect / aspect;
+                            // Update without history to avoid undo stack pollution for auto-calc
+                            onUpdateClip(track.id, { ...item, height: hPct }, true);
+                        }
+                    }
+                }
+            });
         });
-    }, [currentTime, isPlaying, renderItems, bufferedItems, interactionMode, selectedItemId]);
+    }, [tracks, dimension]);
 
     const fitScale = Math.min((window.innerWidth - 400) / dimension.width, (window.innerHeight - 400) / dimension.height) * 0.85;
     const currentScale = scalePercent === 0 ? Math.max(0.2, fitScale) : scalePercent / 100;
@@ -742,80 +1090,186 @@ const Canvas: React.FC<CanvasProps> = ({
 
         switch (type) {
             // --- Dissolves ---
-            case 'dissolve': return { opacity: role === 'main' ? p : 1 - p };
-            case 'film-dissolve': return { opacity: role === 'main' ? p : 1 - p }; // Similar to dissolve but usually linear light
+            case 'dissolve':
+                // Professional cross-dissolve with gamma correction (like Premiere Pro)
+                const dissolveEase = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+                if (role === 'main') {
+                    return {
+                        opacity: Math.max(0.01, dissolveEase),
+                        filter: `brightness(${0.98 + dissolveEase * 0.02})`,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        opacity: Math.max(0.01, 1 - dissolveEase),
+                        filter: `brightness(${1 - (1 - dissolveEase) * 0.02})`,
+                        zIndex: 10
+                    };
+                }
+            case 'film-dissolve':
+                // Film-style dissolve with grain, saturation, and sepia (like Premiere Pro Film Dissolve)
+                const filmP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+                const grain = Math.sin(p * 100) * 0.015; // Simulated film grain
+                if (role === 'main') {
+                    return {
+                        opacity: Math.max(0.01, filmP),
+                        filter: `contrast(${1.05 + grain}) saturate(${0.95 + filmP * 0.05}) sepia(${(1 - filmP) * 0.08})`,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        opacity: Math.max(0.01, 1 - filmP),
+                        filter: `contrast(${1.05 + grain}) saturate(${1 - (1 - filmP) * 0.05}) sepia(${filmP * 0.08})`,
+                        zIndex: 10
+                    };
+                }
             case 'additive-dissolve':
                 return role === 'main'
                     ? { opacity: p, mixBlendMode: 'plus-lighter' as any }
                     : { opacity: 1 - p, mixBlendMode: 'plus-lighter' as any };
             case 'dip-to-black':
-                // Fade out outgoing to black, then fade in incoming from black
-                // p: 0 -> 0.5 (fade out), 0.5 -> 1 (fade in)
-                if (role === 'outgoing') return { opacity: p < 0.5 ? 1 - (p * 2) : 0 };
-                if (role === 'main') return { opacity: p > 0.5 ? (p - 0.5) * 2 : 0 };
+                // Professional dip-to-black (like Premiere Pro): fade to black, then fade from black
+                if (role === 'outgoing') {
+                    if (p < 0.5) {
+                        const fadeOut = p * 2; // 0 -> 1 in first half
+                        const easeOut = Math.pow(fadeOut, 2); // Quadratic ease-in
+                        return {
+                            opacity: Math.max(0.05, 1 - easeOut),
+                            filter: `brightness(${1 - fadeOut * 0.6})`, // Darken while fading
+                            zIndex: 10
+                        };
+                    } else {
+                        return { opacity: 0.05, zIndex: 10 };
+                    }
+                }
+                if (role === 'main') {
+                    if (p > 0.5) {
+                        const fadeIn = (p - 0.5) * 2; // 0 -> 1 in second half
+                        const easeIn = 1 - Math.pow(1 - fadeIn, 2); // Quadratic ease-out
+                        return {
+                            opacity: Math.max(0.05, easeIn),
+                            filter: `brightness(${0.4 + fadeIn * 0.6})`, // Brighten from dark
+                            zIndex: 20
+                        };
+                    } else {
+                        return { opacity: 0.05, zIndex: 20 };
+                    }
+                }
                 return {};
             case 'dip-to-white':
-                // Similar to dip-to-black but with white overlay (simulated by brightness/opacity or overlay div)
-                // For simplicity, we'll use opacity and a white background on container (assumed)
-                if (role === 'outgoing') return { filter: `brightness(${1 + p * 2})`, opacity: p < 0.5 ? 1 - (p * 2) : 0 };
-                if (role === 'main') return { filter: `brightness(${1 + (1 - p) * 2})`, opacity: p > 0.5 ? (p - 0.5) * 2 : 0 };
+                // Professional dip-to-white (like Premiere Pro): flash to white, then fade from white
+                if (role === 'outgoing') {
+                    if (p < 0.5) {
+                        const fadeOut = p * 2; // 0 -> 1 in first half
+                        const easeOut = Math.pow(fadeOut, 1.5); // Ease-in (faster than quadratic)
+                        return {
+                            opacity: 1 - easeOut,
+                            filter: `brightness(${1 + fadeOut * 1.5}) saturate(${1 - fadeOut * 0.7}) contrast(${1 - fadeOut * 0.2})`,
+                            zIndex: 10
+                        };
+                    } else {
+                        return { opacity: 0.05, filter: 'brightness(2.5) saturate(0.3)', zIndex: 10 };
+                    }
+                }
+                if (role === 'main') {
+                    if (p > 0.5) {
+                        const fadeIn = (p - 0.5) * 2; // 0 -> 1 in second half
+                        const easeIn = 1 - Math.pow(1 - fadeIn, 1.5); // Ease-out
+                        return {
+                            opacity: Math.max(0.05, easeIn),
+                            filter: `brightness(${2.5 - fadeIn * 1.5}) saturate(${0.3 + fadeIn * 0.7}) contrast(${0.8 + fadeIn * 0.2})`,
+                            zIndex: 20
+                        };
+                    } else {
+                        return { opacity: 0.05, filter: 'brightness(2.5) saturate(0.3)', zIndex: 20 };
+                    }
+                }
                 return {};
 
             // --- Slides & Pushes ---
             case 'slide':
-                // Incoming slides over outgoing
-                return role === 'main'
-                    ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)`, zIndex: 20 }
-                    : { transform: 'none', zIndex: 10 };
+                // Ultra-light slide - crystal clear video
+                if (role === 'main') {
+                    return {
+                        transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)`,
+                        zIndex: 20
+                    };
+                } else {
+                    return { zIndex: 10 };
+                }
             case 'push':
-                // Incoming pushes outgoing
+                // Ultra-optimized push (no blur for 8K performance)
                 return role === 'main'
                     ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)` }
                     : { transform: `translate(${xMult * -100 * p}%, ${yMult * -100 * p}%)` };
             case 'whip':
-                // Fast push with blur
+                // Ultra-optimized whip (no blur for 8K performance)
                 return role === 'main'
-                    ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)`, filter: `blur(${Math.sin(p * Math.PI) * 20}px)` }
-                    : { transform: `translate(${xMult * -100 * p}%, ${yMult * -100 * p}%)`, filter: `blur(${Math.sin(p * Math.PI) * 20}px)` };
+                    ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)` }
+                    : { transform: `translate(${xMult * -100 * p}%, ${yMult * -100 * p}%)` };
             case 'split':
                 // Incoming splits from center (simulated as simple slide for now or clip)
                 // Better: Clip path split
                 return role === 'main'
-                    ? { clipPath: `inset(${direction === 'up' || direction === 'down' ? `0 ${50 * (1 - p)}% 0 ${50 * (1 - p)}%` : `${50 * (1 - p)}% 0 ${50 * (1 - p)}% 0`})` }
-                    : {};
+                    ? { clipPath: `inset(${direction === 'up' || direction === 'down' ? `0 ${50 * (1 - p)}% 0 ${50 * (1 - p)}%` : `${50 * (1 - p)}% 0 ${50 * (1 - p)}% 0`})`, zIndex: 20 }
+                    : { zIndex: 10 };
             case 'band-slide':
                 // Slide strips (simplified to push for now)
-                return role === 'main' ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)` } : {};
+                return role === 'main' ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)` } : { transform: `translate(${xMult * -100 * p}%, ${yMult * -100 * p}%)` };
 
             // --- Iris Shapes ---
             case 'iris-box':
-                return role === 'main' ? { clipPath: `inset(${50 * (1 - p)}%)` } : {};
+                // Box iris with easing curve
+                const easeBox = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { clipPath: `inset(${50 * (1 - easeBox)}%)`, filter: `brightness(${0.7 + 0.3 * p})`, zIndex: 20 }
+                    : { filter: `brightness(${1 - p * 0.3})`, zIndex: 10 };
             case 'iris-round':
             case 'circle':
-                return role === 'main' ? { clipPath: `circle(${p * 75}% at 50% 50%)` } : {};
+                // Circular iris with smooth easing
+                const easeCircle = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { clipPath: `circle(${easeCircle * 75}% at 50% 50%)`, filter: `brightness(${0.7 + 0.3 * p})`, zIndex: 20 }
+                    : { filter: `brightness(${1 - p * 0.3})`, zIndex: 10 };
             case 'iris-diamond':
-                return role === 'main' ? { clipPath: `polygon(50% ${50 - 50 * p}%, ${50 + 50 * p}% 50%, 50% ${50 + 50 * p}%, ${50 - 50 * p}% 50%)` } : {};
+                // Diamond iris with easing
+                const easeDiamond = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { clipPath: `polygon(50% ${50 - 50 * easeDiamond}%, ${50 + 50 * easeDiamond}% 50%, 50% ${50 + 50 * easeDiamond}%, ${50 - 50 * easeDiamond}% 50%)`, filter: `brightness(${0.7 + 0.3 * p})`, zIndex: 20 }
+                    : { filter: `brightness(${1 - p * 0.3})`, zIndex: 10 };
             case 'iris-cross':
-                // Plus shape expanding
-                const w = 20 + (80 * p); // width of arms
+                // Plus shape expanding with easing
+                const easeCross = 1 - Math.pow(1 - p, 3);
+                const w = 20 + (80 * easeCross);
                 return role === 'main' ? {
                     clipPath: `polygon(
                     ${50 - w / 2}% 0%, ${50 + w / 2}% 0%, ${50 + w / 2}% ${50 - w / 2}%, 
                     100% ${50 - w / 2}%, 100% ${50 + w / 2}%, ${50 + w / 2}% ${50 + w / 2}%, 
                     ${50 + w / 2}% 100%, ${50 - w / 2}% 100%, ${50 - w / 2}% ${50 + w / 2}%, 
                     0% ${50 + w / 2}%, 0% ${50 - w / 2}%, ${50 - w / 2}% ${50 - w / 2}%
-                )` } : {};
+                )`,
+                    filter: `brightness(${0.7 + 0.3 * p})`,
+                    zIndex: 20
+                } : { filter: `brightness(${1 - p * 0.3})`, zIndex: 10 };
 
             // --- Wipes ---
 
             case 'wipe':
-                return role === 'main' ? { clipPath: `inset(${direction === 'right' ? `0 ${100 - (p * 100)}% 0 0` : direction === 'up' ? `${100 - (p * 100)}% 0 0 0` : direction === 'down' ? `0 0 ${100 - (p * 100)}% 0` : `0 0 0 ${100 - (p * 100)}%`})` } : {};
+                // Directional wipe with easing and edge brightness
+                const easeWipe = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { clipPath: `inset(${direction === 'right' ? `0 ${100 - (easeWipe * 100)}% 0 0` : direction === 'up' ? `${100 - (easeWipe * 100)}% 0 0 0` : direction === 'down' ? `0 0 ${100 - (easeWipe * 100)}% 0` : `0 0 0 ${100 - (easeWipe * 100)}%`})`, filter: `brightness(${0.8 + 0.2 * p})`, zIndex: 20 }
+                    : { filter: `brightness(${1 - p * 0.2})`, zIndex: 10 };
             case 'barn-doors':
+                // Barn doors with easing and brightness
+                const easeBarn = 1 - Math.pow(1 - p, 3);
                 return role === 'main' ? {
                     clipPath: direction === 'up' || direction === 'down'
-                        ? `inset(${50 * (1 - p)}% 0 ${50 * (1 - p)}% 0)`
-                        : `inset(0 ${50 * (1 - p)}% 0 ${50 * (1 - p)}%)`
-                } : {};
+                        ? `inset(${50 * (1 - easeBarn)}% 0 ${50 * (1 - easeBarn)}% 0)`
+                        : `inset(0 ${50 * (1 - easeBarn)}% 0 ${50 * (1 - easeBarn)}%)`,
+                    filter: `brightness(${0.8 + 0.2 * p})`,
+                    zIndex: 20
+                } : { filter: `brightness(${1 - p * 0.2})`, zIndex: 10 };
             case 'wedge-wipe':
                 // Radial wipe from top center
                 const angle = p * 360;
@@ -824,72 +1278,162 @@ const Canvas: React.FC<CanvasProps> = ({
             case 'radial-wipe':
                 return role === 'main' ? {
                     WebkitMaskImage: `conic-gradient(from 0deg at 50% 50%, black ${p * 360}deg, transparent ${p * 360}deg)`,
-                    maskImage: `conic-gradient(from 0deg at 50% 50%, black ${p * 360}deg, transparent ${p * 360}deg)`
-                } : {};
+                    maskImage: `conic-gradient(from 0deg at 50% 50%, black ${p * 360}deg, transparent ${p * 360}deg)`,
+                    zIndex: 20
+                } : {
+                    zIndex: 10  // Outgoing clip stays visible behind the mask
+                };
             case 'venetian-blinds':
+                // Venetian blinds with easing and transparency effect
+                const easeVenetian = 1 - Math.pow(1 - p, 3);
                 return role === 'main' ? {
-                    WebkitMaskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${p * 100}%, transparent ${p * 100}%)`,
-                    maskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${p * 100}%, transparent ${p * 100}%)`,
-                    WebkitMaskSize: direction === 'up' || direction === 'down' ? '100% 10%' : '10% 100%',
-                    maskSize: direction === 'up' || direction === 'down' ? '100% 10%' : '10% 100%',
+                    WebkitMaskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${easeVenetian * 100}%, transparent ${easeVenetian * 100}%)`,
+                    maskImage: `linear-gradient(${direction === 'up' || direction === 'down' ? 'to bottom' : 'to right'}, black ${easeVenetian * 100}%, transparent ${easeVenetian * 100}%)`,
+                    WebkitMaskSize: direction === 'up' || direction === 'down' ? '100% 8%' : '8% 100%',
+                    maskSize: direction === 'up' || direction === 'down' ? '100% 8%' : '8% 100%',
                     WebkitMaskRepeat: 'repeat',
-                    maskRepeat: 'repeat'
-                } : {};
+                    maskRepeat: 'repeat',
+                    filter: `brightness(${0.8 + 0.2 * p})`,
+                    zIndex: 20
+                } : { filter: `brightness(${1 - p * 0.2})`, zIndex: 10 };
             case 'checker-wipe':
+                // Checker wipe with dynamic scaling and brightness
+                const easeChecker = 1 - Math.pow(1 - p, 2);
                 return role === 'main' ? {
                     WebkitMaskImage: `conic-gradient(black 90deg, transparent 90deg, transparent 180deg, black 180deg, black 270deg, transparent 270deg)`,
                     maskImage: `conic-gradient(black 90deg, transparent 90deg, transparent 180deg, black 180deg, black 270deg, transparent 270deg)`,
-                    WebkitMaskSize: `${200 * (1.1 - p)}% ${200 * (1.1 - p)}%`, // Zooming checkerboard effect
-                    maskSize: `${200 * (1.1 - p)}% ${200 * (1.1 - p)}%`,
-                    opacity: p
-                } : {};
+                    WebkitMaskSize: `${200 * (1.2 - easeChecker * 0.2)}% ${200 * (1.2 - easeChecker * 0.2)}%`,
+                    maskSize: `${200 * (1.2 - easeChecker * 0.2)}% ${200 * (1.2 - easeChecker * 0.2)}%`,
+                    opacity: easeChecker,
+                    filter: `brightness(${0.8 + 0.2 * p})`,
+                    zIndex: 20
+                } : { opacity: 1 - easeChecker * 0.7, filter: `brightness(${1 - p * 0.2})`, zIndex: 10 };
             case 'zig-zag':
+                // Zig-zag wipe with easing and brightness
+                const easeZigZag = 1 - Math.pow(1 - p, 3);
                 return role === 'main' ? {
-                    WebkitMaskImage: `linear-gradient(135deg, black ${p * 100}%, transparent ${p * 100}%)`,
-                    maskImage: `linear-gradient(135deg, black ${p * 100}%, transparent ${p * 100}%)`,
-                    WebkitMaskSize: '10% 100%',
-                    maskSize: '10% 100%'
-                } : {};
+                    WebkitMaskImage: `linear-gradient(135deg, black ${easeZigZag * 100}%, transparent ${easeZigZag * 100}%)`,
+                    maskImage: `linear-gradient(135deg, black ${easeZigZag * 100}%, transparent ${easeZigZag * 100}%)`,
+                    WebkitMaskSize: '12% 100%',
+                    maskSize: '12% 100%',
+                    filter: `brightness(${0.8 + 0.2 * p})`,
+                    zIndex: 20
+                } : { filter: `brightness(${1 - p * 0.2})`, zIndex: 10 };
 
             // --- Zooms ---
             case 'cross-zoom':
-                // Zoom in outgoing, Zoom out incoming
-                // Outgoing: 1 -> 5, opacity 1 -> 0
-                // Incoming: 0.2 -> 1, opacity 0 -> 1
-                if (role === 'outgoing') return { transform: `scale(${1 + p * 4})`, opacity: 1 - p };
-                if (role === 'main') return { transform: `scale(${0.2 + p * 0.8})`, opacity: p };
+                // Cross zoom: outgoing zooms in while incoming zooms out
+                if (role === 'outgoing') {
+                    const blurAmount = Math.sin(p * Math.PI) * 10;
+                    return {
+                        transform: `scale(${1 + p * 3})`,
+                        filter: `blur(${blurAmount}px) brightness(${1 + p * 0.5})`,
+                        opacity: 1 - p,
+                        zIndex: 10
+                    };
+                }
+                if (role === 'main') {
+                    const blurAmount = Math.sin(p * Math.PI) * 10;
+                    return {
+                        transform: `scale(${3 - p * 2})`,
+                        filter: `blur(${blurAmount}px) brightness(${1.5 - p * 0.5})`,
+                        opacity: p,
+                        zIndex: 20
+                    };
+                }
                 return {};
 
             // --- Page ---
             case 'page-peel':
-                // Simulated with clip path and shadow
+                // Page peel corner effect with shadow
+                const peelSize = p * 100;
                 return role === 'main' ? {
-                    clipPath: `polygon(0 0, ${p * 200}% 0, 0 ${p * 200}%)`,
+                    clipPath: `polygon(0 0, 100% 0, 100% ${peelSize}%, ${100 - peelSize}% 100%, 0 100%)`,
                     filter: 'drop-shadow(10px 10px 20px rgba(0,0,0,0.5))',
+                    transform: `perspective(1000px) rotateY(${(1 - p) * -5}deg)`,
                     zIndex: 50
-                } : {};
+                } : {
+                    filter: `brightness(${1 - p * 0.2})`,
+                    zIndex: 10
+                };
 
             // --- Legacy / Others ---
-            case 'stack': return role === 'main' ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%)`, boxShadow: '0 0 50px rgba(0,0,0,0.5)' } : { transform: `scale(${1 - (p * 0.05)})`, filter: `brightness(${1 - (p * 0.5)})` };
-            case 'morph-cut': return { opacity: role === 'main' ? p : 1 - p, filter: `blur(${Math.sin(p * Math.PI) * 5}px)` }; // Simple blur approximation
+            case 'stack':
+                // Stack effect with depth and shadow
+                if (role === 'main') {
+                    return {
+                        transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%) scale(${0.8 + 0.2 * p})`,
+                        boxShadow: `0 ${20 * (1 - p)}px ${40 * (1 - p)}px rgba(0,0,0,${0.6 * (1 - p)})`,
+                        filter: `blur(${(1 - p) * 3}px)`,
+                        opacity: 0.3 + 0.7 * p,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        transform: `scale(${1 - p * 0.2})`,
+                        filter: `brightness(${1 - p * 0.4}) blur(${p * 2}px)`,
+                        opacity: 1 - p * 0.3,
+                        zIndex: 10
+                    };
+                }
+            case 'morph-cut':
+                // Morph-like transition with blur and slight scale
+                return role === 'main'
+                    ? { opacity: Math.max(0.05, p), transform: `scale(${0.95 + 0.05 * p})` }
+                    : { opacity: Math.max(0.05, 1 - p), transform: `scale(${1 + 0.05 * (1 - p)})` };
 
             // --- Advanced Transitions ---
             case 'fade-dissolve':
                 // Fade to black then to new clip
-                if (role === 'outgoing') return { opacity: p < 0.5 ? 1 - (p * 2) : 0 };
-                if (role === 'main') return { opacity: p > 0.5 ? (p - 0.5) * 2 : 0 };
+                if (role === 'outgoing') return { opacity: Math.max(0.05, p < 0.5 ? 1 - (p * 2) : 0.05) };
+                if (role === 'main') return { opacity: Math.max(0.05, p > 0.5 ? (p - 0.5) * 2 : 0.05) };
                 return {};
 
             // --- New Filmora-style Transitions ---
 
             // Basic
             case 'luma-dissolve':
-                // Simulated with contrast threshold
-                return role === 'main' ? { filter: `contrast(${1 + p * 2}) brightness(${p})`, opacity: p } : { filter: `contrast(${1 + (1 - p) * 2}) brightness(${1 - p})`, opacity: 1 - p };
+                // Enhanced luma dissolve with contrast sweep and brightness mapping
+                const lumaP = 1 - Math.pow(1 - p, 2);
+                if (role === 'main') {
+                    return {
+                        filter: `contrast(${1 + lumaP * 1.5}) brightness(${0.7 + lumaP * 0.3})`,
+                        opacity: Math.max(0.01, lumaP),
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        filter: `contrast(${1 + (1 - lumaP) * 1.5}) brightness(${1 - (1 - lumaP) * 0.3})`,
+                        opacity: Math.max(0.01, 1 - lumaP),
+                        zIndex: 10
+                    };
+                }
             case 'fade-color':
-                // Fade to white/black (using brightness for simplicity)
-                if (role === 'outgoing') return { filter: `brightness(${1 - p})`, opacity: 1 - p };
-                if (role === 'main') return { filter: `brightness(${p})`, opacity: p };
+                // Fade through color with saturation control
+                if (role === 'outgoing') {
+                    if (p < 0.5) {
+                        const fade = p * 2;
+                        return {
+                            filter: `brightness(${1 - fade * 0.5}) saturate(${1 - fade * 0.7})`,
+                            opacity: Math.max(0.01, 1 - Math.pow(fade, 1.5)),
+                            zIndex: 10
+                        };
+                    } else {
+                        return { opacity: 0.01, zIndex: 10 };
+                    }
+                }
+                if (role === 'main') {
+                    if (p > 0.5) {
+                        const fade = (p - 0.5) * 2;
+                        return {
+                            filter: `brightness(${0.5 + fade * 0.5}) saturate(${0.3 + fade * 0.7})`,
+                            opacity: Math.max(0.01, Math.pow(fade, 0.7)),
+                            zIndex: 20
+                        };
+                    } else {
+                        return { opacity: 0.01, zIndex: 20 };
+                    }
+                }
                 return {};
 
             // Wipes & Slides
@@ -903,40 +1447,99 @@ const Canvas: React.FC<CanvasProps> = ({
 
             // Zooms
             case 'zoom-in':
-                return role === 'main' ? { transform: `scale(${0.5 + 0.5 * p})`, opacity: p } : { transform: `scale(${1 + p})`, opacity: 1 - p };
+                // Ultra-optimized zoom-in (no blur for 8K performance)
+                const easeP = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { transform: `scale(${0.5 + 0.5 * easeP})`, opacity: p, zIndex: 20 }
+                    : { transform: `scale(${1 + p * 0.3})`, opacity: 1 - p, zIndex: 10 };
             case 'zoom-out':
-                return role === 'main' ? { transform: `scale(${1.5 - 0.5 * p})`, opacity: p } : { transform: `scale(${1 - 0.5 * p})`, opacity: 1 - p };
+                // Ultra-optimized zoom-out (no blur for 8K performance)
+                const easeP2 = 1 - Math.pow(1 - p, 3);
+                return role === 'main'
+                    ? { transform: `scale(${1.5 - 0.5 * easeP2})`, opacity: p, zIndex: 20 }
+                    : { transform: `scale(${1 - p * 0.2})`, opacity: 1 - p, zIndex: 10 };
             case 'warp-zoom':
-                return role === 'main' ? { transform: `scale(${p})`, filter: `blur(${(1 - p) * 10}px)` } : { transform: `scale(${1 + p})`, filter: `blur(${p * 10}px)`, opacity: 1 - p };
+                // Ultra-optimized warp zoom (no blur for 8K performance)
+                return role === 'main'
+                    ? { transform: `scale(${0.5 + p * 0.5})`, opacity: p, zIndex: 20 }
+                    : { transform: `scale(${1 + p * 1.5})`, opacity: 1 - p, zIndex: 10 };
 
             // Spin & 3D
             case 'spin-3d':
                 return role === 'main' ? { transform: `perspective(1000px) rotateY(${(1 - p) * -90}deg)`, opacity: p } : { transform: `perspective(1000px) rotateY(${p * 90}deg)`, opacity: 1 - p };
             case 'cube-rotate':
-                return role === 'main' ? { transform: `perspective(1000px) rotateY(${(1 - p) * -90}deg) translateZ(50px)`, opacity: p } : { transform: `perspective(1000px) rotateY(${p * 90}deg) translateZ(50px)`, opacity: 1 - p };
+                // 3D cube rotation with perspective and shadow
+                const cubeEase = 1 - Math.pow(1 - p, 3);
+                if (role === 'main') {
+                    return {
+                        transform: `perspective(1200px) rotateY(${(1 - cubeEase) * -90}deg) translateZ(100px)`,
+                        filter: `brightness(${0.7 + cubeEase * 0.3})`,
+                        opacity: cubeEase,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        transform: `perspective(1200px) rotateY(${cubeEase * 90}deg) translateZ(100px)`,
+                        filter: `brightness(${1 - cubeEase * 0.3})`,
+                        opacity: 1 - cubeEase,
+                        zIndex: 10
+                    };
+                }
             case 'flip-3d':
-                return role === 'main' ? { transform: `perspective(1000px) rotateX(${(1 - p) * -90}deg)`, opacity: p } : { transform: `perspective(1000px) rotateX(${p * 90}deg)`, opacity: 1 - p };
+                // 3D flip with perspective and brightness
+                const flipEase = 1 - Math.pow(1 - p, 3);
+                if (role === 'main') {
+                    return {
+                        transform: `perspective(1200px) rotateX(${(1 - flipEase) * -180}deg)`,
+                        filter: `brightness(${0.6 + flipEase * 0.4})`,
+                        opacity: flipEase,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        transform: `perspective(1200px) rotateX(${flipEase * 180}deg)`,
+                        filter: `brightness(${1 - flipEase * 0.4})`,
+                        opacity: 1 - flipEase,
+                        zIndex: 10
+                    };
+                }
             case 'page-curl':
-                return role === 'main' ? { clipPath: `polygon(0 0, ${p * 150}% 0, 0 ${p * 150}%)`, boxShadow: '-10px 10px 20px rgba(0,0,0,0.5)', zIndex: 50 } : {};
+                return role === 'main' ? { clipPath: `polygon(0 0, ${p * 150}% 0, 0 ${p * 150}%)`, boxShadow: '-10px 10px 20px rgba(0,0,0,0.5)', zIndex: 50 } : { zIndex: 10 };
 
             // Shapes
             case 'shape-circle':
-                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)` } : {};
+                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)`, zIndex: 20 } : { zIndex: 10 };
             case 'shape-heart':
                 // Approximate heart shape or just diamond for now
-                return role === 'main' ? { clipPath: `polygon(50% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 - 20 * p}%, 50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 - 20 * p}%)` } : {};
+                return role === 'main' ? { clipPath: `polygon(50% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 - 20 * p}%, 50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 - 20 * p}%)`, zIndex: 20 } : { zIndex: 10 };
             case 'shape-triangle':
-                return role === 'main' ? { clipPath: `polygon(50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 + 50 * p}%)` } : {};
+                return role === 'main' ? { clipPath: `polygon(50% ${50 - 50 * p}%, ${50 + 50 * p}% ${50 + 50 * p}%, ${50 - 50 * p}% ${50 + 50 * p}%)`, zIndex: 20 } : { zIndex: 10 };
 
             // Glitch & Digital
             case 'chromatic-aberration':
                 return role === 'main' ? { filter: `drop-shadow(${Math.sin(p * 20) * 5}px 0 0 red) drop-shadow(${Math.sin(p * 20 + 2) * -5}px 0 0 blue)`, opacity: p } : { filter: `drop-shadow(${Math.sin(p * 20) * 5}px 0 0 red) drop-shadow(${Math.sin(p * 20 + 2) * -5}px 0 0 blue)`, opacity: 1 - p };
             case 'pixelate':
-                // Simulated with blur as pixelate requires SVG filter or canvas manipulation
-                return role === 'main' ? { filter: `blur(${(1 - p) * 20}px)`, opacity: p } : { filter: `blur(${p * 20}px)`, opacity: 1 - p };
+                // Ultra-optimized pixelate (no blur for 8K performance)
+                return role === 'main'
+                    ? { opacity: p, zIndex: 20 }
+                    : { opacity: 1 - p, zIndex: 10 };
             case 'datamosh':
-                // Simulated with distortion
-                return role === 'main' ? { transform: `scale(${1 + Math.sin(p * 10) * 0.1}) skew(${Math.sin(p * 20) * 10}deg)`, opacity: p } : { transform: `scale(${1 + Math.sin(p * 10) * 0.1}) skew(${Math.sin(p * 20) * 10}deg)`, opacity: 1 - p };
+                // Simplified datamosh - optimized for video performance
+                if (role === 'main') {
+                    return {
+                        transform: `scale(${1 + Math.sin(p * 8) * 0.08}) skew(${Math.sin(p * 15) * 5}deg)`,
+                        filter: `hue-rotate(${p * 30}deg)`,
+                        opacity: p,
+                        zIndex: 20
+                    };
+                } else {
+                    return {
+                        transform: `scale(${1 + Math.sin(p * 8) * 0.08}) skew(${Math.sin(p * 15) * 5}deg)`,
+                        filter: `hue-rotate(${(1 - p) * 30}deg)`,
+                        opacity: 1 - p,
+                        zIndex: 10
+                    };
+                }
 
             // Light
             case 'flash':
@@ -946,29 +1549,29 @@ const Canvas: React.FC<CanvasProps> = ({
 
             // Distort
             case 'ripple':
-                return role === 'main' ? { transform: `scale(${1 + Math.sin(p * 10) * 0.05})`, filter: `blur(${Math.abs(Math.sin(p * 10)) * 5}px)` } : {};
+                return role === 'main' ? { transform: `scale(${1 + Math.sin(p * 10) * 0.05})`, opacity: p } : { opacity: 1 - p };
             case 'liquid':
-                return role === 'main' ? { filter: `contrast(1.5) blur(${(1 - p) * 10}px)`, opacity: p } : { filter: `contrast(1.5) blur(${p * 10}px)`, opacity: 1 - p };
+                return role === 'main' ? { opacity: p } : { opacity: 1 - p };
             case 'stretch':
                 return role === 'main' ? { transform: `scaleX(${0.1 + 0.9 * p})`, opacity: p } : { transform: `scaleX(${1 + p})`, opacity: 1 - p };
 
             // Tile
             case 'tile-drop':
-                return role === 'main' ? { transform: `translateY(${(1 - p) * -100}%)`, opacity: p } : {};
+                return role === 'main' ? { transform: `translateY(${(1 - p) * -100}%)`, opacity: p } : { transform: `translateY(${p * 100}%)`, opacity: 1 - p };
             case 'mosaic-grid':
-                return role === 'main' ? { clipPath: `inset(0 0 0 0 round ${50 * (1 - p)}%)`, transform: `scale(${0.5 + 0.5 * p})` } : {};
+                return role === 'main' ? { clipPath: `inset(0 0 0 0 round ${50 * (1 - p)}%)`, transform: `scale(${0.5 + 0.5 * p})`, zIndex: 20 } : { zIndex: 10 };
 
             // Blur
             case 'speed-blur':
-                return role === 'main' ? { transform: `scale(${1.2})`, filter: `blur(${(1 - p) * 20}px)`, opacity: p } : { transform: `scale(0.8)`, filter: `blur(${p * 20}px)`, opacity: 1 - p };
+                return role === 'main' ? { transform: `scale(${1.2})`, opacity: p } : { transform: `scale(0.8)`, opacity: 1 - p };
             case 'whip-pan':
-                return role === 'main' ? { transform: `translateX(${(1 - p) * 100}%)`, filter: `blur(20px)` } : { transform: `translateX(${p * -100}%)`, filter: `blur(20px)` };
+                return role === 'main' ? { transform: `translateX(${(1 - p) * 100}%)` } : { transform: `translateX(${p * -100}%)` };
 
             // Stylized
             case 'brush-reveal':
-                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)`, filter: `contrast(1.2) sepia(0.2)` } : {};
+                return role === 'main' ? { clipPath: `circle(${p * 100}% at 50% 50%)`, filter: `contrast(1.2) sepia(0.2)`, zIndex: 20 } : { zIndex: 10 };
             case 'ink-splash':
-                return role === 'main' ? { clipPath: `circle(${p * 100}%)`, filter: `contrast(1.5)` } : {};
+                return role === 'main' ? { clipPath: `circle(${p * 100}%)`, filter: `contrast(1.5)`, zIndex: 20 } : { zIndex: 10 };
             case 'flash-zoom-in':
                 // Bright flash + Zoom In
                 if (role === 'outgoing') return { transform: `scale(${1 + p})`, opacity: 1 - p, filter: `brightness(${1 + p * 5})` };
@@ -984,6 +1587,12 @@ const Canvas: React.FC<CanvasProps> = ({
                 return role === 'main'
                     ? { transform: `translateY(${(1 - p) * 100}%)`, filter: 'sepia(0.3)' }
                     : { transform: `translateY(${-p * 100}%)`, filter: 'sepia(0.3)' };
+
+            case 'flow':
+                // Ultra-optimized flow (no blur for 8K performance)
+                return role === 'main'
+                    ? { transform: `translate(${xMult * 100 * (1 - p)}%, ${yMult * 100 * (1 - p)}%) scale(${0.9 + 0.1 * p})`, opacity: p, zIndex: 20 }
+                    : { transform: `translate(${xMult * -50 * p}%, ${yMult * -50 * p}%) scale(${1 - 0.1 * p})`, opacity: 1 - p, zIndex: 10 };
 
             // --- Premiere Pro Style Transitions ---
 
@@ -1070,8 +1679,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
         const adjustmentStyle = getAdjustmentStyle(item, renderScale);
         const presetFilterStyle = getPresetFilterStyle(item.filter || 'none');
-        const intensity = item.filterIntensity ?? 50;
+        const intensity = item.filterIntensity ?? 100;
         const vignetteOpacity = (item.adjustments?.vignette || 0) / 100;
+
+        // Combine adjustment filters and preset filters with intensity
+        const combinedFilterStyle = [adjustmentStyle, presetFilterStyle].filter(Boolean).join(' ').trim();
 
         // Scale pixel values for preview optimization
         const s = (val: number) => val * renderScale;
@@ -1092,25 +1704,30 @@ const Canvas: React.FC<CanvasProps> = ({
                     animationName: animType,
                     animationDuration: `${animDur}s`,
                     animationFillMode: 'both',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             } else if (timing === 'exit') {
                 animationStyle = {
                     animationName: animType,
                     animationDuration: `${animDur}s`,
                     animationDirection: 'reverse',
-                    animationDelay: `${Math.max(0, clipDur - animDur)}s`,
+                    // Allow negative delay so the animation ends exactly at the end of the clip
+                    animationDelay: `${clipDur - animDur}s`,
                     animationFillMode: 'both',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             } else if (timing === 'both') {
                 animationStyle = {
                     animationName: `${animType}, ${animType}`,
                     animationDuration: `${animDur}s, ${animDur}s`,
                     animationDirection: 'normal, reverse',
-                    animationDelay: `0s, ${Math.max(0, clipDur - animDur)}s`,
+                    // Allow negative delay for the exit phase
+                    animationDelay: `0s, ${clipDur - animDur}s`,
                     animationFillMode: 'both, forwards',
-                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1), cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform, opacity, filter'
                 };
             }
         }
@@ -1184,7 +1801,7 @@ const Canvas: React.FC<CanvasProps> = ({
             width: item.isBackground ? '100%' : (item.width ? `${item.width}%` : 'auto'),
             height: item.isBackground ? '100%' : (item.type === 'text' ? 'auto' : (item.height ? `${item.height}%` : 'auto')),
             transform: itemTransform, opacity: isBuffered ? 0 : (isDragging && !item.isBackground && (Math.abs(item.x || 0) > 65 || Math.abs(item.y || 0) > 65) ? 0.4 : (item.opacity ?? 100) / 100),
-            ...maskStyle, filter: adjustmentStyle, ...transitionStyle,
+            ...maskStyle, filter: combinedFilterStyle, ...transitionStyle,
             mixBlendMode: (transitionStyle as any).mixBlendMode,
             pointerEvents: isBuffered ? 'none' : 'auto'
         };
@@ -1209,82 +1826,138 @@ const Canvas: React.FC<CanvasProps> = ({
                     }
                 }}
             >
-                <div style={{ width: '100%', height: '100%', background: 'transparent', ...animationStyle, ...borderRadiusStyle, ...clipPathStyle }} className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass}`}>
+                <div
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        background: 'transparent',
+                        ...animationStyle,
+                        ...borderRadiusStyle,
+                        ...clipPathStyle,
+                        // Force GPU compositing for smooth video playback during animations
+                        ...(item.type === 'video' && item.animation ? {
+                            backgroundColor: '#000000' // Prevent white canvas bleeding through
+                        } : {})
+                    }}
+                    className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass} ${!item.isBackground ? 'flex items-center justify-center' : ''}`}
+                >
                     {vignetteOpacity > 0 && <div className="absolute inset-0 z-10 pointer-events-none" style={{ background: `radial-gradient(circle, transparent 50%, rgba(0,0,0,${vignetteOpacity}) 100%)`, ...borderRadiusStyle }}></div>}
                     {(!isErasing || item.type === 'text' || item.type === 'color') && (
                         <>
                             {item.type === 'video' && (
                                 <>
-                                    <video ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} playsInline crossOrigin="anonymous" />
+                                    <video
+                                        ref={(el) => { mediaRefs.current[item.id] = el; }}
+                                        src={item.src}
+                                        className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-auto h-auto max-w-full max-h-full shadow-sm'}`}
+                                        style={{
+                                            objectFit: item.isBackground ? (item.fit || 'cover') : 'contain',
+                                            objectPosition,
+                                            transform: cropTransform,
+                                            boxSizing: 'border-box',
+                                            ...borderStyle,
+                                            ...borderRadiusStyle,
+                                            // Hide video element ONLY when GPU is rendering AND no animation AND no transition
+                                            // Animated/transitioning videos MUST stay visible for CSS effects to work
+                                            // IMPORTANT: Don't set opacity when transitioning - parent container handles it
+                                            ...((gpuReady && item.isBackground && !item.animation && !obj.transition) ? { opacity: 0 } : {}),
+                                            // Force visibility for animated videos
+                                            ...(item.animation ? {
+                                                display: 'block',
+                                                position: 'relative',
+                                                zIndex: 10,
+                                                backfaceVisibility: 'hidden',
+                                                perspective: 1000,
+                                                WebkitBackfaceVisibility: 'hidden',
+                                                WebkitPerspective: 1000
+                                            } : {
+                                                backfaceVisibility: 'hidden',
+                                                perspective: 1000,
+                                                WebkitBackfaceVisibility: 'hidden',
+                                                WebkitPerspective: 1000
+                                            })
+                                        }}
+                                        playsInline
+                                        crossOrigin="anonymous"
+                                        preload="auto"
+                                        disablePictureInPicture
+                                    />
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
-                                    )}
-                                    {/* Border Overlay */}
-                                    {item.border && (
-                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
                                     )}
                                 </>
                             )}
                             {item.type === 'image' && (
                                 <>
-                                    <img ref={(el) => { mediaRefs.current[item.id] = el; }} src={item.src} className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-full h-full shadow-sm'}`} style={{ objectFit: item.fit || 'cover', objectPosition, transform: cropTransform, boxSizing: 'border-box' }} />
+                                    <img
+                                        ref={(el) => { mediaRefs.current[item.id] = el; }}
+                                        src={item.src}
+                                        className={`pointer-events-none block ${item.isBackground ? 'w-full h-full' : 'w-auto h-auto max-w-full max-h-full shadow-sm'}`}
+                                        style={{
+                                            objectFit: item.isBackground ? (item.fit || 'cover') : 'contain',
+                                            objectPosition,
+                                            transform: cropTransform,
+                                            boxSizing: 'border-box',
+                                            ...borderStyle,
+                                            ...borderRadiusStyle
+                                        }}
+                                    />
                                     {/* Add Color Overlay for Tinting Images */}
                                     {item.backgroundColor && (
                                         <div className="absolute inset-0 pointer-events-none z-[1]" style={{ backgroundColor: item.backgroundColor, mixBlendMode: 'multiply', opacity: 0.5 }}></div>
                                     )}
-                                    {/* Border Overlay */}
-                                    {item.border && (
-                                        <div className="absolute inset-0 pointer-events-none z-[2]" style={{ ...borderStyle, ...borderRadiusStyle, boxSizing: 'border-box' }}></div>
-                                    )}
                                 </>
                             )}
-                            {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src, ...borderStyle, ...borderRadiusStyle }}></div>}
-                            {item.type === 'text' && (
-                                isEditing ? (
-                                    // Use correct tag for editing to show bullets/numbers natively
-                                    React.createElement(
-                                        item.listType === 'bullet' ? 'ul' : item.listType === 'number' ? 'ol' : 'div',
-                                        {
-                                            ref: textInputRef,
-                                            contentEditable: true,
-                                            suppressContentEditableWarning: true,
-                                            className: `outline-none pointer-events-auto cursor-text ${item.listType === 'bullet' ? 'list-disc list-inside' : item.listType === 'number' ? 'list-decimal list-inside' : ''}`,
-                                            style: {
-                                                ...fullTextStyle, // Apply full styling (including padding) to input
-                                                width: '100%',
-                                                height: '100%',
-                                                background: 'transparent',
-                                                border: 'none',
-                                                overflow: 'visible',
-                                                display: 'inline-block',
-                                                minWidth: '10px'
-                                            },
-                                            onBlur: (e: React.FocusEvent<HTMLElement>) => {
-                                                onUpdateClip(item.trackId, { ...item, name: e.currentTarget.innerText });
-                                                setIsEditingText(false);
-                                            },
-                                            onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
-                                            children: item.listType !== 'none'
-                                                ? item.name.split('\n').map((line, i) => <li key={i}>{line}</li>)
-                                                : item.name
-                                        }
-                                    )
-                                ) : (
-                                    <div className="whitespace-pre-wrap" style={fullTextStyle}>
-                                        {renderTextContent()}
-                                    </div>
-                                )
-                            )}
                         </>
                     )}
-                    {isErasing && (item.type === 'image' || item.type === 'video') && (
-                        <>
-                            <canvas ref={compositeCanvasRef} width={renderWidth} height={renderHeight} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition }} />
-                            <canvas ref={eraserCanvasRef} width={renderWidth} height={renderHeight} className="absolute inset-0 hidden pointer-events-none" />
-                        </>
+                    {item.type === 'color' && <div className="w-full h-full" style={{ background: item.src, ...borderStyle, ...borderRadiusStyle }}></div>}
+                    {item.type === 'text' && (
+                        isEditing ? (
+                            // Use correct tag for editing to show bullets/numbers natively
+                            React.createElement(
+                                item.listType === 'bullet' ? 'ul' : item.listType === 'number' ? 'ol' : 'div',
+                                {
+                                    ref: textInputRef,
+                                    contentEditable: true,
+                                    suppressContentEditableWarning: true,
+                                    className: `outline-none pointer-events-auto cursor-text ${item.listType === 'bullet' ? 'list-disc list-inside' : item.listType === 'number' ? 'list-decimal list-inside' : ''}`,
+                                    style: {
+                                        ...fullTextStyle, // Apply full styling (including padding) to input
+                                        width: '100%',
+                                        height: '100%',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        overflow: 'visible',
+                                        display: 'inline-block',
+                                        minWidth: '10px'
+                                    },
+                                    onBlur: (e: React.FocusEvent<HTMLElement>) => {
+                                        onUpdateClip(item.trackId, { ...item, name: e.currentTarget.innerText });
+                                        setIsEditingText(false);
+                                    },
+                                    onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
+                                    children: item.listType !== 'none'
+                                        ? item.name.split('\n').map((line, i) => <li key={i}>{line}</li>)
+                                        : item.name
+                                }
+                            )
+                        ) : (
+                            <div className="whitespace-pre-wrap" style={fullTextStyle}>
+                                {renderTextContent()}
+                            </div>
+                        )
                     )}
-                </div>
-            </div>
+
+                    {
+                        isErasing && (item.type === 'image' || item.type === 'video') && (
+                            <>
+                                <canvas ref={compositeCanvasRef} width={renderWidth} height={renderHeight} className={`w-full h-full ${item.isBackground ? 'object-cover' : 'object-contain'}`} style={{ objectPosition }} />
+                                <canvas ref={eraserCanvasRef} width={renderWidth} height={renderHeight} className="absolute inset-0 hidden pointer-events-none" />
+                            </>
+                        )
+                    }
+                </div >
+            </div >
         );
 
         if (!isOverlayPass) { if (isDragging && !item.isBackground) return null; return contentJsx; }
@@ -1386,7 +2059,13 @@ const Canvas: React.FC<CanvasProps> = ({
                     const deleteThreshold = 65;
                     if (Math.abs(selectedItem.x || 0) > deleteThreshold || Math.abs(selectedItem.y || 0) > deleteThreshold) {
                         onDeleteClip(selectedItem.trackId, selectedItem.id);
+                    } else {
+                        // Commit Drag to History
+                        onUpdateClip(selectedItem.trackId, selectedItem, false);
                     }
+                } else if ((isResizing || isRotating) && selectedItem) {
+                    // Commit Resize/Rotate to History
+                    onUpdateClip(selectedItem.trackId, selectedItem, false);
                 }
 
                 setIsDraggingItem(false);
@@ -1403,7 +2082,7 @@ const Canvas: React.FC<CanvasProps> = ({
                 {/* Main Canvas Background / Wrapper */}
                 <div
                     ref={canvasWrapperRef}
-                    className="bg-white shadow-2xl relative transition-transform duration-300 ease-in-out origin-center group"
+                    className="bg-black shadow-2xl relative transition-transform duration-300 ease-in-out origin-center group"
                     style={{
                         width: renderWidth,
                         height: renderHeight,
@@ -1422,13 +2101,27 @@ const Canvas: React.FC<CanvasProps> = ({
                     }}
                 >
                     {/* Layer 1: Content (Clipped) */}
-                    <div className="absolute inset-0 overflow-hidden bg-white">
+                    <div className="absolute inset-0 overflow-hidden bg-transparent">
+                        {/* GPU Accelerated Canvas - renders video/image layers with hardware acceleration */}
+                        <canvas
+                            ref={gpuCanvasRef}
+                            width={renderWidth}
+                            height={renderHeight}
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                display: gpuReady ? 'block' : 'none',
+                                zIndex: 0
+                            }}
+                        />
+                        {/* 2D Canvas - fallback and overlay rendering */}
                         <canvas
                             ref={mainCanvasRef}
                             width={renderWidth}
                             height={renderHeight}
                             className="absolute inset-0 pointer-events-none"
-                            style={{ width: '100%', height: '100%' }}
+                            style={{ width: '100%', height: '100%', zIndex: 1 }}
                         />
                         {renderItems.length === 0 && (
                             <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold text-4xl">
@@ -1437,7 +2130,18 @@ const Canvas: React.FC<CanvasProps> = ({
                         )}
 
                         {/* Render Visible Items */}
-                        {renderItems.filter(obj => obj.item.type !== 'audio').map((obj) => renderItemContent(obj, false))}
+                        {/* When GPU is ready, skip video/image backgrounds - they render via GPU canvas */}
+                        {renderItems
+                            .filter(obj => obj.item.type !== 'audio')
+                            .filter(obj => {
+                                // Skip NON-ANIMATED, NON-TRANSITIONING background videos/images when GPU is rendering them
+                                // IMPORTANT: Keep animated items AND items with transitions in DOM so CSS effects work
+                                if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
+                                    return false;
+                                }
+                                return true;
+                            })
+                            .map((obj) => renderItemContent(obj, false))}
 
                         {/* Render Buffered Items (Hidden but Mounted) */}
                         {bufferedItems.map((obj) => renderItemContent(obj, false))}
@@ -1447,7 +2151,17 @@ const Canvas: React.FC<CanvasProps> = ({
 
                     {/* Layer 2: UI Overlays (Not Clipped by viewport, but inside canvas wrapper) */}
                     <div className="absolute inset-0 pointer-events-none">
-                        {renderItems.filter(obj => obj.item.type !== 'audio').map((obj) => renderItemContent(obj, true))}
+                        {renderItems
+                            .filter(obj => obj.item.type !== 'audio')
+                            .filter(obj => {
+                                // Skip NON-ANIMATED, NON-TRANSITIONING background videos/images when GPU is rendering them
+                                // IMPORTANT: Keep animated items AND items with transitions in DOM so CSS effects work
+                                if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
+                                    return false;
+                                }
+                                return true;
+                            })
+                            .map((obj) => renderItemContent(obj, true))}
                     </div>
 
                     {/* Audio Elements (Invisible) */}
@@ -1459,6 +2173,36 @@ const Canvas: React.FC<CanvasProps> = ({
                             preload="auto"
                         />
                     ))}
+
+                    {/* Hidden Video Elements for GPU Rendering */}
+                    {/* These are invisible but provide texture source for WebGL rendering */}
+                    {/* CRITICAL: Only for NON-ANIMATED, NON-TRANSITIONING videos - those need visible DOM element */}
+                    {gpuReady && renderItems
+                        .filter(obj => obj.item.isBackground && !obj.item.animation && !obj.transition && (obj.item.type === 'video' || obj.item.type === 'image'))
+                        .map((obj) => (
+                            obj.item.type === 'video' ? (
+                                <video
+                                    key={`gpu-${obj.item.id}`}
+                                    ref={(el) => { mediaRefs.current[obj.item.id] = el; }}
+                                    src={obj.item.src}
+                                    className="absolute opacity-0 pointer-events-none"
+                                    style={{ width: 1, height: 1, position: 'absolute', left: -9999 }}
+                                    playsInline
+                                    crossOrigin="anonymous"
+                                    preload="auto"
+                                    muted={!!obj.item.muteVideo}
+                                />
+                            ) : (
+                                <img
+                                    key={`gpu-${obj.item.id}`}
+                                    ref={(el) => { mediaRefs.current[obj.item.id] = el; }}
+                                    src={obj.item.src}
+                                    className="absolute opacity-0 pointer-events-none"
+                                    style={{ width: 1, height: 1, position: 'absolute', left: -9999 }}
+                                />
+                            )
+                        ))
+                    }
 
                 </div>
 
@@ -1495,6 +2239,21 @@ const Canvas: React.FC<CanvasProps> = ({
                         <button onClick={() => saveCrop(selectedItem.trackId, selectedItem)} className="p-2 bg-violet-600 hover:bg-violet-700 rounded-full text-white"><Check size={20} /></button>
                     </div>
                 )}
+
+                {/* GPU Acceleration Status Badge */}
+                {gpuInfo && (
+                    <div
+                        className={`absolute bottom-2 right-2 px-2 py-1 rounded text-[10px] font-medium flex items-center gap-1 transition-all ${gpuReady
+                            ? 'bg-green-500/80 text-white'
+                            : 'bg-gray-500/60 text-white'
+                            }`}
+                        title={`GPU: ${gpuInfo.name}${gpuInfo.can8K ? ' (8K capable)' : ''}`}
+                    >
+                        <span className={`w-1.5 h-1.5 rounded-full ${gpuReady ? 'bg-green-200 animate-pulse' : 'bg-gray-300'}`}></span>
+                        {gpuReady ? 'GPU' : 'CPU'}
+                        {gpuInfo.can8K && gpuReady && <span className="text-[8px] ml-0.5">8K</span>}
+                    </div>
+                )}
             </div>
 
 
@@ -1503,4 +2262,3 @@ const Canvas: React.FC<CanvasProps> = ({
 };
 
 export default Canvas;
-

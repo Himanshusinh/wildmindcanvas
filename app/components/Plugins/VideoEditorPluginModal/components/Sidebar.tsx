@@ -19,7 +19,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         { id: 'images', icon: Image, label: 'Photos' },
         { id: 'videos', icon: Video, label: 'Videos' },
         { id: 'audio', icon: Music, label: 'Audio' },
-        { id: 'projects', icon: FolderKanban, label: 'Projects' },
     ];
 
     return (

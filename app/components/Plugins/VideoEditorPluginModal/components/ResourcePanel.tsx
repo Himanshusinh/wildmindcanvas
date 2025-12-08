@@ -14,9 +14,10 @@ interface ResourcePanelProps {
     onAlign: (align: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
     uploads: Array<{ id: string, type: 'image' | 'video' | 'audio', src: string, name: string, thumbnail?: string, duration?: string }>;
     onUpload: () => void;
+    onRemoveUpload: (id: string) => void;
 }
 
-const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClose, onAddClip, selectedItem, onAlign, uploads, onUpload }) => {
+const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClose, onAddClip, selectedItem, onAlign, uploads, onUpload, onRemoveUpload }) => {
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
     const audioPlayer = useRef<HTMLAudioElement | null>(null);
 
@@ -33,6 +34,7 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
         uploaded: [],
     });
     const [libraryLoading, setLibraryLoading] = useState(false);
+    const libraryLoadingRef = useRef(false);
     const [libraryPage, setLibraryPage] = useState(1);
     const [libraryHasMore, setLibraryHasMore] = useState(true);
     const [activeLibraryCategory, setActiveLibraryCategory] = useState<'images' | 'videos' | 'music' | 'uploaded'>('images');
@@ -70,9 +72,10 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
     };
 
     const fetchMediaLibrary = useCallback(async (pageNum: number, isRefresh = false) => {
-        if (libraryLoading && !isRefresh) return;
+        if (libraryLoadingRef.current && !isRefresh) return;
 
         setLibraryLoading(true);
+        libraryLoadingRef.current = true;
         try {
             const limit = 20;
             const response = await getMediaLibrary(pageNum, limit);
@@ -107,8 +110,9 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
             console.error('Error fetching media library:', error);
         } finally {
             setLibraryLoading(false);
+            libraryLoadingRef.current = false;
         }
-    }, [libraryLoading]);
+    }, []);
 
     useEffect(() => {
         if (activeTab === 'library') {
@@ -369,6 +373,18 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
                                     </div>
                                 )}
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none"></div>
+
+                                {/* Remove Button */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRemoveUpload(item.id);
+                                    }}
+                                    className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md"
+                                    title="Remove upload"
+                                >
+                                    <X size={14} />
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -476,13 +492,13 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
                             </button>
                             <div
                                 className="flex-1 min-w-0 cursor-pointer"
-                                onClick={() => onAddClip(audio.name, 'audio')}
+                                onClick={() => onAddClip(audio.src, 'audio', { name: audio.name, duration: parseDurationString(audio.duration) })}
                             >
                                 <p className="text-xs font-bold text-gray-700 truncate">{audio.name}</p>
                                 <p className="text-[10px] text-gray-400">{audio.category} • {audio.duration}</p>
                             </div>
                             <button
-                                onClick={() => onAddClip(audio.name, 'audio')}
+                                onClick={() => onAddClip(audio.src, 'audio', { name: audio.name, duration: parseDurationString(audio.duration) })}
                                 className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-all"
                                 title="Add to timeline"
                             >
