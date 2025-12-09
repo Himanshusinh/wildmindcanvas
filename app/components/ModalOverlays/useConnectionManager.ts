@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Konva from 'konva';
-import { Connection, ActiveDrag, ImageModalState } from './types';
+import { Connection, ActiveDrag, ImageModalState, ComponentMenu } from './types';
 import { getComponentType, computeNodeCenter } from './utils';
 
 interface UseConnectionManagerProps {
@@ -50,7 +50,7 @@ export function useConnectionManager({
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [dimmedFrameId, setDimmedFrameId] = useState<string | null>(null);
-  const [componentMenu, setComponentMenu] = useState<{ x: number; y: number; canvasX: number; canvasY: number; sourceNodeId?: string; connectionColor?: string } | null>(null);
+  const [componentMenu, setComponentMenu] = useState<ComponentMenu | null>(null);
   const [componentMenuSearch, setComponentMenuSearch] = useState('');
 
   const effectiveConnections = connections ?? localConnections;
@@ -171,6 +171,16 @@ export function useConnectionManager({
         }
       }
 
+      // CRITICAL FIX: Prevent text connections from triggering on image-specific receive nodes
+      // This prevents duplicate connections when connecting text to storyboard
+      if (fromType === 'text' && toType === 'storyboard' && side && side.startsWith('receive-') && side !== 'receive') {
+        // Text is trying to connect to an image-specific node (receive-character, receive-background, receive-props)
+        // Ignore this event - only the main 'receive' node should handle text connections
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+        return;
+      }
+
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music', 'storyboard'],
         image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'storyboard'],
@@ -185,11 +195,6 @@ export function useConnectionManager({
         return;
       }
 
-      // Additional validation for media connections:
-      // 1. Media can only connect to empty image generation modals
-      // 2. Image generation modals cannot connect to media
-
-      // Check if source is media (Library Image or Uploaded Image)
       const fromModal = imageModalStates.find(m => m.id === activeDrag.from);
       const isFromMedia = fromModal && (
         fromModal.model === 'Library Image' ||
@@ -397,7 +402,15 @@ export function useConnectionManager({
               const stageBox = stage.container().getBoundingClientRect();
               const canvasX = (mouseX - stageBox.left - position.x) / scale;
               const canvasY = (mouseY - stageBox.top - position.y) / scale;
-              setComponentMenu({ x: mouseX, y: mouseY, canvasX, canvasY, sourceNodeId: activeDrag.from, connectionColor: activeDrag.color });
+              setComponentMenu({
+                x: mouseX,
+                y: mouseY,
+                canvasX,
+                canvasY,
+                sourceNodeId: activeDrag.from,
+                sourceNodeType: getComponentType(activeDrag.from) || undefined,
+                connectionColor: activeDrag.color
+              });
             }
           }
         }

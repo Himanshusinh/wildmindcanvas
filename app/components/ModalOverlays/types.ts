@@ -202,6 +202,7 @@ export interface ComponentMenu {
   canvasX: number;
   canvasY: number;
   sourceNodeId?: string;
+  sourceNodeType?: string;
   connectionColor?: string;
 }
 
