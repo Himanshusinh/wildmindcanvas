@@ -957,7 +957,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         >
           {/* Erase Icon */}
           <img
-            src="/icons/layer.png"
+            src="/icons/erase.svg"
             alt="Erase"
             style={{
               width: `${40 * scale}px`,
@@ -966,9 +966,11 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+
             }}
             onError={(e) => {
-              console.error('[ErasePluginModal] Failed to load layer.png icon');
+              console.error('[ErasePluginModal] Failed to load erase.svg icon');
               // Fallback: hide broken image
               e.currentTarget.style.display = 'none';
             }}

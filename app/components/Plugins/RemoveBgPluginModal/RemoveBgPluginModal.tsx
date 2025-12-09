@@ -602,8 +602,8 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         >
           {/* Layer Icon */}
           <img
-            src="/icons/layer.png"
-            alt="Remove BG"
+            src="/icons/removebg.svg"
+            alt="Remove Background"
             style={{
               width: `${40 * scale}px`,
               height: `${40 * scale}px`,
@@ -611,9 +611,11 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+              transition: 'filter 0.3s ease',
             }}
             onError={(e) => {
-              console.error('[RemoveBgPluginModal] Failed to load layer.png icon');
+              console.error('[RemoveBgPluginModal] Failed to load removebg.svg icon');
               // Fallback: hide broken image
               e.currentTarget.style.display = 'none';
             }}

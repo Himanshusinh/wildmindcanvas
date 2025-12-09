@@ -739,7 +739,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
         >
           {/* Expand Icon */}
           <img
-            src="/icons/layer.png"
+            src="/icons/resize.svg"
             alt="Expand"
             style={{
               width: `${40 * scale}px`,
@@ -748,9 +748,11 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+
             }}
             onError={(e) => {
-              console.error('[ExpandPluginModal] Failed to load layer.png icon');
+              console.error('[ExpandPluginModal] Failed to load resize.svg icon');
               // Fallback: hide broken image
               e.currentTarget.style.display = 'none';
             }}
