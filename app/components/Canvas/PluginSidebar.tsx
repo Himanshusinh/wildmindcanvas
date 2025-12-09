@@ -15,6 +15,7 @@ interface Plugin {
   name: string;
   description?: string;
   icon?: string;
+  invertInDarkMode?: boolean;
 }
 
 const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelectPlugin, scale = 1, viewportCenter }) => {
@@ -35,36 +36,43 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       id: 'upscale',
       name: 'Upscale',
       description: 'Enhance image resolution and quality',
+      icon: '/icons/upscale.svg',
     },
     {
       id: 'removebg',
       name: 'Remove BG',
       description: 'Remove background from images',
+      icon: '/icons/removebg.svg',
     },
     {
       id: 'erase',
       name: 'Erase / Replace',
       description: 'Erase or replace parts of images using AI',
+      icon: '/icons/erase.svg',
     },
     {
       id: 'expand',
       name: 'Expand',
       description: 'Reserve empty frames for future edits',
+      icon: '/icons/resize.svg',
     },
     {
       id: 'vectorize',
       name: 'Vectorize',
       description: 'Convert images to vector format',
+      icon: '/icons/vector.svg',
     },
     {
       id: 'storyboard',
       name: 'Storyboard',
       description: 'Create storyboard frames for your project',
+      icon: '/icons/film-editing.svg',
     },
     {
       id: 'video-editor',
       name: 'Video Editor',
       description: 'Edit and assemble videos',
+      icon: '/icons/video-editor.svg',
     },
   ]);
 
@@ -173,34 +181,30 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: '8px',
+                width: '32px',
+                height: '32px',
               }}
             >
-              {item.id === 'upscale' ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              ) : item.id === 'removebg' ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
-                </svg>
-              ) : item.id === 'video-editor' ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
-                  <line x1="7" y1="2" x2="7" y2="22" />
-                  <line x1="17" y1="2" x2="17" y2="22" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <line x1="2" y1="7" x2="7" y2="7" />
-                  <line x1="2" y1="17" x2="7" y2="17" />
-                  <line x1="17" y1="17" x2="22" y2="17" />
-                  <line x1="17" y1="7" x2="22" y2="7" />
-                </svg>
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m6.66 6.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m6.66-6.66l4.24-4.24" />
-                </svg>
-              )}
+              <img
+                src={item.icon}
+                alt={item.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+                  transition: 'filter 0.3s ease',
+                }}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  // Fallback to generic icon if image fails
+                  e.currentTarget.insertAdjacentHTML('afterend', `
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    </svg>
+                  `);
+                }}
+              />
             </div>
             {/* Plugin Name - centered below icon */}
             <div

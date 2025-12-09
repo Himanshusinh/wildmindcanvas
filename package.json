@@ -16,7 +16,7 @@
     "konva": "^10.0.8",
     "lucide-react": "^0.555.0",
     "mp4-muxer": "^5.2.2",
-    "next": "16.0.1",
+    "next": "^16.0.8",
     "pixi.js": "^8.14.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -37,7 +37,7 @@
     "@types/three": "^0.169.0",
     "@types/utif": "^3.0.6",
     "eslint": "^9",
-    "eslint-config-next": "16.0.1",
+    "eslint-config-next": "^16.0.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

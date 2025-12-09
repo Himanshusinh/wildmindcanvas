@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ComponentMenu } from './types';
 
 interface ComponentCreationMenuProps {
@@ -70,8 +70,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     };
   }, [componentMenu, setComponentMenu, setComponentMenuSearch]);
 
-  if (!componentMenu) return null;
-
+  // Define components list (always, to avoid conditional hook calls)
   const components = [
     { id: 'text', label: 'Text Generation', type: 'text' },
     { id: 'image', label: 'Image Generation', type: 'image' },
@@ -84,9 +83,56 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
 
-  const filtered = components.filter(comp =>
-    comp.label.toLowerCase().includes(componentMenuSearch.toLowerCase())
-  );
+  // Always call useMemo (before early return) to comply with Rules of Hooks
+  const allowedComponentsFromSource = useMemo(() => {
+    if (!componentMenu) return null;
+
+    const sourceType = componentMenu.sourceNodeType;
+    if (!sourceType) return null;
+
+    switch (sourceType) {
+      case 'storyboard':
+      case 'script':
+        return ['image', 'video'];
+
+      case 'text':
+        return ['image', 'video', 'music', 'storyboard-plugin'];
+
+      case 'image':
+        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'storyboard-plugin'];
+
+      case 'video':
+      case 'music':
+        return ['video'];
+
+      case 'upscale':
+      case 'removebg':
+      case 'erase':
+      case 'expand':
+      case 'vectorize':
+        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin'];
+
+      default:
+        return null;
+    }
+  }, [componentMenu]);
+
+  // Early return after all hooks
+  if (!componentMenu) return null;
+
+  const filtered = components.filter(comp => {
+    // Search filter
+    if (!comp.label.toLowerCase().includes(componentMenuSearch.toLowerCase())) {
+      return false;
+    }
+
+    // Context filter
+    if (allowedComponentsFromSource) {
+      return allowedComponentsFromSource.includes(comp.id);
+    }
+
+    return true;
+  });
 
   const handleCreateConnection = (targetId: string) => {
     if (componentMenu.sourceNodeId && onPersistConnectorCreate) {

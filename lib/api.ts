@@ -298,6 +298,11 @@ export async function generateImageForCanvas(
       throw new Error(result.message || 'Failed to generate image');
     }
 
+    // Trigger credit refresh event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('refresh-credits'));
+    }
+
     // Return the data object directly (contains mediaId, url, storagePath, generationId)
     return result.data || result;
   } catch (error: any) {
@@ -1611,3 +1616,38 @@ export async function saveUploadedMedia(
   }
 }
 
+
+/**
+ * Fetch user credits
+ */
+export async function fetchCredits(): Promise<{ planCode: string; creditBalance: number }> {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    const response = await fetch(`${API_GATEWAY_URL}/credits/me`, {
+      method: 'GET',
+      credentials: 'include',
+      headers,
+    });
+
+    if (!response.ok) {
+      // Silently fail or throw? If fails, user just sees nothing or error.
+      // Let's return default if fails? calling code handles error.
+      throw new Error('Failed to fetch credits');
+    }
+
+    // formatApiResponse returns { responseStatus, message, data }
+    const result = await response.json();
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Error fetching credits');
+    }
+
+    return result.data;
+  } catch (err) {
+    console.error('API fetchCredits error', err);
+    throw err;
+  }
+}

@@ -162,16 +162,38 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
                         zIndex: 20,
                     }}
                 >
-                    <svg width={`${Math.min(screenWidth, screenHeight) * 0.4}px`} height={`${Math.min(screenWidth, screenHeight) * 0.4}px`} viewBox="0 0 24 24" fill="none" stroke={isDark ? '#ffffff' : '#000000'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
-                        <line x1="7" y1="2" x2="7" y2="22" />
-                        <line x1="17" y1="2" x2="17" y2="22" />
-                        <line x1="2" y1="12" x2="22" y2="12" />
-                        <line x1="2" y1="7" x2="7" y2="7" />
-                        <line x1="2" y1="17" x2="7" y2="17" />
-                        <line x1="17" y1="17" x2="22" y2="17" />
-                        <line x1="17" y1="7" x2="22" y2="7" />
-                    </svg>
+                    {/* Video Editor Icon */}
+                    <img
+                        src="/icons/video-editor.svg"
+                        alt="Video Editor"
+                        style={{
+                            width: `${Math.min(screenWidth, screenHeight) * 0.4}px`,
+                            height: `${Math.min(screenWidth, screenHeight) * 0.4}px`,
+                            objectFit: 'contain',
+                            display: 'block',
+                            userSelect: 'none',
+                            pointerEvents: 'none',
+                            filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+
+                        }}
+                        onError={(e) => {
+                            console.error('[VideoEditorTrigger] Failed to load video-editor.svg icon');
+                            // Fallback to inline SVG
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.insertAdjacentHTML('afterend', `
+                                <svg width="${Math.min(screenWidth, screenHeight) * 0.4}px" height="${Math.min(screenWidth, screenHeight) * 0.4}px" viewBox="0 0 24 24" fill="none" stroke="${isDark ? '#ffffff' : '#000000'}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; user-select: none; pointer-events: none;">
+                                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+                                    <line x1="7" y1="2" x2="7" y2="22" />
+                                    <line x1="17" y1="2" x2="17" y2="22" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <line x1="2" y1="7" x2="7" y2="7" />
+                                    <line x1="2" y1="17" x2="7" y2="17" />
+                                    <line x1="17" y1="17" x2="22" y2="17" />
+                                    <line x1="17" y1="7" x2="22" y2="7" />
+                                </svg>
+                            `);
+                        }}
+                    />
 
                     <ConnectionNodes
                         id={id}

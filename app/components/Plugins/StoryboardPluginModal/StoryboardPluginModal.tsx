@@ -358,27 +358,45 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
           }}
         >
           {/* Storyboard Icon - Using SVG */}
-          <svg
-            width={40 * scale}
-            height={40 * scale}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={isDark ? '#ffffff' : '#1a1a1a'}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Storyboard Icon */}
+          <img
+            src="/icons/film-editing.svg"
+            alt="Storyboard"
             style={{
+              width: `${40 * scale}px`,
+              height: `${40 * scale}px`,
+              objectFit: 'contain',
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+
             }}
-          >
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-            <line x1="2" y1="9" x2="22" y2="9" />
-            <line x1="12" y1="3" x2="12" y2="9" />
-          </svg>
+            onError={(e) => {
+              console.error('[StoryboardPluginModal] Failed to load film-editing.svg icon');
+              // Fallback to inline SVG if image fails
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.insertAdjacentHTML('afterend', `
+                <svg
+                  width="${40 * scale}px"
+                  height="${40 * scale}px"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="${isDark ? '#ffffff' : '#1a1a1a'}"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  style="display: block; user-select: none; pointer-events: none;"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                  <line x1="2" y1="9" x2="22" y2="9" />
+                  <line x1="12" y1="3" x2="12" y2="9" />
+                </svg>
+              `);
+            }}
+          />
 
           <StoryboardConnectionNodes
             id={id}

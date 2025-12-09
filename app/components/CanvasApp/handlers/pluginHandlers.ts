@@ -1261,16 +1261,18 @@ export function createPluginHandlers(
       }
     };
 
-    // Create the three nodes with slight delays to ensure unique IDs/timestamps if needed, 
-    // though Math.random should handle it.
+    // DISABLED: Auto-creation of 3 text inputs (Character, Background, Props)
+    // This was causing unwanted behavior when connecting text to storyboard
+    // Users should manually create and connect text inputs as needed
+
     // Character Node (Top)
-    await createInputNode('Character', 50, '#FF5733', 'receive-character');
+    // await createInputNode('Character', 50, '#FF5733', 'receive-character');
 
     // Background Node (Middle)
-    await createInputNode('Background', 200, '#33FF57', 'receive-background');
+    // await createInputNode('Background', 200, '#33FF57', 'receive-background');
 
     // Prompt Node (Bottom)
-    await createInputNode('Props', 350, '#3357FF', 'receive-props');
+    // await createInputNode('Props', 350, '#3357FF', 'receive-props');
   };
 
   const onPersistStoryboardModalMove = async (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; stitchedImageUrl?: string }>) => {

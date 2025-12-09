@@ -6,7 +6,8 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import type { Track, TimelineItem, CanvasDimension } from '../../types';
+import type { Track, TimelineItem, CanvasDimension, Transition, Animation } from '../../types';
+import { getAdjustmentStyle, getPresetFilterStyle, getTextEffectStyle, DEFAULT_ADJUSTMENTS } from '../../types';
 import type { ExportSettings, ExportProgress } from '../types/export';
 
 export interface FFmpegExportOptions {
@@ -15,6 +16,27 @@ export interface FFmpegExportOptions {
     dimension: CanvasDimension;
     settings: ExportSettings;
     onProgress: (progress: ExportProgress) => void;
+}
+
+// Internal type for rendering items with transition info
+interface RenderItem {
+    item: TimelineItem;
+    track: Track;
+    role: 'main' | 'outgoing';
+    transition: Transition | null;
+    transitionProgress: number;
+}
+
+// Transition style properties for rendering
+interface TransitionStyle {
+    opacity?: number;
+    scale?: number;
+    rotate?: number;
+    translateX?: number;
+    translateY?: number;
+    blur?: number;
+    clipX?: number;
+    clipWidth?: number;
 }
 
 class FFmpegExportService {
@@ -363,7 +385,7 @@ class FFmpegExportService {
 
     /**
      * Render a single frame with all active timeline items
-     * Returns the number of items rendered
+     * Handles transitions between overlapping clips
      */
     private async renderFrame(
         tracks: Track[],
@@ -371,24 +393,82 @@ class FFmpegExportService {
         canvas: HTMLCanvasElement,
         ctx: CanvasRenderingContext2D
     ): Promise<number> {
-        // Get active items at current time
-        const activeItems: { item: TimelineItem; track: Track }[] = [];
+        // Get active items at current time with transition info
+        const renderItems: RenderItem[] = [];
 
         for (const track of tracks) {
             if (track.isHidden) continue;
-            for (const item of track.items) {
-                if (currentTime >= item.start && currentTime < item.start + item.duration) {
-                    activeItems.push({ item, track });
+
+            const trackItems = track.items
+                .filter(item => currentTime >= item.start && currentTime < item.start + item.duration)
+                .sort((a, b) => a.start - b.start);
+
+            // Detect overlapping clips for transitions
+            for (let i = 0; i < trackItems.length; i++) {
+                const item = trackItems[i];
+                const nextItem = trackItems[i + 1];
+
+                // Check if this item has a transition with the next item
+                if (nextItem && nextItem.transition && nextItem.transition.type !== 'none') {
+                    const transitionStart = nextItem.start;
+                    const transitionDuration = nextItem.transition.duration;
+                    const transitionEnd = transitionStart + transitionDuration;
+
+                    if (currentTime >= transitionStart && currentTime < transitionEnd) {
+                        // We're in a transition zone
+                        const transitionProgress = (currentTime - transitionStart) / transitionDuration;
+
+                        // Outgoing clip
+                        renderItems.push({
+                            item,
+                            track,
+                            role: 'outgoing',
+                            transition: nextItem.transition,
+                            transitionProgress
+                        });
+
+                        // Incoming clip
+                        renderItems.push({
+                            item: nextItem,
+                            track,
+                            role: 'main',
+                            transition: nextItem.transition,
+                            transitionProgress
+                        });
+
+                        i++; // Skip the next item as we've already added it
+                        continue;
+                    }
                 }
+
+                // No transition, render normally
+                renderItems.push({
+                    item,
+                    track,
+                    role: 'main',
+                    transition: null,
+                    transitionProgress: 0
+                });
             }
         }
 
+        // Sort by layer (background first, then by z-index)
+        renderItems.sort((a, b) => {
+            if (a.item.isBackground && !b.item.isBackground) return -1;
+            if (!a.item.isBackground && b.item.isBackground) return 1;
+            return (a.item.layer || 0) - (b.item.layer || 0);
+        });
+
         let renderedCount = 0;
 
-        // Render each item
-        for (const { item } of activeItems) {
+        // Render each item with transition effects
+        for (const renderItem of renderItems) {
+            const { item, role, transition, transitionProgress } = renderItem;
+
             if (item.type === 'video' || item.type === 'image') {
-                const success = await this.renderMediaItem(item, currentTime, canvas, ctx);
+                const success = await this.renderMediaItemWithTransition(
+                    item, currentTime, canvas, ctx, role, transition, transitionProgress
+                );
                 if (success) renderedCount++;
             } else if (item.type === 'color') {
                 this.renderColorItem(item, canvas, ctx);
@@ -403,8 +483,188 @@ class FFmpegExportService {
     }
 
     /**
-     * Render video or image item
-     * Returns true if successfully rendered
+     * Render item interface for transition handling
+     */
+    private renderMediaItemWithTransition(
+        item: TimelineItem,
+        currentTime: number,
+        canvas: HTMLCanvasElement,
+        ctx: CanvasRenderingContext2D,
+        role: 'main' | 'outgoing',
+        transition: Transition | null,
+        transitionProgress: number
+    ): Promise<boolean> {
+        // If in transition, apply transition style
+        if (transition && transition.type !== 'none') {
+            const transitionStyle = this.calculateTransitionStyle(transition.type, transitionProgress, role);
+            return this.renderMediaItemWithStyle(item, currentTime, canvas, ctx, transitionStyle);
+        }
+
+        // Normal render
+        return this.renderMediaItem(item, currentTime, canvas, ctx);
+    }
+
+    /**
+     * Calculate transition effect style based on type and progress
+     */
+    private calculateTransitionStyle(
+        type: string,
+        progress: number,
+        role: 'main' | 'outgoing'
+    ): TransitionStyle {
+        const p = progress;
+        const outP = 1 - p;
+
+        switch (type) {
+            case 'dissolve':
+            case 'fade-dissolve':
+                return { opacity: role === 'outgoing' ? outP : p };
+
+            case 'dip-to-black':
+                return {
+                    opacity: role === 'outgoing' ? Math.max(0, 1 - p * 2) : Math.max(0, p * 2 - 1)
+                };
+
+            case 'slide':
+            case 'push':
+                const slideDir = role === 'outgoing' ? -1 : 1;
+                return {
+                    translateX: role === 'outgoing' ? -p * 100 : (1 - p) * 100 * slideDir,
+                    opacity: 1
+                };
+
+            case 'wipe':
+                return {
+                    clipX: role === 'outgoing' ? p : 0,
+                    clipWidth: role === 'outgoing' ? 1 - p : p,
+                    opacity: 1
+                };
+
+            case 'zoom-in':
+                return {
+                    scale: role === 'outgoing' ? 1 : 0.5 + 0.5 * p,
+                    opacity: role === 'outgoing' ? outP : p
+                };
+
+            case 'zoom-out':
+                return {
+                    scale: role === 'outgoing' ? 1 + p * 0.5 : 1,
+                    opacity: role === 'outgoing' ? outP : p
+                };
+
+            case 'spin':
+                return {
+                    rotate: role === 'outgoing' ? p * 360 : (1 - p) * -360,
+                    scale: role === 'outgoing' ? outP : p,
+                    opacity: role === 'outgoing' ? outP : p
+                };
+
+            case 'flash':
+                return {
+                    opacity: role === 'outgoing'
+                        ? (p < 0.5 ? 1 : 0)
+                        : (p >= 0.5 ? 1 : 0)
+                };
+
+            case 'blur':
+            case 'zoom-blur':
+                return {
+                    blur: role === 'outgoing' ? p * 20 : (1 - p) * 20,
+                    opacity: role === 'outgoing' ? outP : p
+                };
+
+            default:
+                // Default to dissolve
+                return { opacity: role === 'outgoing' ? outP : p };
+        }
+    }
+
+    /**
+     * Render media item with transition style applied
+     */
+    private async renderMediaItemWithStyle(
+        item: TimelineItem,
+        currentTime: number,
+        canvas: HTMLCanvasElement,
+        ctx: CanvasRenderingContext2D,
+        style: TransitionStyle
+    ): Promise<boolean> {
+        const mediaEl = await this.loadMedia(item, currentTime);
+        if (!mediaEl) return false;
+
+        const { x, y, width, height } = this.calculateBounds(item, canvas, mediaEl);
+
+        ctx.save();
+
+        // Apply CSS filters
+        let filterString = this.buildFilterString(item);
+        if (style.blur) {
+            filterString += ` blur(${style.blur}px)`;
+        }
+        if (filterString) {
+            ctx.filter = filterString.trim();
+        }
+
+        // Apply animation
+        const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        // Base transform
+        let tx = x + width / 2;
+        let ty = y + height / 2;
+
+        // Transition translate
+        if (style.translateX) tx += (style.translateX / 100) * canvas.width;
+        if (style.translateY) ty += (style.translateY / 100) * canvas.height;
+
+        ctx.translate(tx, ty);
+
+        // Transition + animation scale
+        const totalScale = (style.scale ?? 1) * (animStyle.scale ?? 1);
+        if (totalScale !== 1) ctx.scale(totalScale, totalScale);
+
+        // Transition + animation rotate
+        const totalRotate = (style.rotate ?? 0) + (animStyle.rotate ?? 0);
+        if (totalRotate) ctx.rotate((totalRotate * Math.PI) / 180);
+
+        // Animation translate
+        if (animStyle.translateX || animStyle.translateY) {
+            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        }
+
+        // Item transforms
+        if (item.rotation) ctx.rotate((item.rotation * Math.PI) / 180);
+        if (item.flipH || item.flipV) ctx.scale(item.flipH ? -1 : 1, item.flipV ? -1 : 1);
+
+        // Opacity (combine all)
+        const baseOpacity = (item.opacity ?? 100) / 100;
+        const animOpacity = animStyle.opacity ?? 1;
+        const transitionOpacity = style.opacity ?? 1;
+        ctx.globalAlpha = baseOpacity * animOpacity * transitionOpacity;
+
+        // Clip for wipe transitions
+        if (style.clipX !== undefined || style.clipWidth !== undefined) {
+            ctx.beginPath();
+            const clipX = (style.clipX ?? 0) * width;
+            const clipW = (style.clipWidth ?? 1) * width;
+            ctx.rect(-width / 2 + clipX, -height / 2, clipW, height);
+            ctx.clip();
+        }
+
+        try {
+            ctx.drawImage(mediaEl, -width / 2, -height / 2, width, height);
+            ctx.restore();
+            return true;
+        } catch (e) {
+            console.error('[FFmpegExportService] Error drawing media:', e);
+            ctx.restore();
+            return false;
+        }
+    }
+
+
+    /**
+     * Render video or image item with all effects
+     * Supports: filters, animations, fit property, transformations
      */
     private async renderMediaItem(
         item: TimelineItem,
@@ -415,13 +675,42 @@ class FFmpegExportService {
         const mediaEl = await this.loadMedia(item, currentTime);
         if (!mediaEl) return false;
 
-        const { x, y, width, height } = this.calculateBounds(item, canvas);
+        // Calculate bounds with fit property support
+        const { x, y, width, height } = this.calculateBounds(item, canvas, mediaEl);
 
         ctx.save();
+
+        // === APPLY CSS FILTERS ===
+        const filterString = this.buildFilterString(item);
+        if (filterString) {
+            ctx.filter = filterString;
+        }
+
+        // === APPLY ANIMATION ===
+        const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        // Base transform
         ctx.translate(x + width / 2, y + height / 2);
+
+        // Animation transforms
+        if (animStyle.scale) {
+            ctx.scale(animStyle.scale, animStyle.scale);
+        }
+        if (animStyle.rotate) {
+            ctx.rotate((animStyle.rotate * Math.PI) / 180);
+        }
+        if (animStyle.translateX || animStyle.translateY) {
+            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        }
+
+        // Item transforms
         if (item.rotation) ctx.rotate((item.rotation * Math.PI) / 180);
         if (item.flipH || item.flipV) ctx.scale(item.flipH ? -1 : 1, item.flipV ? -1 : 1);
-        ctx.globalAlpha = (item.opacity ?? 100) / 100;
+
+        // Opacity (combine with animation opacity)
+        const baseOpacity = (item.opacity ?? 100) / 100;
+        const animOpacity = animStyle.opacity ?? 1;
+        ctx.globalAlpha = baseOpacity * animOpacity;
 
         try {
             ctx.drawImage(mediaEl, -width / 2, -height / 2, width, height);
@@ -431,6 +720,94 @@ class FFmpegExportService {
             console.error('[FFmpegExportService] Error drawing media:', e);
             ctx.restore();
             return false;
+        }
+    }
+
+    /**
+     * Build CSS filter string from item adjustments and presets
+     */
+    private buildFilterString(item: TimelineItem): string {
+        const adjustmentFilter = getAdjustmentStyle(item, 1);
+        const presetFilter = getPresetFilterStyle(item.filter || 'none');
+        return [adjustmentFilter, presetFilter].filter(Boolean).join(' ').trim();
+    }
+
+    /**
+     * Calculate animation style based on current time
+     */
+    private calculateAnimationStyle(item: TimelineItem, currentTime: number): {
+        opacity?: number;
+        scale?: number;
+        rotate?: number;
+        translateX?: number;
+        translateY?: number;
+    } {
+        if (!item.animation) return {};
+
+        const animType = item.animation.type;
+        const animDur = item.animation.duration || 1;
+        const timing = item.animation.timing || 'enter';
+        const itemTime = currentTime - item.start;
+        const clipDur = item.duration;
+
+        let progress = 0;
+        let isActive = false;
+
+        if (timing === 'enter' || timing === 'both') {
+            if (itemTime < animDur) {
+                progress = itemTime / animDur;
+                isActive = true;
+            }
+        }
+        if (timing === 'exit' || timing === 'both') {
+            const exitStart = clipDur - animDur;
+            if (itemTime >= exitStart && itemTime <= clipDur) {
+                progress = 1 - ((itemTime - exitStart) / animDur);
+                isActive = true;
+            }
+        }
+
+        if (!isActive) return {};
+
+        // Apply easing (ease-out)
+        const p = 1 - Math.pow(1 - progress, 3);
+
+        switch (animType) {
+            case 'fade-in':
+                return { opacity: p };
+            case 'zoom-in-1':
+            case 'zoom-in-center':
+                return { scale: 0.5 + 0.5 * p, opacity: p };
+            case 'zoom-out-1':
+                return { scale: 1.5 - 0.5 * p, opacity: p };
+            case 'fade-slide-left':
+                return { opacity: p, translateX: (1 - p) * -50 };
+            case 'fade-slide-right':
+                return { opacity: p, translateX: (1 - p) * 50 };
+            case 'fade-slide-up':
+                return { opacity: p, translateY: (1 - p) * -50 };
+            case 'fade-slide-down':
+                return { opacity: p, translateY: (1 - p) * 50 };
+            case 'rotate-cw-1':
+                return { rotate: (1 - p) * -360 };
+            case 'rotate-ccw':
+                return { rotate: (1 - p) * 360 };
+            case 'boom':
+                return { scale: p, opacity: p };
+            case 'bounce-left':
+            case 'bounce-right':
+            case 'bounce-up':
+            case 'bounce-down':
+                const bounceDir = animType.includes('left') ? -1 : animType.includes('right') ? 1 : 0;
+                const bounceVertDir = animType.includes('up') ? -1 : animType.includes('down') ? 1 : 0;
+                const bounce = Math.sin(p * Math.PI * 2) * (1 - p) * 20;
+                return {
+                    translateX: bounceDir * bounce,
+                    translateY: bounceVertDir * bounce,
+                    opacity: p
+                };
+            default:
+                return { opacity: p };
         }
     }
 
@@ -591,29 +968,154 @@ class FFmpegExportService {
     }
 
     /**
-     * Render text item
+     * Render text item with text effects
+     * Supports: shadow, outline, neon, glitch, etc.
      */
     private renderTextItem(item: TimelineItem, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
-        const { x, y, width } = this.calculateBounds(item, canvas);
+        const { x, y, width, height } = this.calculateBounds(item, canvas);
         ctx.save();
-        ctx.font = `${item.fontWeight || 'normal'} ${item.fontSize || 40}px ${item.fontFamily || 'Inter'}`;
+
+        const fontSize = item.fontSize || 40;
+        ctx.font = `${item.fontWeight || 'normal'} ${fontSize}px ${item.fontFamily || 'Inter'}`;
         ctx.fillStyle = item.color || '#000000';
         ctx.textAlign = (item.textAlign as CanvasTextAlign) || 'center';
         ctx.globalAlpha = (item.opacity ?? 100) / 100;
-        ctx.fillText(item.src, x + width / 2, y + (item.fontSize || 40));
+
+        const textX = x + width / 2;
+        const textY = y + fontSize;
+        const text = item.name || item.src || '';
+
+        // === APPLY TEXT EFFECTS ===
+        if (item.textEffect && item.textEffect.type !== 'none') {
+            const effect = item.textEffect;
+            const effColor = effect.color || '#000000';
+            const intensity = effect.intensity ?? 50;
+            const offset = effect.offset ?? 50;
+            const dist = (offset / 100) * 20;
+            const blur = (intensity / 100) * 20;
+
+            switch (effect.type) {
+                case 'shadow':
+                    ctx.shadowColor = effColor;
+                    ctx.shadowBlur = blur;
+                    ctx.shadowOffsetX = dist;
+                    ctx.shadowOffsetY = dist;
+                    break;
+                case 'lift':
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = blur + 10;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = dist * 0.5 + 4;
+                    break;
+                case 'outline':
+                    ctx.strokeStyle = effColor;
+                    ctx.lineWidth = (intensity / 100) * 3 + 1;
+                    ctx.strokeText(text, textX, textY);
+                    break;
+                case 'hollow':
+                    ctx.strokeStyle = item.color || '#000000';
+                    ctx.lineWidth = (intensity / 100) * 3 + 1;
+                    ctx.strokeText(text, textX, textY);
+                    ctx.restore();
+                    return; // Don't fill, just stroke for hollow effect
+                case 'neon':
+                    // Multiple glow layers
+                    ctx.shadowColor = effColor;
+                    ctx.shadowBlur = intensity * 0.4;
+                    ctx.fillText(text, textX, textY);
+                    ctx.shadowBlur = intensity * 0.2;
+                    ctx.fillText(text, textX, textY);
+                    ctx.shadowBlur = intensity * 0.1;
+                    break;
+                case 'glitch':
+                    const gOff = (offset / 100) * 5 + 2;
+                    // Cyan layer
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillText(text, textX - gOff, textY - gOff);
+                    // Magenta layer
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillText(text, textX + gOff, textY + gOff);
+                    // Original
+                    ctx.fillStyle = item.color || '#000000';
+                    break;
+                case 'echo':
+                    const echoAlpha = ctx.globalAlpha;
+                    ctx.globalAlpha = echoAlpha * 0.2;
+                    ctx.fillText(text, textX + dist * 3, textY + dist * 3);
+                    ctx.globalAlpha = echoAlpha * 0.4;
+                    ctx.fillText(text, textX + dist * 2, textY + dist * 2);
+                    ctx.globalAlpha = echoAlpha * 0.8;
+                    ctx.fillText(text, textX + dist, textY + dist);
+                    ctx.globalAlpha = echoAlpha;
+                    break;
+            }
+        }
+
+        // Draw main text
+        ctx.fillText(text, textX, textY);
         ctx.restore();
     }
 
     /**
-     * Calculate item bounds
+     * Calculate item bounds with fit property support
+     * @param item Timeline item
+     * @param canvas HTML canvas element
+     * @param mediaEl Optional media element for aspect ratio calculation
      */
-    private calculateBounds(item: TimelineItem, canvas: HTMLCanvasElement) {
+    private calculateBounds(
+        item: TimelineItem,
+        canvas: HTMLCanvasElement,
+        mediaEl?: HTMLImageElement | HTMLVideoElement | null
+    ) {
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
 
-        let width = item.isBackground ? canvasWidth : (item.width ? (item.width / 100) * canvasWidth : canvasWidth * 0.5);
-        let height = item.isBackground ? canvasHeight : (item.height ? (item.height / 100) * canvasHeight : canvasHeight * 0.5);
+        let width: number;
+        let height: number;
 
+        if (item.isBackground) {
+            // Get media aspect ratio for proper fit calculation
+            let mediaAspect = 1;
+            if (mediaEl) {
+                if (mediaEl instanceof HTMLVideoElement) {
+                    mediaAspect = mediaEl.videoWidth / mediaEl.videoHeight || 1;
+                } else if (mediaEl instanceof HTMLImageElement) {
+                    mediaAspect = mediaEl.naturalWidth / mediaEl.naturalHeight || 1;
+                }
+            }
+
+            const canvasAspect = canvasWidth / canvasHeight;
+            const fit = item.fit || 'contain';
+
+            if (fit === 'fill') {
+                // Stretch to fill (ignores aspect ratio)
+                width = canvasWidth;
+                height = canvasHeight;
+            } else if (fit === 'cover') {
+                // Cover - fill canvas while maintaining aspect ratio (may crop)
+                if (mediaAspect > canvasAspect) {
+                    height = canvasHeight;
+                    width = height * mediaAspect;
+                } else {
+                    width = canvasWidth;
+                    height = width / mediaAspect;
+                }
+            } else {
+                // Contain - fit inside canvas while maintaining aspect ratio (may letterbox)
+                if (mediaAspect > canvasAspect) {
+                    width = canvasWidth;
+                    height = width / mediaAspect;
+                } else {
+                    height = canvasHeight;
+                    width = height * mediaAspect;
+                }
+            }
+        } else {
+            width = item.width ? (item.width / 100) * canvasWidth : canvasWidth * 0.5;
+            height = item.height ? (item.height / 100) * canvasHeight : canvasHeight * 0.5;
+        }
+
+        // Center the item
         const x = (canvasWidth / 2) + ((item.x || 0) / 100) * canvasWidth - width / 2;
         const y = (canvasHeight / 2) + ((item.y || 0) / 100) * canvasHeight - height / 2;
 

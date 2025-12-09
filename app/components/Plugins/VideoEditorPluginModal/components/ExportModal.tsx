@@ -4,7 +4,7 @@
 // =================================================================================================
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Download, Upload, Settings, Cpu, Zap, HardDrive, Clock } from 'lucide-react';
+import { X, Download, Upload, Settings, Cpu, Zap, HardDrive, Clock, Server, Globe } from 'lucide-react';
 import type { Track, CanvasDimension } from '../types';
 import {
     exportEngine,
@@ -16,6 +16,7 @@ import {
     BITRATE_CONFIGS,
     DEFAULT_EXPORT_SETTINGS,
 } from '../core';
+import { serverExportService } from '../core/export/ServerExportService';
 
 interface ExportModalProps {
     isOpen: boolean;
@@ -45,11 +46,18 @@ const ExportModal: React.FC<ExportModalProps> = ({
     const [showRecommendations, setShowRecommendations] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     const [progress, setProgress] = useState<ExportProgress>({ phase: 'preparing', progress: 0 });
+    const [useServerExport, setUseServerExport] = useState(false);
+    const [serverAvailable, setServerAvailable] = useState(false);
 
     // Load device capabilities on mount
     useEffect(() => {
         if (isOpen) {
             deviceDetector.getDeviceCapabilities().then(setDeviceCapabilities);
+            // Check if server export is available
+            serverExportService.isAvailable().then(available => {
+                setServerAvailable(available);
+                if (available) setUseServerExport(true); // Default to server if available
+            });
         }
     }, [isOpen]);
 
@@ -89,7 +97,23 @@ const ExportModal: React.FC<ExportModalProps> = ({
         setIsExporting(true);
 
         try {
-            const blob = await exportEngine.export(tracks, duration, dimension, settings, setProgress);
+            let blob: Blob;
+
+            if (useServerExport && serverAvailable) {
+                // Use server-side FFmpeg (faster)
+                console.log('[ExportModal] Using server-side export');
+                blob = await serverExportService.export({
+                    tracks,
+                    duration,
+                    dimension,
+                    settings,
+                    onProgress: setProgress
+                });
+            } else {
+                // Use client-side FFmpeg.wasm
+                console.log('[ExportModal] Using client-side export');
+                blob = await exportEngine.export(tracks, duration, dimension, settings, setProgress);
+            }
 
             // Trigger download
             const url = URL.createObjectURL(blob);
@@ -333,6 +357,33 @@ const ExportModal: React.FC<ExportModalProps> = ({
                                     }`}
                             >
                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.useGPU ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                            </button>
+                        </div>
+
+                        {/* Server Export Toggle */}
+                        <div className={`flex items-center justify-between px-4 py-3 rounded-lg border ${serverAvailable ? 'bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-green-700/50' : 'bg-gray-800/50 border-gray-700/50'}`}>
+                            <div className="flex items-center gap-3">
+                                <Server className={`w-5 h-5 ${serverAvailable ? 'text-green-400' : 'text-gray-500'}`} />
+                                <div>
+                                    <div className="text-sm font-medium text-white flex items-center gap-2">
+                                        Server-side Export
+                                        {serverAvailable && <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">10-50x Faster</span>}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                        {serverAvailable
+                                            ? 'Uses native FFmpeg with hardware acceleration'
+                                            : 'Server not available - using browser export'}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setUseServerExport(!useServerExport)}
+                                disabled={isExporting || !serverAvailable}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${useServerExport && serverAvailable ? 'bg-green-500' : 'bg-gray-600'
+                                    }`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${useServerExport && serverAvailable ? 'translate-x-6' : 'translate-x-1'
                                     }`} />
                             </button>
                         </div>

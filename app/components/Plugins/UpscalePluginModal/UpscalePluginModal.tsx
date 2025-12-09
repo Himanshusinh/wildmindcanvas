@@ -522,7 +522,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         >
           {/* Upscale Icon */}
           <img
-            src="/icons/layer.png"
+            src="/icons/upscale.svg"
             alt="Upscale"
             style={{
               width: `${40 * scale}px`,
@@ -531,9 +531,11 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+              transition: 'filter 0.3s ease',
             }}
             onError={(e) => {
-              console.error('[UpscalePluginModal] Failed to load layer.png icon');
+              console.error('[UpscalePluginModal] Failed to load upscale.svg icon');
               // Fallback: hide broken image
               e.currentTarget.style.display = 'none';
             }}

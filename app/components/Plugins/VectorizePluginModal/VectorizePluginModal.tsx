@@ -520,7 +520,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         >
           {/* Vectorize Icon */}
           <img
-            src="/icons/layer.png"
+            src="/icons/vector.svg"
             alt="Vectorize"
             style={{
               width: `${40 * scale}px`,
@@ -529,9 +529,11 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
               display: 'block',
               userSelect: 'none',
               pointerEvents: 'none',
+              filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
+
             }}
             onError={(e) => {
-              console.error('[VectorizePluginModal] Failed to load layer.png icon');
+              console.error('[VectorizePluginModal] Failed to load vector.svg icon');
               // Fallback: hide broken image
               e.currentTarget.style.display = 'none';
             }}
