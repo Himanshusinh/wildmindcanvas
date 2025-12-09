@@ -161,7 +161,7 @@ const Canvas: React.FC<CanvasProps> = ({
         return () => {
             mounted = false;
         };
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Update compositor resolution when dimensions change
     useEffect(() => {
@@ -2081,6 +2081,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
                 {/* Main Canvas Background / Wrapper */}
                 <div
+                    key={`canvas-${dimension.width}-${dimension.height}`}
                     ref={canvasWrapperRef}
                     className="bg-black shadow-2xl relative transition-transform duration-300 ease-in-out origin-center group"
                     style={{
@@ -2134,11 +2135,12 @@ const Canvas: React.FC<CanvasProps> = ({
                         {renderItems
                             .filter(obj => obj.item.type !== 'audio')
                             .filter(obj => {
+                                // TEMPORARILY DISABLED GPU FILTERING - Always render in DOM to diagnose black canvas issue
                                 // Skip NON-ANIMATED, NON-TRANSITIONING background videos/images when GPU is rendering them
                                 // IMPORTANT: Keep animated items AND items with transitions in DOM so CSS effects work
-                                if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
-                                    return false;
-                                }
+                                // if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
+                                //     return false;
+                                // }
                                 return true;
                             })
                             .map((obj) => renderItemContent(obj, false))}
@@ -2154,11 +2156,12 @@ const Canvas: React.FC<CanvasProps> = ({
                         {renderItems
                             .filter(obj => obj.item.type !== 'audio')
                             .filter(obj => {
+                                // TEMPORARILY DISABLED GPU FILTERING - Always render in DOM to diagnose black canvas issue
                                 // Skip NON-ANIMATED, NON-TRANSITIONING background videos/images when GPU is rendering them
                                 // IMPORTANT: Keep animated items AND items with transitions in DOM so CSS effects work
-                                if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
-                                    return false;
-                                }
+                                // if (gpuReady && !obj.item.animation && !obj.transition && obj.item.isBackground && (obj.item.type === 'video' || obj.item.type === 'image')) {
+                                //     return false;
+                                // }
                                 return true;
                             })
                             .map((obj) => renderItemContent(obj, true))}

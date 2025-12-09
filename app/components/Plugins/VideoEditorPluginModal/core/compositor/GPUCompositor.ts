@@ -211,6 +211,11 @@ export class GPUCompositor {
             this.canvas.width = width;
             this.canvas.height = height;
         }
+
+        // Update WebGL viewport to match new resolution
+        if (this.gl) {
+            this.gl.viewport(0, 0, width, height);
+        }
     }
 
     /**

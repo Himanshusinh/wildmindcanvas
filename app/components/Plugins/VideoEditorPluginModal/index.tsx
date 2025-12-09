@@ -1353,14 +1353,15 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
     const handleDimensionChange = (newDim: CanvasDimension) => {
         setCurrentDimension(newDim);
 
-        // Update background items to "contain" fit to prevent cropping
+        // Update background items to "contain" fit to preserve image aspect ratio
+        // Images will show at their own aspect ratio within the new canvas dimensions
         setTracks(prev => prev.map(track => {
             if (track.type === 'video' || track.type === 'overlay') {
                 return {
                     ...track,
                     items: track.items.map(item => {
                         if (item.isBackground) {
-                            return { ...item, fit: 'fill' };
+                            return { ...item, fit: 'contain' };
                         }
                         return item;
                     })

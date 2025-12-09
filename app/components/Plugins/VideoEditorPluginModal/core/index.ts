@@ -28,7 +28,8 @@ export {
 } from './adapters';
 
 // Export
-export { exportEngine, ExportEngine } from './export/ExportEngine';
+export { exportEngine, ExportEngine, type ExportMode } from './export/ExportEngine';
+export { ffmpegExportService } from './export/FFmpegExportService';
 export { deviceDetector, DeviceDetector } from './export/DeviceDetector';
 export type { ExportSettings, ExportProgress, DeviceCapabilities } from './types/export';
 export { RESOLUTION_PRESETS, BITRATE_CONFIGS, DEFAULT_EXPORT_SETTINGS } from './types/export';

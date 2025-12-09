@@ -1,6 +1,7 @@
 // ============================================
 // Export Engine - Frame-by-Frame Video Renderer
 // Uses WebCodecs VideoEncoder for frame-accurate export
+// Supports FFmpeg.wasm for professional-grade output
 // Supports GPU acceleration when available
 // ============================================
 
@@ -11,6 +12,9 @@ import { gpuCompositor } from '../compositor/GPUCompositor';
 import { hardwareAccel } from '../engine/HardwareAccel';
 import { Muxer as WebmMuxer, ArrayBufferTarget as WebmArrayBufferTarget } from 'webm-muxer';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4ArrayBufferTarget } from 'mp4-muxer';
+import { ffmpegExportService } from './FFmpegExportService';
+
+export type ExportMode = 'auto' | 'ffmpeg' | 'webcodecs' | 'mediarecorder';
 
 export class ExportEngine {
     private canvas: HTMLCanvasElement | null = null;
@@ -39,6 +43,7 @@ export class ExportEngine {
      * @param dimension Canvas dimensions
      * @param settings Export settings
      * @param onProgress Progress callback
+     * @param exportMode Export mode: 'auto' | 'ffmpeg' | 'webcodecs' | 'mediarecorder'
      * @returns Blob of the exported video
      */
     async export(
@@ -46,16 +51,52 @@ export class ExportEngine {
         duration: number,
         dimension: CanvasDimension,
         settings: ExportSettings,
-        onProgress: (progress: ExportProgress) => void
+        onProgress: (progress: ExportProgress) => void,
+        exportMode: ExportMode = 'auto'
     ): Promise<Blob> {
         this.isExporting = true;
         this.cancelled = false;
 
-        // Use VideoEncoder if available, otherwise fall back to MediaRecorder
-        if (this.supportsVideoEncoder()) {
+        // Determine which export method to use
+        if (exportMode === 'ffmpeg' || (exportMode === 'auto' && ffmpegExportService.isSupported())) {
+            // Try FFmpeg for best quality
+            try {
+                console.log('%c🎬 Using FFmpeg.wasm for export (best quality)', 'color: #ff6600; font-weight: bold');
+                onProgress({ phase: 'preparing', progress: 0 });
+
+                // Load FFmpeg if not already loaded
+                const loaded = await ffmpegExportService.load((progress) => {
+                    onProgress({ phase: 'preparing', progress: progress * 0.5 }); // 0-50% for loading
+                });
+
+                if (!loaded) {
+                    console.warn('[ExportEngine] FFmpeg failed to load, falling back to VideoEncoder');
+                    if (exportMode === 'ffmpeg') {
+                        throw new Error('FFmpeg failed to load');
+                    }
+                    // Fall through to VideoEncoder
+                } else {
+                    return await ffmpegExportService.export({
+                        tracks,
+                        duration,
+                        dimension,
+                        settings,
+                        onProgress,
+                    });
+                }
+            } catch (error) {
+                if (exportMode === 'ffmpeg') {
+                    throw error;
+                }
+                console.warn('[ExportEngine] FFmpeg export failed, falling back', error);
+            }
+        }
+
+        // Fallback to VideoEncoder or MediaRecorder
+        if (exportMode === 'webcodecs' || (exportMode === 'auto' && this.supportsVideoEncoder())) {
             return this.exportWithVideoEncoder(tracks, duration, dimension, settings, onProgress);
         } else {
-            console.warn('[ExportEngine] VideoEncoder not available, falling back to MediaRecorder');
+            console.warn('[ExportEngine] Using MediaRecorder fallback');
             return this.exportWithMediaRecorder(tracks, duration, dimension, settings, onProgress);
         }
     }
@@ -149,10 +190,27 @@ export class ExportEngine {
                 },
             });
 
-            // H.264 Baseline Profile Level 3.1 - universal compatibility
-            // avc1.42001f = Baseline Profile, Level 3.1
+            // Select appropriate H.264 level based on resolution:
+            // - Level 3.1 (0x1f): max 1280x720 (720p)
+            // - Level 4.0 (0x28): max 1920x1080 (1080p) 
+            // - Level 5.1 (0x33): max 4096x2160 (4K)
+            const resolutionArea = settings.resolution.width * settings.resolution.height;
+            let avcLevel: string;
+            let levelName: string;
+
+            if (resolutionArea <= 921600) { // 1280x720
+                avcLevel = 'avc1.42001f'; // Level 3.1
+                levelName = '3.1';
+            } else if (resolutionArea <= 2073600) { // 1920x1080
+                avcLevel = 'avc1.420028'; // Level 4.0
+                levelName = '4.0';
+            } else {
+                avcLevel = 'avc1.420033'; // Level 5.1 for 4K+
+                levelName = '5.1';
+            }
+
             encoder.configure({
-                codec: 'avc1.42001f',
+                codec: avcLevel,
                 width: settings.resolution.width,
                 height: settings.resolution.height,
                 bitrate: bitrate * 5, // High bitrate for quality
@@ -160,7 +218,7 @@ export class ExportEngine {
                 avc: { format: 'avc' }, // Use AVC format for MP4 compatibility
             });
 
-            console.log(`%c⚙️ VideoEncoder configured: H.264 (avc1.42001f), ${(bitrate * 5 / 1000).toFixed(0)}kbps, ${settings.fps}fps`, 'color: #00ff00');
+            console.log(`%c⚙️ VideoEncoder configured: H.264 (${avcLevel}, Level ${levelName}), ${(bitrate * 5 / 1000).toFixed(0)}kbps, ${settings.fps}fps`, 'color: #00ff00');
 
             onProgress({ phase: 'rendering', progress: 0 });
 
@@ -440,8 +498,8 @@ export class ExportEngine {
             return;
         }
 
-        // Calculate position and size
-        const { x, y, width, height } = this.calculateItemBounds(item, canvas);
+        // Calculate position and size (pass media element for aspect ratio calculation)
+        const { x, y, width, height } = this.calculateItemBounds(item, canvas, mediaEl);
 
         // Save context state
         ctx.save();
@@ -496,8 +554,13 @@ export class ExportEngine {
 
     /**
      * Calculate item bounds in canvas pixels
+     * Respects the fit property for proper aspect ratio handling
      */
-    private calculateItemBounds(item: TimelineItem, canvas: HTMLCanvasElement) {
+    private calculateItemBounds(
+        item: TimelineItem,
+        canvas: HTMLCanvasElement,
+        mediaEl?: HTMLImageElement | HTMLVideoElement | null
+    ) {
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
 
@@ -505,13 +568,52 @@ export class ExportEngine {
         let height: number;
 
         if (item.isBackground) {
-            width = canvasWidth;
-            height = canvasHeight;
+            // Get media aspect ratio for proper fit calculation
+            let mediaAspect = 1;
+            if (mediaEl) {
+                if (mediaEl instanceof HTMLVideoElement) {
+                    mediaAspect = mediaEl.videoWidth / mediaEl.videoHeight || 1;
+                } else if (mediaEl instanceof HTMLImageElement) {
+                    mediaAspect = mediaEl.naturalWidth / mediaEl.naturalHeight || 1;
+                }
+            }
+
+            const canvasAspect = canvasWidth / canvasHeight;
+            const fit = item.fit || 'contain';
+
+            if (fit === 'fill') {
+                // Stretch to fill (ignores aspect ratio)
+                width = canvasWidth;
+                height = canvasHeight;
+            } else if (fit === 'cover') {
+                // Cover - fill canvas while maintaining aspect ratio (may crop)
+                if (mediaAspect > canvasAspect) {
+                    // Media is wider, fit to height and crop width
+                    height = canvasHeight;
+                    width = height * mediaAspect;
+                } else {
+                    // Media is taller, fit to width and crop height
+                    width = canvasWidth;
+                    height = width / mediaAspect;
+                }
+            } else {
+                // Contain - fit inside canvas while maintaining aspect ratio (may letterbox)
+                if (mediaAspect > canvasAspect) {
+                    // Media is wider, fit to width
+                    width = canvasWidth;
+                    height = width / mediaAspect;
+                } else {
+                    // Media is taller, fit to height
+                    height = canvasHeight;
+                    width = height * mediaAspect;
+                }
+            }
         } else {
             width = item.width ? (item.width / 100) * canvasWidth : canvasWidth * 0.5;
             height = item.height ? (item.height / 100) * canvasHeight : canvasHeight * 0.5;
         }
 
+        // Center the item
         const x = (canvasWidth / 2) + ((item.x || 0) / 100) * canvasWidth - width / 2;
         const y = (canvasHeight / 2) + ((item.y || 0) / 100) * canvasHeight - height / 2;
 
