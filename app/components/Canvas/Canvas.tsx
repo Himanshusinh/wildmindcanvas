@@ -1408,11 +1408,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           aspectRatio: '1:1', // Default to 1:1 for scene-generated images
           sourceImageUrl: finalSourceImageUrl, // Reference images - CRITICAL for image-to-image
           // Default settings for scene-generated images
-          model: 'Google nano banana pro', // Default model (not 2K)
+          model: 'Google nano banana', // Default model (Standard, ~98 credits) instead of Pro (320 credits)
           frame: '1:1', // Default frame aspect ratio
           // Scene metadata for storyboard generation
           sceneNumber: sceneFrame.sceneNumber,
           storyboardMetadata,
+          // CRITICAL: Explicitly set isGenerating to FALSE to prevent auto-generation and charge
+          // User must manually click "Generate" to incur the cost per image
+          isGenerating: false,
         } as any;
       });
 
@@ -1438,6 +1441,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
 
       console.log(`[Canvas] Created ${newSceneFrames.length} scene frames with Story World consistency`);
+
+      // Trigger instant credit refresh for the scene script generation (10 credits)
+      window.dispatchEvent(new Event('refresh-credits'));
 
     } catch (error) {
       console.error('[Canvas] Error generating scenes:', error);
@@ -1773,6 +1779,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         resultUrl: result?.url ? result.url.substring(0, 100) + '...' : 'none',
         imagesCount: result?.images?.length || 0,
       });
+
+      // Trigger instant credit refresh for the image generation
+      if (result) {
+        window.dispatchEvent(new Event('refresh-credits'));
+      }
       return result;
     }
 

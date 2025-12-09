@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useCredits } from '../../../hooks/useCredits';
+import { Coins } from 'lucide-react'; // Ensure lucide-react is installed
 
 interface HeaderProps {
   projectName?: string;
@@ -13,7 +15,7 @@ interface HeaderProps {
   isHidden?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
+export const Header: React.FC<HeaderProps> = ({
   projectName: initialProjectName = 'Untitled',
   onProjectNameChange,
   onSwitchProject,
@@ -23,13 +25,14 @@ export const Header: React.FC<HeaderProps> = ({
   canRedo = false,
   isHidden = false,
 }) => {
+  const { credits } = useCredits();
   // Use prop directly to avoid hydration mismatches - only use state when editing
   const [editingValue, setEditingValue] = useState(initialProjectName);
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync editing value with prop changes
-  useEffect(() => { 
+  useEffect(() => {
     if (initialProjectName !== undefined && !isEditing) {
       setEditingValue(initialProjectName);
     }
@@ -216,6 +219,30 @@ export const Header: React.FC<HeaderProps> = ({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 3h18v18H3zM7 12h10M7 12l3-3M7 12l3 3" />
           </svg>
+        </div>
+      )}
+
+      {/* Credit Balance */}
+      {typeof credits === 'number' && (
+        <div
+          style={{
+            padding: '6px 10px',
+            backgroundColor: bgColor,
+            borderRadius: '8px',
+            border: `1px solid ${borderColor}`,
+            boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.3)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: textColor,
+            fontSize: '14px',
+            fontWeight: '500',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+          }}
+          title="Available Credits"
+        >
+          <Coins size={16} color={isDark ? '#fbbf24' : '#f59e0b'} />
+          <span>{credits.toLocaleString()}</span>
         </div>
       )}
     </div>
