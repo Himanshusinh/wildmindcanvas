@@ -290,6 +290,9 @@ const Timeline: React.FC<TimelineProps> = ({
             const current = sortedItems[i];
             const next = sortedItems[i + 1];
 
+            // Skip transition button if either item is a text clip
+            if (current.type === 'text' || next.type === 'text') continue;
+
             const gap = next.start - (current.start + current.duration);
 
             if (Math.abs(gap) < 0.1) {
@@ -728,13 +731,18 @@ const Timeline: React.FC<TimelineProps> = ({
                                         {item.isBackground ? 'Detach image from background' : 'Set as background'}
                                     </button>
                                     <div className="h-px bg-gray-100 my-1"></div>
-                                    <button onClick={() => { onSelectTransition(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
-                                        <Zap size={16} /> Add Transition
-                                    </button>
-                                    {item.transition && item.transition.type !== 'none' && (
-                                        <button onClick={() => { onUpdateClip(track.id, { ...item, transition: { type: 'none', duration: 0 } }); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-3 text-red-600">
-                                            <ZapOff size={16} /> Remove Transition
-                                        </button>
+                                    {/* Hide transition options for text clips */}
+                                    {item.type !== 'text' && (
+                                        <>
+                                            <button onClick={() => { onSelectTransition(track.id, item.id); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-gray-100 flex items-center gap-3 text-gray-700">
+                                                <Zap size={16} /> Add Transition
+                                            </button>
+                                            {item.transition && item.transition.type !== 'none' && (
+                                                <button onClick={() => { onUpdateClip(track.id, { ...item, transition: { type: 'none', duration: 0 } }); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-3 text-red-600">
+                                                    <ZapOff size={16} /> Remove Transition
+                                                </button>
+                                            )}
+                                        </>
                                     )}
                                     {item.animation && (
                                         <button onClick={() => { onUpdateClip(track.id, { ...item, animation: undefined }); setActiveClipMenu(null); }} className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-3 text-red-600">

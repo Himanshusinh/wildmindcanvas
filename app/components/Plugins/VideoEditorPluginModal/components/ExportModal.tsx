@@ -351,7 +351,29 @@ const ExportModal: React.FC<ExportModalProps> = ({
                                 </div>
                             </div>
                             <button
-                                onClick={() => setSettings({ ...settings, useGPU: !settings.useGPU })}
+                                onClick={() => {
+                                    const newUseGPU = !settings.useGPU;
+                                    setSettings({ ...settings, useGPU: newUseGPU });
+
+                                    // Log GPU acceleration status to console
+                                    if (newUseGPU) {
+                                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                                        console.log('%c⚡ GPU ACCELERATION ENABLED', 'font-weight: bold; font-size: 14px; color: #00ff00');
+                                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                                        if (deviceCapabilities) {
+                                            const gpuType = deviceCapabilities.isDedicatedGPU ? '🎮 DEDICATED' : '💻 INTEGRATED';
+                                            const color = deviceCapabilities.isDedicatedGPU ? '#00ff00' : '#ffaa00';
+                                            console.log(`%c${gpuType} GPU`, `color: ${color}; font-weight: bold`);
+                                            console.log(`%c├─ Vendor: ${deviceCapabilities.gpuVendor?.toUpperCase() || 'Unknown'}`, 'color: #00aaff');
+                                            console.log(`%c├─ VRAM: ${deviceCapabilities.vramGB.toFixed(1)} GB`, 'color: #ff00ff');
+                                            console.log(`%c├─ Hardware Encode: ${deviceCapabilities.hardwareEncodingAvailable ? '✅ Yes' : '❌ No'}`, 'color: #00aaff');
+                                            console.log(`%c└─ Recommended: ${deviceCapabilities.maxResolution.label}`, 'color: #ffaa00');
+                                        }
+                                        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+                                    } else {
+                                        console.log('%c⚡ GPU ACCELERATION DISABLED - Using CPU rendering', 'color: #ff6600; font-weight: bold');
+                                    }
+                                }}
                                 disabled={isExporting}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${settings.useGPU ? 'bg-purple-500' : 'bg-gray-600'
                                     }`}

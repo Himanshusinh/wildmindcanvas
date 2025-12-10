@@ -1571,6 +1571,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedVectorizeModalIds([]);
     setSelectedStoryboardModalId(null);
     setSelectedStoryboardModalIds([]);
+    setSelectedVideoEditorModalId(null);
+    setSelectedVideoEditorModalIds([]);
     setContextMenuOpen(false);
     setContextMenuImageIndex(null);
     setContextMenuModalId(null);
@@ -3503,7 +3505,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         return;
       }
       // Handle 'z' to zoom to selection or to all components
-      if (e.key === 'z' && !e.repeat) {
+      // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
+      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
         // Avoid when typing in inputs
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
@@ -4270,186 +4273,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         const wasDragged = marqueeRect.width > 5 || marqueeRect.height > 5;
 
         if (wasDragged) {
-<<<<<<< HEAD
-          // Find all items that intersect with the marquee using Konva's intersection utility
-          const selectedIndices: number[] = [];
-          const selectedImageModalIdsList: string[] = [];
-          const selectedVideoModalIdsList: string[] = [];
-          const selectedMusicModalIdsList: string[] = [];
-          const selectedTextInputIdsList: string[] = [];
-          const selectedUpscaleModalIdsList: string[] = [];
-          const selectedRemoveBgModalIdsList: string[] = [];
-          const selectedEraseModalIdsList: string[] = [];
-          const selectedExpandModalIdsList: string[] = [];
-          const selectedVectorizeModalIdsList: string[] = [];
-          const selectedStoryboardModalIdsList: string[] = [];
-          const selectedScriptFrameModalIdsList: string[] = [];
-          const selectedSceneFrameModalIdsList: string[] = [];
-
-          // Check images and videos (skip 3D models)
-          images.forEach((img, index) => {
-            if (img.type === 'model3d') return;
-
-            const imgX = img.x || 0;
-            const imgY = img.y || 0;
-            const imgWidth = img.width || 0;
-            const imgHeight = img.height || 0;
-
-            // For text, estimate dimensions
-            let width = imgWidth;
-            let height = imgHeight;
-            if (img.type === 'text') {
-              const fontSize = img.fontSize || 24;
-              width = (img.text || '').length * fontSize * 0.6;
-              height = fontSize * 1.2;
-            }
-
-            // Create bounding box for the item
-            const itemRect = {
-              x: imgX,
-              y: imgY,
-              width: width,
-              height: height,
-            };
-
-            // Check if component overlaps with selection box (even partially)
-            // Select if ANY part of the component is inside the selection box
-            const componentRight = itemRect.x + itemRect.width;
-            const componentBottom = itemRect.y + itemRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            // Check if rectangles overlap (any intersection)
-            const overlaps = !(
-              componentRight < marqueeRect.x ||
-              itemRect.x > marqueeRight ||
-              componentBottom < marqueeRect.y ||
-              itemRect.y > marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedIndices.push(index);
-            }
-          });
-
-          // Check image modals (600px wide, aspect ratio height, typically 400px+ min height)
-          imageModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight < marqueeRect.x ||
-              modalRect.x > marqueeRight ||
-              modalBottom < marqueeRect.y ||
-              modalRect.y > marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedImageModalIdsList.push(modal.id);
-            }
-          });
-
-          // Check video modals (600px wide, aspect ratio height, typically 400px+ min height)
-          videoModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 400;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight < marqueeRect.x ||
-              modalRect.x > marqueeRight ||
-              modalBottom < marqueeRect.y ||
-              modalRect.y > marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedVideoModalIdsList.push(modal.id);
-            }
-          });
-
-          // Check music modals (600px wide, 300px high)
-          musicModalStates.forEach((modal) => {
-            const modalX = modal.x;
-            const modalY = modal.y;
-            const modalWidth = modal.frameWidth ?? 600;
-            const modalHeight = modal.frameHeight ?? 300;
-            const modalRect = {
-              x: modalX,
-              y: modalY,
-              width: modalWidth,
-              height: modalHeight,
-            };
-            // Check if modal overlaps with selection box (even partially)
-            const modalRight = modalRect.x + modalRect.width;
-            const modalBottom = modalRect.y + modalRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              modalRight < marqueeRect.x ||
-              modalRect.x > marqueeRight ||
-              modalBottom < marqueeRect.y ||
-              modalRect.y > marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedMusicModalIdsList.push(modal.id);
-            }
-          });
-
-          // Check text input modals (400px+ wide, variable height, typically 200px+ with controls)
-          textInputStates.forEach((textState) => {
-            const textX = textState.x;
-            const textY = textState.y;
-            const textWidth = 400; // Minimum width
-            const textHeight = 200; // Approximate height with controls
-            const textRect = {
-              x: textX,
-              y: textY,
-              width: textWidth,
-              height: textHeight,
-            };
-            // Check if text input overlaps with selection box (even partially)
-            const textRight = textRect.x + textRect.width;
-            const textBottom = textRect.y + textRect.height;
-            const marqueeRight = marqueeRect.x + marqueeRect.width;
-            const marqueeBottom = marqueeRect.y + marqueeRect.height;
-
-            const overlaps = !(
-              textRight < marqueeRect.x ||
-              textRect.x > marqueeRight ||
-              textBottom < marqueeRect.y ||
-              textRect.y > marqueeBottom
-            );
-
-            if (overlaps) {
-              selectedTextInputIdsList.push(textState.id);
-=======
           // Calculate tight bounding box from selected elements
           // This will be used for the selection box visualization
           const allSelectedComponents: Array<{ x: number; y: number; width: number; height: number }> = [];
@@ -4517,7 +4340,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 width: dims.width,
                 height: dims.height,
               });
->>>>>>> 533e642d73cad8f937d75ebb9027b0c0c503bc2a
             }
           });
 
@@ -4639,114 +4461,6 @@ export const Canvas: React.FC<CanvasProps> = ({
               maxY = Math.max(maxY, comp.y + comp.height);
             });
 
-<<<<<<< HEAD
-            // Include image modals
-            // Image modals: 600px wide, height = max(400px, 600px / aspectRatio)
-            // The frame has minHeight: 400px, but actual height varies by aspect ratio
-            // For tight bounding box, we need to use the actual visible frame height
-            // Since we can't know the exact aspect ratio, use a conservative estimate
-            // Most common: 1:1 = 600px, 16:9 = 400px (clamped), 9:16 = 1066px
-            // To ensure tight fit and avoid extra space, use a value that works for common cases
-            // Using 400px ensures we don't overestimate for 16:9, but may underestimate for 1:1
-            selectedImageModalIdsList.forEach((id) => {
-              const modal = imageModalStates.find(m => m.id === id);
-              if (modal) {
-                const modalWidth = 600; // Fixed width
-                // Use minimum frame height to ensure tight bounding box
-                // This matches the CSS minHeight and works for most aspect ratios
-                // Use a slightly smaller estimate to ensure tight fit at bottom
-                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
-                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
-                minX = Math.min(minX, modal.x);
-                minY = Math.min(minY, modal.y);
-                maxX = Math.max(maxX, modal.x + modalWidth);
-                // Calculate bottom edge: modal.y + modalHeight
-                // This gives us the actual bottom border of this component
-                maxY = Math.max(maxY, modal.y + modalHeight);
-              }
-            });
-
-            // Include video modals
-            // Video modals: 600px wide, height = max(400px, 600px / aspectRatio)
-            // Default aspect ratio is 16:9, so height = max(400px, 600/(16/9)) = max(400px, 337.5px) = 400px
-            // Use the minimum frame height to ensure tight bounding box
-            selectedVideoModalIdsList.forEach((id) => {
-              const modal = videoModalStates.find(m => m.id === id);
-              if (modal) {
-                const modalWidth = 600; // Fixed width
-                // Use a slightly smaller estimate to ensure tight fit at bottom
-                // The frame minHeight is 400px, but we use 380px to account for any padding/margins
-                const modalHeight = 380; // Slightly less than minHeight to ensure tight fit
-                minX = Math.min(minX, modal.x);
-                minY = Math.min(minY, modal.y);
-                maxX = Math.max(maxX, modal.x + modalWidth);
-                // Calculate bottom edge: modal.y + modalHeight
-                // This gives us the actual bottom border of this component
-                maxY = Math.max(maxY, modal.y + modalHeight);
-              }
-            });
-
-            // Include music modals
-            // Music modals: 600px wide, 300px height (fixed) - this is the frame height
-            selectedMusicModalIdsList.forEach((id) => {
-              const modal = musicModalStates.find(m => m.id === id);
-              if (modal) {
-                const modalWidth = 600; // Fixed width
-                const modalHeight = 300; // Fixed frame height
-                minX = Math.min(minX, modal.x);
-                minY = Math.min(minY, modal.y);
-                maxX = Math.max(maxX, modal.x + modalWidth);
-                maxY = Math.max(maxY, modal.y + modalHeight);
-              }
-            });
-
-            // Include text input modals
-            // Text inputs: min 400px width, height is variable based on content
-            // Structure: drag handle (~4px) + padding top (~12px) + textarea (min 80px) + padding bottom (~12px) + buttons (~32px)
-            // Total: ~140px minimum, but can grow with content
-            // Use minimum height for tight bounding box
-            selectedTextInputIdsList.forEach((id) => {
-              const textState = textInputStates.find(t => t.id === id);
-              if (textState) {
-                const textWidth = 400; // Minimum width
-                // Use minimum height: handle (4px) + top padding (12px) + textarea min (80px) + bottom padding (12px) + buttons (32px) = 140px
-                // But to be more accurate, let's use a slightly smaller estimate to ensure tight fit
-                // Use a tighter estimate to ensure no extra space at bottom
-                // Actual height is ~140px minimum, but we use 110px to ensure tight fit
-                const textHeight = 110; // Tighter estimate to remove extra bottom space
-                minX = Math.min(minX, textState.x);
-                minY = Math.min(minY, textState.y);
-                maxX = Math.max(maxX, textState.x + textWidth);
-                maxY = Math.max(maxY, textState.y + textHeight);
-              }
-            });
-
-            // Helper to update bounds for generic modals
-            const updateBounds = (id: string, list: any[], width: number, height: number) => {
-              const m = list.find(item => item.id === id);
-              if (m) {
-                const mx = m.x ?? 0;
-                const my = m.y ?? 0;
-                const mw = m.frameWidth ?? width;
-                const mh = m.frameHeight ?? height;
-                minX = Math.min(minX, mx);
-                minY = Math.min(minY, my);
-                maxX = Math.max(maxX, mx + mw);
-                maxY = Math.max(maxY, my + mh);
-              }
-            };
-
-            selectedUpscaleModalIdsList.forEach(id => updateBounds(id, upscaleModalStates, 600, 400));
-            selectedRemoveBgModalIdsList.forEach(id => updateBounds(id, removeBgModalStates, 600, 400));
-            selectedEraseModalIdsList.forEach(id => updateBounds(id, eraseModalStates, 600, 400));
-            selectedExpandModalIdsList.forEach(id => updateBounds(id, expandModalStates, 600, 400));
-            selectedVectorizeModalIdsList.forEach(id => updateBounds(id, vectorizeModalStates, 600, 400));
-            selectedStoryboardModalIdsList.forEach(id => updateBounds(id, storyboardModalStates, 400, 500));
-            selectedScriptFrameModalIdsList.forEach(id => updateBounds(id, scriptFrameModalStates, 360, 260));
-            selectedSceneFrameModalIdsList.forEach(id => updateBounds(id, sceneFrameModalStates, 350, 300));
-
-=======
->>>>>>> 533e642d73cad8f937d75ebb9027b0c0c503bc2a
             if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
               setSelectionTightRect({
                 x: minX,
@@ -5186,7 +4900,25 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedImageModalIds.length > 0 ||
         selectedVideoModalIds.length > 0 ||
         selectedMusicModalIds.length > 0 ||
-        selectedTextInputIds.length > 0;
+        selectedTextInputIds.length > 0 ||
+        selectedUpscaleModalId !== null ||
+        selectedUpscaleModalIds.length > 0 ||
+        selectedExpandModalId !== null ||
+        selectedExpandModalIds.length > 0 ||
+        selectedEraseModalId !== null ||
+        selectedEraseModalIds.length > 0 ||
+        selectedRemoveBgModalId !== null ||
+        selectedRemoveBgModalIds.length > 0 ||
+        selectedVectorizeModalId !== null ||
+        selectedVectorizeModalIds.length > 0 ||
+        selectedStoryboardModalId !== null ||
+        selectedStoryboardModalIds.length > 0 ||
+        selectedVideoEditorModalId !== null ||
+        selectedVideoEditorModalIds.length > 0 ||
+        selectedScriptFrameModalId !== null ||
+        selectedScriptFrameModalIds.length > 0 ||
+        selectedSceneFrameModalId !== null ||
+        selectedSceneFrameModalIds.length > 0;
 
       if (hasSelections) {
         clearAllSelections(true);

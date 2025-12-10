@@ -11,7 +11,7 @@ import type { ExportSettings, ExportProgress } from '../types/export';
 // For video export, we use the correct backend port directly
 const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isDev
-    ? 'http://localhost:3000/api'  // Local dev backend
+    ? 'http://localhost:5001/api'  // Local dev backend
     : (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wildmindai.com') + '/api';
 
 interface ServerExportOptions {
@@ -97,7 +97,38 @@ class ServerExportService {
             await this.uploadAssets(jobId, assets, (uploadProgress) => {
                 onProgress({
                     phase: 'rendering',
-                    progress: 10 + uploadProgress * 0.2 // 10-30%
+                    progress: 10 + uploadProgress * 0.15 // 10-25%
+                });
+            });
+        }
+
+        // Step 3: Render and upload text frames
+        const { renderAllTextFrames, getTextItems } = await import('./TextFrameRenderer');
+        const textItems = getTextItems(tracks);
+
+        if (textItems.length > 0) {
+            onProgress({ phase: 'rendering', progress: 25 });
+            console.log(`[ServerExport] Rendering ${textItems.length} text items as frame sequences...`);
+
+            const textSequences = await renderAllTextFrames(
+                tracks,
+                dimension.width,
+                dimension.height,
+                settings.fps,
+                (phase, progress) => {
+                    onProgress({
+                        phase: 'rendering',
+                        progress: 25 + progress * 0.15 // 25-40%
+                    });
+                    console.log(`[ServerExport] ${phase}: ${Math.round(progress * 100)}%`);
+                }
+            );
+
+            // Upload text frame sequences
+            await this.uploadTextFrames(jobId, textSequences, (uploadProgress) => {
+                onProgress({
+                    phase: 'rendering',
+                    progress: 40 + uploadProgress * 0.1 // 40-50%
                 });
             });
         }
@@ -115,6 +146,42 @@ class ServerExportService {
             duration,
             dimension: { width: dimension.width, height: dimension.height }
         };
+
+        // Log audio sources in browser console
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('%c🎵 SERVER EXPORT - AUDIO INFO', 'font-weight: bold; font-size: 14px; color: #00aaff');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        for (const track of tracks) {
+            if (track.type === 'audio') {
+                for (const item of track.items) {
+                    console.log(`%c🎵 Audio Track: ${item.name}`, 'color: #00ff00');
+                    console.log(`   └─ Duration: ${item.duration.toFixed(2)}s, Start: ${item.start.toFixed(2)}s`);
+                }
+            }
+            if (track.type === 'video') {
+                for (const item of track.items) {
+                    if (item.type === 'video') {
+                        if (item.muteVideo) {
+                            console.log(`%c🔇 Video MUTED (no audio): ${item.name}`, 'color: #ff6600');
+                        } else {
+                            console.log(`%c🎬 Video with audio: ${item.name}`, 'color: #00ff00');
+                            console.log(`   └─ Duration: ${item.duration.toFixed(2)}s, Start: ${item.start.toFixed(2)}s`);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Count audio sources
+        const audioCount = tracks.filter(t => t.type === 'audio').flatMap(t => t.items).length;
+        const videoAudioCount = tracks.filter(t => t.type === 'video')
+            .flatMap(t => t.items)
+            .filter(i => i.type === 'video' && !i.muteVideo).length;
+
+        console.log(`%c📊 Total: ${audioCount} audio track(s) + ${videoAudioCount} video audio(s)`, 'color: #ffaa00');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
 
         const processResponse = await fetch(`${API_BASE}/video-export/process/${jobId}`, {
             method: 'POST',
@@ -242,6 +309,58 @@ class ServerExportService {
             method: 'POST',
             body: formData
         });
+    }
+
+    /**
+     * Upload text frame sequences to server
+     * Each sequence is uploaded as a series of PNG frames that the server will convert to video
+     */
+    private async uploadTextFrames(
+        jobId: string,
+        sequences: Array<{
+            textItemId: string;
+            frames: Blob[];
+            fps: number;
+            startTime: number;
+            duration: number;
+            width: number;
+            height: number;
+        }>,
+        onProgress: (progress: number) => void
+    ): Promise<void> {
+        const totalFrames = sequences.reduce((sum, seq) => sum + seq.frames.length, 0);
+        let uploadedFrames = 0;
+
+        for (const sequence of sequences) {
+            const formData = new FormData();
+
+            // Add metadata
+            formData.append('metadata', JSON.stringify({
+                textItemId: sequence.textItemId,
+                fps: sequence.fps,
+                startTime: sequence.startTime,
+                duration: sequence.duration,
+                width: sequence.width,
+                height: sequence.height,
+                frameCount: sequence.frames.length
+            }));
+
+            // Add all frames
+            for (let i = 0; i < sequence.frames.length; i++) {
+                const paddedIndex = String(i).padStart(5, '0');
+                formData.append('frames', sequence.frames[i], `frame_${paddedIndex}.png`);
+                uploadedFrames++;
+                onProgress(uploadedFrames / totalFrames);
+            }
+
+            // Upload this sequence
+            console.log(`[ServerExport] Uploading text sequence ${sequence.textItemId}: ${sequence.frames.length} frames`);
+
+            await fetch(`${API_BASE}/video-export/upload-text-frames/${jobId}`, {
+                method: 'POST',
+                body: formData
+            });
+        }
     }
 
     /**

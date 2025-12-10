@@ -5,7 +5,7 @@
 // Supports GPU acceleration when available
 // ============================================
 
-import type { Track, TimelineItem, CanvasDimension } from '../../types';
+import type { Track, TimelineItem, CanvasDimension, Transition } from '../../types';
 import type { ExportSettings, ExportProgress } from '../types/export';
 import { BITRATE_CONFIGS } from '../types/export';
 import { gpuCompositor } from '../compositor/GPUCompositor';
@@ -15,18 +15,101 @@ import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4ArrayBufferTarget } from 'mp
 import { ffmpegExportService } from './FFmpegExportService';
 
 export type ExportMode = 'auto' | 'ffmpeg' | 'webcodecs' | 'mediarecorder';
+export type AccelerationMode = 'dedicated' | 'integrated' | 'cpu';
+
+// Transition style properties for rendering
+interface TransitionStyle {
+    opacity?: number;
+    scale?: number;
+    scaleX?: number;
+    scaleY?: number;
+    rotate?: number;
+    translateX?: number;
+    translateY?: number;
+    blur?: number;
+    clipX?: number;
+    clipWidth?: number;
+    brightness?: number;
+}
+
+// Internal type for rendering items with transition info
+interface RenderItem {
+    item: TimelineItem;
+    track: Track;
+    role: 'main' | 'outgoing';
+    transition: Transition | null;
+    transitionProgress: number;
+}
 
 export class ExportEngine {
     private canvas: HTMLCanvasElement | null = null;
     private ctx: CanvasRenderingContext2D | null = null;
     private isExporting: boolean = false;
     private cancelled: boolean = false;
+    private accelerationMode: AccelerationMode = 'cpu';
+    private gpuInitialized: boolean = false;
 
     // Media caches to avoid reloading for each frame
     private videoCache: Map<string, HTMLVideoElement> = new Map();
     private imageCache: Map<string, HTMLImageElement> = new Map();
 
     constructor() { }
+
+    /**
+     * Determine acceleration mode based on GPU capabilities
+     * Fallback chain: Dedicated GPU → Integrated GPU → CPU
+     */
+    private determineAccelerationMode(useGPU: boolean): AccelerationMode {
+        if (!useGPU) return 'cpu';
+
+        const caps = hardwareAccel.getCapabilities();
+        if (!caps) return 'cpu';
+
+        // Dedicated GPU (NVIDIA, AMD) - Best performance
+        if (caps.vendor === 'nvidia' || caps.vendor === 'amd') {
+            if (caps.supportsWebGL2) return 'dedicated';
+        }
+
+        // Integrated GPU (Intel, Apple) - Good performance
+        if (caps.vendor === 'intel' || caps.vendor === 'apple') {
+            if (caps.supportsWebGL2) return 'integrated';
+        }
+
+        return 'cpu';
+    }
+
+    /**
+     * Log acceleration mode with detailed GPU info
+     */
+    private logAccelerationMode(mode: AccelerationMode): void {
+        const caps = hardwareAccel.getCapabilities();
+
+        console.log('\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('%c🎬 EXPORT ACCELERATION MODE', 'font-weight: bold; font-size: 14px; color: #00ff00');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        if (mode === 'dedicated') {
+            console.log('%c🎮 DEDICATED GPU RENDERING', 'color: #00ff00; font-weight: bold');
+            console.log(`%c├─ GPU: ${caps?.name || 'Unknown'}`, 'color: #00aaff');
+            console.log(`%c├─ VRAM: ${caps ? (caps.vram / (1024 * 1024 * 1024)).toFixed(1) : '?'} GB`, 'color: #ff00ff');
+            console.log('%c├─ Compositing: WebGL2 (GPU)', 'color: #00ff00');
+            console.log('%c├─ Encoding: Hardware (NVENC/AMF)', 'color: #00ff00');
+            console.log('%c└─ Speed: ~10-50x faster', 'color: #ffaa00; font-weight: bold');
+        } else if (mode === 'integrated') {
+            console.log('%c💻 INTEGRATED GPU RENDERING', 'color: #ffaa00; font-weight: bold');
+            console.log(`%c├─ GPU: ${caps?.name || 'Unknown'}`, 'color: #00aaff');
+            console.log('%c├─ Compositing: WebGL2 (GPU)', 'color: #00ff00');
+            console.log('%c├─ Encoding: Hardware (QSV)', 'color: #ffaa00');
+            console.log('%c└─ Speed: ~2-5x faster', 'color: #ffaa00; font-weight: bold');
+        } else {
+            console.log('%c🖥️ CPU RENDERING', 'color: #ff6600; font-weight: bold');
+            console.log('%c├─ Compositing: 2D Canvas (CPU)', 'color: #ff6600');
+            console.log('%c├─ Encoding: Software (libx264)', 'color: #ff6600');
+            console.log('%c└─ Speed: Baseline', 'color: #ff6600');
+        }
+
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n');
+    }
 
     /**
      * Check if WebCodecs VideoEncoder is available
@@ -156,6 +239,10 @@ export class ExportEngine {
                 }
             }
 
+            // Determine and log acceleration mode
+            this.accelerationMode = this.determineAccelerationMode(actuallyUsingGPU);
+            this.logAccelerationMode(this.accelerationMode);
+
             // Pre-load all video elements
             console.log('%c📦 Pre-loading all video assets...', 'color: #00aaff');
             await this.preloadAllVideos(tracks);
@@ -216,6 +303,7 @@ export class ExportEngine {
                 bitrate: bitrate * 5, // High bitrate for quality
                 framerate: settings.fps,
                 avc: { format: 'avc' }, // Use AVC format for MP4 compatibility
+                hardwareAcceleration: this.accelerationMode !== 'cpu' ? 'prefer-hardware' : 'prefer-software',
             });
 
             console.log(`%c⚙️ VideoEncoder configured: H.264 (${avcLevel}, Level ${levelName}), ${(bitrate * 5 / 1000).toFixed(0)}kbps, ${settings.fps}fps`, 'color: #00ff00');
@@ -240,6 +328,16 @@ export class ExportEngine {
                 const isKeyframe = frameIndex % 15 === 0;
                 encoder.encode(frame, { keyFrame: isKeyframe });
                 frame.close();
+
+                // Periodic memory management (every 60 frames = 2 seconds at 30fps)
+                if ((frameIndex + 1) % 60 === 0) {
+                    this.clearCaches();
+
+                    const memInfo = this.getMemoryInfo();
+                    if (memInfo.percentage) {
+                        console.log(`   📊 Memory: ${memInfo.used.toFixed(0)}MB / ${memInfo.limit?.toFixed(0)}MB (${memInfo.percentage.toFixed(1)}%)`);
+                    }
+                }
 
                 // Update progress
                 const progress = ((frameIndex + 1) / totalFrames) * 100;
@@ -354,6 +452,11 @@ export class ExportEngine {
                 const currentTime = frameIndex / settings.fps;
                 await this.renderFrame(tracks, currentTime, dimension, settings, false, frameIndex);
 
+                // Periodic memory management (every 60 frames)
+                if ((frameIndex + 1) % 60 === 0) {
+                    this.clearCaches();
+                }
+
                 const progress = ((frameIndex + 1) / totalFrames) * 100;
                 onProgress({
                     phase: 'rendering',
@@ -403,6 +506,7 @@ export class ExportEngine {
 
     /**
      * Render a single frame at the specified time
+     * Now handles transitions between clips
      */
     private async renderFrame(
         tracks: Track[],
@@ -425,33 +529,194 @@ export class ExportEngine {
             gpuCompositor.clear();
         }
 
-        // Get all active items at current time
-        const activeItems = this.getActiveItems(tracks, currentTime);
+        // Get all items to render (with transition info)
+        const renderItems = this.getRenderItems(tracks, currentTime);
 
         // Debug: Log active items
-        if (activeItems.length > 0 && currentFrame === 0) {
-            console.log(`%c📋 Found ${activeItems.length} items to render:`, 'color: #00aaff');
-            activeItems.forEach(({ item }) => {
-                console.log(`   - ${item.type}: ${item.name || item.src} (${item.start}s - ${item.start + item.duration}s)`);
+        if (renderItems.length > 0 && currentFrame === 0) {
+            console.log(`%c📋 Found ${renderItems.length} items to render:`, 'color: #00aaff');
+            renderItems.forEach(({ item, role, transition }) => {
+                const transitionInfo = transition ? ` [${role} in ${transition.type}]` : '';
+                console.log(`   - ${item.type}: ${item.name || item.src} (${item.start}s - ${item.start + item.duration}s)${transitionInfo}`);
             });
         }
 
         // Render each item (bottom to top)
-        for (const { item, track } of activeItems) {
+        for (const renderItem of renderItems) {
+            const { item, track, role, transition, transitionProgress } = renderItem;
             if (track.isHidden) continue;
 
             // Skip audio items (handled by audio tracks)
             if (item.type === 'audio') continue;
 
+            // Calculate transition style if applicable
+            let transitionStyle: TransitionStyle = {};
+            if (transition && transition.type !== 'none') {
+                transitionStyle = this.calculateTransitionStyle(transition.type, transition.direction || 'left', transitionProgress, role);
+                // Debug: Log transition detection
+                if (transitionProgress > 0.01 && transitionProgress < 0.99) {
+                    console.log(`%c🎬 TRANSITION [${transition.type}] role=${role} progress=${transitionProgress.toFixed(2)} opacity=${transitionStyle.opacity?.toFixed(2) ?? 'N/A'}`,
+                        'color: #ff6600; font-weight: bold');
+                }
+            }
+
             // Render based on type
             if (item.type === 'video' || item.type === 'image') {
-                await this.renderMediaItem(item, ctx, canvas, useGPU, currentTime);
+                await this.renderMediaItemWithStyle(item, ctx, canvas, useGPU, currentTime, transitionStyle);
             } else if (item.type === 'color') {
                 this.renderColorItem(item, ctx, canvas);
             } else if (item.type === 'text') {
-                this.renderTextItem(item, ctx, canvas);
+                this.renderTextItem(item, ctx, canvas, currentTime);
             }
         }
+    }
+
+    /**
+     * Get all items to render with transition information
+     * MATCHES Canvas.tsx renderItems logic exactly
+     */
+    private getRenderItems(tracks: Track[], currentTime: number): RenderItem[] {
+        const renderItems: RenderItem[] = [];
+
+        // Sort tracks by layer (background first)
+        const sortedTracks = [...tracks].sort((a, b) => {
+            if (a.id === 'main-video') return -1;
+            if (b.id === 'main-video') return 1;
+            return 0;
+        });
+
+        for (const track of sortedTracks) {
+            // Only video/overlay tracks have transitions
+            if (track.type !== 'video' && track.type !== 'overlay') {
+                // Non-video tracks: simple render of all active items
+                const activeItems = track.items.filter(i =>
+                    currentTime >= i.start && currentTime < i.start + i.duration
+                );
+                activeItems.forEach(item => {
+                    renderItems.push({ item, track, role: 'main', transition: null, transitionProgress: 0 });
+                });
+                continue;
+            }
+
+            // Sort items by start time
+            const sortedItems = [...track.items].sort((a, b) => a.start - b.start);
+
+            // Debug: Log items with transitions (only once per export at frame 0)
+            if (currentTime < 0.05) {
+                const itemsWithTransitions = sortedItems.filter(i => i.transition && i.transition.type !== 'none');
+                if (itemsWithTransitions.length > 0) {
+                    console.log(`%c📍 Track "${track.id}" has ${itemsWithTransitions.length} items with transitions:`, 'color: #ff00ff; font-weight: bold');
+                    itemsWithTransitions.forEach(i => {
+                        console.log(`   - "${i.name || i.src}" at ${i.start}s: ${i.transition?.type} (timing: ${i.transition?.timing || 'postfix'})`);
+                    });
+                }
+            }
+
+            // Find main item (the one playing at currentTime)
+            const mainItemIndex = sortedItems.findIndex(i =>
+                currentTime >= i.start && currentTime < i.start + i.duration
+            );
+            const mainItem = mainItemIndex !== -1 ? sortedItems[mainItemIndex] : null;
+
+            // Find next item
+            let nextItemIndex = -1;
+            if (mainItem) {
+                nextItemIndex = mainItemIndex + 1;
+            } else {
+                nextItemIndex = sortedItems.findIndex(i => i.start > currentTime);
+            }
+            const nextItem = (nextItemIndex !== -1 && nextItemIndex < sortedItems.length)
+                ? sortedItems[nextItemIndex] : null;
+
+            let isTransitioning = false;
+            let transition: Transition | null = null;
+            let progress = 0;
+            let outgoingItem: TimelineItem | null = null;
+            let incomingItem: TimelineItem | null = null;
+
+            // CHECK 1: Incoming Transition on Main Item (Postfix / Overlap-Right)
+            if (mainItem && mainItem.transition && mainItem.transition.type !== 'none') {
+                const t = mainItem.transition;
+                const timing = t.timing || 'postfix';
+                const timeIntoClip = currentTime - mainItem.start;
+
+                let transStart = 0;
+                if (timing === 'postfix') transStart = 0;
+                else if (timing === 'overlap') transStart = -t.duration / 2;
+                else if (timing === 'prefix') transStart = -t.duration;
+
+                // Check if we are in the transition window
+                if (timeIntoClip >= transStart && timeIntoClip <= transStart + t.duration) {
+                    isTransitioning = true;
+                    transition = t;
+                    progress = (timeIntoClip - transStart) / t.duration;
+                    incomingItem = mainItem;
+                    if (mainItemIndex > 0) outgoingItem = sortedItems[mainItemIndex - 1];
+                }
+            }
+
+            // CHECK 2: Outgoing Transition on Next Item (Prefix / Overlap-Left)
+            if (!isTransitioning && nextItem && nextItem.transition && nextItem.transition.type !== 'none') {
+                const t = nextItem.transition;
+                const timing = t.timing || 'postfix';
+                const timeUntilNext = nextItem.start - currentTime;
+
+                // Only relevant if timing puts transition BEFORE the clip starts
+                if (timing === 'prefix' || timing === 'overlap') {
+                    let transDurationBeforeStart = 0;
+                    if (timing === 'prefix') transDurationBeforeStart = t.duration;
+                    if (timing === 'overlap') transDurationBeforeStart = t.duration / 2;
+
+                    if (timeUntilNext <= transDurationBeforeStart) {
+                        isTransitioning = true;
+                        transition = t;
+                        progress = (transDurationBeforeStart - timeUntilNext) / t.duration;
+                        incomingItem = nextItem;
+                        if (nextItemIndex > 0) outgoingItem = sortedItems[nextItemIndex - 1];
+                    }
+                }
+            }
+
+            // RENDER
+            if (isTransitioning && transition && incomingItem) {
+                // Render Outgoing (if exists)
+                if (outgoingItem) {
+                    renderItems.push({
+                        item: outgoingItem,
+                        track,
+                        role: 'outgoing',
+                        transition,
+                        transitionProgress: progress
+                    });
+                }
+                // Render Incoming (Main)
+                renderItems.push({
+                    item: incomingItem,
+                    track,
+                    role: 'main',
+                    transition,
+                    transitionProgress: progress
+                });
+            } else if (mainItem) {
+                // No transition, just render main item
+                renderItems.push({
+                    item: mainItem,
+                    track,
+                    role: 'main',
+                    transition: null,
+                    transitionProgress: 0
+                });
+            }
+        }
+
+        // Sort by z-index: outgoing first, then main
+        renderItems.sort((a, b) => {
+            if (a.role === 'outgoing' && b.role === 'main') return -1;
+            if (a.role === 'main' && b.role === 'outgoing') return 1;
+            return 0;
+        });
+
+        return renderItems;
     }
 
     /**
@@ -478,6 +743,12 @@ export class ExportEngine {
             }
         }
 
+        // Debug: Log text items
+        const textItems = activeItems.filter(({ item }) => item.type === 'text');
+        if (textItems.length > 0) {
+            console.log(`[ExportEngine] getActiveItems: Found ${textItems.length} text item(s) at t=${currentTime.toFixed(2)}s`);
+        }
+
         return activeItems;
     }
 
@@ -498,6 +769,7 @@ export class ExportEngine {
             return;
         }
 
+
         // Calculate position and size (pass media element for aspect ratio calculation)
         const { x, y, width, height } = this.calculateItemBounds(item, canvas, mediaEl);
 
@@ -510,6 +782,45 @@ export class ExportEngine {
         if (item.flipH || item.flipV) ctx.scale(item.flipH ? -1 : 1, item.flipV ? -1 : 1);
         ctx.globalAlpha = (item.opacity ?? 100) / 100;
 
+        // Apply CSS filters (brightness, contrast, saturation, blur)
+        const filters: string[] = [];
+
+        if (item.adjustments) {
+            // Brightness (-100 to +100) -> (0 to 2)
+            if (item.adjustments.brightness !== undefined && item.adjustments.brightness !== 0) {
+                const value = 1 + (item.adjustments.brightness / 100);
+                filters.push(`brightness(${value})`);
+            }
+
+            // Contrast (-100 to +100) -> (0 to 2)
+            if (item.adjustments.contrast !== undefined && item.adjustments.contrast !== 0) {
+                const value = 1 + (item.adjustments.contrast / 100);
+                filters.push(`contrast(${value})`);
+            }
+
+            // Saturation (-100 to +100) -> (0 to 2)
+            if (item.adjustments.saturation !== undefined && item.adjustments.saturation !== 0) {
+                const value = 1 + (item.adjustments.saturation / 100);
+                filters.push(`saturate(${value})`);
+            }
+
+            // Blur
+            if (item.adjustments.sharpness !== undefined && item.adjustments.sharpness < 0) {
+                const blurAmount = Math.abs(item.adjustments.sharpness) / 20;
+                filters.push(`blur(${blurAmount}px)`);
+            }
+        }
+
+        // Apply preset filter if set
+        if (item.filter && item.filter !== 'none') {
+            const filterStyle = this.getFilterStyle(item.filter);
+            if (filterStyle) filters.push(filterStyle);
+        }
+
+        if (filters.length > 0) {
+            ctx.filter = filters.join(' ');
+        }
+
         // Draw media
         try {
             ctx.drawImage(mediaEl, -width / 2, -height / 2, width, height);
@@ -518,6 +829,473 @@ export class ExportEngine {
         }
 
         ctx.restore();
+    }
+
+    /**
+     * Render a media item with transition style applied
+     * Combines item properties (filters, transforms) with transition effects
+     */
+    private async renderMediaItemWithStyle(
+        item: TimelineItem,
+        ctx: CanvasRenderingContext2D,
+        canvas: HTMLCanvasElement,
+        useGPU: boolean,
+        currentTime: number,
+        transitionStyle: TransitionStyle
+    ): Promise<void> {
+        // Load media element at the correct time position
+        const mediaEl = await this.loadMediaElement(item, currentTime);
+        if (!mediaEl) {
+            console.warn(`[ExportEngine] Failed to load media: ${item.name || item.src}`);
+            return;
+        }
+
+        // Calculate position and size
+        const { x, y, width, height } = this.calculateItemBounds(item, canvas, mediaEl);
+
+        // Apply animation style for images/videos (Phase 2)
+        const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        ctx.save();
+
+        // Apply transition opacity
+        const baseOpacity = (item.opacity ?? 100) / 100;
+        const transitionOpacity = transitionStyle.opacity ?? 1;
+        const animOpacity = animStyle.opacity ?? 1;
+        ctx.globalAlpha = baseOpacity * transitionOpacity * animOpacity;
+
+        // Calculate combined transforms
+        let scaleX = 1, scaleY = 1;
+        let translateX = 0, translateY = 0;
+        let rotation = item.rotation || 0;
+
+        // Apply item flips
+        if (item.flipH) scaleX *= - 1;
+        if (item.flipV) scaleY *= -1;
+
+        // Apply transition transforms
+        if (transitionStyle.scale !== undefined) {
+            scaleX *= transitionStyle.scale;
+            scaleY *= transitionStyle.scale;
+        }
+        if (transitionStyle.scaleX !== undefined) scaleX *= transitionStyle.scaleX;
+        if (transitionStyle.scaleY !== undefined) scaleY *= transitionStyle.scaleY;
+        if (transitionStyle.translateX !== undefined) {
+            translateX += (transitionStyle.translateX / 100) * canvas.width;
+        }
+        if (transitionStyle.translateY !== undefined) {
+            translateY += (transitionStyle.translateY / 100) * canvas.height;
+        }
+        if (transitionStyle.rotate !== undefined) {
+            rotation += transitionStyle.rotate;
+        }
+
+        // Apply animation transforms
+        if (animStyle.scale !== undefined) {
+            scaleX *= animStyle.scale;
+            scaleY *= animStyle.scale;
+        }
+        if (animStyle.scaleX !== undefined) scaleX *= animStyle.scaleX;
+        if (animStyle.scaleY !== undefined) scaleY *= animStyle.scaleY;
+        if (animStyle.translateX !== undefined) translateX += animStyle.translateX;
+        if (animStyle.translateY !== undefined) translateY += animStyle.translateY;
+        if (animStyle.rotate !== undefined) rotation += animStyle.rotate;
+
+        // Apply combined transforms
+        ctx.translate(x + width / 2 + translateX, y + height / 2 + translateY);
+        if (rotation) ctx.rotate((rotation * Math.PI) / 180);
+        if (scaleX !== 1 || scaleY !== 1) ctx.scale(scaleX, scaleY);
+
+        // Build filter string
+        const filters: string[] = [];
+
+        // Item adjustments
+        if (item.adjustments) {
+            if (item.adjustments.brightness !== undefined && item.adjustments.brightness !== 0) {
+                filters.push(`brightness(${1 + item.adjustments.brightness / 100})`);
+            }
+            if (item.adjustments.contrast !== undefined && item.adjustments.contrast !== 0) {
+                filters.push(`contrast(${1 + item.adjustments.contrast / 100})`);
+            }
+            if (item.adjustments.saturation !== undefined && item.adjustments.saturation !== 0) {
+                filters.push(`saturate(${1 + item.adjustments.saturation / 100})`);
+            }
+            if (item.adjustments.sharpness !== undefined && item.adjustments.sharpness < 0) {
+                filters.push(`blur(${Math.abs(item.adjustments.sharpness) / 20}px)`);
+            }
+        }
+
+        // Preset filter
+        if (item.filter && item.filter !== 'none') {
+            const filterStyle = this.getFilterStyle(item.filter);
+            if (filterStyle) filters.push(filterStyle);
+        }
+
+        // Transition blur
+        if (transitionStyle.blur) {
+            filters.push(`blur(${transitionStyle.blur}px)`);
+        }
+
+        // Animation blur
+        if (animStyle.blur) {
+            filters.push(`blur(${animStyle.blur}px)`);
+        }
+
+        // Transition brightness
+        if (transitionStyle.brightness !== undefined) {
+            filters.push(`brightness(${transitionStyle.brightness})`);
+        }
+
+        if (filters.length > 0) {
+            ctx.filter = filters.join(' ');
+        }
+
+        // Handle clip path for wipe transitions
+        if (transitionStyle.clipX !== undefined || transitionStyle.clipWidth !== undefined) {
+            const clipX = (transitionStyle.clipX ?? 0) * width;
+            const clipW = (transitionStyle.clipWidth ?? 1) * width;
+            ctx.beginPath();
+            ctx.rect(-width / 2 + clipX, -height / 2, clipW, height);
+            ctx.clip();
+        }
+
+        // Draw media with crop support
+        try {
+            const crop = item.crop || { x: 50, y: 50, zoom: 1 };
+
+            // Apply crop zoom by scaling the source region
+            const cropZoom = crop.zoom || 1;
+
+            // Get source dimensions from media element
+            let sourceWidth: number, sourceHeight: number;
+            if (mediaEl instanceof HTMLVideoElement) {
+                sourceWidth = mediaEl.videoWidth;
+                sourceHeight = mediaEl.videoHeight;
+            } else {
+                sourceWidth = mediaEl.naturalWidth;
+                sourceHeight = mediaEl.naturalHeight;
+            }
+
+            // Calculate the visible region based on crop pan (x, y are percentages)
+            // When zoom > 1, we only show a portion of the image
+            const visibleWidth = sourceWidth / cropZoom;
+            const visibleHeight = sourceHeight / cropZoom;
+
+            // Calculate source offset based on crop pan position (0-100%)
+            // At x=50, y=50, we center the visible region
+            const maxOffsetX = sourceWidth - visibleWidth;
+            const maxOffsetY = sourceHeight - visibleHeight;
+            const srcX = (crop.x / 100) * maxOffsetX;
+            const srcY = (crop.y / 100) * maxOffsetY;
+
+            // Draw with 9-argument form: (img, sx, sy, sw, sh, dx, dy, dw, dh)
+            ctx.drawImage(
+                mediaEl,
+                srcX, srcY, visibleWidth, visibleHeight,  // Source region (cropped)
+                -width / 2, -height / 2, width, height    // Destination
+            );
+
+            // Draw border if defined (after image)
+            if (item.border && item.border.width > 0 && !item.isBackground) {
+                ctx.strokeStyle = item.border.color || '#000000';
+                ctx.lineWidth = item.border.width;
+                // Draw border around the item
+                ctx.strokeRect(-width / 2, -height / 2, width, height);
+            }
+        } catch (error) {
+            console.warn(`[ExportEngine] Failed to draw media: ${item.name || item.src}`, error);
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Calculate transition style based on type, direction, and progress
+     * Matches Canvas.tsx getTransitionStyle exactly
+     */
+    private calculateTransitionStyle(
+        type: string,
+        direction: string,
+        progress: number,
+        role: 'main' | 'outgoing'
+    ): TransitionStyle {
+        const p = progress;
+        const outP = 1 - p;
+
+        // Direction multipliers
+        let xMult = 1, yMult = 0;
+        if (direction === 'right') { xMult = -1; yMult = 0; }
+        else if (direction === 'up') { xMult = 0; yMult = 1; }
+        else if (direction === 'down') { xMult = 0; yMult = -1; }
+
+        // Easing functions
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+        switch (type) {
+            // === DISSOLVES ===
+            case 'dissolve': {
+                const dissolveEase = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+                return role === 'main'
+                    ? { opacity: dissolveEase, brightness: 0.98 + dissolveEase * 0.02 }
+                    : { opacity: 1 - dissolveEase, brightness: 1 - (1 - dissolveEase) * 0.02 };
+            }
+            case 'film-dissolve': {
+                const filmP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+                return role === 'main'
+                    ? { opacity: filmP }
+                    : { opacity: 1 - filmP };
+            }
+            case 'additive-dissolve':
+                return role === 'main' ? { opacity: p } : { opacity: outP };
+            case 'dip-to-black':
+                if (role === 'outgoing') {
+                    return p < 0.5
+                        ? { opacity: 1 - p * 2, brightness: 1 - p * 1.2 }
+                        : { opacity: 0.05 };
+                }
+                return p > 0.5
+                    ? { opacity: (p - 0.5) * 2, brightness: 0.4 + (p - 0.5) * 1.2 }
+                    : { opacity: 0.05 };
+            case 'dip-to-white':
+                if (role === 'outgoing') {
+                    return p < 0.5
+                        ? { opacity: 1 - p * 2, brightness: 1 + p * 3 }
+                        : { opacity: 0.05 };
+                }
+                return p > 0.5
+                    ? { opacity: (p - 0.5) * 2, brightness: 2.5 - (p - 0.5) * 3 }
+                    : { opacity: 0.05 };
+            case 'fade-dissolve':
+                if (role === 'outgoing') return { opacity: p < 0.5 ? 1 - p * 2 : 0.05 };
+                return { opacity: p > 0.5 ? (p - 0.5) * 2 : 0.05 };
+
+            // === SLIDES & PUSHES ===
+            case 'slide':
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP }
+                    : {};
+            case 'push':
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP }
+                    : { translateX: xMult * -100 * p, translateY: yMult * -100 * p };
+            case 'whip':
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, blur: Math.sin(p * Math.PI) * 5 }
+                    : { translateX: xMult * -100 * p, translateY: yMult * -100 * p, blur: Math.sin(p * Math.PI) * 5 };
+
+            // === IRIS SHAPES ===
+            case 'iris-box': {
+                const easeBox = easeOutCubic(p);
+                return role === 'main'
+                    ? { scale: easeBox, opacity: easeBox, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
+            }
+            case 'iris-round':
+            case 'circle': {
+                const easeCircle = easeOutCubic(p);
+                return role === 'main'
+                    ? { scale: easeCircle, opacity: easeCircle, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
+            }
+
+            // === WIPES ===
+            case 'wipe': {
+                const easeWipe = easeOutCubic(p);
+                return role === 'main'
+                    ? { clipX: direction === 'right' ? 0 : direction === 'left' ? 1 - easeWipe : 0, clipWidth: direction === 'left' || direction === 'right' ? easeWipe : 1, brightness: 0.8 + 0.2 * p }
+                    : { brightness: 1 - p * 0.2 };
+            }
+            case 'barn-doors': {
+                const easeBarn = easeOutCubic(p);
+                return role === 'main'
+                    ? { scale: 0.5 + 0.5 * easeBarn, opacity: easeBarn }
+                    : { opacity: outP };
+            }
+
+            // === ZOOMS ===
+            case 'cross-zoom': {
+                const blurAmount = Math.sin(p * Math.PI) * 10;
+                if (role === 'outgoing') {
+                    return { scale: 1 + p * 3, blur: blurAmount, brightness: 1 + p * 0.5, opacity: outP };
+                }
+                return { scale: 3 - p * 2, blur: blurAmount, brightness: 1.5 - p * 0.5, opacity: p };
+            }
+            case 'zoom-in':
+                return role === 'main'
+                    ? { scale: 0.5 + 0.5 * p, opacity: p }
+                    : { opacity: outP };
+            case 'zoom-out':
+                return role === 'outgoing'
+                    ? { scale: 1 + p * 0.5, opacity: outP }
+                    : { opacity: p };
+
+            // === SPINS ===
+            case 'spin':
+                return role === 'outgoing'
+                    ? { rotate: p * 360, scale: outP, opacity: outP }
+                    : { rotate: (1 - p) * -360, scale: p, opacity: p };
+
+            // === FLASH ===
+            case 'flash':
+                return role === 'outgoing'
+                    ? { opacity: p < 0.5 ? 1 : 0 }
+                    : { opacity: p >= 0.5 ? 1 : 0 };
+
+            // === BLUR ===
+            case 'blur':
+            case 'zoom-blur':
+                return role === 'outgoing'
+                    ? { blur: p * 20, opacity: outP }
+                    : { blur: outP * 20, opacity: p };
+
+            // === GLITCH ===
+            case 'glitch': {
+                const glitchOffset = Math.sin(p * 50) * 5 * (1 - p);
+                return role === 'main'
+                    ? { translateX: glitchOffset, opacity: p }
+                    : { translateX: -glitchOffset, opacity: outP };
+            }
+
+            // === STACK ===
+            case 'stack':
+                if (role === 'main') {
+                    return {
+                        translateX: xMult * 100 * outP,
+                        translateY: yMult * 100 * outP,
+                        scale: 0.8 + 0.2 * p,
+                        blur: outP * 3,
+                        opacity: 0.3 + 0.7 * p
+                    };
+                }
+                return { scale: 1 - p * 0.2, brightness: 1 - p * 0.4, blur: p * 2, opacity: 1 - p * 0.3 };
+
+            // === MORPH ===
+            case 'morph-cut':
+                return role === 'main'
+                    ? { opacity: p, scale: 0.95 + 0.05 * p }
+                    : { opacity: outP, scale: 1 + 0.05 * outP };
+
+            // === PAGE ===
+            case 'page-peel':
+                return role === 'main'
+                    ? { rotate: (1 - p) * -5, opacity: p }
+                    : { brightness: 1 - p * 0.2 };
+
+            // === FILM & LIGHT EFFECTS ===
+            case 'film-burn': {
+                const burnIntensity = Math.sin(p * Math.PI);
+                return {
+                    brightness: 1 + burnIntensity * 3,
+                    scale: 1 + burnIntensity * 0.1,
+                    opacity: role === 'main' ? p : outP
+                };
+            }
+            case 'light-leak':
+                return role === 'main'
+                    ? { brightness: 1 + (1 - p), opacity: p }
+                    : { brightness: 1 + p, opacity: outP };
+            case 'luma-dissolve': {
+                const lumaP = 1 - Math.pow(1 - p, 2);
+                return role === 'main'
+                    ? { brightness: 0.7 + lumaP * 0.3, opacity: lumaP }
+                    : { brightness: 1 - lumaP * 0.3, opacity: 1 - lumaP };
+            }
+
+            // === DIGITAL EFFECTS ===
+            case 'rgb-split':
+                return {
+                    scale: 1 + Math.sin(p * Math.PI) * 0.1,
+                    opacity: role === 'main' ? p : outP
+                };
+            case 'pixelate':
+                return role === 'main' ? { opacity: p } : { opacity: outP };
+            case 'datamosh': {
+                return {
+                    scale: 1 + Math.sin(p * 8) * 0.08,
+                    opacity: role === 'main' ? p : outP
+                };
+            }
+            case 'chromatic-aberration':
+                return { opacity: role === 'main' ? p : outP };
+
+            // === DISTORTION ===
+            case 'ripple':
+                return role === 'main'
+                    ? { scale: 1 + Math.sin(p * 10) * 0.05, opacity: p }
+                    : { opacity: outP };
+            case 'ripple-dissolve':
+                return {
+                    scale: 1 + Math.sin(p * Math.PI * 4) * 0.05,
+                    blur: Math.sin(p * Math.PI) * 2,
+                    opacity: role === 'main' ? p : outP
+                };
+            case 'stretch':
+                return role === 'main'
+                    ? { scaleX: 0.1 + 0.9 * p, opacity: p }
+                    : { scaleX: 1 + p, opacity: outP };
+            case 'liquid':
+                return { opacity: role === 'main' ? p : outP };
+
+            // === MOVEMENT ===
+            case 'flow':
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, scale: 0.9 + 0.1 * p, opacity: p }
+                    : { translateX: xMult * -50 * p, translateY: yMult * -50 * p, scale: 1 - 0.1 * p, opacity: outP };
+            case 'smooth-wipe':
+                return role === 'main'
+                    ? { translateX: 50 * outP, opacity: p }
+                    : { translateX: -50 * p, opacity: outP };
+            case 'tile-drop':
+                return role === 'main'
+                    ? { translateY: -100 * outP, opacity: p }
+                    : { translateY: 100 * p, opacity: outP };
+            case 'whip-pan':
+                return role === 'main'
+                    ? { translateX: 100 * outP }
+                    : { translateX: -100 * p };
+            case 'film-roll':
+                return role === 'main'
+                    ? { translateY: 100 * outP }
+                    : { translateY: -100 * p };
+
+            // === ADVANCED DISSOLVES ===
+            case 'non-additive-dissolve':
+                return { opacity: role === 'main' ? Math.pow(p, 2) : Math.pow(outP, 2) };
+            case 'flash-zoom-in':
+                return role === 'main'
+                    ? { scale: 2 - p, brightness: 1 + (1 - p) * 5, opacity: p }
+                    : { scale: 1 + p, brightness: 1 + p * 5, opacity: outP };
+            case 'flash-zoom-out':
+                return role === 'main'
+                    ? { scale: 0.5 + p * 0.5, brightness: 1 + (1 - p) * 5, opacity: p }
+                    : { scale: 1 - p * 0.5, brightness: 1 + p * 5, opacity: outP };
+
+            // DEFAULT
+            default:
+                return { opacity: role === 'main' ? p : outP };
+        }
+    }
+
+
+    /**
+     * Get CSS filter string for preset filter
+     */
+    private getFilterStyle(filterName: string): string {
+        switch (filterName) {
+            case 'vintage':
+                return 'sepia(0.5) contrast(1.2) saturate(0.8)';
+            case 'cinematic':
+                return 'contrast(1.3) saturate(0.9) brightness(0.95)';
+            case 'warm':
+                return 'sepia(0.3) saturate(1.3)';
+            case 'cold':
+                return 'hue-rotate(180deg) saturate(1.2)';
+            case 'bw':
+            case 'black-white':
+                return 'grayscale(1)';
+            default:
+                return '';
+        }
     }
 
     /**
@@ -534,22 +1312,676 @@ export class ExportEngine {
     }
 
     /**
-     * Render a text item
+     * Render a text item with ALL features to match preview exactly
+     * Supports: text effects, animations, textDecoration, textTransform, listType, multiline
      */
-    private renderTextItem(item: TimelineItem, ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
-        const { x, y, width } = this.calculateItemBounds(item, canvas);
-
+    private renderTextItem(item: TimelineItem, ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, currentTime: number): void {
+        const { x, y, width, height } = this.calculateItemBounds(item, canvas);
         ctx.save();
-        ctx.font = `${item.fontWeight || 'normal'} ${item.fontSize || 40}px ${item.fontFamily || 'Inter'}`;
+
+        const fontSize = item.fontSize || 40;
+        const fontStyle = item.fontStyle || 'normal';
+        const fontWeight = item.fontWeight || 'normal';
+        const lineHeight = fontSize * 1.4; // Match CSS lineHeight: 1.4
+        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${item.fontFamily || 'Inter'}`;
         ctx.fillStyle = item.color || '#000000';
         ctx.textAlign = (item.textAlign as CanvasTextAlign) || 'center';
-        ctx.globalAlpha = (item.opacity ?? 100) / 100;
+        ctx.textBaseline = 'top';
 
-        const textX = x + width / 2;
-        const textY = y + (item.fontSize || 40);
+        // Get text and apply textTransform
+        let text = item.name || item.src || '';
+        if (item.textTransform === 'uppercase') {
+            text = text.toUpperCase();
+        } else if (item.textTransform === 'lowercase') {
+            text = text.toLowerCase();
+        }
 
-        ctx.fillText(item.src, textX, textY);
+        // === APPLY ANIMATIONS ===
+        const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        // Debug: Log text rendering with animation
+        console.log(`[ExportEngine] Rendering text "${text.substring(0, 20)}..." at t=${currentTime.toFixed(2)}s`, {
+            animation: item.animation?.type || 'none',
+            animStyle,
+            position: { x, y, width, height }
+        });
+
+        // Calculate text position - MATCH Canvas.tsx getItemPositionAndTransform
+        // Canvas.tsx uses: left = 50 + item.x %, transform = translate(-50%, -50%)
+        // This means: position at center + offset, then shift back by half width/height
+
+        let textX: number;
+        let textY: number;
+
+        // Apply text alignment adjustments (matching Canvas.tsx lines 1058-1063)
+        const textAlign = item.textAlign || 'center';
+        const verticalAlign = item.verticalAlign || 'middle';
+
+        if (textAlign === 'left') {
+            textX = x;
+            ctx.textAlign = 'left';
+        } else if (textAlign === 'right') {
+            textX = x + width;
+            ctx.textAlign = 'right';
+        } else {
+            textX = x + width / 2;
+            ctx.textAlign = 'center';
+        }
+
+        if (verticalAlign === 'top') {
+            textY = y;
+        } else if (verticalAlign === 'bottom') {
+            textY = y + height - fontSize;
+        } else {
+            // Middle: center vertically
+            textY = y + height / 2 - fontSize / 2;
+        }
+
+        // Apply transformations from animation - translate to text position first
+        ctx.translate(textX, textY);
+
+        // Apply item rotation (from editor)
+        if (item.rotation) {
+            ctx.rotate((item.rotation * Math.PI) / 180);
+        }
+
+        // Combine uniform scale with independent x/y scale
+        const sX = (animStyle.scale ?? 1) * (animStyle.scaleX ?? 1);
+        const sY = (animStyle.scale ?? 1) * (animStyle.scaleY ?? 1);
+
+        if (sX !== 1 || sY !== 1) {
+            ctx.scale(sX, sY);
+        }
+
+        if (animStyle.rotate) {
+            ctx.rotate((animStyle.rotate * Math.PI) / 180);
+        }
+        if (animStyle.translateX || animStyle.translateY) {
+            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        }
+
+        // Apply blur filter if needed
+        if (animStyle.blur) {
+            ctx.filter = `blur(${animStyle.blur}px)`;
+        }
+
+        // Apply opacity from both animation and item
+        const baseOpacity = (item.opacity ?? 100) / 100;
+        const animOpacity = animStyle.opacity ?? 1;
+        ctx.globalAlpha = baseOpacity * animOpacity;
+
+        // Get effect properties
+        const effect = item.textEffect;
+        const effectType = effect?.type || 'none';
+        const effColor = effect?.color || '#000000';
+        const intensity = effect?.intensity ?? 50;
+        const offset = effect?.offset ?? 50;
+        const dist = (offset / 100) * 20;
+        const blur = (intensity / 100) * 20;
+
+        // === RENDER TEXT (with multiline and list support) ===
+        const lines = text.split('\n');
+        let currentY = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            let lineText = lines[i];
+
+            // Apply list formatting
+            if (item.listType === 'bullet') {
+                lineText = '• ' + lineText;
+            } else if (item.listType === 'number') {
+                lineText = `${i + 1}. ` + lineText;
+            }
+
+            // Draw based on effect type
+            switch (effectType) {
+                case 'shadow':
+                    ctx.shadowColor = effColor;
+                    ctx.shadowBlur = blur;
+                    ctx.shadowOffsetX = dist;
+                    ctx.shadowOffsetY = dist;
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'lift':
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = blur + 10;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = dist * 0.5 + 4;
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'outline':
+                    ctx.strokeStyle = effColor;
+                    ctx.lineWidth = (intensity / 100) * 3 + 1;
+                    ctx.strokeText(lineText, 0, currentY);
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'hollow':
+                    ctx.strokeStyle = item.color || '#000000';
+                    ctx.lineWidth = (intensity / 100) * 3 + 1;
+                    ctx.strokeText(lineText, 0, currentY);
+                    // Don't fill - hollow effect shows only stroke
+                    break;
+
+                case 'neon':
+                    ctx.shadowColor = effColor;
+                    ctx.shadowBlur = intensity * 0.4;
+                    ctx.fillText(lineText, 0, currentY);
+                    ctx.shadowBlur = intensity * 0.2;
+                    ctx.fillText(lineText, 0, currentY);
+                    ctx.shadowBlur = intensity * 0.1;
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'glitch':
+                    const gOff = (offset / 100) * 5 + 2;
+                    // Cyan layer
+                    ctx.fillStyle = '#00ffff';
+                    ctx.fillText(lineText, -gOff, currentY - gOff);
+                    // Magenta layer
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillText(lineText, gOff, currentY + gOff);
+                    // Original
+                    ctx.fillStyle = item.color || '#000000';
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'echo':
+                    const echoAlpha = ctx.globalAlpha;
+                    ctx.globalAlpha = echoAlpha * 0.2;
+                    ctx.fillText(lineText, dist * 3, currentY + dist * 3);
+                    ctx.globalAlpha = echoAlpha * 0.4;
+                    ctx.fillText(lineText, dist * 2, currentY + dist * 2);
+                    ctx.globalAlpha = echoAlpha * 0.8;
+                    ctx.fillText(lineText, dist, currentY + dist);
+                    ctx.globalAlpha = echoAlpha;
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'splice':
+                    ctx.strokeStyle = item.color || '#000000';
+                    ctx.lineWidth = (intensity / 100) * 3 + 1;
+                    ctx.strokeText(lineText, 0, currentY);
+                    ctx.fillStyle = effColor;
+                    ctx.fillText(lineText, dist + 2, currentY + dist + 2);
+                    ctx.fillStyle = item.color || '#000000';
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                case 'background':
+                    const textMetrics = ctx.measureText(lineText);
+                    const textWidth = textMetrics.width;
+                    const textHeight = fontSize * 1.2;
+                    const padX = 8;
+                    const padY = 4;
+                    // Calculate background position based on alignment
+                    let bgX = -padX;
+                    if (ctx.textAlign === 'center') {
+                        bgX = -textWidth / 2 - padX;
+                    } else if (ctx.textAlign === 'right') {
+                        bgX = -textWidth - padX;
+                    }
+                    // Draw background
+                    ctx.fillStyle = effColor;
+                    ctx.fillRect(bgX, currentY - padY, textWidth + padX * 2, textHeight + padY * 2);
+                    // Draw text
+                    ctx.fillStyle = item.color || '#000000';
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+
+                default:
+                    // No effect or 'none' - just draw text
+                    ctx.fillText(lineText, 0, currentY);
+                    break;
+            }
+
+            // Draw text decoration (underline or strikethrough)
+            if (item.textDecoration && item.textDecoration !== 'none') {
+                this.drawTextDecoration(ctx, lineText, 0, currentY, fontSize, item.textDecoration, item.color || '#000000');
+            }
+
+            currentY += lineHeight;
+        }
+
         ctx.restore();
+    }
+
+    /**
+     * Draw text decoration (underline or strikethrough)
+     */
+    private drawTextDecoration(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        fontSize: number,
+        decoration: string,
+        color: string
+    ): void {
+        const textMetrics = ctx.measureText(text);
+        const textWidth = textMetrics.width;
+
+        // Calculate line position based on text alignment
+        let lineX = x;
+        if (ctx.textAlign === 'center') {
+            lineX = x - textWidth / 2;
+        } else if (ctx.textAlign === 'right') {
+            lineX = x - textWidth;
+        }
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1, fontSize / 20);
+        ctx.beginPath();
+
+        if (decoration === 'underline') {
+            const underlineY = y + fontSize * 1.1;
+            ctx.moveTo(lineX, underlineY);
+            ctx.lineTo(lineX + textWidth, underlineY);
+        } else if (decoration === 'line-through') {
+            const strikeY = y + fontSize * 0.5;
+            ctx.moveTo(lineX, strikeY);
+            ctx.lineTo(lineX + textWidth, strikeY);
+        }
+
+        ctx.stroke();
+        ctx.restore();
+    }
+    /**
+     * Calculate animation style based on current time
+     * Matches CSS keyframes in animations.css exactly
+     */
+    private calculateAnimationStyle(item: TimelineItem, currentTime: number): {
+        opacity?: number;
+        scale?: number;
+        scaleX?: number;
+        scaleY?: number;
+        rotate?: number;
+        translateX?: number;
+        translateY?: number;
+        blur?: number;
+    } {
+        if (!item.animation) return {};
+
+        const animType = item.animation.type;
+        const animDur = item.animation.duration || 1;
+        const timing = item.animation.timing || 'enter';
+        const itemTime = currentTime - item.start;
+        const clipDur = item.duration;
+
+        let progress = 0;
+        let isActive = false;
+
+        if (timing === 'enter' || timing === 'both') {
+            if (itemTime < animDur) {
+                progress = itemTime / animDur;
+                isActive = true;
+            }
+        }
+        if (timing === 'exit' || timing === 'both') {
+            const exitStart = clipDur - animDur;
+            if (itemTime >= exitStart && itemTime <= clipDur) {
+                progress = 1 - ((itemTime - exitStart) / animDur);
+                isActive = true;
+            }
+        }
+
+        if (!isActive) return {};
+
+        // CSS cubic-bezier(0.2, 0.8, 0.2, 1) approximation
+        const cubicBezier = (t: number): number => {
+            // Approximate cubic-bezier(0.2, 0.8, 0.2, 1) with ease-out feel
+            return t < 0.5
+                ? 4 * t * t * t
+                : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        };
+
+        const p = cubicBezier(progress);
+
+        // Helper for multi-stop keyframes
+        const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
+
+        switch (animType) {
+            // === BASIC (from animations.css) ===
+            case 'fade-in':
+                // 0%: opacity 0 → 100%: opacity 1
+                return { opacity: p };
+
+            case 'boom':
+                // 0%: scale(0.8), opacity 0 → 50%: scale(1.1) → 100%: scale(1), opacity 1
+                if (progress < 0.5) {
+                    const t = progress / 0.5;
+                    return { scale: 0.8 + 0.3 * t, opacity: t };
+                } else {
+                    const t = (progress - 0.5) / 0.5;
+                    return { scale: 1.1 - 0.1 * t, opacity: 1 };
+                }
+
+            // === BOUNCE (4-stop keyframes) ===
+            case 'bounce-left':
+                // 0%: translateX(-100%), opacity 0 → 60%: translateX(20px) → 80%: translateX(-10px) → 100%: translateX(0)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { translateX: lerp(-100, 20, t), opacity: Math.min(1, t * 1.5) };
+                } else if (progress < 0.8) {
+                    const t = (progress - 0.6) / 0.2;
+                    return { translateX: lerp(20, -10, t), opacity: 1 };
+                } else {
+                    const t = (progress - 0.8) / 0.2;
+                    return { translateX: lerp(-10, 0, t), opacity: 1 };
+                }
+
+            case 'bounce-right':
+                // 0%: translateX(100%) → 60%: translateX(-20px) → 80%: translateX(10px) → 100%: translateX(0)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { translateX: lerp(100, -20, t), opacity: Math.min(1, t * 1.5) };
+                } else if (progress < 0.8) {
+                    const t = (progress - 0.6) / 0.2;
+                    return { translateX: lerp(-20, 10, t), opacity: 1 };
+                } else {
+                    const t = (progress - 0.8) / 0.2;
+                    return { translateX: lerp(10, 0, t), opacity: 1 };
+                }
+
+            case 'bounce-up':
+                // 0%: translateY(100%) → 60%: translateY(-20px) → 80%: translateY(10px) → 100%: translateY(0)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { translateY: lerp(100, -20, t), opacity: Math.min(1, t * 1.5) };
+                } else if (progress < 0.8) {
+                    const t = (progress - 0.6) / 0.2;
+                    return { translateY: lerp(-20, 10, t), opacity: 1 };
+                } else {
+                    const t = (progress - 0.8) / 0.2;
+                    return { translateY: lerp(10, 0, t), opacity: 1 };
+                }
+
+            case 'bounce-down':
+                // 0%: translateY(-100%) → 60%: translateY(20px) → 80%: translateY(-10px) → 100%: translateY(0)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { translateY: lerp(-100, 20, t), opacity: Math.min(1, t * 1.5) };
+                } else if (progress < 0.8) {
+                    const t = (progress - 0.6) / 0.2;
+                    return { translateY: lerp(20, -10, t), opacity: 1 };
+                } else {
+                    const t = (progress - 0.8) / 0.2;
+                    return { translateY: lerp(-10, 0, t), opacity: 1 };
+                }
+
+            // === ROTATION ===
+            case 'rotate-cw-1':
+                // from: rotate(-360deg), opacity 0 → to: rotate(0), opacity 1
+                return { rotate: -360 + 360 * p, opacity: p };
+
+            case 'rotate-cw-2':
+                return { rotate: -180 + 180 * p, opacity: p };
+
+            case 'rotate-ccw':
+                // from: rotate(360deg) → to: rotate(0)
+                return { rotate: 360 - 360 * p, opacity: p };
+
+            case 'spin-open':
+                // 0%: scale(0.1), rotate(720deg), opacity 0 → 100%: scale(1), rotate(0), opacity 1
+                return { scale: 0.1 + 0.9 * p, rotate: 720 - 720 * p, opacity: p };
+
+            case 'spin-1':
+                // from: rotate(-90deg) scale(0.5), opacity 0 → to: rotate(0) scale(1), opacity 1
+                return { rotate: -90 + 90 * p, scale: 0.5 + 0.5 * p, opacity: p };
+
+            // === SLIDE / MOVE (CORRECTED DIRECTIONS from CSS) ===
+            case 'slide-down-up-1':
+                // from: translateY(100%), opacity 0 → to: translateY(0), opacity 1
+                return { translateY: 100 - 100 * p, opacity: p };
+
+            case 'move-left':
+                // CSS: from translateX(100%) → to translateX(0) (comes from RIGHT)
+                return { translateX: 100 - 100 * p, opacity: p };
+
+            case 'move-right':
+                // CSS: from translateX(-100%) → to translateX(0) (comes from LEFT)
+                return { translateX: -100 + 100 * p, opacity: p };
+
+            case 'move-top':
+                // CSS: from translateY(100%) → to translateY(0) (comes from BOTTOM)
+                return { translateY: 100 - 100 * p, opacity: p };
+
+            case 'move-bottom':
+                // CSS: from translateY(-100%) → to translateY(0) (comes from TOP)
+                return { translateY: -100 + 100 * p, opacity: p };
+
+            // === FADE + MOVEMENT ===
+            case 'fade-slide-left':
+                // CSS: from translateX(50px), opacity 0 → to translateX(0), opacity 1
+                return { translateX: 50 - 50 * p, opacity: p };
+
+            case 'fade-slide-right':
+                // CSS: from translateX(-50px), opacity 0 → to translateX(0), opacity 1
+                return { translateX: -50 + 50 * p, opacity: p };
+
+            case 'fade-slide-up':
+                // CSS: from translateY(50px) → to translateY(0)
+                return { translateY: 50 - 50 * p, opacity: p };
+
+            case 'fade-slide-down':
+                // CSS: from translateY(-50px) → to translateY(0)
+                return { translateY: -50 + 50 * p, opacity: p };
+
+            case 'fade-zoom-in':
+                // CSS: from scale(0.8), opacity 0 → to scale(1), opacity 1
+                return { scale: 0.8 + 0.2 * p, opacity: p };
+
+            case 'fade-zoom-out':
+                // CSS: from scale(1.2), opacity 0 → to scale(1), opacity 1
+                return { scale: 1.2 - 0.2 * p, opacity: p };
+
+            // === BLUR/FLASH (simulated - Canvas 2D can't do blur) ===
+            // === BLUR/FLASH (simulated - Canvas 2D can't do blur) ===
+            case 'motion-blur':
+                // CSS: from blur(20px), scale(1.1), opacity 0 → to blur(0), scale(1), opacity 1
+                return { scale: 1.1 - 0.1 * p, opacity: p, blur: 20 * (1 - p) };
+
+            case 'blur-in':
+                return { opacity: p, blur: 10 * (1 - p) };
+
+            case 'blurry-eject':
+                // 0%: scale(0.5), opacity 0 → 60%: scale(1.05) → 100%: scale(1), opacity 1
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { scale: 0.5 + 0.55 * t, blur: 5 * (1 - t), opacity: t };
+                } else {
+                    const t = (progress - 0.6) / 0.4;
+                    return { scale: 1.05 - 0.05 * t, opacity: 1 };
+                }
+
+            case 'flash-drop':
+                // CSS: from translateY(-50px), brightness(3), opacity 0 → to translateY(0), brightness(1), opacity 1
+                return { translateY: -50 + 50 * p, opacity: p, blur: 10 * (1 - p) };
+
+            case 'flash-open':
+                // CSS: from scale(0.5), brightness(5), opacity 0 → to scale(1), brightness(1), opacity 1
+                return { scale: 0.5 + 0.5 * p, opacity: p };
+
+            case 'black-hole':
+                // CSS: from scale(0) rotate(180deg), opacity 0 → to scale(1) rotate(0), opacity 1
+                return { scale: p, rotate: 180 - 180 * p, opacity: p };
+
+            case 'pixelated-motion':
+                return { opacity: p, blur: 10 * (1 - p) };
+
+            case 'screen-flicker':
+                // Multi-stop flicker effect: 0%→20%→40%→60%→80%→100%
+                if (progress < 0.2) return { opacity: progress * 2.5 };
+                if (progress < 0.4) return { opacity: 0.2 + 0.3 * Math.random() };
+                if (progress < 0.6) return { opacity: 0.5 + 0.5 * ((progress - 0.4) / 0.2) };
+                if (progress < 0.8) return { opacity: 0.8 + 0.2 * Math.random() };
+                return { opacity: 1 };
+
+            case 'pulse-open':
+                // 0%: scale(1.2), opacity 0 → 50%: scale(0.9) → 100%: scale(1), opacity 1
+                if (progress < 0.5) {
+                    const t = progress / 0.5;
+                    return { scale: 1.2 - 0.3 * t, blur: 2 * (1 - t), opacity: t };
+                } else {
+                    const t = (progress - 0.5) / 0.5;
+                    return { scale: 0.9 + 0.1 * t, opacity: 1 };
+                }
+
+            case 'rgb-drop':
+                // CSS: from translateY(-50px), opacity 0 → to translateY(0), opacity 1
+                return { translateY: -50 + 50 * p, opacity: p };
+
+            // === CREATIVE/MASK (approximated) ===
+            case 'round-open':
+                // CSS: from clip-path: circle(0%) → to clip-path: circle(100%)
+                // Approximated with scale
+                return { scale: p, opacity: p };
+
+            case 'expansion':
+                // CSS: from scaleX(0), opacity 0 → to scale(1), opacity 1
+                return { scaleX: p, opacity: p };
+
+            case 'old-tv':
+                // 0%: scaleY(0.01) scaleX(0) → 50%: scaleY(0.01) scaleX(1) → 100%: scaleY(1) scaleX(1)
+                if (progress < 0.5) {
+                    const t = progress / 0.5;
+                    return { scaleY: 0.01, scaleX: t, opacity: t };
+                } else {
+                    const t = (progress - 0.5) / 0.5;
+                    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+                    return { scaleY: lerp(0.01, 1, t), scaleX: 1, opacity: 1 };
+                }
+
+            case 'shard-roll':
+                // CSS: from rotate(360deg) scale(0) → to rotate(0) scale(1)
+                return { rotate: 360 - 360 * p, scale: p, opacity: p };
+
+            case 'tear-paper':
+                // CSS uses clip-path - approximate with translateY
+                return { translateY: -50 + 50 * p, opacity: p };
+
+            // === FLIP (3D approximated) ===
+            case 'flip-down-1':
+            case 'flip-down-2':
+                // CSS: from perspective rotateX(90deg), opacity 0 → to rotateX(0), opacity 1
+                // Approximate 3D with scale + slight translateY
+                return { scale: 0.3 + 0.7 * p, translateY: -20 + 20 * p, opacity: p };
+
+            case 'flip-up-1':
+            case 'flip-up-2':
+                // CSS: from rotateX(-90deg), opacity 0
+                return { scale: 0.3 + 0.7 * p, translateY: 20 - 20 * p, opacity: p };
+
+            // === FLY ===
+            case 'fly-in-rotate':
+                // CSS: from translateX(-100%) rotate(-90deg), opacity 0 → to translateX(0) rotate(0), opacity 1
+                return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
+
+            case 'fly-in-flip':
+                // CSS: from translateX(-100%) rotateY(90deg) → 3D flip approximated
+                const flipScale = Math.abs(Math.cos((1 - p) * Math.PI / 2));
+                return { translateX: -100 + 100 * p, scaleX: flipScale, opacity: p };
+
+            case 'fly-to-zoom':
+                // CSS: from scale(0) translateX(-100%), opacity 0 → to scale(1) translateX(0), opacity 1
+                return { scale: p, translateX: -100 + 100 * p, opacity: p };
+
+            case 'grow-shrink':
+                // 0%: scale(0.8), opacity 0 → 60%: scale(1.2) → 100%: scale(1), opacity 1
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { scale: 0.8 + 0.4 * t, opacity: t };
+                } else {
+                    const t = (progress - 0.6) / 0.4;
+                    return { scale: 1.2 - 0.2 * t, opacity: 1 };
+                }
+
+            // === STRETCH ===
+            case 'stretch-in-left':
+                // CSS: from scaleX(2) translateX(-50%) → to scaleX(1) translateX(0)
+                return { scaleX: 2 - p, translateX: -50 + 50 * p, opacity: p, blur: 5 * (1 - p) };
+
+            case 'stretch-in-right':
+                // CSS: from scaleX(2) translateX(50%) → to scaleX(1) translateX(0)
+                return { scaleX: 2 - p, translateX: 50 - 50 * p, opacity: p, blur: 5 * (1 - p) };
+
+            case 'stretch-in-up':
+                // CSS: from scaleY(2) translateY(50%) → to scaleY(1) translateY(0)
+                return { scaleY: 2 - p, translateY: 50 - 50 * p, opacity: p, blur: 5 * (1 - p) };
+
+            case 'stretch-in-down':
+                // CSS: from scaleY(2) translateY(-50%) → to scaleY(1) translateY(0)
+                return { scaleY: 2 - p, translateY: -50 + 50 * p, opacity: p, blur: 5 * (1 - p) };
+
+            case 'stretch-to-full':
+                // CSS: from scale(0.5), opacity 0 → to scale(1), opacity 1
+                return { scale: 0.5 + 0.5 * p, opacity: p };
+
+            // === ZOOM ===
+            case 'tiny-zoom':
+                return { scale: p, opacity: p };
+
+            case 'zoom-in-center':
+            case 'zoom-in-1':
+                return { scale: 0.5 + 0.5 * p, opacity: p };
+
+            case 'zoom-in-left':
+                return { scale: 0.5 + 0.5 * p, translateX: -30 + 30 * p, opacity: p };
+
+            case 'zoom-in-right':
+                return { scale: 0.5 + 0.5 * p, translateX: 30 - 30 * p, opacity: p };
+
+            case 'zoom-in-top':
+                return { scale: 0.5 + 0.5 * p, translateY: -30 + 30 * p, opacity: p };
+
+            case 'zoom-in-bottom':
+                return { scale: 0.5 + 0.5 * p, translateY: 30 - 30 * p, opacity: p };
+
+            case 'zoom-out-1':
+                // CSS: from scale(1.5), opacity 0 → to scale(1), opacity 1
+                return { scale: 1.5 - 0.5 * p, opacity: p };
+
+            case 'wham':
+                // Quick overshoot zoom
+                if (progress < 0.7) {
+                    const t = progress / 0.7;
+                    return { scale: 0.3 + 0.8 * t, opacity: t };
+                } else {
+                    const t = (progress - 0.7) / 0.3;
+                    return { scale: 1.1 - 0.1 * t, opacity: 1 };
+                }
+
+            // === POSITION-BASED ===
+            case 'to-left-1':
+                // CSS: from translateX(100%), opacity 0 → to translateX(0), opacity 1
+                return { translateX: 100 - 100 * p, opacity: p };
+
+            case 'to-left-2':
+                return { translateX: 50 - 50 * p, opacity: p };
+
+            case 'to-right-1':
+                return { translateX: -100 + 100 * p, opacity: p };
+
+            case 'to-right-2':
+                return { translateX: -50 + 50 * p, opacity: p };
+
+            case 'up-down-1':
+                // Multi-keyframe bounce
+                if (progress < 0.2) return { translateY: lerp(-20, 20, progress / 0.2), opacity: progress * 5 };
+                if (progress < 0.4) return { translateY: lerp(20, -10, (progress - 0.2) / 0.2), opacity: 1 };
+                if (progress < 0.6) return { translateY: lerp(-10, 10, (progress - 0.4) / 0.2), opacity: 1 };
+                if (progress < 0.8) return { translateY: lerp(10, -5, (progress - 0.6) / 0.2), opacity: 1 };
+                return { translateY: lerp(-5, 0, (progress - 0.8) / 0.2), opacity: 1 };
+
+            case 'up-down-2':
+                return { translateY: 20 - 20 * p, opacity: p };
+
+            default:
+                return { opacity: p };
+        }
     }
 
     /**
@@ -814,16 +2246,38 @@ export class ExportEngine {
     /**
      * Set up audio tracks from timeline using Web Audio API
      * Creates a mixed audio stream from all audio clips in the timeline
+     * Also extracts audio from video items (unless muteVideo is enabled)
      */
     private async setupAudioTracks(tracks: Track[], duration: number): Promise<MediaStreamTrack[]> {
+        // Collect all audio sources: audio track items + video items with audio
+        const audioItems: TimelineItem[] = [];
+
+        // Get items from audio track
         const audioTrack = tracks.find(t => t.type === 'audio');
-        if (!audioTrack || audioTrack.items.length === 0) {
-            console.log('%c🔇 No audio tracks found', 'color: #ffaa00');
+        if (audioTrack) {
+            audioItems.push(...audioTrack.items);
+        }
+
+        // Get video items that have audio (not muted)
+        const videoTrack = tracks.find(t => t.type === 'video');
+        if (videoTrack) {
+            for (const item of videoTrack.items) {
+                if (item.type === 'video' && item.muteVideo !== true) {
+                    audioItems.push(item);
+                    console.log(`   🎬 Video with audio: ${item.name}`);
+                } else if (item.type === 'video' && item.muteVideo === true) {
+                    console.log(`   🔇 Video muted: ${item.name}`);
+                }
+            }
+        }
+
+        if (audioItems.length === 0) {
+            console.log('%c🔇 No audio sources found (no audio tracks, videos muted or have no audio)', 'color: #ffaa00');
             return [];
         }
 
         try {
-            console.log(`%c🎵 Setting up audio (${audioTrack.items.length} clips)...`, 'color: #00aaff');
+            console.log(`%c🎵 Setting up audio (${audioItems.length} source(s))...`, 'color: #00aaff');
 
             // Create AudioContext
             const audioContext = new AudioContext({ sampleRate: 48000 });
@@ -832,20 +2286,21 @@ export class ExportEngine {
             // Load and schedule all audio clips
             const audioBuffers: Array<{ buffer: AudioBuffer; item: TimelineItem }> = [];
 
-            for (const item of audioTrack.items) {
+            for (const item of audioItems) {
                 try {
                     const buffer = await this.loadAudioBuffer(audioContext, item.src);
                     if (buffer) {
                         audioBuffers.push({ buffer, item });
-                        console.log(`   ✓ Loaded: ${item.name || 'Audio clip'}`);
+                        const emoji = item.type === 'video' ? '🎬' : '🎵';
+                        console.log(`   ✓ ${emoji} Loaded: ${item.name || 'Audio clip'}`);
                     }
                 } catch (error) {
-                    console.warn(`   ✗ Failed to load: ${item.name}`, error);
+                    console.warn(`   ✗ Failed to load audio from: ${item.name}`, error);
                 }
             }
 
             if (audioBuffers.length === 0) {
-                console.warn('%c⚠️ No audio clips could be loaded', 'color: #ff6600');
+                console.warn('%c⚠️ No audio could be loaded from any source', 'color: #ff6600');
                 return [];
             }
 
@@ -874,7 +2329,8 @@ export class ExportEngine {
                 // Start playback
                 source.start(startTime, offset, clipDuration);
 
-                console.log(`   ⏯️  Scheduled: ${item.name} at ${startTime.toFixed(2)}s (duration: ${clipDuration.toFixed(2)}s, volume: ${(item.volume ?? 100)}%)`);
+                const emoji = item.type === 'video' ? '🎬' : '🎵';
+                console.log(`   ${emoji} Scheduled: ${item.name} at ${startTime.toFixed(2)}s (duration: ${clipDuration.toFixed(2)}s, volume: ${(item.volume ?? 100)}%)`);
             }
 
             // Get the audio stream track
@@ -948,6 +2404,42 @@ export class ExportEngine {
     cancel(): void {
         this.cancelled = true;
     }
+
+    /**
+     * Clear media caches to free memory
+     */
+    private clearCaches(): void {
+        console.log('%c🧹 Clearing media caches...', 'color: #ffaa00');
+        const videoCount = this.videoCache.size;
+        for (const [key, video] of this.videoCache.entries()) {
+            video.pause();
+            video.src = '';
+            video.load();
+        }
+        this.videoCache.clear();
+        this.imageCache.clear();
+        console.log(`   ✓ Cleared ${videoCount} videos`);
+    }
+
+    /**
+     * Get memory usage
+     */
+    private getMemoryInfo(): { used: number; limit?: number; percentage?: number } {
+        const memory = (performance as any).memory;
+        if (memory) {
+            const usedMB = memory.usedJSHeapSize / (1024 * 1024);
+            const limitMB = memory.jsHeapSizeLimit / (1024 * 1024);
+            return {
+                used: usedMB,
+                limit: limitMB,
+                percentage: (usedMB / limitMB) * 100
+            };
+        }
+        return { used: 0 };
+    }
+
+
+
 
     /**
      * Cleanup resources
