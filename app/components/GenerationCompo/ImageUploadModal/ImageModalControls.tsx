@@ -301,14 +301,10 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         key={model}
                         onClick={(e) => {
                           e.stopPropagation();
-                          e.preventDefault();
                           onModelChange(model);
                           onSetIsModelDropdownOpen(false);
                         }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                        }}
+
                         style={{
                           padding: `${6 * scale}px ${12 * scale}px`,
                           fontSize: controlFontSize,

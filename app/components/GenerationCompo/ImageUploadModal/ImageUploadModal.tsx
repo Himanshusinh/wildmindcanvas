@@ -1120,17 +1120,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // Google Nano Banana Pro supports 1K, 2K, 4K
     if (modelLower.includes('nano banana pro')) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
-        { value: '4K', label: '4K (4096px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
       ];
     }
 
     // Flux 2 Pro supports 1K, 2K, 1024x2048
     if (modelLower.includes('flux 2 pro')) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
         { value: '1024x2048', label: '1024x2048' },
       ];
     }
@@ -1142,17 +1142,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       modelLower.includes('flux pro 1.1')
     ) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
-        { value: '4K', label: '4K (4096px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
       ];
     }
 
     // Z Image Turbo supports 1K and 2K only
     if (modelLower.includes('z image turbo')) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
       ];
     }
 
@@ -1161,8 +1161,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   };
 
   // Build final model name with resolution for API call
-  const getFinalModelName = () => {
-    const modelLower = selectedModel.toLowerCase();
+  const getFinalModelName = (modelOverride?: string) => {
+    const targetModel = modelOverride || selectedModel;
+    const modelLower = targetModel.toLowerCase();
 
     // For Google Nano Banana Pro, DO NOT append resolution
     // The backend expects just "Google nano banana pro" (mapped to google-nano-banana-pro)
@@ -1183,11 +1184,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       modelLower.includes('flux pro 1.1') ||
       modelLower.includes('z image turbo')
     ) {
-      return `${selectedModel} ${selectedResolution}`;
+      return `${targetModel} ${selectedResolution}`;
     }
 
     // For other models, use as-is
-    return selectedModel;
+    return targetModel;
   };
 
 
@@ -1423,7 +1424,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             const ar = w && h ? (w / h) : 1;
             const rawHeight = Math.round(frameWidth / ar);
             const frameHeight = Math.max(400, rawHeight);
-            const opts: any = { model: getFinalModelName(), frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
+            // CRITICAL FIX: Pass 'model' explicitly to getFinalModelName because selectedModel state is stale
+            const opts: any = { model: getFinalModelName(model), frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
             if (!generatedImageUrl) {
               opts.aspectRatio = newAspectRatio;
             }
