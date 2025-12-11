@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, MultiangleGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -13,6 +13,8 @@ export function useCanvasState() {
   const [eraseGenerators, setEraseGenerators] = useState<EraseGenerator[]>([]);
   const [expandGenerators, setExpandGenerators] = useState<ExpandGenerator[]>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<VectorizeGenerator[]>([]);
+  const [nextSceneGenerators, setNextSceneGenerators] = useState<NextSceneGenerator[]>([]);
+  const [multiangleGenerators, setMultiangleGenerators] = useState<MultiangleGenerator[]>([]);
   const [storyboardGenerators, setStoryboardGenerators] = useState<StoryboardGenerator[]>([]);
   const [scriptFrameGenerators, setScriptFrameGenerators] = useState<ScriptFrameGenerator[]>([]);
   const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
@@ -31,6 +33,8 @@ export function useCanvasState() {
     eraseGenerators,
     expandGenerators,
     vectorizeGenerators,
+    nextSceneGenerators,
+    multiangleGenerators,
     storyboardGenerators,
     scriptFrameGenerators,
     sceneFrameGenerators,
@@ -50,6 +54,8 @@ export function useCanvasState() {
     setEraseGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
+    setNextSceneGenerators,
+    setMultiangleGenerators,
     setStoryboardGenerators,
     setScriptFrameGenerators,
     setSceneFrameGenerators,

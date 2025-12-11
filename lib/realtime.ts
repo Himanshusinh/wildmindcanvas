@@ -21,6 +21,8 @@ export type GeneratorOverlay = {
   localExpandedImageUrl?: string | null;
   localVectorizedImageUrl?: string | null;
   localMultiangleImageUrl?: string | null;
+  nextSceneImageUrl?: string | null;
+  localNextSceneImageUrl?: string | null;
   mode?: string;
   frameWidth?: number;
   frameHeight?: number;
