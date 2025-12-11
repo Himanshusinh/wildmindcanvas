@@ -147,6 +147,22 @@ class ServerExportService {
             dimension: { width: dimension.width, height: dimension.height }
         };
 
+        // DEBUG: Log timeline with transitions/animations
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('%c📤 SERVER EXPORT - TIMELINE DATA', 'font-weight: bold; font-size: 14px; color: #00ff00');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        for (const track of tracks) {
+            for (const item of track.items) {
+                if (item.transition) {
+                    console.log(`%c🔀 TRANSITION: "${item.name}"`, 'color: #ff00ff', item.transition);
+                }
+                if (item.animation) {
+                    console.log(`%c💫 ANIMATION: "${item.name}"`, 'color: #00ffff', item.animation);
+                }
+            }
+        }
+        console.log('%cFull timeline:', 'color: #999', JSON.stringify(timeline, null, 2).substring(0, 2000));
+
         // Log audio sources in browser console
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('%c🎵 SERVER EXPORT - AUDIO INFO', 'font-weight: bold; font-size: 14px; color: #00aaff');
