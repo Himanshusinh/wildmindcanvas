@@ -4,7 +4,7 @@ import React from 'react';
 import { VideoUploadModal } from '@/app/components/GenerationCompo/VideoUploadModal';
 import { getReplicateQueueStatus, getReplicateQueueResult, getFalQueueStatus, getFalQueueResult, getMiniMaxVideoStatus, getMiniMaxVideoFile } from '@/lib/api';
 import Konva from 'konva';
-import { VideoModalState, Connection, ImageModalState } from './types';
+import { VideoModalState, Connection, ImageModalState, TextModalState } from './types';
 import { ImageUpload } from '@/types/canvas';
 
 interface VideoModalOverlaysProps {
@@ -25,6 +25,7 @@ interface VideoModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  textInputStates?: TextModalState[];
 }
 
 export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
@@ -45,6 +46,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  textInputStates,
 }) => {
   return (
     <>
@@ -68,11 +70,11 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               const taskId = submitRes?.taskId;
               const generationId = submitRes?.generationId;
               const provider = submitRes?.provider || 'replicate'; // Default to replicate for backward compatibility
-              
+
               if (onPersistVideoModalMove) {
                 const [w, h] = aspectRatio.split(':').map(Number);
                 const frameWidth = 600;
-                const ar = w && h ? (w / h) : 16/9;
+                const ar = w && h ? (w / h) : 16 / 9;
                 const rawHeight = ar ? Math.round(frameWidth / ar) : 338;
                 const frameHeight = Math.max(400, rawHeight);
                 Promise.resolve(onPersistVideoModalMove(modalState.id, {
@@ -93,11 +95,11 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               // Optimistic state update with tracking fields
               setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider, status: 'submitted' } : m));
               if (!taskId) return null;
-              
+
               // Determine which service to poll based on provider or model
               const isFalModel = provider === 'fal' || model?.toLowerCase().includes('sora') || model?.toLowerCase().includes('veo') || model?.toLowerCase().includes('ltx');
               const isMiniMaxModel = provider === 'minimax' || model?.toLowerCase().includes('minimax') || model?.toLowerCase().includes('hailuo');
-              
+
               // Poll for completion
               const pollIntervalMs = 3000;
               const maxAttempts = 600; // ~30 minutes max
@@ -105,7 +107,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                 try {
                   let statusData: any;
                   let statusVal: string;
-                  
+
                   // Use appropriate polling endpoint based on provider
                   if (isFalModel) {
                     statusData = await getFalQueueStatus(taskId);
@@ -117,11 +119,11 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     const resultStatusCode = statusData?.result?.status_code;
                     const baseRespCode = statusData?.base_resp?.status_code;
                     const resultStatus = statusData?.result?.status || statusData?.status;
-                    
+
                     // MiniMax: 0 = success, 1 = processing, other = error
                     // Also check if file_id exists (indicates completion)
                     const hasFileId = !!(statusData?.result?.file_id || statusData?.file_id);
-                    
+
                     if (hasFileId || resultStatusCode === 0 || baseRespCode === 0 || resultStatus === 'SUCCESS' || resultStatus === 'success') {
                       statusVal = 'completed';
                     } else if (resultStatusCode === 1 || baseRespCode === 1 || resultStatus === 'PROCESSING' || resultStatus === 'processing') {
@@ -134,12 +136,12 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     statusData = await getReplicateQueueStatus(taskId);
                     statusVal = String(statusData?.status || '').toLowerCase();
                   }
-                  
+
                   if (statusVal === 'completed' || statusVal === 'succeeded' || statusVal === 'success') {
                     // Fetch result via appropriate helper
                     let resultData: any;
                     let videoUrl: string | null = null;
-                    
+
                     if (isFalModel) {
                       resultData = await getFalQueueResult(taskId);
                     } else if (isMiniMaxModel) {
@@ -157,7 +159,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     } else {
                       resultData = await getReplicateQueueResult(taskId);
                     }
-                    
+
                     // Determine URL from known shapes (for non-MiniMax)
                     if (!videoUrl) {
                       if (Array.isArray(resultData?.videos) && resultData.videos[0]?.url) {
@@ -172,10 +174,10 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                         videoUrl = resultData.data.video.url;
                       }
                     }
-                    
+
                     if (videoUrl) {
                       setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedVideoUrl: videoUrl, status: 'completed' } : m));
-                    if (onPersistVideoModalMove) {
+                      if (onPersistVideoModalMove) {
                         Promise.resolve(onPersistVideoModalMove(modalState.id, {
                           generatedVideoUrl: videoUrl,
                           status: 'completed',
@@ -197,7 +199,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                   if (pollErr?.status === 404 || pollErr?.isNotFound) {
                     console.error('[Canvas Video Poll] Prediction not found (404)', { taskId, provider, error: pollErr?.message });
                     if (onPersistVideoModalMove) {
-                      Promise.resolve(onPersistVideoModalMove(modalState.id, { 
+                      Promise.resolve(onPersistVideoModalMove(modalState.id, {
                         status: 'failed',
                         error: pollErr?.message || 'Prediction not found. The prediction may have been deleted or expired.'
                       } as any)).catch(console.error);
@@ -257,7 +259,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               // If it returns a promise, handle it
               if (result && typeof result.then === 'function') {
                 Promise.resolve(result).catch(console.error);
-            }
+              }
             }
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync videoModalStates with externalVideoModals
@@ -307,7 +309,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
-            setVideoModalStates(prev => prev.map(m => 
+            setVideoModalStates(prev => prev.map(m =>
               m.id === modalState.id ? { ...m, x: newX, y: newY } : m
             ));
           }}
@@ -319,6 +321,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           stageRef={stageRef}
           scale={scale}
           position={position}
+          textInputStates={textInputStates}
         />
       ))}
     </>

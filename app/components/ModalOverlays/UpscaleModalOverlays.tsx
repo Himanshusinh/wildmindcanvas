@@ -4,6 +4,7 @@ import React from 'react';
 import { UpscalePluginModal } from '@/app/components/Plugins/UpscalePluginModal/UpscalePluginModal';
 import Konva from 'konva';
 import { UpscaleModalState, Connection, ImageModalState } from './types';
+import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 
 interface UpscaleModalOverlaysProps {
   upscaleModalStates: UpscaleModalState[] | undefined;
@@ -93,19 +94,17 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
               // If it returns a promise, handle it
               if (result && typeof result.then === 'function') {
                 Promise.resolve(result).catch((err) => {
-                console.error('[ModalOverlays] Error in onPersistUpscaleModalDelete', err);
-              });
+                  console.error('[ModalOverlays] Error in onPersistUpscaleModalDelete', err);
+                });
               }
             }
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync upscaleModalStates with externalUpscaleModals
           }}
-          onDownload={() => {
+          onDownload={async () => {
             if (modalState.upscaledImageUrl) {
-              const link = document.createElement('a');
-              link.href = modalState.upscaledImageUrl;
-              link.download = `upscaled-${modalState.id}.png`;
-              link.click();
+              const filename = generateDownloadFilename('upscaled', modalState.id, 'png');
+              await downloadImage(modalState.upscaledImageUrl, filename);
             }
           }}
           onDuplicate={() => {
@@ -132,7 +131,7 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
               const newValue = (opts as any)[key];
               return currentValue !== newValue;
             });
-            
+
             if (hasChanges) {
               setUpscaleModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
               if (onPersistUpscaleModalMove) {

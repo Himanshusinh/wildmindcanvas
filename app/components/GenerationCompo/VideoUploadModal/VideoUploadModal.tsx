@@ -594,6 +594,20 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         onSetIsFrameOrderSwapped={setIsFrameOrderSwapped}
         onOptionsChange={onOptionsChange}
       />
+
+      {/* Invisible Hover Trigger Zone for Bottom Approach */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          width: '100%',
+          height: `${60 * scale}px`,
+          background: 'transparent',
+          zIndex: 0,
+          pointerEvents: 'auto',
+        }}
+      />
     </div>
   );
 };

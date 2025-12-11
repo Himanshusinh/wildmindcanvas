@@ -15,6 +15,8 @@ import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
 import { EraseModalOverlays } from './EraseModalOverlays';
 import { ExpandModalOverlays } from './ExpandModalOverlays';
 import { VectorizeModalOverlays } from './VectorizeModalOverlays';
+import { NextSceneModalOverlays } from './NextSceneModalOverlays';
+import { MultiangleModalOverlays } from './MultiangleModalOverlays';
 import { StoryboardModalOverlays } from './StoryboardModalOverlays';
 import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
 import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
@@ -31,6 +33,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   eraseModalStates,
   expandModalStates,
   vectorizeModalStates,
+  nextSceneModalStates,
+  multiangleModalStates,
   storyboardModalStates,
   scriptFrameModalStates,
   sceneFrameModalStates,
@@ -54,6 +58,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedExpandModalIds,
   selectedVectorizeModalId,
   selectedVectorizeModalIds,
+  selectedNextSceneModalId,
+  selectedNextSceneModalIds,
+  selectedMultiangleModalId,
+  selectedMultiangleModalIds,
   selectedStoryboardModalId,
   selectedStoryboardModalIds,
   clearAllSelections,
@@ -88,6 +96,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setVectorizeModalStates = () => { },
   setSelectedVectorizeModalId = () => { },
   setSelectedVectorizeModalIds = () => { },
+  setNextSceneModalStates = () => { },
+  setSelectedNextSceneModalId = () => { },
+  setSelectedNextSceneModalIds = () => { },
+  setMultiangleModalStates = () => { },
+  setSelectedMultiangleModalId = () => { },
+  setSelectedMultiangleModalIds = () => { },
   setStoryboardModalStates = () => { },
   setScriptFrameModalStates = () => { },
   setSelectedStoryboardModalId = () => { },
@@ -122,6 +136,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
+  onUpdateImageModalState,
   onPersistUpscaleModalCreate,
   onPersistUpscaleModalMove,
   onPersistUpscaleModalDelete,
@@ -142,6 +157,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistVectorizeModalMove,
   onPersistVectorizeModalDelete,
   onVectorize,
+  onPersistNextSceneModalCreate,
+  onPersistNextSceneModalMove,
+  onPersistNextSceneModalDelete,
+  onPersistMultiangleModalCreate,
+  onPersistMultiangleModalMove,
+  onPersistMultiangleModalDelete,
   onPersistStoryboardModalCreate,
   onPersistStoryboardModalMove,
   onPersistStoryboardModalDelete,
@@ -193,6 +214,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     eraseModalStates: eraseModalStates ?? [],
     expandModalStates: expandModalStates ?? [],
     vectorizeModalStates: vectorizeModalStates ?? [],
+    nextSceneModalStates: nextSceneModalStates ?? [],
     storyboardModalStates: storyboardModalStates ?? [],
     scriptFrameModalStates: scriptFrameModalStates ?? [],
     sceneFrameModalStates: sceneFrameModalStates ?? [],
@@ -218,6 +240,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         eraseModalStates={eraseModalStates ?? []}
         expandModalStates={expandModalStates ?? []}
         vectorizeModalStates={vectorizeModalStates ?? []}
+        nextSceneModalStates={nextSceneModalStates ?? []}
         storyboardModalStates={storyboardModalStates ?? []}
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         sceneFrameModalStates={sceneFrameModalStates ?? []}
@@ -287,6 +310,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        textInputStates={textInputStates}
       />
 
       <VideoEditorModalOverlays
@@ -434,6 +458,49 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
+      <NextSceneModalOverlays
+        nextSceneModalStates={nextSceneModalStates ?? []}
+        selectedNextSceneModalId={selectedNextSceneModalId ?? null}
+        selectedNextSceneModalIds={selectedNextSceneModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setNextSceneModalStates={setNextSceneModalStates}
+        setSelectedNextSceneModalId={setSelectedNextSceneModalId}
+        setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
+        onPersistNextSceneModalCreate={onPersistNextSceneModalCreate}
+        onPersistNextSceneModalMove={onPersistNextSceneModalMove}
+        onPersistNextSceneModalDelete={onPersistNextSceneModalDelete}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        connections={externalConnections ?? []}
+        imageModalStates={imageModalStates}
+        images={images}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
+
+      <MultiangleModalOverlays
+        multiangleModalStates={multiangleModalStates ?? []}
+        selectedMultiangleModalId={selectedMultiangleModalId ?? null}
+        selectedMultiangleModalIds={selectedMultiangleModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setMultiangleModalStates={setMultiangleModalStates}
+        setSelectedMultiangleModalId={setSelectedMultiangleModalId}
+        setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
+        onPersistMultiangleModalCreate={onPersistMultiangleModalCreate}
+        onPersistMultiangleModalMove={onPersistMultiangleModalMove}
+        onPersistMultiangleModalDelete={onPersistMultiangleModalDelete}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        connections={externalConnections ?? []}
+        imageModalStates={imageModalStates}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+        onUpdateImageModalState={onUpdateImageModalState}
+      />
+
       <StoryboardModalOverlays
         storyboardModalStates={storyboardModalStates ?? []}
         selectedStoryboardModalId={selectedStoryboardModalId ?? null}
@@ -485,6 +552,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setComponentMenu={connectionManager.setComponentMenu}
         setComponentMenuSearch={connectionManager.setComponentMenuSearch}
         scale={scale}
+        position={position}
         onPersistTextModalCreate={onPersistTextModalCreate}
         onPersistImageModalCreate={onPersistImageModalCreate}
         onPersistVideoModalCreate={onPersistVideoModalCreate}
@@ -499,9 +567,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setExpandModalStates={setExpandModalStates}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
         setStoryboardModalStates={setStoryboardModalStates}
+        onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
+        setVectorizeModalStates={setVectorizeModalStates}
+        onPersistNextSceneModalCreate={onPersistNextSceneModalCreate}
+        setNextSceneModalStates={setNextSceneModalStates}
+        onPersistMultiangleModalCreate={onPersistMultiangleModalCreate}
         onPersistConnectorCreate={onPersistConnectorCreate}
       />
     </>
   );
 };
-

@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
-import { ImageUploadModal } from '@/app/components/GenerationCompo/ImageUploadModal';
+import React, { useState, useEffect } from 'react';
+import { ImageUploadModal } from '@/app/components/GenerationCompo/ImageUploadModal/ImageUploadModal';
 import Konva from 'konva';
 import { ImageModalState, Connection } from './types';
+import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 import { ImageUpload } from '@/types/canvas';
 import { getReferenceImagesForText } from '@/app/components/Plugins/StoryboardPluginModal/mentionUtils';
 
@@ -528,29 +529,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           onDownload={async () => {
             // Download the generated image if available
             if (modalState.generatedImageUrl) {
-              try {
-                // Fetch the image to handle CORS issues
-                const response = await fetch(modalState.generatedImageUrl);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `generated-image-${modalState.id}-${Date.now()}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-              } catch (error) {
-                console.error('Failed to download image:', error);
-                // Fallback: try direct download
-                const link = document.createElement('a');
-                link.href = modalState.generatedImageUrl!;
-                link.download = `generated-image-${modalState.id}-${Date.now()}.png`;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
+              const filename = generateDownloadFilename('generated-image', modalState.id, 'png');
+              await downloadImage(modalState.generatedImageUrl, filename);
             }
           }}
           onDuplicate={() => {

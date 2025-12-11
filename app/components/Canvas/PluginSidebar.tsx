@@ -63,6 +63,18 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       icon: '/icons/vector.svg',
     },
     {
+      id: 'next-scene',
+      name: 'Next Scene',
+      description: 'Generate next scene based on current scene',
+      icon: '/icons/film-editing.svg',
+    },
+    {
+      id: 'multiangle',
+      name: 'Multiangle',
+      description: 'Process images with multiangle view',
+      icon: '/icons/multiangle.svg',
+    },
+    {
       id: 'storyboard',
       name: 'Storyboard',
       description: 'Create storyboard frames for your project',

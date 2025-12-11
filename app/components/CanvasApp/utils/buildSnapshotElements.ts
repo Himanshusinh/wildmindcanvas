@@ -205,6 +205,54 @@ export function buildSnapshotElements(
     };
   });
 
+  // NextScene generators
+  state.nextSceneGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      nextSceneImageUrl: modal.nextSceneImageUrl || null,
+      sourceImageUrl: modal.sourceImageUrl || null,
+      localNextSceneImageUrl: modal.localNextSceneImageUrl || null,
+      mode: modal.mode || 'scene',
+      frameWidth: modal.frameWidth || 400,
+      frameHeight: modal.frameHeight || 500,
+      isProcessing: modal.isProcessing || false,
+    };
+    // Attach any connections originating from this element into its meta
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'next-scene-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+
+  // Multiangle generators
+  state.multiangleGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      multiangleImageUrl: modal.multiangleImageUrl || null,
+      sourceImageUrl: modal.sourceImageUrl || null,
+      localMultiangleImageUrl: modal.localMultiangleImageUrl || null,
+      frameWidth: modal.frameWidth || 400,
+      frameHeight: modal.frameHeight || 500,
+      isProcessing: modal.isProcessing || false,
+    };
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'multiangle-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+
   // Storyboard generators
   state.storyboardGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;

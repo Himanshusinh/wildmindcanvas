@@ -3,7 +3,8 @@
 import React from 'react';
 import { ErasePluginModal } from '@/app/components/Plugins/ErasePluginModal/ErasePluginModal';
 import Konva from 'konva';
-import { Connection, ImageModalState, EraseModalState } from './types';
+import { EraseModalState, Connection, ImageModalState } from './types';
+import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 
 interface EraseModalOverlaysProps {
   eraseModalStates: EraseModalState[] | undefined;
@@ -102,12 +103,10 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync eraseModalStates with externalEraseModals
           }}
-          onDownload={() => {
+          onDownload={async () => {
             if (modalState.erasedImageUrl) {
-              const link = document.createElement('a');
-              link.href = modalState.erasedImageUrl;
-              link.download = `erase-${modalState.id}.png`;
-              link.click();
+              const filename = generateDownloadFilename('erase', modalState.id, 'png');
+              await downloadImage(modalState.erasedImageUrl, filename);
             }
           }}
           onDuplicate={() => {
@@ -133,7 +132,7 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
               const newValue = (opts as any)[key];
               return currentValue !== newValue;
             });
-            
+
             if (hasChanges) {
               setEraseModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
               if (onPersistEraseModalMove) {

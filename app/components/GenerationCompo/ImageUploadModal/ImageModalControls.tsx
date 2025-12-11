@@ -113,7 +113,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
     }
   }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isResolutionDropdownOpen, onSetIsModelDropdownOpen, onSetIsAspectRatioDropdownOpen, onSetIsResolutionDropdownOpen]);
 
-  if (isUploadedImage) return null;
+
 
   return (
     <>
@@ -147,8 +147,6 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
           transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
         }}
-        onMouseEnter={() => onSetIsHovered(true)}
-        onMouseLeave={() => onSetIsHovered(false)}
       >
         {/* Prompt Input */}
         < div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>

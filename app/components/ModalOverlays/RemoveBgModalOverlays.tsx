@@ -4,6 +4,7 @@ import React from 'react';
 import { RemoveBgPluginModal } from '@/app/components/Plugins/RemoveBgPluginModal/RemoveBgPluginModal';
 import Konva from 'konva';
 import { Connection, ImageModalState, RemoveBgModalState } from './types';
+import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 
 interface RemoveBgModalOverlaysProps {
   removeBgModalStates: RemoveBgModalState[] | undefined;
@@ -100,12 +101,10 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync removeBgModalStates with externalRemoveBgModals
           }}
-          onDownload={() => {
+          onDownload={async () => {
             if (modalState.removedBgImageUrl) {
-              const link = document.createElement('a');
-              link.href = modalState.removedBgImageUrl;
-              link.download = `removebg-${modalState.id}.png`;
-              link.click();
+              const filename = generateDownloadFilename('removebg', modalState.id, 'png');
+              await downloadImage(modalState.removedBgImageUrl, filename);
             }
           }}
           onDuplicate={() => {
@@ -133,7 +132,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
               const newValue = (opts as any)[key];
               return currentValue !== newValue;
             });
-            
+
             if (hasChanges) {
               setRemoveBgModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
               if (onPersistRemoveBgModalMove) {

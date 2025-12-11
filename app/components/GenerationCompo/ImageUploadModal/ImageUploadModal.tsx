@@ -1490,6 +1490,20 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
         onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
       />
+
+      {/* Invisible Hover Trigger Zone for Bottom Approach */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          width: '100%',
+          height: `${60 * scale}px`,
+          background: 'transparent',
+          zIndex: 0,
+          pointerEvents: 'auto',
+        }}
+      />
     </div>
   );
 };

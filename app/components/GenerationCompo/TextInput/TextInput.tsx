@@ -343,7 +343,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           autoFocusInput={autoFocusInput}
           onTextChange={(v) => {
             setText(v);
-            // Don't call onValueChange here to avoid flooding undo history
+            if (onValueChange) onValueChange(v);
           }}
           onTextFocus={() => setIsTextFocused(true)}
           onTextBlur={() => {

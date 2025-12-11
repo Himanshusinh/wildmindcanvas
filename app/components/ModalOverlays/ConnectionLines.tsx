@@ -52,6 +52,7 @@ interface ConnectionLinesProps {
   eraseModalStates?: any[];
   expandModalStates?: any[];
   vectorizeModalStates?: any[];
+  nextSceneModalStates?: any[];
   storyboardModalStates?: any[];
   scriptFrameModalStates?: any[];
   sceneFrameModalStates?: any[];
@@ -76,6 +77,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   eraseModalStates,
   expandModalStates,
   vectorizeModalStates,
+  nextSceneModalStates,
   storyboardModalStates,
   scriptFrameModalStates,
   sceneFrameModalStates,
@@ -130,8 +132,11 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
     scriptFrameModalStates?.forEach(modal => {
       if (modal?.id && modal.isLoading) ids.add(modal.id);
     });
+    nextSceneModalStates?.forEach(modal => {
+      if (modal?.id && modal.isProcessing) ids.add(modal.id);
+    });
     return ids;
-  }, [imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, scriptFrameModalStates]);
+  }, [imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, scriptFrameModalStates]);
 
   // Memoize connection lines to recalculate when viewport changes
   const connectionLines = useMemo(() => {
@@ -148,8 +153,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         }
         seen.add(uniqueKey);
 
-        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
         if (!fromCenter || !toCenter) {
           // Debug: log when nodes can't be found
           if (process.env.NODE_ENV === 'development') {
@@ -167,17 +172,17 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, recalcKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, recalcKey, stageRef]);
 
   return (
     <svg
-      style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        width: '100vw', 
-        height: '100vh', 
-        pointerEvents: 'none', 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
         zIndex: 1000, // Lower than all components (2000+) so lines appear behind
         transition: 'none', // Disable all transitions
       }}
@@ -228,7 +233,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 if (isSelected) {
                   onSelectConnection(null);
                 } else {
-                onSelectConnection(connectionId);
+                  onSelectConnection(connectionId);
                 }
               }}
               onMouseEnter={(e) => {
@@ -266,10 +271,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                     style={{
                       pointerEvents: 'none',
                       filter: idx === 0 ? 'blur(7px)' : 'drop-shadow(0 0 18px rgba(201,236,255,0.9))',
-                      strokeDashoffset: sweepStartOffset,
-                      animation: `connection-line-dash ${dashAnimationDuration}s linear infinite`,
+                      '--sweepStart': sweepStartOffset, // Pass as CSS variable
+                      animationName: 'connection-line-dash',
+                      animationDuration: `${dashAnimationDuration}s`,
+                      animationTimingFunction: 'linear',
+                      animationIterationCount: 'infinite',
                       animationDelay: `${delay}s`,
-                    }}
+                    } as React.CSSProperties}
                   />
                 ))}
               </>
@@ -279,8 +287,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               cy={line.fromY}
               r={computeCircleRadiusForScale(3, scale)}
               fill={strokeColor}
-              style={{ 
-                pointerEvents: 'auto', 
+              style={{
+                pointerEvents: 'auto',
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
               }}
@@ -298,8 +306,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               cy={line.toY}
               r={computeCircleRadiusForScale(3, scale)}
               fill={strokeColor}
-              style={{ 
-                pointerEvents: 'auto', 
+              style={{
+                pointerEvents: 'auto',
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
               }}

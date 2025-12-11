@@ -22,7 +22,7 @@ import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
 import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
 import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
 import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
-import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator } from '@/app/components/CanvasApp/types';
+import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/app/components/CanvasApp/types';
 import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
 
 interface CanvasAppProps {
@@ -40,6 +40,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [eraseGenerators, setEraseGenerators] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
   const [expandGenerators, setExpandGenerators] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeGenerators, setVectorizeGenerators] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
+  const [nextSceneGenerators, setNextSceneGenerators] = useState<NextSceneGenerator[]>([]);
+  const [multiangleGenerators, setMultiangleGenerators] = useState<Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>>([]);
   const [storyboardGenerators, setStoryboardGenerators] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
   const [scriptFrameGenerators, setScriptFrameGenerators] = useState<ScriptFrameGenerator[]>([]);
   const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
@@ -286,6 +288,37 @@ export function CanvasApp({ user }: CanvasAppProps) {
               isVectorizing: element.meta?.isVectorizing
             }];
           });
+        } else if (element.type === 'next-scene-plugin') {
+          setNextSceneGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
+              mode: element.meta?.mode,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isProcessing: element.meta?.isProcessing
+            }];
+          });
+        } else if (element.type === 'multiangle-plugin') {
+          setMultiangleGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              multiangleImageUrl: element.meta?.multiangleImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localMultiangleImageUrl: element.meta?.localMultiangleImageUrl || null,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isProcessing: element.meta?.isProcessing
+            }];
+          });
         } else if (element.type === 'storyboard-plugin') {
           setStoryboardGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -359,6 +392,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setNextSceneGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
@@ -452,6 +486,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setEraseGenerators(updatePluginPosition);
         setExpandGenerators(updatePluginPosition);
         setVectorizeGenerators(updatePluginPosition);
+        setNextSceneGenerators(updatePluginPosition);
         setStoryboardGenerators(updatePluginPosition);
         setScriptFrameGenerators(updatePluginPosition);
         setSceneFrameGenerators(updatePluginPosition);
@@ -523,6 +558,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setEraseGenerators(updatePluginState);
         setExpandGenerators(updatePluginState);
         setVectorizeGenerators(updatePluginState);
+        setNextSceneGenerators(updatePluginState);
         setStoryboardGenerators(updatePluginState);
         setScriptFrameGenerators(updatePluginState);
         setSceneFrameGenerators(updatePluginState);
@@ -583,6 +619,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           eraseGenerators,
           expandGenerators,
           vectorizeGenerators,
+          nextSceneGenerators,
+          multiangleGenerators,
           storyboardGenerators,
           scriptFrameGenerators,
           sceneFrameGenerators,
@@ -801,6 +839,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           eraseGenerators,
           expandGenerators,
           vectorizeGenerators,
+          nextSceneGenerators,
+          multiangleGenerators,
           storyboardGenerators,
           scriptFrameGenerators,
           sceneFrameGenerators,
@@ -819,7 +859,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, multiangleGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -838,9 +878,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
           const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
+          const newMultiangleGenerators: Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
           const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
           const newScriptFrameGenerators: ScriptFrameGenerator[] = [];
           const newSceneFrameGenerators: SceneFrameGenerator[] = [];
+          const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
           // Track connector signatures to prevent duplicates: "from|to|toAnchor"
@@ -999,6 +1041,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'multiangle-plugin') {
+                newMultiangleGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  multiangleImageUrl: element.meta?.multiangleImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localMultiangleImageUrl: element.meta?.localMultiangleImageUrl || null,
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isProcessing: element.meta?.isProcessing || false,
+                });
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'storyboard-plugin') {
                 newStoryboardGenerators.push({
                   id: element.id,
@@ -1048,6 +1105,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'next-scene-plugin') {
+                newNextSceneGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
+                  sourceImageUrl: element.meta?.sourceImageUrl || null,
+                  localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
+                  mode: element.meta?.mode || 'scene',
+                  frameWidth: element.meta?.frameWidth || 400,
+                  frameHeight: element.meta?.frameHeight || 500,
+                  isProcessing: element.meta?.isProcessing || false,
+                });
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
               }
             }
           });
@@ -1060,9 +1133,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setEraseGenerators(newEraseGenerators);
           setExpandGenerators(newExpandGenerators);
           setVectorizeGenerators(newVectorizeGenerators);
+          setMultiangleGenerators(newMultiangleGenerators);
           setStoryboardGenerators(newStoryboardGenerators);
           setScriptFrameGenerators(newScriptFrameGenerators);
           setSceneFrameGenerators(newSceneFrameGenerators);
+          setNextSceneGenerators(newNextSceneGenerators);
           setTextGenerators(newTextGenerators);
           setConnectors(newConnectors);
 
@@ -1163,6 +1238,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
     eraseGenerators,
     expandGenerators,
     vectorizeGenerators,
+    nextSceneGenerators,
+    multiangleGenerators,
     storyboardGenerators,
     scriptFrameGenerators,
     sceneFrameGenerators,
@@ -1182,6 +1259,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setEraseGenerators,
     setExpandGenerators,
     setVectorizeGenerators,
+    setNextSceneGenerators,
+    setMultiangleGenerators,
     setStoryboardGenerators,
     setScriptFrameGenerators,
     setSceneFrameGenerators,
@@ -1959,6 +2038,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalEraseModals={eraseGenerators}
               externalExpandModals={expandGenerators}
               externalVectorizeModals={vectorizeGenerators}
+              externalNextSceneModals={nextSceneGenerators}
+              externalMultiangleModals={multiangleGenerators}
               externalStoryboardModals={storyboardGenerators}
               externalScriptFrameModals={scriptFrameGenerators}
               externalSceneFrameModals={sceneFrameGenerators}
@@ -2012,6 +2093,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         eraseGenerators,
                         expandGenerators,
                         vectorizeGenerators,
+                        nextSceneGenerators,
+                        multiangleGenerators,
                         storyboardGenerators,
                         scriptFrameGenerators,
                         sceneFrameGenerators,
@@ -2055,6 +2138,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         eraseGenerators,
                         expandGenerators,
                         vectorizeGenerators,
+                        nextSceneGenerators,
+                        multiangleGenerators,
                         storyboardGenerators,
                         scriptFrameGenerators,
                         sceneFrameGenerators,
@@ -2263,6 +2348,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistVectorizeModalMove={pluginHandlers.onPersistVectorizeModalMove}
               onPersistVectorizeModalDelete={pluginHandlers.onPersistVectorizeModalDelete}
               onVectorize={pluginHandlers.onVectorize}
+              onPersistNextSceneModalCreate={pluginHandlers.onPersistNextSceneModalCreate}
+              onPersistNextSceneModalMove={pluginHandlers.onPersistNextSceneModalMove}
+              onPersistNextSceneModalDelete={pluginHandlers.onPersistNextSceneModalDelete}
+              onPersistMultiangleModalCreate={pluginHandlers.onPersistMultiangleModalCreate}
+              onPersistMultiangleModalMove={pluginHandlers.onPersistMultiangleModalMove}
+              onPersistMultiangleModalDelete={pluginHandlers.onPersistMultiangleModalDelete}
               onPersistStoryboardModalCreate={pluginHandlers.onPersistStoryboardModalCreate}
               onPersistStoryboardModalMove={pluginHandlers.onPersistStoryboardModalMove}
               onPersistStoryboardModalDelete={pluginHandlers.onPersistStoryboardModalDelete}
@@ -2538,6 +2629,85 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         frameWidth: 400,
                         frameHeight: 500,
                         isVectorizing: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+          } else if (plugin.id === 'multiangle') {
+            const viewportCenter = viewportCenterRef.current;
+            let modalX: number;
+            let modalY: number;
+
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+
+            const modalId = `multiangle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newMultiangle = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              multiangleImageUrl: null,
+              sourceImageUrl: null,
+              localMultiangleImageUrl: null,
+              frameWidth: 400,
+              frameHeight: 500,
+              isProcessing: false,
+            };
+            console.log('[Plugin] Creating multiangle modal at viewport center:', newMultiangle, 'viewportCenter:', viewportCenter);
+            // Persist via callback (this will trigger realtime + ops)
+            (async () => {
+              // Optimistic update
+              setMultiangleGenerators(prev => {
+                if (prev.some(m => m.id === modalId)) {
+                  console.log('[Plugin] Multiangle modal already exists, skipping');
+                  return prev;
+                }
+                const updated = [...prev, newMultiangle];
+                console.log('[Plugin] Updated multiangleGenerators, count:', updated.length);
+                return updated;
+              });
+              // Broadcast via realtime
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create multiangle', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'multiangle' as any,
+                  x: modalX,
+                  y: modalY,
+                  multiangleImageUrl: null,
+                  sourceImageUrl: null,
+                  localMultiangleImageUrl: null,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isProcessing: false,
+                });
+              }
+              // Always append op for undo/redo and persistence
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'multiangle-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        multiangleImageUrl: null,
+                        sourceImageUrl: null,
+                        localMultiangleImageUrl: null,
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isProcessing: false,
                       },
                     },
                   },
@@ -2866,6 +3036,70 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
                 });
               }
+            })().catch(console.error);
+          } else if (plugin.id === 'next-scene') {
+            const viewportCenter = viewportCenterRef.current;
+            const modalX = viewportCenter.x;
+            const modalY = viewportCenter.y;
+            const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newNextScene = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              nextSceneImageUrl: null,
+              sourceImageUrl: null,
+              localNextSceneImageUrl: null,
+              mode: 'scene',
+              frameWidth: 400,
+              frameHeight: 500,
+              isProcessing: false,
+            };
+            console.log('[Plugin] Creating next-scene modal at viewport center:', newNextScene);
+            (async () => {
+              setNextSceneGenerators(prev => {
+                if (prev.some(m => m.id === modalId)) return prev;
+                return [...prev, newNextScene];
+              });
+              if (realtimeActive) {
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'next-scene-plugin',
+                  x: modalX,
+                  y: modalY,
+                  nextSceneImageUrl: null,
+                  sourceImageUrl: null,
+                  localNextSceneImageUrl: null,
+                  mode: 'scene',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isProcessing: false,
+                });
+              }
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'next-scene-plugin',
+                      x: modalX,
+                      y: modalY,
+                      meta: {
+                        nextSceneImageUrl: null,
+                        sourceImageUrl: null,
+                        localNextSceneImageUrl: null,
+                        mode: 'scene',
+                        frameWidth: 400,
+                        frameHeight: 500,
+                        isProcessing: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+              await pluginHandlers.onPersistNextSceneModalCreate(newNextScene);
             })().catch(console.error);
           }
           setIsPluginSidebarOpen(false);

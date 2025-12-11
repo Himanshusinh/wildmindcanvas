@@ -136,6 +136,32 @@ export interface VectorizeModalState {
   isVectorizing?: boolean;
 }
 
+export interface NextSceneModalState {
+  id: string;
+  x: number;
+  y: number;
+  nextSceneImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localNextSceneImageUrl?: string | null;
+  mode?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isProcessing?: boolean;
+}
+
+export interface MultiangleModalState {
+  id: string;
+  x: number;
+  y: number;
+  multiangleImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localMultiangleImageUrl?: string | null;
+  frameWidth?: number;
+  frameHeight?: number;
+  isProcessing?: boolean;
+}
+
+
 export interface StoryboardModalState {
   id: string;
   x: number;
@@ -217,6 +243,8 @@ export interface ModalOverlaysProps {
   eraseModalStates?: EraseModalState[];
   expandModalStates?: ExpandModalState[];
   vectorizeModalStates?: VectorizeModalState[];
+  nextSceneModalStates?: NextSceneModalState[];
+  multiangleModalStates?: MultiangleModalState[];
   storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
@@ -240,6 +268,10 @@ export interface ModalOverlaysProps {
   selectedExpandModalIds?: string[];
   selectedVectorizeModalId?: string | null;
   selectedVectorizeModalIds?: string[];
+  selectedNextSceneModalId?: string | null;
+  selectedNextSceneModalIds?: string[];
+  selectedMultiangleModalId?: string | null;
+  selectedMultiangleModalIds?: string[];
   selectedStoryboardModalId?: string | null;
   selectedStoryboardModalIds?: string[];
   clearAllSelections: () => void;
@@ -274,6 +306,12 @@ export interface ModalOverlaysProps {
   setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
   setSelectedVectorizeModalId?: (id: string | null) => void;
   setSelectedVectorizeModalIds?: (ids: string[]) => void;
+  setNextSceneModalStates?: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
+  setSelectedNextSceneModalId?: (id: string | null) => void;
+  setSelectedNextSceneModalIds?: (ids: string[]) => void;
+  setMultiangleModalStates?: React.Dispatch<React.SetStateAction<MultiangleModalState[]>>;
+  setSelectedMultiangleModalId?: (id: string | null) => void;
+  setSelectedMultiangleModalIds?: (ids: string[]) => void;
   setStoryboardModalStates?: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
   setScriptFrameModalStates?: React.Dispatch<React.SetStateAction<ScriptFrameModalState[]>>;
   setSelectedStoryboardModalId?: (id: string | null) => void;
@@ -340,6 +378,12 @@ export interface ModalOverlaysProps {
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
+  onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
+  onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
+  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
+  onPersistMultiangleModalDelete?: (id: string) => void | Promise<void>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
@@ -367,5 +411,6 @@ export interface ModalOverlaysProps {
   onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
   onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
   onPluginSidebarOpen?: () => void;
+  onUpdateImageModalState?: (modalId: string, updates: Partial<{ generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }>) => void;
 }
 
