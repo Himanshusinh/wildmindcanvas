@@ -489,6 +489,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           initialFrame={modalState.frame}
           initialAspectRatio={modalState.aspectRatio}
           initialPrompt={modalState.prompt}
+          frameWidth={modalState.frameWidth}
+          frameHeight={modalState.frameHeight}
           onOptionsChange={(opts) => {
             // Update local state to keep UI in sync
             setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));

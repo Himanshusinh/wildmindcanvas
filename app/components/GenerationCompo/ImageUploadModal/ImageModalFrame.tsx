@@ -18,6 +18,8 @@ interface ImageModalFrameProps {
   externalIsGenerating?: boolean;
   onSelect?: () => void;
   getAspectRatio: (ratio: string) => string;
+  width?: number;
+  height?: number;
 }
 
 export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
@@ -34,6 +36,8 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   externalIsGenerating,
   onSelect,
   getAspectRatio,
+  width,
+  height,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -43,6 +47,11 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   const frameBorderWidth = 2;
   const frameBg = isDark ? '#121212' : '#ffffff';
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
+
+  // Use props width/height if available, otherwise fallback to default behavior
+  // Note: if width/height are provided, we use them directly.
+  // Otherwise we default to 600 width and use aspect ratio for height.
+  const finalWidth = width || 600;
 
   return (
     <div
@@ -54,10 +63,11 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         }
       }}
       style={{
-        width: `${600 * scale}px`,
+        width: `${finalWidth * scale}px`,
         maxWidth: '90vw',
-        aspectRatio: getAspectRatio(displayAspectRatio),
-        minHeight: `${400 * scale}px`,
+        aspectRatio: width && height ? undefined : getAspectRatio(displayAspectRatio),
+        height: height ? `${height * scale}px` : undefined,
+        minHeight: `${(height || 400) * scale}px`,
         backgroundColor: frameBg,
         borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${20 * scale}px`,
         // keep top/left/right borders, but remove bottom border when controls are hovered (only for generated images)

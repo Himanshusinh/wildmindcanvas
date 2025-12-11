@@ -40,6 +40,8 @@ interface ImageUploadModalProps {
   initialPrompt?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number; isGenerating?: boolean }) => void;
   initialCount?: number;
+  frameWidth?: number;
+  frameHeight?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, sceneNumber?: number, previousSceneImageUrl?: string, storyboardMetadata?: Record<string, string>, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
@@ -95,6 +97,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   scriptFrameModalStates = [],
   storyboardModalStates = [],
   refImages = {},  // Flat map of character/location names to image URLs
+  frameWidth,
+  frameHeight,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -1335,19 +1339,32 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   new: `${newWidth}x${newHeight}`
                 });
 
+                const newAspectRatio = `${newWidth}:${newHeight}`;
+
+                // Check if dimensions are already correct to avoid infinite loop
+                if (frameWidth === newWidth && frameHeight === newHeight) {
+                  return;
+                }
+
+                console.log('[ImageUploadModal] Auto-resizing for plugin result:', {
+                  model: selectedModel,
+                  natural: `${naturalWidth}x${naturalHeight}`,
+                  new: `${newWidth}x${newHeight}`,
+                  old: `${frameWidth}x${frameHeight}`
+                });
+
                 if (onOptionsChange) {
                   onOptionsChange({
                     frameWidth: newWidth,
                     frameHeight: newHeight,
-                    // We also likely want to update aspect ratio string to 'Custom' or approximate ratio
-                    // but keeping it simple for now to just resize frame
+                    aspectRatio: newAspectRatio,
                   } as any);
                 }
               }
             };
             img.src = generatedImageUrl;
           }
-        }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange]);
+        }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange, frameWidth, frameHeight]);
         return null;
       })()}
 
@@ -1385,6 +1402,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
+          width={frameWidth}
+          height={frameHeight}
         />
         <ImageModalNodes
           id={id}
