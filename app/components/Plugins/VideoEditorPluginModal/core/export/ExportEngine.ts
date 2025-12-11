@@ -1863,17 +1863,18 @@ export class ExportEngine {
                 // CSS uses clip-path - approximate with translateY
                 return { translateY: -50 + 50 * p, opacity: p };
 
-            // === FLIP (3D approximated) ===
+            // === FLIP (3D approximated with scaleY/scaleX for rotateX/rotateY) ===
             case 'flip-down-1':
+                // CSS: from perspective rotateX(90deg) → simulate with scaleY
+                return { scaleY: p, opacity: p };
             case 'flip-down-2':
-                // CSS: from perspective rotateX(90deg), opacity 0 → to rotateX(0), opacity 1
-                // Approximate 3D with scale + slight translateY
-                return { scale: 0.3 + 0.7 * p, translateY: -20 + 20 * p, opacity: p };
-
+                // CSS: from rotateX(90deg) scale(0.8) → simulate with scaleY + scale
+                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
             case 'flip-up-1':
+                // CSS: from rotateX(-90deg) → simulate with scaleY
+                return { scaleY: p, opacity: p };
             case 'flip-up-2':
-                // CSS: from rotateX(-90deg), opacity 0
-                return { scale: 0.3 + 0.7 * p, translateY: 20 - 20 * p, opacity: p };
+                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
 
             // === FLY ===
             case 'fly-in-rotate':
@@ -1881,9 +1882,8 @@ export class ExportEngine {
                 return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
 
             case 'fly-in-flip':
-                // CSS: from translateX(-100%) rotateY(90deg) → 3D flip approximated
-                const flipScale = Math.abs(Math.cos((1 - p) * Math.PI / 2));
-                return { translateX: -100 + 100 * p, scaleX: flipScale, opacity: p };
+                // CSS: from translateX(-100%) rotateY(90deg) → simulate rotateY with scaleX
+                return { translateX: -100 + 100 * p, scaleX: p, opacity: p };
 
             case 'fly-to-zoom':
                 // CSS: from scale(0) translateX(-100%), opacity 0 → to scale(1) translateX(0), opacity 1

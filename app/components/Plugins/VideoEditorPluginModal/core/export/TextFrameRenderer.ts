@@ -191,17 +191,25 @@ function calculateAnimationStyle(item: TimelineItem, currentTime: number): {
             }
         case 'shard-roll': return { rotate: 360 - 360 * p, scale: p, opacity: p };
 
+        // FLIP ANIMATIONS: CSS uses rotateX/rotateY with perspective for 3D effect
+        // In 2D Canvas, we simulate this by scaling the axis being rotated
         case 'flip-down-1':
+            // Flip from top (rotateX: 90deg -> 0): simulate with scaleY
+            return { scaleY: p, opacity: p };
         case 'flip-down-2':
-            return { scale: 0.3 + 0.7 * p, translateY: -20 + 20 * p, opacity: p };
+            // Flip from top with scale
+            return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
         case 'flip-up-1':
+            // Flip from bottom: simulate with scaleY
+            return { scaleY: p, opacity: p };
         case 'flip-up-2':
-            return { scale: 0.3 + 0.7 * p, translateY: 20 - 20 * p, opacity: p };
+            // Flip from bottom with scale
+            return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
 
         case 'fly-in-rotate': return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
         case 'fly-in-flip':
-            const flipScale = Math.abs(Math.cos((1 - p) * Math.PI / 2));
-            return { translateX: -100 + 100 * p, scaleX: flipScale, opacity: p };
+            // Fly in from left while rotating on Y axis (simulated with scaleX)
+            return { translateX: -100 + 100 * p, scaleX: p, opacity: p };
         case 'fly-to-zoom': return { scale: p, translateX: -100 + 100 * p, opacity: p };
 
         case 'grow-shrink':
@@ -319,8 +327,11 @@ function renderTextFrame(
     }
 
     if (animStyle.rotate) ctx.rotate((animStyle.rotate * Math.PI) / 180);
-    if (animStyle.translateX || animStyle.translateY) {
-        ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+    // Animation translateX/Y are percentages - convert to pixels
+    const animTranslateX = (animStyle.translateX ?? 0) / 100 * canvas.width;
+    const animTranslateY = (animStyle.translateY ?? 0) / 100 * canvas.height;
+    if (animTranslateX !== 0 || animTranslateY !== 0) {
+        ctx.translate(animTranslateX, animTranslateY);
     }
 
     // Apply blur filter if needed

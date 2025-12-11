@@ -841,9 +841,11 @@ class FFmpegExportService {
         const totalRotate = (style.rotate ?? 0) + (animStyle.rotate ?? 0);
         if (totalRotate) ctx.rotate((totalRotate * Math.PI) / 180);
 
-        // Animation translate
-        if (animStyle.translateX || animStyle.translateY) {
-            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        // Animation translate - convert percentages to pixels
+        const animTx = (animStyle.translateX ?? 0) / 100 * canvas.width;
+        const animTy = (animStyle.translateY ?? 0) / 100 * canvas.height;
+        if (animTx !== 0 || animTy !== 0) {
+            ctx.translate(animTx, animTy);
         }
 
         // Item transforms
@@ -944,15 +946,20 @@ class FFmpegExportService {
         // Base transform
         ctx.translate(x + width / 2, y + height / 2);
 
-        // Animation transforms
-        if (animStyle.scale) {
-            ctx.scale(animStyle.scale, animStyle.scale);
+        // Animation transforms - with scaleX/scaleY support and percentage-to-pixel conversion
+        const sX = (animStyle.scale ?? 1) * (animStyle.scaleX ?? 1);
+        const sY = (animStyle.scale ?? 1) * (animStyle.scaleY ?? 1);
+        if (sX !== 1 || sY !== 1) {
+            ctx.scale(sX, sY);
         }
         if (animStyle.rotate) {
             ctx.rotate((animStyle.rotate * Math.PI) / 180);
         }
-        if (animStyle.translateX || animStyle.translateY) {
-            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        // Convert percentage-based translate to pixels
+        const animTx = (animStyle.translateX ?? 0) / 100 * canvas.width;
+        const animTy = (animStyle.translateY ?? 0) / 100 * canvas.height;
+        if (animTx !== 0 || animTy !== 0) {
+            ctx.translate(animTx, animTy);
         }
 
         // Item transforms
@@ -1183,17 +1190,20 @@ class FFmpegExportService {
             case 'expansion': return { scaleX: p, opacity: p };
             case 'shard-roll': return { rotate: 360 - 360 * p, scale: p, opacity: p };
 
+            // FLIP ANIMATIONS: Simulate 3D rotateX/rotateY with scaleY/scaleX
             case 'flip-down-1':
+                return { scaleY: p, opacity: p };
             case 'flip-down-2':
-                return { scale: 0.3 + 0.7 * p, translateY: -20 + 20 * p, opacity: p };
+                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
             case 'flip-up-1':
+                return { scaleY: p, opacity: p };
             case 'flip-up-2':
-                return { scale: 0.3 + 0.7 * p, translateY: 20 - 20 * p, opacity: p };
+                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
 
             case 'fly-in-rotate': return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
             case 'fly-in-flip':
-                const flipScale = Math.abs(Math.cos((1 - p) * Math.PI / 2));
-                return { translateX: -100 + 100 * p, scaleX: flipScale, opacity: p };
+                // Simulate rotateY with scaleX
+                return { translateX: -100 + 100 * p, scaleX: p, opacity: p };
             case 'fly-to-zoom': return { scale: p, translateX: -100 + 100 * p, opacity: p };
 
             case 'grow-shrink':
@@ -1454,8 +1464,11 @@ class FFmpegExportService {
         if (animStyle.rotate) {
             ctx.rotate((animStyle.rotate * Math.PI) / 180);
         }
-        if (animStyle.translateX || animStyle.translateY) {
-            ctx.translate(animStyle.translateX || 0, animStyle.translateY || 0);
+        // Convert percentage-based translate to pixels
+        const animTx = (animStyle.translateX ?? 0) / 100 * canvas.width;
+        const animTy = (animStyle.translateY ?? 0) / 100 * canvas.height;
+        if (animTx !== 0 || animTy !== 0) {
+            ctx.translate(animTx, animTy);
         }
 
         // Apply blur filter if needed
