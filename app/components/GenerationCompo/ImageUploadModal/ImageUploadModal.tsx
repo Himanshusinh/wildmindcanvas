@@ -102,6 +102,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const processedImageRef = useRef<string | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -1312,26 +1313,24 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       {(() => {
         useEffect(() => {
           if (generatedImageUrl && isUploadedImage) {
+            // STRICT SAFETY CHECK:
+            // If we have already processed this exact image URL, do absolutely nothing.
+            if (processedImageRef.current === generatedImageUrl) {
+              return;
+            }
+
             const img = new window.Image();
             img.onload = () => {
               const naturalWidth = img.naturalWidth;
               const naturalHeight = img.naturalHeight;
 
               if (naturalWidth && naturalHeight) {
-                // Calculate new dimensions with max width constraint
                 const MAX_WIDTH = 600;
-                // If image is smaller than max width, use natural size (but at least 300)
-                // If larger, scale down to max width
                 let newWidth = Math.min(Math.max(naturalWidth, 300), MAX_WIDTH);
                 let newHeight = Math.round(newWidth * (naturalHeight / naturalWidth));
 
-                // Check if dimensions actually changed significantly (avoid infinite loops)
-                // accessing frameWidth/Height from props/state if available, 
-                // but since we don't have direct access to current frameWidth/Height state in this scope easily without prop drill,
-                // we'll rely on onOptionsChange to handle the update.
-                // WE SHOULD ONLY DO THIS ONCE per image generation to avoid fighting with user resize.
-                // However, detecting "new" image vs "same" image is hard without prevRef.
-                // For now, we rely on generatedImageUrl changing.
+                // Mark this URL as processed BEFORE triggering any updates
+                processedImageRef.current = generatedImageUrl;
 
                 console.log('[ImageUploadModal] Auto-resizing for plugin result:', {
                   model: selectedModel,
@@ -1341,24 +1340,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
                 const newAspectRatio = `${newWidth}:${newHeight}`;
 
-                // Check if dimensions are already correct to avoid infinite loop
-                if (frameWidth === newWidth && frameHeight === newHeight) {
-                  return;
-                }
-
-                console.log('[ImageUploadModal] Auto-resizing for plugin result:', {
-                  model: selectedModel,
-                  natural: `${naturalWidth}x${naturalHeight}`,
-                  new: `${newWidth}x${newHeight}`,
-                  old: `${frameWidth}x${frameHeight}`
-                });
-
                 if (onOptionsChange) {
-                  onOptionsChange({
-                    frameWidth: newWidth,
-                    frameHeight: newHeight,
-                    aspectRatio: newAspectRatio,
-                  } as any);
+                  // Only trigger update if dimensions actually need changing
+                  // (though the ref guard handles the loop, this prevents one unnecessary render if coincidentally correct)
+                  if (frameWidth !== newWidth || frameHeight !== newHeight) {
+                    onOptionsChange({
+                      frameWidth: newWidth,
+                      frameHeight: newHeight,
+                      aspectRatio: newAspectRatio,
+                    } as any);
+                  }
                 }
               }
             };
