@@ -421,6 +421,9 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
     };
 
     const handleTabChange = (tab: Tab) => {
+        // Close transition panel when switching tabs
+        setTransitionEditTarget(null);
+
         // If edit panel is open, close it and open resource panel
         if (isEditPanelOpen) {
             setIsEditPanelOpen(false);
@@ -440,6 +443,7 @@ const VideoEditorPluginModal: React.FC<VideoEditorPluginModalProps> = ({ isOpen,
 
     const handleOpenEditPanel = (view: 'main' | 'adjust' | 'eraser' | 'color' | 'text-effects' | 'animate' | 'font' = 'main') => {
         setIsResourcePanelOpen(false); // Close resource panel
+        setTransitionEditTarget(null); // Close transition panel
         setInteractionMode('none'); // Ensure regular edit mode
         setActiveEditView(view);
         setIsEditPanelOpen(true);

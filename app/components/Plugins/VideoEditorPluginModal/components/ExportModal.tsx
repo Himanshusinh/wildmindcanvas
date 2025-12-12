@@ -3,8 +3,8 @@
 // Original design inspired by Filmora concepts but with unique styling
 // =================================================================================================
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Download, Upload, Settings, Cpu, Zap, HardDrive, Clock, Server, Globe } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { X, Download, Upload, Settings, Cpu, Zap, HardDrive, Clock, Server, Globe, FolderOpen } from 'lucide-react';
 import type { Track, CanvasDimension } from '../types';
 import {
     exportEngine,
@@ -49,6 +49,10 @@ const ExportModal: React.FC<ExportModalProps> = ({
     const [useServerExport, setUseServerExport] = useState(false);
     const [serverAvailable, setServerAvailable] = useState(false);
 
+    // File System Access API state for custom save location
+    const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
+    const [saveLocation, setSaveLocation] = useState<string>('Downloads folder');
+
     // Load device capabilities on mount
     useEffect(() => {
         if (isOpen) {
@@ -92,6 +96,54 @@ const ExportModal: React.FC<ExportModalProps> = ({
         return sizeMB;
     }, [summaryInfo.bitrate, duration]);
 
+    // Check if File System Access API is supported
+    const isFileSystemAccessSupported = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+
+    // Handle choosing save location using File System Access API
+    const handleChooseSaveLocation = async () => {
+        if (!isFileSystemAccessSupported) {
+            console.warn('[ExportModal] File System Access API not supported');
+            return;
+        }
+
+        try {
+            // Get the appropriate file extension and MIME type
+            const formatConfig: Record<string, { extensions: string[], mimeType: string }> = {
+                mp4: { extensions: ['.mp4'], mimeType: 'video/mp4' },
+                webm: { extensions: ['.webm'], mimeType: 'video/webm' },
+                mov: { extensions: ['.mov'], mimeType: 'video/quicktime' },
+                mkv: { extensions: ['.mkv'], mimeType: 'video/x-matroska' },
+                avi: { extensions: ['.avi'], mimeType: 'video/x-msvideo' },
+            };
+
+            const config = formatConfig[settings.format] || formatConfig.mp4;
+
+            const options: SaveFilePickerOptions = {
+                suggestedName: `${settings.projectName}.${settings.format}`,
+                types: [
+                    {
+                        description: `${settings.format.toUpperCase()} Video`,
+                        accept: { [config.mimeType]: config.extensions },
+                    },
+                ],
+            };
+
+            const handle = await (window as any).showSaveFilePicker(options);
+            setFileHandle(handle);
+
+            // Extract the file name for display
+            const fileName = handle.name;
+            setSaveLocation(fileName);
+
+            console.log('[ExportModal] Save location selected:', fileName);
+        } catch (error: any) {
+            // User cancelled the picker or an error occurred
+            if (error.name !== 'AbortError') {
+                console.error('[ExportModal] Error choosing save location:', error);
+            }
+        }
+    };
+
     // Handle export
     const handleExport = async () => {
         setIsExporting(true);
@@ -115,15 +167,24 @@ const ExportModal: React.FC<ExportModalProps> = ({
                 blob = await exportEngine.export(tracks, duration, dimension, settings, setProgress);
             }
 
-            // Trigger download
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${settings.projectName}.${settings.format}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Save to chosen location or fall back to auto-download
+            if (fileHandle) {
+                // Use File System Access API to write to chosen location
+                try {
+                    console.log('[ExportModal] Saving to user-selected location...');
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    console.log('[ExportModal] File saved successfully to:', saveLocation);
+                } catch (writeError) {
+                    console.error('[ExportModal] Failed to write to chosen location, falling back to download:', writeError);
+                    // Fall back to download if writing fails
+                    triggerDownload(blob);
+                }
+            } else {
+                // Fall back to standard download
+                triggerDownload(blob);
+            }
 
             // Close modal after successful export
             setTimeout(() => {
@@ -134,6 +195,18 @@ const ExportModal: React.FC<ExportModalProps> = ({
             console.error('[ExportModal] Export failed:', error);
             setIsExporting(false);
         }
+    };
+
+    // Helper function to trigger browser download
+    const triggerDownload = (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${settings.projectName}.${settings.format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Check if option is recommended
@@ -219,9 +292,36 @@ const ExportModal: React.FC<ExportModalProps> = ({
                             <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-2">Save To</label>
                                 <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg">
-                                    <HardDrive className="w-4 h-4 text-gray-500" />
-                                    <span className="text-sm text-gray-400 flex-1">Downloads folder</span>
-                                    <span className="text-xs text-purple-400">Auto</span>
+                                    <HardDrive className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                    <span className="text-sm text-gray-400 flex-1 truncate" title={saveLocation}>
+                                        {fileHandle ? saveLocation : 'Downloads folder'}
+                                    </span>
+                                    {!fileHandle && (
+                                        <span className="text-xs text-purple-400 flex-shrink-0">Auto</span>
+                                    )}
+                                    {isFileSystemAccessSupported && (
+                                        <button
+                                            onClick={handleChooseSaveLocation}
+                                            disabled={isExporting}
+                                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 rounded-md transition-colors disabled:opacity-50"
+                                        >
+                                            <FolderOpen className="w-3.5 h-3.5" />
+                                            Browse
+                                        </button>
+                                    )}
+                                    {fileHandle && (
+                                        <button
+                                            onClick={() => {
+                                                setFileHandle(null);
+                                                setSaveLocation('Downloads folder');
+                                            }}
+                                            disabled={isExporting}
+                                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+                                            title="Reset to auto-download"
+                                        >
+                                            Reset
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
