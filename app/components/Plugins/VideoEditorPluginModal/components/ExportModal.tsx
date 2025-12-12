@@ -119,8 +119,7 @@ const ExportModal: React.FC<ExportModalProps> = ({
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            const extension = settings.format === 'mp4' ? 'mp4' : 'webm';
-            a.download = `${settings.projectName}.${extension}`;
+            a.download = `${settings.projectName}.${settings.format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -235,15 +234,24 @@ const ExportModal: React.FC<ExportModalProps> = ({
                             <label className="block text-sm font-medium text-gray-300 mb-2">Format</label>
                             <select
                                 value={settings.format}
-                                onChange={(e) => setSettings({ ...settings, format: e.target.value as 'mp4' | 'webm' })}
+                                onChange={(e) => setSettings({ ...settings, format: e.target.value as 'mp4' | 'webm' | 'mov' | 'mkv' | 'avi' })}
                                 disabled={isExporting}
                                 className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                             >
-                                <option value="webm" style={{ opacity: isRecommended('format', 'webm') ? 1 : 0.5 }}>
-                                    WebM {!isRecommended('format', 'webm') && showRecommendations && '(Not Recommended)'}
-                                </option>
                                 <option value="mp4" style={{ opacity: isRecommended('format', 'mp4') ? 1 : 0.5 }}>
-                                    MP4 {!isRecommended('format', 'mp4') && showRecommendations && '(Not Recommended)'}
+                                    MP4 (H.264) - Best Compatibility {!isRecommended('format', 'mp4') && showRecommendations && '(Not Recommended)'}
+                                </option>
+                                <option value="webm" style={{ opacity: isRecommended('format', 'webm') ? 1 : 0.5 }}>
+                                    WebM (VP9) - Web Optimized {!isRecommended('format', 'webm') && showRecommendations && '(Not Recommended)'}
+                                </option>
+                                <option value="mov" style={{ opacity: isRecommended('format', 'mov') ? 1 : 0.5 }}>
+                                    MOV (H.264) - Apple/Final Cut {!isRecommended('format', 'mov') && showRecommendations && '(Not Recommended)'}
+                                </option>
+                                <option value="mkv" style={{ opacity: isRecommended('format', 'mkv') ? 1 : 0.5 }}>
+                                    MKV (H.264) - High Quality {!isRecommended('format', 'mkv') && showRecommendations && '(Not Recommended)'}
+                                </option>
+                                <option value="avi" style={{ opacity: isRecommended('format', 'avi') ? 1 : 0.5 }}>
+                                    AVI (MPEG-4) - Legacy Support {!isRecommended('format', 'avi') && showRecommendations && '(Not Recommended)'}
                                 </option>
                             </select>
                         </div>
@@ -409,6 +417,15 @@ const ExportModal: React.FC<ExportModalProps> = ({
                                     }`} />
                             </button>
                         </div>
+
+                        {/* Server Export Text Warning */}
+                        {useServerExport && serverAvailable && (
+                            <div className="px-4 py-2 bg-amber-900/20 border border-amber-700/40 rounded-lg">
+                                <p className="text-xs text-amber-400">
+                                    <span className="font-medium">⚠️ Note:</span> If using text with custom fonts, font combinations, or text effects, turn off server-side export for proper rendering.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Recommend to Device Toggle */}
                         <div className="flex items-center justify-between px-4 py-3 bg-gray-800/50 rounded-lg border border-gray-700/50">

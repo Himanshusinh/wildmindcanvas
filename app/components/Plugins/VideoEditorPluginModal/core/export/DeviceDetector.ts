@@ -83,33 +83,28 @@ export class DeviceDetector {
             .slice(0, maxIndex + 1)
             .map(r => r.label);
 
-        // Check MediaRecorder codec support
+        // Check MediaRecorder codec support (for client-side)
+        // Note: Server-side FFmpeg supports all formats regardless of browser support
         const recommendedFormats: string[] = [];
         const recommendedEncoders: string[] = [];
 
-        // Check WebM VP9 (best quality)
+        // MP4 is the most compatible format - always recommend first
+        recommendedFormats.push('mp4');
+        recommendedEncoders.push('h264');
+
+        // Check WebM VP9 (best quality for web)
         if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
             recommendedFormats.push('webm');
             recommendedEncoders.push('vp9');
-        }
-
-        // Check WebM VP8 (good compatibility)
-        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-            if (!recommendedFormats.includes('webm')) recommendedFormats.push('webm');
-            recommendedEncoders.push('vp8');
-        }
-
-        // Check MP4 H.264 (best compatibility, but browser support varies)
-        if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264')) {
-            recommendedFormats.push('mp4');
-            recommendedEncoders.push('h264');
-        }
-
-        // Fallback
-        if (recommendedFormats.length === 0) {
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
             recommendedFormats.push('webm');
             recommendedEncoders.push('vp8');
         }
+
+        // MOV, MKV, AVI are always available via server-side FFmpeg
+        // These are recommended for specific use cases
+        recommendedFormats.push('mov', 'mkv', 'avi');
+        recommendedEncoders.push('mpeg4'); // For AVI
 
         // Hardware encoding recommendation
         // Dedicated GPUs (NVIDIA, AMD) are MORE LIKELY to have hardware encoding
@@ -137,9 +132,9 @@ export class DeviceDetector {
     private getDefaultCapabilities(): DeviceCapabilities {
         console.warn('[DeviceDetector] Using default capabilities (hardware detection failed)');
         return {
-            recommendedFormats: ['webm'],
+            recommendedFormats: ['mp4', 'webm', 'mov', 'mkv', 'avi'],
             recommendedResolutions: ['360p', '480p', '720p'],
-            recommendedEncoders: ['vp8'],
+            recommendedEncoders: ['h264', 'vp8', 'mpeg4'],
             maxResolution: RESOLUTION_PRESETS[2], // 720p safe default
             hardwareEncodingAvailable: false,
             isDedicatedGPU: false,

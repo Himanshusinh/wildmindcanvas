@@ -3,7 +3,7 @@
 // ============================================
 
 export interface ExportSettings {
-    format: 'mp4' | 'webm';
+    format: 'mp4' | 'webm' | 'mov' | 'mkv' | 'avi';
     resolution: {
         width: number;
         height: number;
@@ -11,7 +11,7 @@ export interface ExportSettings {
     };
     quality: 'low' | 'medium' | 'high';
     fps: number;
-    encoder: 'auto' | 'h264' | 'vp8' | 'vp9';
+    encoder: 'auto' | 'h264' | 'h265' | 'vp8' | 'vp9' | 'prores' | 'mpeg4';
     useGPU: boolean;
     projectName: string;
     thumbnailFile?: File;
@@ -63,7 +63,7 @@ export const BITRATE_CONFIGS: Record<string, BitrateConfig> = {
 };
 
 export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
-    format: 'webm',
+    format: 'mp4',
     resolution: RESOLUTION_PRESETS[3], // 1080p
     quality: 'high',
     fps: 30,
