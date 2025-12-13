@@ -142,8 +142,13 @@ export const computeStrokeForScale = (base: number, scale: number): number => {
   return Math.max(0.5, Math.min(8, Math.round(raw * 10) / 10));
 };
 
-export const computeCircleRadiusForScale = (base: number, scale: number): number => {
-  const effectiveScale = typeof scale === 'number' && !isNaN(scale) ? scale : 1;
-  const raw = base * effectiveScale;
-  return Math.max(1, Math.min(8, Math.round(raw * 10) / 10));
+export const computeCircleRadiusForScale = (_base: number, _scale: number): number => {
+  // Background dots are 4px diameter (2px radius) and maintain constant visual size
+  // Since connection line circles are in fixed-position SVG (screen space), not canvas space,
+  // they MUST use a fixed pixel size to maintain constant visual size like background dots
+  // Scale parameter is intentionally ignored - circles should never scale with zoom
+  // Match background dot size exactly: 2px radius (4px diameter)
+  // This ensures circles appear the same size regardless of zoom level (in or out)
+  // The circles will maintain constant visual size just like the background dots do
+  return 2;
 };

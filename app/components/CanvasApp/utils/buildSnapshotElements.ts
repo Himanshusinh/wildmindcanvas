@@ -582,6 +582,35 @@ export function buildSnapshotElements(
     elements[t.id] = { id: t.id, type: 'text-generator', x: t.x, y: t.y, meta: { value: t.value || '' } };
   });
 
+  // Canvas text (rich text) elements - persist all properties
+  if (state.canvasTextStates) {
+    state.canvasTextStates.forEach((text) => {
+      const metaObj: any = {
+        text: text.text || '',
+        fontSize: text.fontSize || 24,
+        fontWeight: text.fontWeight || 'normal',
+        fontStyle: text.fontStyle || 'normal',
+        fontFamily: text.fontFamily || 'Inter, sans-serif',
+        styleType: text.styleType || 'paragraph',
+        textAlign: text.textAlign || 'left',
+        color: text.color || '#ffffff',
+        width: text.width || 300,
+        height: text.height || 100,
+      };
+      // Attach any connections originating from this element into its meta
+      if (connectionsBySource[text.id] && connectionsBySource[text.id].length) {
+        metaObj.connections = connectionsBySource[text.id];
+      }
+      elements[text.id] = {
+        id: text.id,
+        type: 'canvas-text',
+        x: text.x,
+        y: text.y,
+        meta: metaObj,
+      };
+    });
+  }
+
   // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
   // Also include connector elements as top-level elements so snapshots contain explicit connector records
   const connectorsToUseFinal = connectorsOverride ?? state.connectors;

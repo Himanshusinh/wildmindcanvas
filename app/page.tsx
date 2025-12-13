@@ -23,6 +23,7 @@ import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSna
 import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
 import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/app/components/CanvasApp/types';
+import { CanvasTextState } from '@/app/components/ModalOverlays/types';
 import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
 
 interface CanvasAppProps {
@@ -45,13 +46,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [storyboardGenerators, setStoryboardGenerators] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>>([]);
   const [scriptFrameGenerators, setScriptFrameGenerators] = useState<ScriptFrameGenerator[]>([]);
   const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
+  const [canvasTextStates, setCanvasTextStates] = useState<CanvasTextState[]>([]);
+  const [selectedCanvasTextId, setSelectedCanvasTextId] = useState<string | null>(null);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
-  // Global reference images map - stores character/background/prop names to image URLs
-  // This is simpler and more reliable than storing sourceImageUrl in each scene modal
   const [refImages, setRefImages] = useState<Record<string, string>>({});
-  // Connectors (node-to-node links)
+
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
   const snapshotLoadedRef = useRef(false);
   const realtimeRef = useRef<RealtimeClient | null>(null);
@@ -821,11 +822,16 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // buildSnapshotElements is now imported from utils
 
   // Persist full snapshot on every interaction (debounced)
+  // Use longer debounce for canvasTextStates to prevent lag during typing/dragging
   useEffect(() => {
     if (!projectId) return;
     if (persistTimerRef.current) {
       window.clearTimeout(persistTimerRef.current);
     }
+    
+    // Use longer debounce (1000ms) when only canvasTextStates changes to prevent lag during typing
+    const debounceTime = 300;
+    
     persistTimerRef.current = window.setTimeout(async () => {
       try {
         const elements = buildSnapshotElements({
@@ -845,6 +851,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           scriptFrameGenerators,
           sceneFrameGenerators,
           textGenerators,
+          canvasTextStates,
           connectors,
           generationQueue,
         });
@@ -853,13 +860,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
       }
-    }, 300) as unknown as number;
+    }, debounceTime) as unknown as number;
     return () => {
       if (persistTimerRef.current) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, multiangleGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, multiangleGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -884,6 +891,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newSceneFrameGenerators: SceneFrameGenerator[] = [];
           const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
+          const newCanvasTextStates: Array<import('@/app/components/ModalOverlays/types').CanvasTextState> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
           // Track connector signatures to prevent duplicates: "from|to|toAnchor"
           const connectorSignatures = new Set<string>();
@@ -967,6 +975,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'text-generator') {
                 newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'canvas-text') {
+                newCanvasTextStates.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  text: element.meta?.text || 'add text here',
+                  fontSize: element.meta?.fontSize || 24,
+                  fontWeight: element.meta?.fontWeight || 'normal',
+                  fontStyle: element.meta?.fontStyle || 'normal',
+                  fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                  styleType: element.meta?.styleType || 'paragraph',
+                  textAlign: element.meta?.textAlign || 'left',
+                  color: element.meta?.color || '#ffffff',
+                  width: element.meta?.width || 300,
+                  height: element.meta?.height || 100,
+                });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
@@ -1139,6 +1166,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setSceneFrameGenerators(newSceneFrameGenerators);
           setNextSceneGenerators(newNextSceneGenerators);
           setTextGenerators(newTextGenerators);
+          setCanvasTextStates(newCanvasTextStates);
           setConnectors(newConnectors);
 
         }
@@ -1625,7 +1653,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleTextCreate = imageHandlers.handleTextCreate;
   const handleAddImageToCanvas = imageHandlers.handleAddImageToCanvas;
 
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
@@ -1636,7 +1664,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
 
-  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
+  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text') => {
     // Always update to trigger effect, even if tool is the same
     // Use counter to force re-render when clicking same tool again
     if (tool === selectedTool) {
@@ -2422,6 +2450,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
+              onToolSelect={handleToolSelect}
+              canvasTextStates={canvasTextStates}
+              setCanvasTextStates={setCanvasTextStates}
+              selectedCanvasTextId={selectedCanvasTextId}
+              setSelectedCanvasTextId={setSelectedCanvasTextId}
+              onPersistCanvasTextCreate={(text) => {
+                // Placeholder for persistence logic if needed
+                console.log('Persist canvas text create:', text);
+              }}
+              onPersistCanvasTextMove={(id, updates) => {
+                // Placeholder for persistence logic if needed
+                console.log('Persist canvas text move:', id, updates);
+                setCanvasTextStates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+              }}
+              onPersistCanvasTextDelete={(id) => {
+                // Placeholder for persistence logic if needed
+                console.log('Persist canvas text delete:', id);
+                setCanvasTextStates(prev => prev.filter(t => t.id !== id));
+              }}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
           </>

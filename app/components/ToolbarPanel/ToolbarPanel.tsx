@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 interface ToolbarPanelProps {
-  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
+  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
   onUpload?: (files: File[]) => void;
   isHidden?: boolean;
 }
@@ -31,7 +31,7 @@ const ensureThemeTransitionStyles = () => {
 };
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const [isDark, setIsDark] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
@@ -46,7 +46,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
     return () => observer.disconnect();
   }, []);
 
-  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
+  const handleToolClick = (tool: 'cursor' | 'move' | 'text' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
     // Debounce guard: ignore repeated clicks on same tool within 400ms
     const now = Date.now();
     if (lastToolClick.current.tool === tool && now - lastToolClick.current.time < 400) {
@@ -54,7 +54,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
     }
     lastToolClick.current = { tool, time: now };
 
-    // Only 'cursor' and 'move' are persistent selected tools. Other tools (text/image/video/music/library)
+    // Only 'cursor' and 'move' are persistent selected tools. Other tools (text/image/video/music/library/canvas-text)
     // act on single-click and should not remain visually selected.
     const persistent = tool === 'cursor' || tool === 'move';
     if (persistent) {
@@ -137,6 +137,15 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           <polyline points="4 7 4 4 20 4 20 7" />
           <line x1="9" y1="20" x2="15" y2="20" />
           <line x1="12" y1="4" x2="12" y2="20" />
+        </svg>
+      ),
+      label: 'AI Text',
+    },
+    {
+      id: 'canvas-text' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8.7504 4.125C9.19499 4.125 9.59787 4.38683 9.77843 4.7931L15.7783 18.2931C16.0307 18.8609 15.775 19.5257 15.2072 19.778C14.6394 20.0304 13.9746 19.7747 13.7222 19.2069L12.0935 15.5422L5.40708 15.542L3.77831 19.2066C3.52596 19.7744 2.86113 20.0301 2.29336 19.7777C1.72559 19.5254 1.4699 18.8606 1.72225 18.2928L7.72236 4.79308C7.90293 4.38681 8.30582 4.125 8.7504 4.125ZM6.40711 13.2921L11.0935 13.2922L8.75036 8.01997L6.40711 13.2921ZM20.4548 4.4545C20.8941 4.01516 21.6064 4.01517 22.0458 4.4545C22.4851 4.89384 22.4851 5.60616 22.0458 6.0455L18.0339 10.0573C17.5946 10.4967 16.8823 10.4967 16.4429 10.0574L14.5013 8.11574C14.062 7.6764 14.062 6.96409 14.5013 6.52475C14.9406 6.08541 15.6529 6.0854 16.0923 6.52474L17.2384 7.67087L20.4548 4.4545Z" fill="currentColor" />
         </svg>
       ),
       label: 'Text',

@@ -185,6 +185,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         pointerEvents: 'none',
         zIndex: 1000, // Lower than all components (2000+) so lines appear behind
         transition: 'none', // Disable all transitions
+        transform: 'none', // Ensure no transforms affect the SVG
+        // No viewBox - use pixel coordinates directly to ensure circles maintain fixed size
       }}
     >
       <defs>
@@ -214,6 +216,21 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
 
         return (
           <g key={connectionId}>
+            {/* Dashed helper line showing connection path (like in demo) */}
+            <path
+              d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+              stroke="#666"
+              strokeWidth={computeStrokeForScale(3, scale)}
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={`${10 * scale} ${10 * scale} 0 ${10 * scale}`}
+              opacity={0.3}
+              style={{
+                pointerEvents: 'none',
+                transition: 'none',
+              }}
+            />
+            {/* Main connection line */}
             <path
               d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
               stroke={strokeColor}
@@ -291,6 +308,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 pointerEvents: 'auto',
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
+                transform: 'none', // Ensure no transforms affect circle size
+                // Circle radius is fixed at 2px via computeCircleRadiusForScale to match background dots
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -310,6 +329,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 pointerEvents: 'auto',
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
+                transform: 'none', // Ensure no transforms affect circle size
+                // Circle radius is fixed at 2px via computeCircleRadiusForScale to match background dots
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -324,13 +345,30 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         );
       })}
       {activeDrag && (
-        <path
-          d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-          stroke="#437eb5"
-          strokeWidth={computeStrokeForScale(1.6, scale)}
-          fill="none"
-          strokeDasharray={`${6 * scale} ${4 * scale}`}
-        />
+        <>
+          {/* Dashed helper line for active drag */}
+          <path
+            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
+            stroke="#666"
+            strokeWidth={computeStrokeForScale(3, scale)}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${10 * scale} ${10 * scale} 0 ${10 * scale}`}
+            opacity={0.3}
+            style={{
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Main active drag line */}
+          <path
+            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
+            stroke="#437eb5"
+            strokeWidth={computeStrokeForScale(1.6, scale)}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${6 * scale} ${4 * scale}`}
+          />
+        </>
       )}
     </svg>
   );

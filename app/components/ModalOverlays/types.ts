@@ -174,6 +174,22 @@ export interface StoryboardModalState {
   backgroundNamesMap?: Record<number, string>;
 }
 
+export interface CanvasTextState {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  width?: number;
+  height?: number;
+  styleType: 'title' | 'heading' | 'paragraph'; // Kept for backward compatibility, but not used in UI
+  fontSize: number;
+  fontWeight: string;
+  fontStyle?: string; // 'normal' | 'italic'
+  fontFamily?: string; // Font family name
+  textAlign: 'left' | 'center' | 'right';
+  color: string; // Kept for backward compatibility, but text color is now theme-aware
+}
+
 export interface ScriptFrameModalState {
   id: string;
   pluginId: string;
@@ -412,5 +428,14 @@ export interface ModalOverlaysProps {
   onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
   onPluginSidebarOpen?: () => void;
   onUpdateImageModalState?: (modalId: string, updates: Partial<{ generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }>) => void;
+  // Canvas Text (Rich Text)
+  canvasTextStates?: CanvasTextState[];
+  setCanvasTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
+  selectedCanvasTextId?: string | null;
+  selectedCanvasTextIds?: string[];
+  setSelectedCanvasTextId?: (id: string | null) => void;
+  setSelectedCanvasTextIds?: (ids: string[]) => void;
+  onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
+  onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
+  onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
 }
-
