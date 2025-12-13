@@ -35,16 +35,39 @@ interface TransitionStyle {
     translateX?: number;
     translateY?: number;
     blur?: number;
-    clipX?: number;
-    clipWidth?: number;
+    // Filter effects
+    brightness?: number;
+    contrast?: number;
+    saturate?: number;
+    sepia?: number;
+    hueRotate?: number; // degrees
+    // Clip path types
+    clipType?: 'none' | 'inset' | 'circle' | 'polygon';
+    clipInset?: { top: number; right: number; bottom: number; left: number }; // percentages
+    clipCircle?: { radius: number; cx: number; cy: number }; // radius as %, cx/cy as %
+    clipPolygon?: Array<{ x: number; y: number }>; // array of points as %
+    // Blend mode
+    blendMode?: GlobalCompositeOperation;
 }
 
 class FFmpegExportService {
     private ffmpeg: FFmpeg | null = null;
     private loaded = false;
     private loading = false;
-    private readonly BATCH_SIZE = 30; // Process frames in batches of 30
     private mediaCache: Map<string, HTMLVideoElement | HTMLImageElement> = new Map();
+
+    // Dynamic batch size calculated based on resolution
+    private getBatchSize(width: number, height: number): number {
+        const pixels = width * height;
+        // 4K (3840x2160) = 8.3M pixels -> batch size 5
+        // 2K (2560x1440) = 3.7M pixels -> batch size 10
+        // 1080p (1920x1080) = 2M pixels -> batch size 20
+        // 720p (1280x720) = 0.9M pixels -> batch size 30
+        if (pixels >= 8000000) return 5;  // 4K+
+        if (pixels >= 3500000) return 10; // 2K
+        if (pixels >= 2000000) return 15; // 1080p
+        return 30; // 720p and below
+    }
 
     /**
      * Check if FFmpeg is available in browser
@@ -132,6 +155,17 @@ class FFmpegExportService {
         const totalFrames = Math.ceil(duration * settings.fps);
         const framePrefix = 'frame_';
 
+        // Calculate resolution-aware batch size for memory management
+        const isHighRes = settings.resolution.width >= 3840 || settings.resolution.height >= 2160;
+        const batchSize = this.getBatchSize(settings.resolution.width, settings.resolution.height);
+        const frameSizeMB = (settings.resolution.width * settings.resolution.height * 4) / (1024 * 1024);
+
+        console.log(`%c📊 Export Configuration:`, 'color: #00aaff; font-weight: bold');
+        console.log(`   Resolution: ${settings.resolution.width}x${settings.resolution.height} (${isHighRes ? '4K/HIGH-RES' : 'Standard'})`);
+        console.log(`   Frame size: ~${frameSizeMB.toFixed(1)}MB RGBA`);
+        console.log(`   Batch size: ${batchSize} frames (memory-optimized for resolution)`);
+        console.log(`   Total frames: ${totalFrames} (${(totalFrames / settings.fps).toFixed(1)}s at ${settings.fps}fps)`);
+
         onProgress({ phase: 'rendering', progress: 5 });
 
         // Step 1: Preload all video elements BEFORE rendering frames
@@ -140,12 +174,13 @@ class FFmpegExportService {
         console.log('%c✅ Media preloaded!', 'color: #00ff00');
 
         // Step 2: Render frames in batches for better memory management
-        console.log(`%c📸 Rendering ${totalFrames} frames in batches of ${this.BATCH_SIZE}...`, 'color: #ffaa00');
-        const totalBatches = Math.ceil(totalFrames / this.BATCH_SIZE);
+        console.log(`%c📸 Rendering ${totalFrames} frames in batches of ${batchSize}...`, 'color: #ffaa00');
+        const totalBatches = Math.ceil(totalFrames / batchSize);
+        let lastBatchTime = Date.now();
 
         for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-            const batchStart = batchIndex * this.BATCH_SIZE;
-            const batchEnd = Math.min(batchStart + this.BATCH_SIZE, totalFrames);
+            const batchStart = batchIndex * batchSize;
+            const batchEnd = Math.min(batchStart + batchSize, totalFrames);
             const batchFrames: string[] = [];
 
             console.log(`%c📦 Processing batch ${batchIndex + 1}/${totalBatches} (frames ${batchStart}-${batchEnd - 1})...`, 'color: #00aaff');
@@ -183,8 +218,21 @@ class FFmpegExportService {
             }
 
             // Batch complete - cleanup media cache to free memory
-            console.log(`   ✓ Batch ${batchIndex + 1} complete (${batchFrames.length} frames), clearing caches...`);
-            this.cleanupMediaCaches();
+            const batchTime = (Date.now() - lastBatchTime) / 1000;
+            const framesPerSec = batchFrames.length / batchTime;
+            const remainingBatches = totalBatches - batchIndex - 1;
+            const eta = (remainingBatches * batchTime).toFixed(0);
+
+            console.log(`   ✓ Batch ${batchIndex + 1}/${totalBatches} (${batchFrames.length} frames) | ${framesPerSec.toFixed(1)} fps | ETA: ${eta}s`);
+
+            // More aggressive cleanup for 4K
+            if (isHighRes) {
+                this.cleanupMediaCaches();
+            } else if (batchIndex % 3 === 0) {
+                // Cleanup every 3rd batch for lower resolutions
+                this.cleanupMediaCaches();
+            }
+            lastBatchTime = Date.now();
         }
 
         console.log('%c✅ All frames rendered!', 'color: #00ff00');
@@ -553,6 +601,13 @@ class FFmpegExportService {
 
         let renderedCount = 0;
 
+        // === CLIP ALL CONTENT TO CANVAS BOUNDS ===
+        // This matches the preview behavior where CSS overflow:hidden clips content to container
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.clip();
+
         // Render each item with transition effects
         for (const renderItem of renderItems) {
             const { item, role, transition, transitionProgress } = renderItem;
@@ -576,6 +631,9 @@ class FFmpegExportService {
                 renderedCount++;
             }
         }
+
+        // Restore context to remove clip
+        ctx.restore();
 
         return renderedCount;
     }
@@ -604,7 +662,7 @@ class FFmpegExportService {
 
     /**
      * Calculate transition effect style based on type, direction, and progress
-     * Matches ExportEngine.calculateTransitionStyle
+     * MATCHES Canvas.tsx getTransitionStyle exactly for full export parity
      */
     private calculateTransitionStyle(
         type: string,
@@ -615,7 +673,7 @@ class FFmpegExportService {
         const p = progress;
         const outP = 1 - p;
 
-        // Direction multipliers
+        // Direction Multipliers
         let xMult = 1, yMult = 0;
         if (direction === 'right') { xMult = -1; yMult = 0; }
         else if (direction === 'up') { xMult = 0; yMult = 1; }
@@ -629,25 +687,50 @@ class FFmpegExportService {
             case 'dissolve': {
                 const dissolveEase = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
                 return role === 'main'
-                    ? { opacity: dissolveEase }
-                    : { opacity: 1 - dissolveEase };
+                    ? { opacity: Math.max(0.01, dissolveEase), brightness: 0.98 + dissolveEase * 0.02 }
+                    : { opacity: Math.max(0.01, 1 - dissolveEase), brightness: 1 - (1 - dissolveEase) * 0.02 };
             }
             case 'film-dissolve': {
                 const filmP = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-                return role === 'main' ? { opacity: filmP } : { opacity: 1 - filmP };
+                const grain = Math.sin(p * 100) * 0.015;
+                return role === 'main'
+                    ? { opacity: Math.max(0.01, filmP), contrast: 1.05 + grain, saturate: 0.95 + filmP * 0.05, sepia: (1 - filmP) * 0.08 }
+                    : { opacity: Math.max(0.01, 1 - filmP), contrast: 1.05 + grain, saturate: 1 - (1 - filmP) * 0.05, sepia: filmP * 0.08 };
             }
             case 'additive-dissolve':
-                return role === 'main' ? { opacity: p } : { opacity: outP };
+                return role === 'main'
+                    ? { opacity: p, blendMode: 'lighter' as GlobalCompositeOperation }
+                    : { opacity: outP, blendMode: 'lighter' as GlobalCompositeOperation };
             case 'dip-to-black':
                 if (role === 'outgoing') {
-                    return p < 0.5 ? { opacity: 1 - p * 2 } : { opacity: 0.05 };
+                    if (p < 0.5) {
+                        const fadeOut = p * 2;
+                        const easeOut = Math.pow(fadeOut, 2);
+                        return { opacity: Math.max(0.05, 1 - easeOut), brightness: 1 - fadeOut * 0.6 };
+                    }
+                    return { opacity: 0.05 };
                 }
-                return p > 0.5 ? { opacity: (p - 0.5) * 2 } : { opacity: 0.05 };
+                if (p > 0.5) {
+                    const fadeIn = (p - 0.5) * 2;
+                    const easeIn = 1 - Math.pow(1 - fadeIn, 2);
+                    return { opacity: Math.max(0.05, easeIn), brightness: 0.4 + fadeIn * 0.6 };
+                }
+                return { opacity: 0.05 };
             case 'dip-to-white':
                 if (role === 'outgoing') {
-                    return p < 0.5 ? { opacity: 1 - p * 2 } : { opacity: 0.05 };
+                    if (p < 0.5) {
+                        const fadeOut = p * 2;
+                        const easeOut = Math.pow(fadeOut, 1.5);
+                        return { opacity: 1 - easeOut, brightness: 1 + fadeOut * 1.5, saturate: 1 - fadeOut * 0.7, contrast: 1 - fadeOut * 0.2 };
+                    }
+                    return { opacity: 0.05, brightness: 2.5, saturate: 0.3 };
                 }
-                return p > 0.5 ? { opacity: (p - 0.5) * 2 } : { opacity: 0.05 };
+                if (p > 0.5) {
+                    const fadeIn = (p - 0.5) * 2;
+                    const easeIn = 1 - Math.pow(1 - fadeIn, 1.5);
+                    return { opacity: Math.max(0.05, easeIn), brightness: 2.5 - fadeIn * 1.5, saturate: 0.3 + fadeIn * 0.7, contrast: 0.8 + fadeIn * 0.2 };
+                }
+                return { opacity: 0.05, brightness: 2.5, saturate: 0.3 };
             case 'fade-dissolve':
                 if (role === 'outgoing') return { opacity: p < 0.5 ? 1 - p * 2 : 0.05 };
                 return { opacity: p > 0.5 ? (p - 0.5) * 2 : 0.05 };
@@ -663,38 +746,93 @@ class FFmpegExportService {
                     : { translateX: xMult * -100 * p, translateY: yMult * -100 * p };
             case 'whip':
                 return role === 'main'
-                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, blur: Math.sin(p * Math.PI) * 5 }
-                    : { translateX: xMult * -100 * p, translateY: yMult * -100 * p, blur: Math.sin(p * Math.PI) * 5 };
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, blur: Math.sin(p * Math.PI) * 8 }
+                    : { translateX: xMult * -100 * p, translateY: yMult * -100 * p, blur: Math.sin(p * Math.PI) * 8 };
+            case 'split': {
+                const splitInset = 50 * outP;
+                return role === 'main'
+                    ? (direction === 'up' || direction === 'down')
+                        ? { clipType: 'inset', clipInset: { top: 0, right: splitInset, bottom: 0, left: splitInset } }
+                        : { clipType: 'inset', clipInset: { top: splitInset, right: 0, bottom: splitInset, left: 0 } }
+                    : {};
+            }
+            case 'band-slide':
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP }
+                    : { translateX: xMult * -100 * p, translateY: yMult * -100 * p };
 
             // === IRIS SHAPES ===
-            case 'iris-box':
+            case 'iris-box': {
+                const easeBox = easeOutCubic(p);
+                const insetPercent = 50 * (1 - easeBox);
+                return role === 'main'
+                    ? { clipType: 'inset', clipInset: { top: insetPercent, right: insetPercent, bottom: insetPercent, left: insetPercent }, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
+            }
             case 'iris-round':
             case 'circle': {
                 const easeCircle = easeOutCubic(p);
                 return role === 'main'
-                    ? { scale: easeCircle, opacity: easeCircle }
-                    : { opacity: outP };
+                    ? { clipType: 'circle', clipCircle: { radius: easeCircle * 75, cx: 50, cy: 50 }, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
+            }
+            case 'iris-diamond': {
+                const easeDiamond = easeOutCubic(p);
+                const size = 50 * easeDiamond;
+                return role === 'main'
+                    ? {
+                        clipType: 'polygon', clipPolygon: [
+                            { x: 50, y: 50 - size },
+                            { x: 50 + size, y: 50 },
+                            { x: 50, y: 50 + size },
+                            { x: 50 - size, y: 50 }
+                        ], brightness: 0.7 + 0.3 * p
+                    }
+                    : { brightness: 1 - p * 0.3 };
+            }
+            case 'iris-cross': {
+                const easeCross = easeOutCubic(p);
+                const w = 20 + (80 * easeCross);
+                const hw = w / 2;
+                return role === 'main'
+                    ? {
+                        clipType: 'polygon', clipPolygon: [
+                            { x: 50 - hw, y: 0 }, { x: 50 + hw, y: 0 }, { x: 50 + hw, y: 50 - hw },
+                            { x: 100, y: 50 - hw }, { x: 100, y: 50 + hw }, { x: 50 + hw, y: 50 + hw },
+                            { x: 50 + hw, y: 100 }, { x: 50 - hw, y: 100 }, { x: 50 - hw, y: 50 + hw },
+                            { x: 0, y: 50 + hw }, { x: 0, y: 50 - hw }, { x: 50 - hw, y: 50 - hw }
+                        ], brightness: 0.7 + 0.3 * p
+                    }
+                    : { brightness: 1 - p * 0.3 };
             }
 
             // === WIPES ===
             case 'wipe': {
                 const easeWipe = easeOutCubic(p);
+                const revealed = easeWipe * 100;
+                let inset = { top: 0, right: 0, bottom: 0, left: 0 };
+                if (direction === 'left') inset = { top: 0, right: 100 - revealed, bottom: 0, left: 0 };
+                else if (direction === 'right') inset = { top: 0, right: 0, bottom: 0, left: 100 - revealed };
+                else if (direction === 'up') inset = { top: 0, right: 0, bottom: 100 - revealed, left: 0 };
+                else if (direction === 'down') inset = { top: 100 - revealed, right: 0, bottom: 0, left: 0 };
                 return role === 'main'
-                    ? { clipX: direction === 'right' ? 0 : direction === 'left' ? 1 - easeWipe : 0, clipWidth: easeWipe }
-                    : {};
+                    ? { clipType: 'inset', clipInset: inset, brightness: 0.8 + 0.2 * p }
+                    : { brightness: 1 - p * 0.2 };
             }
             case 'barn-doors': {
                 const easeBarn = easeOutCubic(p);
-                return role === 'main' ? { scale: 0.5 + 0.5 * easeBarn, opacity: easeBarn } : { opacity: outP };
+                const insetX = 50 * (1 - easeBarn);
+                return role === 'main'
+                    ? { clipType: 'inset', clipInset: { top: 0, right: insetX, bottom: 0, left: insetX }, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
             }
 
             // === ZOOMS ===
             case 'cross-zoom': {
                 const blurAmount = Math.sin(p * Math.PI) * 10;
-                if (role === 'outgoing') {
-                    return { scale: 1 + p * 3, blur: blurAmount, opacity: outP };
-                }
-                return { scale: 3 - p * 2, blur: blurAmount, opacity: p };
+                return role === 'outgoing'
+                    ? { scale: 1 + p * 3, blur: blurAmount, opacity: outP }
+                    : { scale: 3 - p * 2, blur: blurAmount, opacity: p };
             }
             case 'zoom-in':
                 return role === 'main' ? { scale: 0.5 + 0.5 * p, opacity: p } : { opacity: outP };
@@ -718,16 +856,20 @@ class FFmpegExportService {
 
             // === GLITCH ===
             case 'glitch': {
-                const glitchOffset = Math.sin(p * 50) * 5 * (1 - p);
-                return role === 'main' ? { translateX: glitchOffset, opacity: p } : { translateX: -glitchOffset, opacity: outP };
+                // Match Canvas.tsx: hue-rotate, contrast, random offset, hard cut
+                const glitchIntensity = Math.sin(p * Math.PI);
+                const glitchOffset = Math.sin(p * 50) * 10 * glitchIntensity;
+                if (role === 'outgoing') {
+                    return p > 0.5 ? { opacity: 0 } : { translateX: -glitchOffset, translateY: glitchOffset, hueRotate: p * 90, contrast: 1.5, opacity: 1 };
+                }
+                return p > 0.5 ? { translateX: glitchOffset, translateY: -glitchOffset, hueRotate: p * 90, contrast: 1.5, opacity: 1 } : { opacity: 0 };
             }
 
             // === STACK ===
             case 'stack':
-                if (role === 'main') {
-                    return { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, scale: 0.8 + 0.2 * p, blur: outP * 3, opacity: 0.3 + 0.7 * p };
-                }
-                return { scale: 1 - p * 0.2, blur: p * 2, opacity: 1 - p * 0.3 };
+                return role === 'main'
+                    ? { translateX: xMult * 100 * outP, translateY: yMult * 100 * outP, scale: 0.8 + 0.2 * p, blur: outP * 3, opacity: 0.3 + 0.7 * p }
+                    : { scale: 1 - p * 0.2, blur: p * 2, opacity: 1 - p * 0.3 };
 
             // === MORPH ===
             case 'morph-cut':
@@ -739,20 +881,29 @@ class FFmpegExportService {
 
             // === FILM & LIGHT EFFECTS ===
             case 'film-burn':
-                return { scale: 1 + Math.sin(p * Math.PI) * 0.1, opacity: role === 'main' ? p : outP };
+                return { scale: 1 + Math.sin(p * Math.PI) * 0.1, brightness: 1 + Math.sin(p * Math.PI) * 0.3, opacity: role === 'main' ? p : outP };
             case 'light-leak':
-                return role === 'main' ? { opacity: p } : { opacity: outP };
+                return role === 'main'
+                    ? { opacity: p, brightness: 1 + Math.sin(p * Math.PI) * 0.5 }
+                    : { opacity: outP, brightness: 1 + Math.sin(p * Math.PI) * 0.3 };
             case 'luma-dissolve': {
                 const lumaP = 1 - Math.pow(1 - p, 2);
                 return role === 'main' ? { opacity: lumaP } : { opacity: 1 - lumaP };
             }
 
             // === DIGITAL EFFECTS ===
-            case 'rgb-split':
-                return { scale: 1 + Math.sin(p * Math.PI) * 0.1, opacity: role === 'main' ? p : outP };
+            case 'rgb-split': {
+                // Match Canvas.tsx: hue-rotate cycling through 360deg, scale pulsing
+                const scaleAmount = 1 + Math.sin(p * Math.PI) * 0.1;
+                return {
+                    hueRotate: p * 360,
+                    scale: scaleAmount,
+                    opacity: role === 'main' ? p : outP
+                };
+            }
             case 'pixelate':
             case 'chromatic-aberration':
-                return role === 'main' ? { opacity: p } : { opacity: outP };
+                return role === 'main' ? { opacity: p, contrast: 1.1 } : { opacity: outP };
             case 'datamosh':
                 return { scale: 1 + Math.sin(p * 8) * 0.08, opacity: role === 'main' ? p : outP };
 
@@ -776,7 +927,7 @@ class FFmpegExportService {
             case 'tile-drop':
                 return role === 'main' ? { translateY: -100 * outP, opacity: p } : { translateY: 100 * p, opacity: outP };
             case 'whip-pan':
-                return role === 'main' ? { translateX: 100 * outP } : { translateX: -100 * p };
+                return role === 'main' ? { translateX: 100 * outP, blur: Math.sin(p * Math.PI) * 10 } : { translateX: -100 * p, blur: Math.sin(p * Math.PI) * 10 };
             case 'film-roll':
                 return role === 'main' ? { translateY: 100 * outP } : { translateY: -100 * p };
 
@@ -784,9 +935,46 @@ class FFmpegExportService {
             case 'non-additive-dissolve':
                 return { opacity: role === 'main' ? Math.pow(p, 2) : Math.pow(outP, 2) };
             case 'flash-zoom-in':
-                return role === 'main' ? { scale: 2 - p, opacity: p } : { scale: 1 + p, opacity: outP };
+                return role === 'main' ? { scale: 2 - p, opacity: p, brightness: 1 + outP * 0.5 } : { scale: 1 + p, opacity: outP };
             case 'flash-zoom-out':
                 return role === 'main' ? { scale: 0.5 + p * 0.5, opacity: p } : { scale: 1 - p * 0.5, opacity: outP };
+
+            // === SHAPE TRANSITIONS ===
+            case 'shape-circle': {
+                const easeShape = easeOutCubic(p);
+                return role === 'main'
+                    ? { clipType: 'circle', clipCircle: { radius: easeShape * 75, cx: 50, cy: 50 } }
+                    : {};
+            }
+            case 'shape-heart': {
+                const easeHeart = easeOutCubic(p);
+                const s = easeHeart * 50;
+                return role === 'main'
+                    ? {
+                        clipType: 'polygon', clipPolygon: [
+                            { x: 50, y: 25 + (1 - easeHeart) * 25 },
+                            { x: 50 + s, y: 15 },
+                            { x: 50 + s * 0.8, y: 50 },
+                            { x: 50, y: 75 },
+                            { x: 50 - s * 0.8, y: 50 },
+                            { x: 50 - s, y: 15 }
+                        ]
+                    }
+                    : {};
+            }
+            case 'shape-triangle': {
+                const easeTri = easeOutCubic(p);
+                const ts = easeTri * 50;
+                return role === 'main'
+                    ? {
+                        clipType: 'polygon', clipPolygon: [
+                            { x: 50, y: 50 - ts },
+                            { x: 50 + ts * 0.866, y: 50 + ts * 0.5 },
+                            { x: 50 - ts * 0.866, y: 50 + ts * 0.5 }
+                        ]
+                    }
+                    : {};
+            }
 
             // DEFAULT
             default:
@@ -811,17 +999,60 @@ class FFmpegExportService {
 
         ctx.save();
 
-        // Apply CSS filters
+
+        // Apply animation
+        const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        // Build filter string from transition style + item adjustments
         let filterString = this.buildFilterString(item);
+
+        // Add transition filter effects
         if (style.blur) {
             filterString += ` blur(${style.blur}px)`;
         }
+        if (style.brightness !== undefined && style.brightness !== 1) {
+            filterString += ` brightness(${style.brightness})`;
+        }
+        if (style.contrast !== undefined && style.contrast !== 1) {
+            filterString += ` contrast(${style.contrast})`;
+        }
+        if (style.saturate !== undefined && style.saturate !== 1) {
+            filterString += ` saturate(${style.saturate})`;
+        }
+        if (style.sepia !== undefined && style.sepia !== 0) {
+            filterString += ` sepia(${style.sepia})`;
+        }
+        if (style.hueRotate !== undefined && style.hueRotate !== 0) {
+            filterString += ` hue-rotate(${style.hueRotate}deg)`;
+        }
+
+        // Add animation filter effects
+        if (animStyle.blur) {
+            filterString += ` blur(${animStyle.blur}px)`;
+        }
+        if (animStyle.brightness !== undefined) {
+            filterString += ` brightness(${animStyle.brightness})`;
+        }
+        if (animStyle.contrast !== undefined) {
+            filterString += ` contrast(${animStyle.contrast})`;
+        }
+        if (animStyle.saturate !== undefined) {
+            filterString += ` saturate(${animStyle.saturate})`;
+        }
+        if (animStyle.hueRotate !== undefined) {
+            filterString += ` hue-rotate(${animStyle.hueRotate}deg)`;
+        }
+
         if (filterString) {
             ctx.filter = filterString.trim();
         }
 
-        // Apply animation
-        const animStyle = this.calculateAnimationStyle(item, currentTime);
+        // Apply blend mode if specified
+        if (style.blendMode) {
+            ctx.globalCompositeOperation = style.blendMode;
+        }
+
+        // Animation calculated above
 
         // Base transform
         let tx = x + width / 2;
@@ -858,12 +1089,47 @@ class FFmpegExportService {
         const transitionOpacity = style.opacity ?? 1;
         ctx.globalAlpha = baseOpacity * animOpacity * transitionOpacity;
 
-        // Clip for wipe transitions
-        if (style.clipX !== undefined || style.clipWidth !== undefined) {
+        // Apply clip path for shape/wipe transitions
+        if (style.clipType && style.clipType !== 'none') {
             ctx.beginPath();
-            const clipX = (style.clipX ?? 0) * width;
-            const clipW = (style.clipWidth ?? 1) * width;
-            ctx.rect(-width / 2 + clipX, -height / 2, clipW, height);
+
+            if (style.clipType === 'inset' && style.clipInset) {
+                // Inset clip: top, right, bottom, left as percentages
+                const clipTop = (style.clipInset.top / 100) * height;
+                const clipRight = (style.clipInset.right / 100) * width;
+                const clipBottom = (style.clipInset.bottom / 100) * height;
+                const clipLeft = (style.clipInset.left / 100) * width;
+                ctx.rect(
+                    -width / 2 + clipLeft,
+                    -height / 2 + clipTop,
+                    width - clipLeft - clipRight,
+                    height - clipTop - clipBottom
+                );
+            } else if (style.clipType === 'circle' && style.clipCircle) {
+                // Circle clip: radius as %, cx/cy as %
+                const radius = (style.clipCircle.radius / 100) * Math.max(width, height);
+                const cx = (style.clipCircle.cx - 50) / 100 * width;
+                const cy = (style.clipCircle.cy - 50) / 100 * height;
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            } else if (style.clipType === 'polygon' && style.clipPolygon) {
+                // Polygon clip: array of points as percentages
+                const points = style.clipPolygon;
+                if (points.length > 0) {
+                    const firstPoint = points[0];
+                    ctx.moveTo(
+                        (firstPoint.x - 50) / 100 * width,
+                        (firstPoint.y - 50) / 100 * height
+                    );
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(
+                            (points[i].x - 50) / 100 * width,
+                            (points[i].y - 50) / 100 * height
+                        );
+                    }
+                    ctx.closePath();
+                }
+            }
+
             ctx.clip();
         }
 
@@ -934,14 +1200,32 @@ class FFmpegExportService {
 
         ctx.save();
 
-        // === APPLY CSS FILTERS ===
-        const filterString = this.buildFilterString(item);
-        if (filterString) {
-            ctx.filter = filterString;
-        }
-
         // === APPLY ANIMATION ===
         const animStyle = this.calculateAnimationStyle(item, currentTime);
+
+        // === APPLY CSS FILTERS ===
+        let filterString = this.buildFilterString(item);
+
+        // Add animation filter effects
+        if (animStyle.blur) {
+            filterString += ` blur(${animStyle.blur}px)`;
+        }
+        if (animStyle.brightness !== undefined) {
+            filterString += ` brightness(${animStyle.brightness})`;
+        }
+        if (animStyle.contrast !== undefined) {
+            filterString += ` contrast(${animStyle.contrast})`;
+        }
+        if (animStyle.saturate !== undefined) {
+            filterString += ` saturate(${animStyle.saturate})`;
+        }
+        if (animStyle.hueRotate !== undefined) {
+            filterString += ` hue-rotate(${animStyle.hueRotate}deg)`;
+        }
+
+        if (filterString) {
+            ctx.filter = filterString.trim();
+        }
 
         // Base transform
         ctx.translate(x + width / 2, y + height / 2);
@@ -971,32 +1255,49 @@ class FFmpegExportService {
         const animOpacity = animStyle.opacity ?? 1;
         ctx.globalAlpha = baseOpacity * animOpacity;
 
+        // Draw content
         try {
-            // Draw media with crop support
+            // Check if we need to crop
             const crop = item.crop || { x: 50, y: 50, zoom: 1 };
             const cropZoom = crop.zoom || 1;
 
-            let sourceWidth: number, sourceHeight: number;
-            if (mediaEl instanceof HTMLVideoElement) {
-                sourceWidth = mediaEl.videoWidth;
-                sourceHeight = mediaEl.videoHeight;
+            if (cropZoom > 1 || crop.x !== 50 || crop.y !== 50) {
+                // Draw cropped
+                let sourceWidth: number, sourceHeight: number;
+                if (mediaEl instanceof HTMLVideoElement) {
+                    sourceWidth = mediaEl.videoWidth;
+                    sourceHeight = mediaEl.videoHeight;
+                } else {
+                    sourceWidth = mediaEl.naturalWidth;
+                    sourceHeight = mediaEl.naturalHeight;
+                }
+
+                const visibleWidth = sourceWidth / cropZoom;
+                const visibleHeight = sourceHeight / cropZoom;
+                const maxOffsetX = sourceWidth - visibleWidth;
+                const maxOffsetY = sourceHeight - visibleHeight;
+                const srcX = (crop.x / 100) * maxOffsetX;
+                const srcY = (crop.y / 100) * maxOffsetY;
+
+                ctx.drawImage(
+                    mediaEl,
+                    srcX, srcY, visibleWidth, visibleHeight,
+                    -width / 2, -height / 2, width, height
+                );
             } else {
-                sourceWidth = mediaEl.naturalWidth;
-                sourceHeight = mediaEl.naturalHeight;
+                // Draw normally
+                ctx.drawImage(mediaEl, -width / 2, -height / 2, width, height);
             }
 
-            const visibleWidth = sourceWidth / cropZoom;
-            const visibleHeight = sourceHeight / cropZoom;
-            const maxOffsetX = sourceWidth - visibleWidth;
-            const maxOffsetY = sourceHeight - visibleHeight;
-            const srcX = (crop.x / 100) * maxOffsetX;
-            const srcY = (crop.y / 100) * maxOffsetY;
-
-            ctx.drawImage(
-                mediaEl,
-                srcX, srcY, visibleWidth, visibleHeight,
-                -width / 2, -height / 2, width, height
-            );
+            // Apply background color overlay (tint)
+            if (item.backgroundColor) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = item.backgroundColor;
+                ctx.fillRect(-width / 2, -height / 2, width, height);
+                ctx.restore();
+            }
 
             // Draw border if defined
             if (item.border && item.border.width > 0 && !item.isBackground) {
@@ -1036,6 +1337,10 @@ class FFmpegExportService {
         translateX?: number;
         translateY?: number;
         blur?: number;
+        brightness?: number;
+        contrast?: number;
+        saturate?: number;
+        hueRotate?: number;
     } {
         if (!item.animation) return {};
 
@@ -1191,20 +1496,36 @@ class FFmpegExportService {
             case 'shard-roll': return { rotate: 360 - 360 * p, scale: p, opacity: p };
 
             // FLIP ANIMATIONS: Simulate 3D rotateX/rotateY with scaleY/scaleX
-            case 'flip-down-1':
-                return { scaleY: p, opacity: p };
-            case 'flip-down-2':
-                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
-            case 'flip-up-1':
-                return { scaleY: p, opacity: p };
-            case 'flip-up-2':
-                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
+            // Use minimum scale of 0.01 to prevent blank screen, combined with opacity fade
+            case 'flip-down-1': {
+                // CSS: perspective rotateX(90deg -> 0) - simulate with scaleY(0.01 -> 1)
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'flip-down-2': {
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, scale: 0.8 + 0.2 * p, opacity: p };
+            }
+            case 'flip-up-1': {
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'flip-up-2': {
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, scale: 0.8 + 0.2 * p, opacity: p };
+            }
 
             case 'fly-in-rotate': return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
-            case 'fly-in-flip':
-                // Simulate rotateY with scaleX
-                return { translateX: -100 + 100 * p, scaleX: p, opacity: p };
-            case 'fly-to-zoom': return { scale: p, translateX: -100 + 100 * p, opacity: p };
+            case 'fly-in-flip': {
+                // Simulate rotateY with scaleX - use min 0.01 to prevent blank
+                const minScale = 0.01;
+                return { translateX: -100 + 100 * p, scaleX: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'fly-to-zoom': {
+                // CSS: from scale(0) translateX(-100%) - use min scale to prevent blank
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: -100 + 100 * p, opacity: p };
+            }
 
             case 'grow-shrink':
                 if (progress < 0.6) {
@@ -1221,14 +1542,48 @@ class FFmpegExportService {
             case 'stretch-in-down': return { scaleY: 2 - p, translateY: -50 + 50 * p, opacity: p, blur: 5 * (1 - p) };
             case 'stretch-to-full': return { scale: 0.5 + 0.5 * p, opacity: p };
 
-            case 'tiny-zoom': return { scale: p, opacity: p };
-            case 'zoom-in-center':
-            case 'zoom-in-1': return { scale: 0.5 + 0.5 * p, opacity: p };
-            case 'zoom-in-left': return { scale: 0.5 + 0.5 * p, translateX: -30 + 30 * p, opacity: p };
-            case 'zoom-in-right': return { scale: 0.5 + 0.5 * p, translateX: 30 - 30 * p, opacity: p };
-            case 'zoom-in-top': return { scale: 0.5 + 0.5 * p, translateY: -30 + 30 * p, opacity: p };
-            case 'zoom-in-bottom': return { scale: 0.5 + 0.5 * p, translateY: 30 - 30 * p, opacity: p };
+            case 'tiny-zoom': {
+                // CSS: from scale(0.1) - safe value
+                return { scale: 0.1 + 0.9 * p, opacity: p };
+            }
+            case 'zoom-in-center': {
+                // CSS: from scale(0) - use minimum to prevent blank
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'zoom-in-1': {
+                // CSS: 0% scale(0.5), 60% scale(1.1), 100% scale(1)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { scale: 0.5 + 0.6 * t, opacity: Math.min(1, t * 1.5) };
+                } else {
+                    const t = (progress - 0.6) / 0.4;
+                    return { scale: 1.1 - 0.1 * t, opacity: 1 };
+                }
+            }
+            case 'zoom-in-2': {
+                // CSS: from scale(0.2)
+                return { scale: 0.2 + 0.8 * p, opacity: p };
+            }
+            case 'zoom-in-left': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: -50 + 50 * p, opacity: p };
+            }
+            case 'zoom-in-right': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: 50 - 50 * p, opacity: p };
+            }
+            case 'zoom-in-top': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateY: -50 + 50 * p, opacity: p };
+            }
+            case 'zoom-in-bottom': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateY: 50 - 50 * p, opacity: p };
+            }
             case 'zoom-out-1': return { scale: 1.5 - 0.5 * p, opacity: p };
+            case 'zoom-out-2': return { scale: 2 - p, opacity: p };
+            case 'zoom-out-3': return { scale: 3 - 2 * p, opacity: p, blur: 5 * (1 - p) };
 
             case 'wham':
                 if (progress < 0.7) {
@@ -1396,10 +1751,192 @@ class FFmpegExportService {
     private renderColorItem(item: TimelineItem, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
         const { x, y, width, height } = this.calculateBounds(item, canvas);
         ctx.save();
-        ctx.fillStyle = item.src;
         ctx.globalAlpha = (item.opacity ?? 100) / 100;
+
+        const colorSrc = item.src || '';
+
+        // Check if it's a gradient (linear or radial)
+        if (colorSrc.includes('linear-gradient')) {
+            // Parse linear-gradient(angle, color1, color2, ...)
+            const gradientFill = this.parseLinearGradient(colorSrc, x, y, width, height, ctx);
+            if (gradientFill) {
+                ctx.fillStyle = gradientFill;
+            } else {
+                ctx.fillStyle = '#000000'; // Fallback
+            }
+        } else if (colorSrc.includes('radial-gradient')) {
+            // Parse radial-gradient(color1, color2, ...)
+            const gradientFill = this.parseRadialGradient(colorSrc, x, y, width, height, ctx);
+            if (gradientFill) {
+                ctx.fillStyle = gradientFill;
+            } else {
+                ctx.fillStyle = '#000000'; // Fallback
+            }
+        } else {
+            // Solid color
+            ctx.fillStyle = colorSrc || '#000000';
+        }
+
         ctx.fillRect(x, y, width, height);
         ctx.restore();
+    }
+
+    /**
+     * Parse CSS linear-gradient and create Canvas gradient
+     */
+    private parseLinearGradient(
+        css: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        ctx: CanvasRenderingContext2D
+    ): CanvasGradient | null {
+        try {
+            // Extract content inside parentheses
+            const match = css.match(/linear-gradient\(([^)]+)\)/);
+            if (!match) return null;
+
+            const content = match[1];
+            const parts = content.split(',').map(s => s.trim());
+
+            // First part might be angle or direction
+            let angle = 180; // Default: top to bottom
+            let colorStartIndex = 0;
+
+            const firstPart = parts[0].toLowerCase();
+            if (firstPart.includes('deg')) {
+                angle = parseFloat(firstPart);
+                colorStartIndex = 1;
+            } else if (firstPart === 'to right') {
+                angle = 90;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to left') {
+                angle = 270;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to bottom') {
+                angle = 180;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to top') {
+                angle = 0;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to bottom right' || firstPart === 'to right bottom') {
+                angle = 135;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to bottom left' || firstPart === 'to left bottom') {
+                angle = 225;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to top right' || firstPart === 'to right top') {
+                angle = 45;
+                colorStartIndex = 1;
+            } else if (firstPart === 'to top left' || firstPart === 'to left top') {
+                angle = 315;
+                colorStartIndex = 1;
+            }
+
+            // Extract colors
+            const colors = parts.slice(colorStartIndex);
+            if (colors.length < 2) return null;
+
+            // Calculate gradient line endpoints based on angle
+            const radians = (angle - 90) * (Math.PI / 180);
+            const cx = x + width / 2;
+            const cy = y + height / 2;
+            const diagonal = Math.sqrt(width * width + height * height) / 2;
+
+            const x1 = cx - Math.cos(radians) * diagonal;
+            const y1 = cy - Math.sin(radians) * diagonal;
+            const x2 = cx + Math.cos(radians) * diagonal;
+            const y2 = cy + Math.sin(radians) * diagonal;
+
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+
+            // Add color stops
+            colors.forEach((color, i) => {
+                // Handle color with percentage: "red 50%" -> extract just the color
+                const colorParts = color.trim().split(/\s+/);
+                const colorValue = colorParts[0];
+                const stop = colorParts[1] ? parseFloat(colorParts[1]) / 100 : i / (colors.length - 1);
+                gradient.addColorStop(Math.max(0, Math.min(1, stop)), colorValue);
+            });
+
+            return gradient;
+        } catch (err) {
+            console.warn('[FFmpegExport] Failed to parse linear-gradient:', css, err);
+            return null;
+        }
+    }
+
+    /**
+     * Parse CSS radial-gradient and create Canvas gradient
+     */
+    private parseRadialGradient(
+        css: string,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        ctx: CanvasRenderingContext2D
+    ): CanvasGradient | null {
+        try {
+            // Extract content inside parentheses
+            const match = css.match(/radial-gradient\(([^)]+)\)/);
+            if (!match) return null;
+
+            const content = match[1];
+            const parts = content.split(',').map(s => s.trim());
+
+            // Find the colors (skip shape/size/position prefixes)
+            let colorStartIndex = 0;
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i].toLowerCase();
+                if (part.includes('circle') || part.includes('ellipse') ||
+                    part.includes('at ') || part.includes('closest') || part.includes('farthest')) {
+                    colorStartIndex = i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            const colors = parts.slice(colorStartIndex);
+            if (colors.length < 2) {
+                // Try without skipping anything
+                const allColors = parts.filter(p => !p.toLowerCase().includes('circle') && !p.toLowerCase().includes('ellipse'));
+                if (allColors.length >= 2) {
+                    return this.createRadialGradientFromColors(allColors, x, y, width, height, ctx);
+                }
+                return null;
+            }
+
+            return this.createRadialGradientFromColors(colors, x, y, width, height, ctx);
+        } catch (err) {
+            console.warn('[FFmpegExport] Failed to parse radial-gradient:', css, err);
+            return null;
+        }
+    }
+
+    private createRadialGradientFromColors(
+        colors: string[],
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        ctx: CanvasRenderingContext2D
+    ): CanvasGradient {
+        const cx = x + width / 2;
+        const cy = y + height / 2;
+        const radius = Math.max(width, height) / 2;
+
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+
+        colors.forEach((color, i) => {
+            const colorParts = color.trim().split(/\s+/);
+            const colorValue = colorParts[0];
+            const stop = colorParts[1] ? parseFloat(colorParts[1]) / 100 : i / (colors.length - 1);
+            gradient.addColorStop(Math.max(0, Math.min(1, stop)), colorValue);
+        });
+
+        return gradient;
     }
 
     /**

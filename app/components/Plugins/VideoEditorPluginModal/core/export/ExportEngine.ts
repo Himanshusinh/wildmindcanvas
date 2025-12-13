@@ -27,9 +27,19 @@ interface TransitionStyle {
     translateX?: number;
     translateY?: number;
     blur?: number;
-    clipX?: number;
-    clipWidth?: number;
+    // Filter effects
     brightness?: number;
+    contrast?: number;
+    saturate?: number;
+    sepia?: number;
+    hueRotate?: number; // degrees
+    // Clip path types
+    clipType?: 'none' | 'inset' | 'circle' | 'polygon';
+    clipInset?: { top: number; right: number; bottom: number; left: number }; // percentages
+    clipCircle?: { radius: number; cx: number; cy: number }; // radius as %, cx/cy as %
+    clipPolygon?: Array<{ x: number; y: number }>; // array of points as %
+    // Blend mode
+    blendMode?: GlobalCompositeOperation;
 }
 
 // Internal type for rendering items with transition info
@@ -310,6 +320,15 @@ export class ExportEngine {
 
             onProgress({ phase: 'rendering', progress: 0 });
 
+            // Calculate resolution-aware settings for memory management
+            const isHighRes = settings.resolution.width >= 3840 || settings.resolution.height >= 2160;
+            const cacheCleanupInterval = isHighRes ? 10 : 60; // More aggressive for 4K
+            const progressLogInterval = isHighRes ? 15 : 30;
+            let lastLogTime = Date.now();
+
+            console.log(`%c📊 Memory Management: ${isHighRes ? '4K/HIGH-RES MODE' : 'Standard mode'}`, 'color: #ffaa00');
+            console.log(`   Cache cleanup: every ${cacheCleanupInterval} frames`);
+
             // Render and encode each frame
             for (let frameIndex = 0; frameIndex < totalFrames && !this.cancelled; frameIndex++) {
                 const currentTime = frameIndex / settings.fps;
@@ -329,13 +348,13 @@ export class ExportEngine {
                 encoder.encode(frame, { keyFrame: isKeyframe });
                 frame.close();
 
-                // Periodic memory management (every 60 frames = 2 seconds at 30fps)
-                if ((frameIndex + 1) % 60 === 0) {
+                // Periodic memory management - more aggressive for 4K
+                if ((frameIndex + 1) % cacheCleanupInterval === 0) {
                     this.clearCaches();
 
                     const memInfo = this.getMemoryInfo();
-                    if (memInfo.percentage) {
-                        console.log(`   📊 Memory: ${memInfo.used.toFixed(0)}MB / ${memInfo.limit?.toFixed(0)}MB (${memInfo.percentage.toFixed(1)}%)`);
+                    if (memInfo.percentage && isHighRes) {
+                        console.log(`   📊 Memory: ${memInfo.used.toFixed(0)}MB / ${memInfo.limit?.toFixed(0) || '?'}MB (${memInfo.percentage.toFixed(1)}%)`);
                     }
                 }
 
@@ -346,12 +365,17 @@ export class ExportEngine {
                     progress,
                     currentFrame: frameIndex + 1,
                     totalFrames,
-                    estimatedTimeRemaining: Math.ceil((totalFrames - frameIndex - 1) / 60),
+                    estimatedTimeRemaining: Math.ceil((totalFrames - frameIndex - 1) / Math.max(1, settings.fps)),
                 });
 
-                // Log progress every 30 frames
-                if ((frameIndex + 1) % 30 === 0) {
-                    console.log(`%c⏳ Progress: ${progress.toFixed(1)}% (Frame ${frameIndex + 1}/${totalFrames})`, 'color: #ffaa00');
+                // Log progress with timing
+                if ((frameIndex + 1) % progressLogInterval === 0) {
+                    const now = Date.now();
+                    const elapsed = (now - lastLogTime) / 1000;
+                    const framesPerSec = progressLogInterval / elapsed;
+                    const remaining = ((totalFrames - frameIndex - 1) / framesPerSec).toFixed(0);
+                    console.log(`%c⏳ ${progress.toFixed(1)}% | Frame ${frameIndex + 1}/${totalFrames} | ${framesPerSec.toFixed(1)} fps | ETA: ${remaining}s`, 'color: #ffaa00');
+                    lastLogTime = now;
                 }
             }
 
@@ -541,6 +565,13 @@ export class ExportEngine {
             });
         }
 
+        // === CLIP ALL CONTENT TO CANVAS BOUNDS ===
+        // This matches the preview behavior where CSS overflow:hidden clips content to container
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.clip();
+
         // Render each item (bottom to top)
         for (const renderItem of renderItems) {
             const { item, track, role, transition, transitionProgress } = renderItem;
@@ -569,6 +600,9 @@ export class ExportEngine {
                 this.renderTextItem(item, ctx, canvas, currentTime);
             }
         }
+
+        // Restore context to remove clip
+        ctx.restore();
     }
 
     /**
@@ -936,9 +970,20 @@ export class ExportEngine {
             filters.push(`blur(${transitionStyle.blur}px)`);
         }
 
-        // Animation blur
         if (animStyle.blur) {
             filters.push(`blur(${animStyle.blur}px)`);
+        }
+        if (animStyle.brightness !== undefined) {
+            filters.push(`brightness(${animStyle.brightness})`);
+        }
+        if (animStyle.contrast !== undefined) {
+            filters.push(`contrast(${animStyle.contrast})`);
+        }
+        if (animStyle.saturate !== undefined) {
+            filters.push(`saturate(${animStyle.saturate})`);
+        }
+        if (animStyle.hueRotate !== undefined) {
+            filters.push(`hue-rotate(${animStyle.hueRotate}deg)`);
         }
 
         // Transition brightness
@@ -946,16 +991,76 @@ export class ExportEngine {
             filters.push(`brightness(${transitionStyle.brightness})`);
         }
 
+        // Transition contrast
+        if (transitionStyle.contrast !== undefined && transitionStyle.contrast !== 1) {
+            filters.push(`contrast(${transitionStyle.contrast})`);
+        }
+
+        // Transition saturate
+        if (transitionStyle.saturate !== undefined && transitionStyle.saturate !== 1) {
+            filters.push(`saturate(${transitionStyle.saturate})`);
+        }
+
+        // Transition sepia
+        if (transitionStyle.sepia !== undefined && transitionStyle.sepia !== 0) {
+            filters.push(`sepia(${transitionStyle.sepia})`);
+        }
+
+        // Transition hue-rotate
+        if (transitionStyle.hueRotate !== undefined && transitionStyle.hueRotate !== 0) {
+            filters.push(`hue-rotate(${transitionStyle.hueRotate}deg)`);
+        }
+
         if (filters.length > 0) {
             ctx.filter = filters.join(' ');
         }
 
-        // Handle clip path for wipe transitions
-        if (transitionStyle.clipX !== undefined || transitionStyle.clipWidth !== undefined) {
-            const clipX = (transitionStyle.clipX ?? 0) * width;
-            const clipW = (transitionStyle.clipWidth ?? 1) * width;
+        // Apply blend mode if specified
+        if (transitionStyle.blendMode) {
+            ctx.globalCompositeOperation = transitionStyle.blendMode;
+        }
+
+        // Apply clip path for shape/wipe transitions
+        if (transitionStyle.clipType && transitionStyle.clipType !== 'none') {
             ctx.beginPath();
-            ctx.rect(-width / 2 + clipX, -height / 2, clipW, height);
+
+            if (transitionStyle.clipType === 'inset' && transitionStyle.clipInset) {
+                // Inset clip: top, right, bottom, left as percentages
+                const clipTop = (transitionStyle.clipInset.top / 100) * height;
+                const clipRight = (transitionStyle.clipInset.right / 100) * width;
+                const clipBottom = (transitionStyle.clipInset.bottom / 100) * height;
+                const clipLeft = (transitionStyle.clipInset.left / 100) * width;
+                ctx.rect(
+                    -width / 2 + clipLeft,
+                    -height / 2 + clipTop,
+                    width - clipLeft - clipRight,
+                    height - clipTop - clipBottom
+                );
+            } else if (transitionStyle.clipType === 'circle' && transitionStyle.clipCircle) {
+                // Circle clip: radius as %, cx/cy as %
+                const radius = (transitionStyle.clipCircle.radius / 100) * Math.max(width, height);
+                const cx = (transitionStyle.clipCircle.cx - 50) / 100 * width;
+                const cy = (transitionStyle.clipCircle.cy - 50) / 100 * height;
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            } else if (transitionStyle.clipType === 'polygon' && transitionStyle.clipPolygon) {
+                // Polygon clip: array of points as percentages
+                const points = transitionStyle.clipPolygon;
+                if (points.length > 0) {
+                    const firstPoint = points[0];
+                    ctx.moveTo(
+                        (firstPoint.x - 50) / 100 * width,
+                        (firstPoint.y - 50) / 100 * height
+                    );
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(
+                            (points[i].x - 50) / 100 * width,
+                            (points[i].y - 50) / 100 * height
+                        );
+                    }
+                    ctx.closePath();
+                }
+            }
+
             ctx.clip();
         }
 
@@ -994,6 +1099,16 @@ export class ExportEngine {
                 srcX, srcY, visibleWidth, visibleHeight,  // Source region (cropped)
                 -width / 2, -height / 2, width, height    // Destination
             );
+
+            // Apply background color overlay (tint)
+            if (item.backgroundColor) {
+                ctx.save();
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = item.backgroundColor;
+                ctx.fillRect(-width / 2, -height / 2, width, height);
+                ctx.restore();
+            }
 
             // Draw border if defined (after image)
             if (item.border && item.border.width > 0 && !item.isBackground) {
@@ -1086,30 +1201,52 @@ export class ExportEngine {
             // === IRIS SHAPES ===
             case 'iris-box': {
                 const easeBox = easeOutCubic(p);
+                const insetPercent = 50 * (1 - easeBox);
                 return role === 'main'
-                    ? { scale: easeBox, opacity: easeBox, brightness: 0.7 + 0.3 * p }
+                    ? { clipType: 'inset', clipInset: { top: insetPercent, right: insetPercent, bottom: insetPercent, left: insetPercent }, brightness: 0.7 + 0.3 * p }
                     : { brightness: 1 - p * 0.3 };
             }
             case 'iris-round':
             case 'circle': {
                 const easeCircle = easeOutCubic(p);
                 return role === 'main'
-                    ? { scale: easeCircle, opacity: easeCircle, brightness: 0.7 + 0.3 * p }
+                    ? { clipType: 'circle', clipCircle: { radius: easeCircle * 75, cx: 50, cy: 50 }, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
+            }
+            case 'iris-diamond': {
+                const easeDiamond = easeOutCubic(p);
+                const size = 50 * easeDiamond;
+                return role === 'main'
+                    ? {
+                        clipType: 'polygon', clipPolygon: [
+                            { x: 50, y: 50 - size },
+                            { x: 50 + size, y: 50 },
+                            { x: 50, y: 50 + size },
+                            { x: 50 - size, y: 50 }
+                        ], brightness: 0.7 + 0.3 * p
+                    }
                     : { brightness: 1 - p * 0.3 };
             }
 
             // === WIPES ===
             case 'wipe': {
                 const easeWipe = easeOutCubic(p);
+                const revealed = easeWipe * 100;
+                let inset = { top: 0, right: 0, bottom: 0, left: 0 };
+                if (direction === 'left') inset = { top: 0, right: 100 - revealed, bottom: 0, left: 0 };
+                else if (direction === 'right') inset = { top: 0, right: 0, bottom: 0, left: 100 - revealed };
+                else if (direction === 'up') inset = { top: 0, right: 0, bottom: 100 - revealed, left: 0 };
+                else if (direction === 'down') inset = { top: 100 - revealed, right: 0, bottom: 0, left: 0 };
                 return role === 'main'
-                    ? { clipX: direction === 'right' ? 0 : direction === 'left' ? 1 - easeWipe : 0, clipWidth: direction === 'left' || direction === 'right' ? easeWipe : 1, brightness: 0.8 + 0.2 * p }
+                    ? { clipType: 'inset', clipInset: inset, brightness: 0.8 + 0.2 * p }
                     : { brightness: 1 - p * 0.2 };
             }
             case 'barn-doors': {
                 const easeBarn = easeOutCubic(p);
+                const insetX = 50 * (1 - easeBarn);
                 return role === 'main'
-                    ? { scale: 0.5 + 0.5 * easeBarn, opacity: easeBarn }
-                    : { opacity: outP };
+                    ? { clipType: 'inset', clipInset: { top: 0, right: insetX, bottom: 0, left: insetX }, brightness: 0.7 + 0.3 * p }
+                    : { brightness: 1 - p * 0.3 };
             }
 
             // === ZOOMS ===
@@ -1150,10 +1287,13 @@ export class ExportEngine {
 
             // === GLITCH ===
             case 'glitch': {
-                const glitchOffset = Math.sin(p * 50) * 5 * (1 - p);
-                return role === 'main'
-                    ? { translateX: glitchOffset, opacity: p }
-                    : { translateX: -glitchOffset, opacity: outP };
+                // Match Canvas.tsx: hue-rotate, contrast, random offset, hard cut
+                const glitchIntensity = Math.sin(p * Math.PI);
+                const glitchOffset = Math.sin(p * 50) * 10 * glitchIntensity;
+                if (role === 'outgoing') {
+                    return p > 0.5 ? { opacity: 0 } : { translateX: -glitchOffset, translateY: glitchOffset, hueRotate: p * 90, contrast: 1.5, opacity: 1 };
+                }
+                return p > 0.5 ? { translateX: glitchOffset, translateY: -glitchOffset, hueRotate: p * 90, contrast: 1.5, opacity: 1 } : { opacity: 0 };
             }
 
             // === STACK ===
@@ -1202,11 +1342,15 @@ export class ExportEngine {
             }
 
             // === DIGITAL EFFECTS ===
-            case 'rgb-split':
+            case 'rgb-split': {
+                // Match Canvas.tsx: hue-rotate cycling through 360deg, scale pulsing
+                const scaleAmount = 1 + Math.sin(p * Math.PI) * 0.1;
                 return {
-                    scale: 1 + Math.sin(p * Math.PI) * 0.1,
+                    hueRotate: p * 360,
+                    scale: scaleAmount,
                     opacity: role === 'main' ? p : outP
                 };
+            }
             case 'pixelate':
                 return role === 'main' ? { opacity: p } : { opacity: outP };
             case 'datamosh': {
@@ -1305,10 +1449,128 @@ export class ExportEngine {
         const { x, y, width, height } = this.calculateItemBounds(item, canvas);
 
         ctx.save();
-        ctx.fillStyle = item.src; // Color value
         ctx.globalAlpha = (item.opacity ?? 100) / 100;
+
+        const colorSrc = item.src || '';
+
+        // Check if it's a gradient (linear or radial)
+        if (colorSrc.includes('linear-gradient')) {
+            const gradientFill = this.parseLinearGradient(colorSrc, x, y, width, height, ctx);
+            ctx.fillStyle = gradientFill || '#000000';
+        } else if (colorSrc.includes('radial-gradient')) {
+            const gradientFill = this.parseRadialGradient(colorSrc, x, y, width, height, ctx);
+            ctx.fillStyle = gradientFill || '#000000';
+        } else {
+            // Solid color
+            ctx.fillStyle = colorSrc || '#000000';
+        }
+
         ctx.fillRect(x, y, width, height);
         ctx.restore();
+    }
+
+    /**
+     * Parse CSS linear-gradient and create Canvas gradient
+     */
+    private parseLinearGradient(css: string, x: number, y: number, width: number, height: number, ctx: CanvasRenderingContext2D): CanvasGradient | null {
+        try {
+            const match = css.match(/linear-gradient\(([^)]+)\)/);
+            if (!match) return null;
+
+            const content = match[1];
+            const parts = content.split(',').map(s => s.trim());
+
+            let angle = 180;
+            let colorStartIndex = 0;
+
+            const firstPart = parts[0].toLowerCase();
+            if (firstPart.includes('deg')) {
+                angle = parseFloat(firstPart);
+                colorStartIndex = 1;
+            } else if (firstPart === 'to right') { angle = 90; colorStartIndex = 1; }
+            else if (firstPart === 'to left') { angle = 270; colorStartIndex = 1; }
+            else if (firstPart === 'to bottom') { angle = 180; colorStartIndex = 1; }
+            else if (firstPart === 'to top') { angle = 0; colorStartIndex = 1; }
+            else if (firstPart.includes('to bottom right') || firstPart.includes('to right bottom')) { angle = 135; colorStartIndex = 1; }
+            else if (firstPart.includes('to bottom left') || firstPart.includes('to left bottom')) { angle = 225; colorStartIndex = 1; }
+            else if (firstPart.includes('to top right') || firstPart.includes('to right top')) { angle = 45; colorStartIndex = 1; }
+            else if (firstPart.includes('to top left') || firstPart.includes('to left top')) { angle = 315; colorStartIndex = 1; }
+
+            const colors = parts.slice(colorStartIndex);
+            if (colors.length < 2) return null;
+
+            const radians = (angle - 90) * (Math.PI / 180);
+            const cx = x + width / 2;
+            const cy = y + height / 2;
+            const diagonal = Math.sqrt(width * width + height * height) / 2;
+
+            const x1 = cx - Math.cos(radians) * diagonal;
+            const y1 = cy - Math.sin(radians) * diagonal;
+            const x2 = cx + Math.cos(radians) * diagonal;
+            const y2 = cy + Math.sin(radians) * diagonal;
+
+            const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+
+            colors.forEach((color, i) => {
+                const colorParts = color.trim().split(/\s+/);
+                const colorValue = colorParts[0];
+                const stop = colorParts[1] ? parseFloat(colorParts[1]) / 100 : i / (colors.length - 1);
+                gradient.addColorStop(Math.max(0, Math.min(1, stop)), colorValue);
+            });
+
+            return gradient;
+        } catch (err) {
+            console.warn('[ExportEngine] Failed to parse linear-gradient:', css, err);
+            return null;
+        }
+    }
+
+    /**
+     * Parse CSS radial-gradient and create Canvas gradient
+     */
+    private parseRadialGradient(css: string, x: number, y: number, width: number, height: number, ctx: CanvasRenderingContext2D): CanvasGradient | null {
+        try {
+            const match = css.match(/radial-gradient\(([^)]+)\)/);
+            if (!match) return null;
+
+            const content = match[1];
+            const parts = content.split(',').map(s => s.trim());
+
+            // Find colors (skip shape/size/position prefixes)
+            let colorStartIndex = 0;
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i].toLowerCase();
+                if (part.includes('circle') || part.includes('ellipse') || part.includes('at ') || part.includes('closest') || part.includes('farthest')) {
+                    colorStartIndex = i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            let colors = parts.slice(colorStartIndex);
+            if (colors.length < 2) {
+                colors = parts.filter(p => !p.toLowerCase().includes('circle') && !p.toLowerCase().includes('ellipse'));
+                if (colors.length < 2) return null;
+            }
+
+            const cx = x + width / 2;
+            const cy = y + height / 2;
+            const radius = Math.max(width, height) / 2;
+
+            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+
+            colors.forEach((color, i) => {
+                const colorParts = color.trim().split(/\s+/);
+                const colorValue = colorParts[0];
+                const stop = colorParts[1] ? parseFloat(colorParts[1]) / 100 : i / (colors.length - 1);
+                gradient.addColorStop(Math.max(0, Math.min(1, stop)), colorValue);
+            });
+
+            return gradient;
+        } catch (err) {
+            console.warn('[ExportEngine] Failed to parse radial-gradient:', css, err);
+            return null;
+        }
     }
 
     /**
@@ -1602,6 +1864,10 @@ export class ExportEngine {
         translateX?: number;
         translateY?: number;
         blur?: number;
+        brightness?: number;
+        contrast?: number;
+        saturate?: number;
+        hueRotate?: number;
     } {
         if (!item.animation) return {};
 
@@ -1779,7 +2045,7 @@ export class ExportEngine {
                 return { scale: 1.2 - 0.2 * p, opacity: p };
 
             // === BLUR/FLASH (simulated - Canvas 2D can't do blur) ===
-            // === BLUR/FLASH (simulated - Canvas 2D can't do blur) ===
+            // === BLUR/FLASH (simulated - Canvas can do blur/filters now) ===
             case 'motion-blur':
                 // CSS: from blur(20px), scale(1.1), opacity 0 → to blur(0), scale(1), opacity 1
                 return { scale: 1.1 - 0.1 * p, opacity: p, blur: 20 * (1 - p) };
@@ -1794,31 +2060,31 @@ export class ExportEngine {
                     return { scale: 0.5 + 0.55 * t, blur: 5 * (1 - t), opacity: t };
                 } else {
                     const t = (progress - 0.6) / 0.4;
-                    return { scale: 1.05 - 0.05 * t, opacity: 1 };
+                    return { scale: 1.05 - 0.05 * t, opacity: 1, blur: 0 };
                 }
 
             case 'flash-drop':
                 // CSS: from translateY(-50px), brightness(3), opacity 0 → to translateY(0), brightness(1), opacity 1
-                return { translateY: -50 + 50 * p, opacity: p, blur: 10 * (1 - p) };
+                return { translateY: -50 + 50 * p, opacity: p, blur: 10 * (1 - p), brightness: 3 - 2 * p };
 
             case 'flash-open':
                 // CSS: from scale(0.5), brightness(5), opacity 0 → to scale(1), brightness(1), opacity 1
-                return { scale: 0.5 + 0.5 * p, opacity: p };
+                return { scale: 0.5 + 0.5 * p, opacity: p, brightness: 5 - 4 * p };
 
             case 'black-hole':
                 // CSS: from scale(0) rotate(180deg), opacity 0 → to scale(1) rotate(0), opacity 1
-                return { scale: p, rotate: 180 - 180 * p, opacity: p };
+                return { scale: p, rotate: 180 - 180 * p, opacity: p, contrast: 2 - p };
 
             case 'pixelated-motion':
-                return { opacity: p, blur: 10 * (1 - p) };
+                return { opacity: p, blur: 10 * (1 - p), contrast: 2 - p };
 
             case 'screen-flicker':
                 // Multi-stop flicker effect: 0%→20%→40%→60%→80%→100%
-                if (progress < 0.2) return { opacity: progress * 2.5 };
-                if (progress < 0.4) return { opacity: 0.2 + 0.3 * Math.random() };
-                if (progress < 0.6) return { opacity: 0.5 + 0.5 * ((progress - 0.4) / 0.2) };
-                if (progress < 0.8) return { opacity: 0.8 + 0.2 * Math.random() };
-                return { opacity: 1 };
+                if (progress < 0.2) return { opacity: progress * 2.5, brightness: 0.5 + 1.5 * (progress / 0.2) };
+                if (progress < 0.4) return { opacity: 0.2 + 0.3 * Math.random(), brightness: 2 };
+                if (progress < 0.6) return { opacity: 0.5 + 0.5 * ((progress - 0.4) / 0.2), brightness: 2 - 0.5 * ((progress - 0.4) / 0.2) };
+                if (progress < 0.8) return { opacity: 0.8 + 0.2 * Math.random(), brightness: 1.5 };
+                return { opacity: 1, brightness: 1 };
 
             case 'pulse-open':
                 // 0%: scale(1.2), opacity 0 → 50%: scale(0.9) → 100%: scale(1), opacity 1
@@ -1832,7 +2098,7 @@ export class ExportEngine {
 
             case 'rgb-drop':
                 // CSS: from translateY(-50px), opacity 0 → to translateY(0), opacity 1
-                return { translateY: -50 + 50 * p, opacity: p };
+                return { translateY: -50 + 50 * p, opacity: p, brightness: 1 + (1 - p), saturate: 1.5 };
 
             // === CREATIVE/MASK (approximated) ===
             case 'round-open':
@@ -1864,30 +2130,43 @@ export class ExportEngine {
                 return { translateY: -50 + 50 * p, opacity: p };
 
             // === FLIP (3D approximated with scaleY/scaleX for rotateX/rotateY) ===
-            case 'flip-down-1':
+            // Use minimum scale of 0.01 to prevent blank screen
+            case 'flip-down-1': {
                 // CSS: from perspective rotateX(90deg) → simulate with scaleY
-                return { scaleY: p, opacity: p };
-            case 'flip-down-2':
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'flip-down-2': {
                 // CSS: from rotateX(90deg) scale(0.8) → simulate with scaleY + scale
-                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
-            case 'flip-up-1':
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, scale: 0.8 + 0.2 * p, opacity: p };
+            }
+            case 'flip-up-1': {
                 // CSS: from rotateX(-90deg) → simulate with scaleY
-                return { scaleY: p, opacity: p };
-            case 'flip-up-2':
-                return { scaleY: p, scale: 0.8 + 0.2 * p, opacity: p };
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, opacity: p };
+            }
+            case 'flip-up-2': {
+                const minScale = 0.01;
+                return { scaleY: minScale + (1 - minScale) * p, scale: 0.8 + 0.2 * p, opacity: p };
+            }
 
             // === FLY ===
             case 'fly-in-rotate':
                 // CSS: from translateX(-100%) rotate(-90deg), opacity 0 → to translateX(0) rotate(0), opacity 1
                 return { translateX: -100 + 100 * p, rotate: -90 + 90 * p, opacity: p };
 
-            case 'fly-in-flip':
+            case 'fly-in-flip': {
                 // CSS: from translateX(-100%) rotateY(90deg) → simulate rotateY with scaleX
-                return { translateX: -100 + 100 * p, scaleX: p, opacity: p };
+                const minScale = 0.01;
+                return { translateX: -100 + 100 * p, scaleX: minScale + (1 - minScale) * p, opacity: p };
+            }
 
-            case 'fly-to-zoom':
+            case 'fly-to-zoom': {
                 // CSS: from scale(0) translateX(-100%), opacity 0 → to scale(1) translateX(0), opacity 1
-                return { scale: p, translateX: -100 + 100 * p, opacity: p };
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: -100 + 100 * p, opacity: p };
+            }
 
             case 'grow-shrink':
                 // 0%: scale(0.8), opacity 0 → 60%: scale(1.2) → 100%: scale(1), opacity 1
@@ -1921,28 +2200,62 @@ export class ExportEngine {
                 return { scale: 0.5 + 0.5 * p, opacity: p };
 
             // === ZOOM ===
-            case 'tiny-zoom':
-                return { scale: p, opacity: p };
+            case 'tiny-zoom': {
+                // CSS: from scale(0.1) - safe value
+                return { scale: 0.1 + 0.9 * p, opacity: p };
+            }
 
-            case 'zoom-in-center':
-            case 'zoom-in-1':
-                return { scale: 0.5 + 0.5 * p, opacity: p };
+            case 'zoom-in-center': {
+                // CSS: from scale(0) - use minimum to prevent blank
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, opacity: p };
+            }
 
-            case 'zoom-in-left':
-                return { scale: 0.5 + 0.5 * p, translateX: -30 + 30 * p, opacity: p };
+            case 'zoom-in-1': {
+                // CSS: 0% scale(0.5), 60% scale(1.1), 100% scale(1)
+                if (progress < 0.6) {
+                    const t = progress / 0.6;
+                    return { scale: 0.5 + 0.6 * t, opacity: Math.min(1, t * 1.5) };
+                } else {
+                    const t = (progress - 0.6) / 0.4;
+                    return { scale: 1.1 - 0.1 * t, opacity: 1 };
+                }
+            }
 
-            case 'zoom-in-right':
-                return { scale: 0.5 + 0.5 * p, translateX: 30 - 30 * p, opacity: p };
+            case 'zoom-in-2': {
+                // CSS: from scale(0.2)
+                return { scale: 0.2 + 0.8 * p, opacity: p };
+            }
 
-            case 'zoom-in-top':
-                return { scale: 0.5 + 0.5 * p, translateY: -30 + 30 * p, opacity: p };
+            case 'zoom-in-left': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: -50 + 50 * p, opacity: p };
+            }
 
-            case 'zoom-in-bottom':
-                return { scale: 0.5 + 0.5 * p, translateY: 30 - 30 * p, opacity: p };
+            case 'zoom-in-right': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateX: 50 - 50 * p, opacity: p };
+            }
+
+            case 'zoom-in-top': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateY: -50 + 50 * p, opacity: p };
+            }
+
+            case 'zoom-in-bottom': {
+                const minScale = 0.01;
+                return { scale: minScale + (1 - minScale) * p, translateY: 50 - 50 * p, opacity: p };
+            }
 
             case 'zoom-out-1':
                 // CSS: from scale(1.5), opacity 0 → to scale(1), opacity 1
                 return { scale: 1.5 - 0.5 * p, opacity: p };
+
+            case 'zoom-out-2':
+                return { scale: 2 - p, opacity: p };
+
+            case 'zoom-out-3':
+                return { scale: 3 - 2 * p, opacity: p, blur: 5 * (1 - p) };
 
             case 'wham':
                 // Quick overshoot zoom

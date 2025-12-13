@@ -24,6 +24,33 @@ interface ServerExportOptions {
 
 class ServerExportService {
     private pollingInterval: NodeJS.Timeout | null = null;
+    private currentJobId: string | null = null;
+
+    constructor() {
+        // Setup page unload handler to cancel exports when user navigates away
+        if (typeof window !== 'undefined') {
+            window.addEventListener('beforeunload', this.handleBeforeUnload);
+            window.addEventListener('pagehide', this.handleBeforeUnload);
+        }
+    }
+
+    /**
+     * Handle page unload - cancel any active export
+     */
+    private handleBeforeUnload = () => {
+        if (this.currentJobId) {
+            // Use sendBeacon for reliable delivery during page unload
+            const url = `${API_BASE}/video-export/cancel/${this.currentJobId}`;
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(url);
+            } else {
+                // Fallback to fetch with keepalive
+                fetch(url, { method: 'POST', keepalive: true }).catch(() => { });
+            }
+            console.log(`[ServerExport] 🛑 Cancelling export on page unload: ${this.currentJobId}`);
+            this.currentJobId = null;
+        }
+    };
 
     /**
      * Check if server-side export is available
@@ -85,6 +112,7 @@ class ServerExportService {
         }
 
         const { jobId } = await startResponse.json();
+        this.currentJobId = jobId; // Track current job for cleanup on page unload
         console.log(`[ServerExport] Started job ${jobId}`);
 
         onProgress({ phase: 'preparing', progress: 5 });
@@ -144,7 +172,7 @@ class ServerExportService {
                 }))
             })),
             duration,
-            dimension: { width: dimension.width, height: dimension.height }
+            dimension: { width: settings.resolution.width, height: settings.resolution.height }
         };
 
         // DEBUG: Log timeline with transitions/animations
@@ -244,13 +272,14 @@ class ServerExportService {
                         const downloadResponse = await fetch(`${API_BASE}/video-export/download/${jobId}`);
                         const blob = await downloadResponse.blob();
 
-                        // Cleanup
-                        fetch(`${API_BASE}/video-export/${jobId}`, { method: 'DELETE' }).catch(() => { });
+                        // Clear current job ID after successful download
+                        this.currentJobId = null;
 
                         onProgress({ phase: 'complete', progress: 100 });
                         resolve(blob);
-                    } else if (status.status === 'error') {
+                    } else if (status.status === 'error' || status.status === 'cancelled') {
                         this.stopPolling();
+                        this.currentJobId = null;
                         reject(new Error(status.error || 'Export failed'));
                     } else {
                         // Update progress
@@ -263,6 +292,7 @@ class ServerExportService {
 
                     if (errorCount >= MAX_ERRORS) {
                         this.stopPolling();
+                        this.currentJobId = null;
                         reject(new Error('Server connection lost. Please try client-side export instead.'));
                     }
                 }
@@ -390,12 +420,18 @@ class ServerExportService {
     }
 
     /**
-     * Cancel export
+     * Cancel export and cleanup
      */
-    cancel(jobId: string): void {
+    cancel(jobId?: string): void {
         this.stopPolling();
-        fetch(`${API_BASE}/video-export/${jobId}`, { method: 'DELETE' });
+        const id = jobId || this.currentJobId;
+        if (id) {
+            // Use the cancel endpoint to stop processing and cleanup
+            fetch(`${API_BASE}/video-export/cancel/${id}`, { method: 'POST' }).catch(() => { });
+            this.currentJobId = null;
+        }
     }
 }
 
 export const serverExportService = new ServerExportService();
+

@@ -39,8 +39,16 @@ export class GPUCompositor {
      * Initialize compositor with canvas
      */
     async initialize(canvas: HTMLCanvasElement): Promise<boolean> {
+        // If already initialized with the SAME canvas, just return true
         if (this.isInitialized && this.canvas === canvas) {
             return true;
+        }
+
+        // If canvas changed (e.g., after dimension change remount), reinitialize
+        if (this.canvas !== canvas && this.isInitialized) {
+            console.log('[GPUCompositor] Canvas element changed, reinitializing...');
+            // Clean up old context
+            this.dispose();
         }
 
         this.canvas = canvas;

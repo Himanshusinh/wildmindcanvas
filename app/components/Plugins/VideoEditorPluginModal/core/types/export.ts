@@ -14,7 +14,6 @@ export interface ExportSettings {
     encoder: 'auto' | 'h264' | 'h265' | 'vp8' | 'vp9' | 'prores' | 'mpeg4';
     useGPU: boolean;
     projectName: string;
-    thumbnailFile?: File;
 }
 
 export interface ExportProgress {

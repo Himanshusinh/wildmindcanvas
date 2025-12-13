@@ -4,7 +4,7 @@
 // =================================================================================================
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Download, Upload, Settings, Cpu, Zap, HardDrive, Clock, Server, Globe, FolderOpen } from 'lucide-react';
+import { X, Download, Settings, Cpu, Zap, HardDrive, Clock, Server, Globe, FolderOpen } from 'lucide-react';
 import type { Track, CanvasDimension } from '../types';
 import {
     exportEngine,
@@ -41,7 +41,6 @@ const ExportModal: React.FC<ExportModalProps> = ({
         projectName,
         resolution: { width: dimension.width, height: dimension.height, label: `${dimension.height}p` },
     });
-    const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
     const [deviceCapabilities, setDeviceCapabilities] = useState<DeviceCapabilities | null>(null);
     const [showRecommendations, setShowRecommendations] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
@@ -65,18 +64,19 @@ const ExportModal: React.FC<ExportModalProps> = ({
         }
     }, [isOpen]);
 
-    // Handle thumbnail upload
-    const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                setThumbnailPreview(reader.result as string);
-                setSettings({ ...settings, thumbnailFile: file });
-            };
-            reader.readAsDataURL(file);
+    // Sync resolution when canvas dimension changes
+    useEffect(() => {
+        if (isOpen) {
+            setSettings(prev => ({
+                ...prev,
+                resolution: {
+                    width: dimension.width,
+                    height: dimension.height,
+                    label: `${Math.min(dimension.width, dimension.height)}p`
+                }
+            }));
         }
-    };
+    }, [isOpen, dimension.width, dimension.height]);
 
     // Calculate summary info
     const summaryInfo = useMemo(() => {
@@ -249,80 +249,55 @@ const ExportModal: React.FC<ExportModalProps> = ({
 
                 {/* Content */}
                 <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                    {/* Top Section: Thumbnail + Name + Save To */}
-                    <div className="grid grid-cols-4 gap-4">
-                        {/* Thumbnail */}
-                        <div className="col-span-1">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Thumbnail</label>
-                            <label className="relative block w-full aspect-video rounded-lg border-2 border-dashed border-gray-600 hover:border-purple-500 transition-colors cursor-pointer overflow-hidden group">
-                                {thumbnailPreview ? (
-                                    <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full bg-gray-800/50 group-hover:bg-gray-800/70 transition-colors">
-                                        <Upload className="w-6 h-6 text-gray-500 mb-1" />
-                                        <span className="text-xs text-gray-500">Add</span>
-                                    </div>
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleThumbnailUpload}
-                                    className="hidden"
-                                    disabled={isExporting}
-                                />
-                            </label>
+                    {/* Top Section: Name + Save To */}
+                    <div className="space-y-4">
+                        {/* Project Name */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Project Name</label>
+                            <input
+                                type="text"
+                                value={settings.projectName}
+                                onChange={(e) => setSettings({ ...settings, projectName: e.target.value })}
+                                disabled={isExporting}
+                                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                                placeholder="Enter project name..."
+                            />
                         </div>
 
-                        {/* Name + Save To */}
-                        <div className="col-span-3 space-y-4">
-                            {/* Project Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Project Name</label>
-                                <input
-                                    type="text"
-                                    value={settings.projectName}
-                                    onChange={(e) => setSettings({ ...settings, projectName: e.target.value })}
-                                    disabled={isExporting}
-                                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                                    placeholder="Enter project name..."
-                                />
-                            </div>
-
-                            {/* Save To */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">Save To</label>
-                                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg">
-                                    <HardDrive className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                    <span className="text-sm text-gray-400 flex-1 truncate" title={saveLocation}>
-                                        {fileHandle ? saveLocation : 'Downloads folder'}
-                                    </span>
-                                    {!fileHandle && (
-                                        <span className="text-xs text-purple-400 flex-shrink-0">Auto</span>
-                                    )}
-                                    {isFileSystemAccessSupported && (
-                                        <button
-                                            onClick={handleChooseSaveLocation}
-                                            disabled={isExporting}
-                                            className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 rounded-md transition-colors disabled:opacity-50"
-                                        >
-                                            <FolderOpen className="w-3.5 h-3.5" />
-                                            Browse
-                                        </button>
-                                    )}
-                                    {fileHandle && (
-                                        <button
-                                            onClick={() => {
-                                                setFileHandle(null);
-                                                setSaveLocation('Downloads folder');
-                                            }}
-                                            disabled={isExporting}
-                                            className="text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
-                                            title="Reset to auto-download"
-                                        >
-                                            Reset
-                                        </button>
-                                    )}
-                                </div>
+                        {/* Save To */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Save To</label>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg">
+                                <HardDrive className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-sm text-gray-400 flex-1 truncate" title={saveLocation}>
+                                    {fileHandle ? saveLocation : 'Downloads folder'}
+                                </span>
+                                {!fileHandle && (
+                                    <span className="text-xs text-purple-400 flex-shrink-0">Auto</span>
+                                )}
+                                {isFileSystemAccessSupported && (
+                                    <button
+                                        onClick={handleChooseSaveLocation}
+                                        disabled={isExporting}
+                                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 rounded-md transition-colors disabled:opacity-50"
+                                    >
+                                        <FolderOpen className="w-3.5 h-3.5" />
+                                        Browse
+                                    </button>
+                                )}
+                                {fileHandle && (
+                                    <button
+                                        onClick={() => {
+                                            setFileHandle(null);
+                                            setSaveLocation('Downloads folder');
+                                        }}
+                                        disabled={isExporting}
+                                        className="text-xs text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+                                        title="Reset to auto-download"
+                                    >
+                                        Reset
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -364,22 +339,32 @@ const ExportModal: React.FC<ExportModalProps> = ({
                                 onChange={(e) => {
                                     const preset = RESOLUTION_PRESETS.find(r => r.label === e.target.value);
                                     if (preset) {
-                                        setSettings({ ...settings, resolution: { ...preset } });
+                                        // Flip dimensions if canvas is portrait (height > width)
+                                        const isPortrait = dimension.height > dimension.width;
+                                        const width = isPortrait ? preset.height : preset.width;
+                                        const height = isPortrait ? preset.width : preset.height;
+                                        setSettings({ ...settings, resolution: { width, height, label: preset.label } });
                                     }
                                 }}
                                 disabled={isExporting}
                                 className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
                             >
-                                {RESOLUTION_PRESETS.map((preset) => (
-                                    <option
-                                        key={preset.label}
-                                        value={preset.label}
-                                        style={{ opacity: isRecommended('resolution', preset.label) ? 1 : 0.5 }}
-                                    >
-                                        {preset.width}×{preset.height} ({preset.label})
-                                        {!isRecommended('resolution', preset.label) && showRecommendations && ' (Not Recommended)'}
-                                    </option>
-                                ))}
+                                {RESOLUTION_PRESETS.map((preset) => {
+                                    // Flip dimensions for display if canvas is portrait
+                                    const isPortrait = dimension.height > dimension.width;
+                                    const displayWidth = isPortrait ? preset.height : preset.width;
+                                    const displayHeight = isPortrait ? preset.width : preset.height;
+                                    return (
+                                        <option
+                                            key={preset.label}
+                                            value={preset.label}
+                                            style={{ opacity: isRecommended('resolution', preset.label) ? 1 : 0.5 }}
+                                        >
+                                            {displayWidth}×{displayHeight} ({preset.label})
+                                            {!isRecommended('resolution', preset.label) && showRecommendations && ' (Not Recommended)'}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
 
@@ -498,7 +483,6 @@ const ExportModal: React.FC<ExportModalProps> = ({
                                 <div>
                                     <div className="text-sm font-medium text-white flex items-center gap-2">
                                         Server-side Export
-                                        {serverAvailable && <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">10-50x Faster</span>}
                                     </div>
                                     <div className="text-xs text-gray-400">
                                         {serverAvailable

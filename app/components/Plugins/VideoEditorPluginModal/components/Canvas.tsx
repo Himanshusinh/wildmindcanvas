@@ -163,12 +163,26 @@ const Canvas: React.FC<CanvasProps> = ({
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Update compositor resolution when dimensions change
+    // Update compositor resolution and reinitialize when dimensions change (DOM remounts with new canvas)
     useEffect(() => {
-        if (gpuReady) {
-            gpuCompositor.setResolution(renderWidth, renderHeight);
-        }
-    }, [renderWidth, renderHeight, gpuReady]);
+        const reinitCompositor = async () => {
+            if (gpuCanvasRef.current) {
+                // Reinitialize with the new canvas element after dimension change remount
+                const success = await gpuCompositor.initialize(gpuCanvasRef.current);
+                if (success) {
+                    gpuCompositor.setResolution(renderWidth, renderHeight);
+                    setGpuReady(true);
+                    console.log('[Canvas] GPU Compositor reinitialized after dimension change');
+                } else {
+                    setGpuReady(false);
+                }
+            }
+        };
+
+        // Small delay to ensure canvas ref is updated after remount
+        const timer = setTimeout(reinitCompositor, 50);
+        return () => clearTimeout(timer);
+    }, [renderWidth, renderHeight]);
 
     // Close popups on outside click (checking all toolbars)
     useEffect(() => {
@@ -1830,14 +1844,11 @@ const Canvas: React.FC<CanvasProps> = ({
                     style={{
                         width: '100%',
                         height: '100%',
-                        background: 'transparent',
+                        // Use background (not backgroundColor) consistently to avoid React warning
+                        background: (item.type === 'video' && item.animation) ? '#000000' : 'transparent',
                         ...animationStyle,
                         ...borderRadiusStyle,
                         ...clipPathStyle,
-                        // Force GPU compositing for smooth video playback during animations
-                        ...(item.type === 'video' && item.animation ? {
-                            backgroundColor: '#000000' // Prevent white canvas bleeding through
-                        } : {})
                     }}
                     className={`relative ${item.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} pointer-events-none ${animationClass} ${!item.isBackground ? 'flex items-center justify-center' : ''}`}
                 >

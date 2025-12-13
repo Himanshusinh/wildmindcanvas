@@ -82,6 +82,13 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
 
             if (response.responseStatus === 'success' && response.data) {
                 setMediaLibrary(prev => {
+                    // Helper to deduplicate arrays by id
+                    const dedupe = (existing: MediaItem[], incoming: MediaItem[]) => {
+                        const existingIds = new Set(existing.map(item => item.id));
+                        const uniqueNew = incoming.filter(item => !existingIds.has(item.id));
+                        return [...existing, ...uniqueNew];
+                    };
+
                     if (pageNum === 1) {
                         return {
                             images: response.data?.images || [],
@@ -91,10 +98,10 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
                         };
                     } else {
                         return {
-                            images: [...prev.images, ...(response.data?.images || [])],
-                            videos: [...prev.videos, ...(response.data?.videos || [])],
-                            music: [...prev.music, ...(response.data?.music || [])],
-                            uploaded: [...prev.uploaded, ...(response.data?.uploaded || [])],
+                            images: dedupe(prev.images, response.data?.images || []),
+                            videos: dedupe(prev.videos, response.data?.videos || []),
+                            music: dedupe(prev.music, response.data?.music || []),
+                            uploaded: dedupe(prev.uploaded, response.data?.uploaded || []),
                         };
                     }
                 });
@@ -174,17 +181,17 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ activeTab, isOpen, onClos
                     className="flex-1 overflow-y-auto p-4 custom-scrollbar"
                 >
                     <div className="grid grid-cols-2 gap-3">
-                        {items.map((item) => {
+                        {items.map((item, index) => {
                             const mediaUrl = getMediaUrl(item);
                             const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
                             const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
 
                             return (
                                 <div
-                                    key={item.id}
+                                    key={`${item.id}-${index}`}
                                     draggable
-                                    onDragStart={(e) => handleDragStart(e, item.type === 'music' ? 'audio' : item.type, mediaUrl, { name: item.prompt || 'Media' })}
-                                    onClick={() => onAddClip(mediaUrl, item.type === 'music' ? 'audio' : (item.type as any) || (isVideo ? 'video' : 'image'), { name: item.prompt || 'Media' })}
+                                    onDragStart={(e) => handleDragStart(e, item.type === 'music' ? 'audio' : item.type, mediaUrl, { name: item.prompt ? (item.prompt.length > 30 ? item.prompt.substring(0, 30) + '...' : item.prompt) : 'Media' })}
+                                    onClick={() => onAddClip(mediaUrl, item.type === 'music' ? 'audio' : (item.type as any) || (isVideo ? 'video' : 'image'), { name: item.prompt ? (item.prompt.length > 30 ? item.prompt.substring(0, 30) + '...' : item.prompt) : 'Media' })}
                                     className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-violet-500 transition-all relative group"
                                 >
                                     {isVideo ? (
