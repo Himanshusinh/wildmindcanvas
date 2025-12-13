@@ -1525,6 +1525,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onGenerate={handleGenerate}
             getAvailableAspectRatios={getAvailableAspectRatios}
             onSetIsHovered={setIsHovered}
+            onSetIsPinned={setIsPinned}
             onSetIsModelDropdownOpen={setIsModelDropdownOpen}
             onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
             onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
