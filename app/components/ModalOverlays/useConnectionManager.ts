@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Konva from 'konva';
-import { Connection, ActiveDrag, ImageModalState, ComponentMenu } from './types';
+import { Connection, ActiveDrag, ImageModalState, ComponentMenu, NextSceneModalState } from './types';
 import { getComponentType, computeNodeCenter } from './utils';
 
 interface UseConnectionManagerProps {
@@ -20,6 +20,7 @@ interface UseConnectionManagerProps {
   eraseModalStates?: any[];
   expandModalStates?: any[];
   vectorizeModalStates?: any[];
+  nextSceneModalStates?: NextSceneModalState[];
   storyboardModalStates?: any[];
   scriptFrameModalStates?: any[];
   sceneFrameModalStates?: any[];
@@ -42,6 +43,7 @@ export function useConnectionManager({
   eraseModalStates,
   expandModalStates,
   vectorizeModalStates,
+  nextSceneModalStates,
   storyboardModalStates,
   scriptFrameModalStates,
   sceneFrameModalStates,
@@ -80,9 +82,10 @@ export function useConnectionManager({
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music', 'storyboard'],
-      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'storyboard'],
+      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
       video: ['video'],
       music: ['video'],
+      nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
     };
 
     if (!allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
@@ -183,9 +186,10 @@ export function useConnectionManager({
 
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music', 'storyboard'],
-        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'storyboard'],
+        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
         video: ['video'],
         music: ['video'],
+        nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
       };
 
       if (!fromType || !toType || !allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
@@ -256,8 +260,8 @@ export function useConnectionManager({
       }
 
       // Add connection if not duplicate
-      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
       // Include toAnchor in the connection

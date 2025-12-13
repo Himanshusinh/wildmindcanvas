@@ -41,7 +41,7 @@ export function isAuthenticated(): boolean {
   // Check for app_session cookie (works across subdomains when domain=.wildmindai.com)
   const cookies = document.cookie.split(';');
   const hasSessionCookie = cookies.some(c => c.trim().startsWith('app_session='));
-  
+
   if (hasSessionCookie) {
     return true;
   }
@@ -69,7 +69,7 @@ export async function checkAuthStatus(): Promise<boolean> {
   try {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wildmindai.com';
     const apiUrl = `${apiBase}/api/auth/me`;
-    
+
     // Log to localStorage for debugging
     const logDebug = (message: string, data?: unknown) => {
       const timestamp = new Date().toISOString();
@@ -85,16 +85,16 @@ export async function checkAuthStatus(): Promise<boolean> {
         // Ignore localStorage errors
       }
     };
-    
+
     // Check if we're in production (cross-subdomain scenario)
-    const isProd = typeof window !== 'undefined' && 
-      (window.location.hostname === 'studio.wildmindai.com' || 
-       window.location.hostname === 'wildmindai.com' ||
-       window.location.hostname === 'www.wildmindai.com');
-    
-    logDebug('Starting auth check', { 
-      apiUrl, 
-      apiBase, 
+    const isProd = typeof window !== 'undefined' &&
+      (window.location.hostname === 'studio.wildmindai.com' ||
+        window.location.hostname === 'wildmindai.com' ||
+        window.location.hostname === 'www.wildmindai.com');
+
+    logDebug('Starting auth check', {
+      apiUrl,
+      apiBase,
       hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
       isProd,
       cookies: typeof document !== 'undefined' ? document.cookie : 'n/a',
@@ -108,17 +108,17 @@ export async function checkAuthStatus(): Promise<boolean> {
         };
       }) : []
     });
-    
+
     // In production, check if cookie exists (might be httpOnly and not visible)
     // But we can still try the API call - if cookie domain is set correctly, it will be sent
     if (isProd) {
       // Check for app_session cookie (might not be visible if httpOnly, but that's OK)
       const cookies = typeof document !== 'undefined' ? document.cookie.split(';').map(c => c.trim()) : [];
       const hasAppSessionCookie = cookies.some(c => c.startsWith('app_session='));
-      
+
       // CRITICAL: Check if user is logged in on main site
       // Try to check cookies from www.wildmindai.com domain
-      logDebug('Production cookie check', { 
+      logDebug('Production cookie check', {
         hasAppSessionCookie,
         allCookies: cookies,
         note: 'httpOnly cookies may not be visible in document.cookie - this is normal',
@@ -132,14 +132,14 @@ export async function checkAuthStatus(): Promise<boolean> {
         ]
       });
     }
-    
+
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
+
     try {
       logDebug('Making fetch request', { url: apiUrl, credentials: 'include' });
-      
+
       const response = await fetch(apiUrl, {
         method: 'GET',
         credentials: 'include', // CRITICAL: Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
@@ -157,7 +157,7 @@ export async function checkAuthStatus(): Promise<boolean> {
       response.headers.forEach((value, key) => {
         responseHeaders[key] = value;
       });
-      
+
       logDebug('Received response', {
         status: response.status,
         statusText: response.statusText,
@@ -182,9 +182,9 @@ export async function checkAuthStatus(): Promise<boolean> {
       } catch {
         errorData = { raw: errorText.substring(0, 200) };
       }
-      
-      logDebug('Response not OK', { 
-        status: response.status, 
+
+      logDebug('Response not OK', {
+        status: response.status,
         errorText: errorText.substring(0, 200),
         errorData,
         note: isProd ? 'Cookie may not be shared across subdomains - check COOKIE_DOMAIN env var' : '',
@@ -206,16 +206,16 @@ export async function checkAuthStatus(): Promise<boolean> {
           testEndpoint: 'https://api-gateway-services-wildmind.onrender.com/api/auth/debug/cookie-config'
         } : 'Unknown error'
       });
-      
+
       // CRITICAL FIX: If 401, clear any invalid/expired cookies
       if (response.status === 401 && typeof document !== 'undefined') {
         // Check if error is due to cookie not being sent (domain issue)
         // Check both errorData object and raw errorText to be safe
         const errorMessage = errorData?.message || errorText || '';
-        const isDomainIssue = errorMessage.includes('Cookie not sent') || 
-                              errorMessage.includes('No session token') ||
-                              errorMessage.includes('cookie domain');
-        
+        const isDomainIssue = errorMessage.includes('Cookie not sent') ||
+          errorMessage.includes('No session token') ||
+          errorMessage.includes('cookie domain');
+
         if (isDomainIssue) {
           logDebug('401 due to cookie domain issue - NOT clearing cookies', { error: errorData?.message });
           // Don't clear cookies - let user know they need to log in again or fix domain
@@ -234,11 +234,11 @@ export async function checkAuthStatus(): Promise<boolean> {
           }
         }
       }
-      
+
       return false;
     } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
-      
+
       const logDebug = (message: string, data?: unknown) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] [checkAuthStatus] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
@@ -253,7 +253,7 @@ export async function checkAuthStatus(): Promise<boolean> {
           // Ignore localStorage errors
         }
       };
-      
+
       const error = fetchError as Error;
       if (error.name === 'AbortError') {
         logDebug('Auth check timeout - API Gateway may be unreachable', { apiUrl });
@@ -264,7 +264,7 @@ export async function checkAuthStatus(): Promise<boolean> {
           error: error.message
         });
         // In development, allow access even if API is down
-        const isDev = typeof window !== 'undefined' && 
+        const isDev = typeof window !== 'undefined' &&
           (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         if (isDev) {
           logDebug('Development mode: Allowing access despite API connection failure');

@@ -4,6 +4,7 @@ import React from 'react';
 import { VectorizePluginModal } from '@/app/components/Plugins/VectorizePluginModal/VectorizePluginModal';
 import Konva from 'konva';
 import { Connection, ImageModalState, VectorizeModalState } from './types';
+import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 
 interface VectorizeModalOverlaysProps {
   vectorizeModalStates: VectorizeModalState[] | undefined;
@@ -101,14 +102,10 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
             }
             // DO NOT update local state here - let parent state flow down through props
           }}
-          onDownload={() => {
+          onDownload={async () => {
             if (modalState.vectorizedImageUrl) {
-              const link = document.createElement('a');
-              link.href = modalState.vectorizedImageUrl;
-              link.download = `vectorize-${modalState.id}.svg`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              const filename = generateDownloadFilename('vectorize', modalState.id, 'svg');
+              await downloadImage(modalState.vectorizedImageUrl, filename);
             }
           }}
           onDuplicate={() => {

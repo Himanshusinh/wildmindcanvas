@@ -40,6 +40,8 @@ interface ImageUploadModalProps {
   initialPrompt?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; imageCount?: number; isGenerating?: boolean }) => void;
   initialCount?: number;
+  frameWidth?: number;
+  frameHeight?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
@@ -95,9 +97,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   scriptFrameModalStates = [],
   storyboardModalStates = [],
   refImages = {},  // Flat map of character/location names to image URLs
+  frameWidth,
+  frameHeight,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const processedImageRef = useRef<string | null>(null);
   const [isPinned, setIsPinned] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -249,8 +254,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
     'Seedream v4 4K',
-    'Upscale', // Upscale is treated as media (no controls)
-    'Remove BG' // Remove BG is treated as media (no controls)
+    'Upscale',
+    'Remove BG'
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -258,15 +263,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // 1. Model is explicitly 'Library Image' or 'Uploaded Image' (highest priority - check both initialModel and selectedModel), OR
   // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
   // Priority: Explicit model check first, then fallback detection
+  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
   const isUploadedImage =
     initialModel === 'Library Image' ||
     initialModel === 'Uploaded Image' ||
-    initialModel === 'Upscale' ||
-    initialModel === 'Remove BG' ||
+    PLUGIN_MODELS.includes(initialModel || '') ||
     selectedModel === 'Library Image' ||
     selectedModel === 'Uploaded Image' ||
-    selectedModel === 'Upscale' ||
-    selectedModel === 'Remove BG' ||
+    PLUGIN_MODELS.includes(selectedModel || '') ||
     (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
 
   // Detect connected image nodes (for image-to-image generation)
@@ -1104,17 +1108,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     // Google Nano Banana Pro supports 1K, 2K, 4K
     if (modelLower.includes('nano banana pro')) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
-        { value: '4K', label: '4K (4096px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
       ];
     }
 
     // Flux 2 Pro supports 1K, 2K, 1024x2048
     if (modelLower.includes('flux 2 pro')) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
         { value: '1024x2048', label: '1024x2048' },
       ];
     }
@@ -1126,9 +1130,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       modelLower.includes('flux pro 1.1')
     ) {
       return [
-        { value: '1K', label: '1K (1024px)' },
-        { value: '2K', label: '2K (2048px)' },
-        { value: '4K', label: '4K (4096px)' },
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
+      ];
+    }
+
+    // Z Image Turbo supports 1K and 2K only
+    if (modelLower.includes('z image turbo')) {
+      return [
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
       ];
     }
 
@@ -1137,8 +1149,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   };
 
   // Build final model name with resolution for API call
-  const getFinalModelName = () => {
-    const modelLower = selectedModel.toLowerCase();
+  const getFinalModelName = (modelOverride?: string) => {
+    const targetModel = modelOverride || selectedModel;
+    const modelLower = targetModel.toLowerCase();
 
     // For Google Nano Banana Pro, append resolution
     if (modelLower.includes('nano banana pro')) {
@@ -1156,11 +1169,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       modelLower.includes('imagen') ||
       modelLower.includes('flux pro 1.1')
     ) {
-      return `${selectedModel} ${selectedResolution}`;
+      return `${targetModel} ${selectedResolution}`;
     }
 
     // For other models, use as-is
-    return selectedModel;
+    return targetModel;
   };
 
 
@@ -1276,6 +1289,57 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         </div>
       )}
 
+      {/* Auto-resize effect for Plugin Results (Upscale, Vectorize, etc.) */}
+      {/* This ensures the frame expands/collapses to fit the generated image dimensions */}
+      {(() => {
+        useEffect(() => {
+          if (generatedImageUrl && isUploadedImage) {
+            // STRICT SAFETY CHECK:
+            // If we have already processed this exact image URL, do absolutely nothing.
+            if (processedImageRef.current === generatedImageUrl) {
+              return;
+            }
+
+            const img = new window.Image();
+            img.onload = () => {
+              const naturalWidth = img.naturalWidth;
+              const naturalHeight = img.naturalHeight;
+
+              if (naturalWidth && naturalHeight) {
+                const MAX_WIDTH = 600;
+                let newWidth = Math.min(Math.max(naturalWidth, 300), MAX_WIDTH);
+                let newHeight = Math.round(newWidth * (naturalHeight / naturalWidth));
+
+                // Mark this URL as processed BEFORE triggering any updates
+                processedImageRef.current = generatedImageUrl;
+
+                console.log('[ImageUploadModal] Auto-resizing for plugin result:', {
+                  model: selectedModel,
+                  natural: `${naturalWidth}x${naturalHeight}`,
+                  new: `${newWidth}x${newHeight}`
+                });
+
+                const newAspectRatio = `${newWidth}:${newHeight}`;
+
+                if (onOptionsChange) {
+                  // Only trigger update if dimensions actually need changing
+                  // (though the ref guard handles the loop, this prevents one unnecessary render if coincidentally correct)
+                  if (frameWidth !== newWidth || frameHeight !== newHeight) {
+                    onOptionsChange({
+                      frameWidth: newWidth,
+                      frameHeight: newHeight,
+                      aspectRatio: newAspectRatio,
+                    } as any);
+                  }
+                }
+              }
+            };
+            img.src = generatedImageUrl;
+          }
+        }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange, frameWidth, frameHeight]);
+        return null;
+      })()}
+
       <ImageModalTooltip
         isHovered={isHovered}
         isUploadedImage={Boolean(isUploadedImage)}
@@ -1307,6 +1371,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
+          width={frameWidth}
+          height={frameHeight}
         />
         <ImageModalNodes
           id={id}
@@ -1316,149 +1382,169 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         />
       </div>
 
-      <ImageModalControls
-        scale={scale}
-        isHovered={isHovered}
-        isPinned={isPinned}
-        isUploadedImage={Boolean(isUploadedImage)}
-        isSelected={Boolean(isSelected)}
-        prompt={effectivePrompt}
-        isPromptDisabled={!!connectedTextInput}
-        selectedModel={selectedModel}
-        selectedAspectRatio={selectedAspectRatio}
-        selectedFrame={selectedFrame}
-        selectedResolution={selectedResolution}
-        imageCount={imageCount}
-        generatedImageUrl={generatedImageUrl}
-        availableModels={availableModels}
-        availableResolutions={getAvailableResolutions()}
-        isGenerating={isGenerating}
-        isLocked={isLocked}
-        lockReason={lockReason}
-        isModelDropdownOpen={isModelDropdownOpen}
-        isAspectRatioDropdownOpen={isAspectRatioDropdownOpen}
-        isResolutionDropdownOpen={isResolutionDropdownOpen}
-        onPromptChange={(val) => {
-          setPrompt(val);
-          if (onOptionsChange) {
-            const opts: any = { prompt: val, model: getFinalModelName(), frame: selectedFrame, imageCount };
-            if (!generatedImageUrl) {
-              opts.aspectRatio = selectedAspectRatio;
-            }
-            onOptionsChange(opts);
-          }
-        }}
-        onModelChange={(model) => {
-          setSelectedModel(model);
-          setIsModelDropdownOpen(false);
-          const modelLower = model.toLowerCase();
-          let availableRatios: Array<{ value: string; label: string }>;
-          if (modelLower.includes('flux')) {
-            availableRatios = [
-              { value: '1:1', label: '1:1' },
-              { value: '16:9', label: '16:9' },
-              { value: '9:16', label: '9:16' },
-              { value: '4:3', label: '4:3' },
-              { value: '3:4', label: '3:4' },
-              { value: '3:2', label: '3:2' },
-              { value: '2:3', label: '2:3' },
-              { value: '21:9', label: '21:9' },
-              { value: '9:21', label: '9:21' },
-              { value: '16:10', label: '16:10' },
-              { value: '10:16', label: '10:16' },
-            ];
-          } else {
-            availableRatios = [
-              { value: '1:1', label: '1:1' },
-              { value: '16:9', label: '16:9' },
-              { value: '9:16', label: '9:16' },
-              { value: '4:3', label: '4:3' },
-              { value: '3:4', label: '3:4' },
-              { value: '3:2', label: '3:2' },
-              { value: '2:3', label: '2:3' },
-              { value: '21:9', label: '21:9' },
-              { value: '5:4', label: '5:4' },
-              { value: '4:5', label: '4:5' },
-            ];
-          }
-          const newAspectRatio = availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)
-            ? availableRatios[0].value
-            : selectedAspectRatio;
-          if (newAspectRatio !== selectedAspectRatio) {
-            setSelectedAspectRatio(newAspectRatio);
-          }
-          if (onOptionsChange) {
-            const [w, h] = newAspectRatio.split(':').map(Number);
-            const frameWidth = 600;
-            const ar = w && h ? (w / h) : 1;
-            const rawHeight = Math.round(frameWidth / ar);
-            const frameHeight = Math.max(400, rawHeight);
-            const opts: any = { model: getFinalModelName(), frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
-            if (!generatedImageUrl) {
-              opts.aspectRatio = newAspectRatio;
-            }
-            onOptionsChange(opts);
-          }
-        }}
-        onAspectRatioChange={(ratio) => {
-          setSelectedAspectRatio(ratio);
-          setIsAspectRatioDropdownOpen(false);
-          if (onOptionsChange) {
-            const [w, h] = ratio.split(':').map(Number);
-            const frameWidth = 600;
-            const ar = w && h ? (w / h) : 1;
-            const rawHeight = Math.round(frameWidth / ar);
-            const frameHeight = Math.max(400, rawHeight);
-            const opts: any = { model: selectedModel, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
-            if (!generatedImageUrl) {
-              opts.aspectRatio = ratio;
-            }
-            onOptionsChange(opts);
-          }
-        }}
-        onImageCountChange={(count) => {
-          setImageCount(count);
-          if (onOptionsChange) {
-            onOptionsChange({ model: getFinalModelName(), aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount: count } as any);
-          }
-        }}
-        onResolutionChange={(resolution) => {
-          setSelectedResolution(resolution);
-          if (onOptionsChange) {
-            // Helper to get model name with NEW resolution
-            const getModelNameWithResolution = (res: string) => {
-              const modelLower = selectedModel.toLowerCase();
-              if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
-              if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
-              if (
-                modelLower.includes('seedream') ||
-                modelLower.includes('imagen') ||
-                modelLower.includes('flux pro 1.1')
-              ) {
-                return `${selectedModel} ${res}`;
+      {!isUploadedImage && (
+        <>
+          <ImageModalControls
+            scale={scale}
+            isHovered={isHovered}
+            isPinned={isPinned}
+            isUploadedImage={Boolean(isUploadedImage)}
+            isSelected={Boolean(isSelected)}
+            prompt={effectivePrompt}
+            isPromptDisabled={!!connectedTextInput}
+            selectedModel={selectedModel}
+            selectedAspectRatio={selectedAspectRatio}
+            selectedFrame={selectedFrame}
+            selectedResolution={selectedResolution}
+            imageCount={imageCount}
+            generatedImageUrl={generatedImageUrl}
+            availableModels={availableModels}
+            availableResolutions={getAvailableResolutions()}
+            isGenerating={isGenerating}
+            isLocked={isLocked}
+            lockReason={lockReason}
+            isModelDropdownOpen={isModelDropdownOpen}
+            isAspectRatioDropdownOpen={isAspectRatioDropdownOpen}
+            isResolutionDropdownOpen={isResolutionDropdownOpen}
+            onPromptChange={(val) => {
+              setPrompt(val);
+              if (onOptionsChange) {
+                const opts: any = { prompt: val, model: getFinalModelName(), frame: selectedFrame, imageCount };
+                if (!generatedImageUrl) {
+                  opts.aspectRatio = selectedAspectRatio;
+                }
+                onOptionsChange(opts);
               }
-              return selectedModel;
-            };
+            }}
+            onModelChange={(model) => {
+              setSelectedModel(model);
+              setIsModelDropdownOpen(false);
+              const modelLower = model.toLowerCase();
+              let availableRatios: Array<{ value: string; label: string }>;
+              if (modelLower.includes('flux')) {
+                availableRatios = [
+                  { value: '1:1', label: '1:1' },
+                  { value: '16:9', label: '16:9' },
+                  { value: '9:16', label: '9:16' },
+                  { value: '4:3', label: '4:3' },
+                  { value: '3:4', label: '3:4' },
+                  { value: '3:2', label: '3:2' },
+                  { value: '2:3', label: '2:3' },
+                  { value: '21:9', label: '21:9' },
+                  { value: '9:21', label: '9:21' },
+                  { value: '16:10', label: '16:10' },
+                  { value: '10:16', label: '10:16' },
+                ];
+              } else {
+                availableRatios = [
+                  { value: '1:1', label: '1:1' },
+                  { value: '16:9', label: '16:9' },
+                  { value: '9:16', label: '9:16' },
+                  { value: '4:3', label: '4:3' },
+                  { value: '3:4', label: '3:4' },
+                  { value: '3:2', label: '3:2' },
+                  { value: '2:3', label: '2:3' },
+                  { value: '21:9', label: '21:9' },
+                  { value: '5:4', label: '5:4' },
+                  { value: '4:5', label: '4:5' },
+                ];
+              }
+              const newAspectRatio = availableRatios.length > 0 && !availableRatios.find(r => r.value === selectedAspectRatio)
+                ? availableRatios[0].value
+                : selectedAspectRatio;
+              if (newAspectRatio !== selectedAspectRatio) {
+                setSelectedAspectRatio(newAspectRatio);
+              }
+              if (onOptionsChange) {
+                const [w, h] = newAspectRatio.split(':').map(Number);
+                const frameWidth = 600;
+                const ar = w && h ? (w / h) : 1;
+                const rawHeight = Math.round(frameWidth / ar);
+                const frameHeight = Math.max(400, rawHeight);
+                // CRITICAL FIX: Pass 'model' explicitly to getFinalModelName because selectedModel state is stale
+                const opts: any = { model: getFinalModelName(model), frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
+                if (!generatedImageUrl) {
+                  opts.aspectRatio = newAspectRatio;
+                }
+                onOptionsChange(opts);
+              }
+            }}
+            onAspectRatioChange={(ratio) => {
+              setSelectedAspectRatio(ratio);
+              setIsAspectRatioDropdownOpen(false);
+              if (onOptionsChange) {
+                const [w, h] = ratio.split(':').map(Number);
+                const frameWidth = 600;
+                const ar = w && h ? (w / h) : 1;
+                const rawHeight = Math.round(frameWidth / ar);
+                const frameHeight = Math.max(400, rawHeight);
+                const opts: any = { model: selectedModel, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
+                if (!generatedImageUrl) {
+                  opts.aspectRatio = ratio;
+                }
+                onOptionsChange(opts);
+              }
+            }}
+            onImageCountChange={(count) => {
+              setImageCount(count);
+              if (onOptionsChange) {
+                onOptionsChange({ model: getFinalModelName(), aspectRatio: selectedAspectRatio, frame: selectedFrame, prompt, frameWidth: 600, frameHeight: 400, imageCount: count } as any);
+              }
+            }}
+            onResolutionChange={(resolution) => {
+              console.log('[ImageUploadModal] Resolution changed:', { resolution, prev: selectedResolution });
+              setSelectedResolution(resolution);
+              if (onOptionsChange) {
+                // Helper to get model name with NEW resolution
+                const getModelNameWithResolution = (res: string) => {
+                  const modelLower = selectedModel.toLowerCase();
+                  if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
+                  if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
+                  if (
+                    modelLower.includes('seedream') ||
+                    modelLower.includes('imagen') ||
+                    modelLower.includes('flux pro 1.1') ||
+                    modelLower.includes('z image turbo')
+                  ) {
+                    return `${selectedModel} ${res}`;
+                  }
+                  return selectedModel;
+                };
 
-            onOptionsChange({
-              model: getModelNameWithResolution(resolution),
-              aspectRatio: selectedAspectRatio,
-              frame: selectedFrame,
-              prompt,
-              frameWidth: 600,
-              frameHeight: 400,
-              imageCount
-            } as any);
-          }
-        }}
-        onGenerate={handleGenerate}
-        getAvailableAspectRatios={getAvailableAspectRatios}
-        onSetIsHovered={setIsHovered}
-        onSetIsPinned={setIsPinned}
-        onSetIsModelDropdownOpen={setIsModelDropdownOpen}
-        onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
-        onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
-      />
+                onOptionsChange({
+                  model: getModelNameWithResolution(resolution),
+                  aspectRatio: selectedAspectRatio,
+                  frame: selectedFrame,
+                  prompt,
+                  frameWidth: 600,
+                  frameHeight: 400,
+                  imageCount
+                } as any);
+              }
+            }}
+            onGenerate={handleGenerate}
+            getAvailableAspectRatios={getAvailableAspectRatios}
+            onSetIsHovered={setIsHovered}
+            onSetIsModelDropdownOpen={setIsModelDropdownOpen}
+            onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
+            onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
+          />
+
+          {/* Invisible Hover Trigger Zone for Bottom Approach */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              width: '100%',
+              height: `${60 * scale}px`,
+              background: 'transparent',
+              zIndex: 0,
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

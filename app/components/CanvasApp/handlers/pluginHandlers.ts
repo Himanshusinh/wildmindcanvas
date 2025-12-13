@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, MultiangleGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -16,6 +16,12 @@ export interface PluginHandlers {
   onPersistVectorizeModalCreate: (modal: VectorizeGenerator) => Promise<void>;
   onPersistVectorizeModalMove: (id: string, updates: Partial<VectorizeGenerator>) => Promise<void>;
   onPersistVectorizeModalDelete: (id: string) => Promise<void>;
+  onPersistNextSceneModalCreate: (modal: NextSceneGenerator) => Promise<void>;
+  onPersistNextSceneModalMove: (id: string, updates: Partial<NextSceneGenerator>) => Promise<void>;
+  onPersistNextSceneModalDelete: (id: string) => Promise<void>;
+  onPersistMultiangleModalCreate: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => Promise<void>;
+  onPersistMultiangleModalMove: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => Promise<void>;
+  onPersistMultiangleModalDelete: (id: string) => Promise<void>;
   onPersistStoryboardModalCreate: (modal: StoryboardGenerator) => Promise<void>;
   onPersistStoryboardModalMove: (id: string, updates: Partial<StoryboardGenerator>) => Promise<void>;
   onPersistStoryboardModalDelete: (id: string) => Promise<void>;
@@ -596,7 +602,7 @@ export function createPluginHandlers(
   const convertBlobUrlToDataUrl = async (blobUrl: string): Promise<string> => {
     const response = await fetch(blobUrl);
     if (!response.ok) {
-      throw new Error(`Failed to read local image (status ${response.status}). Please reconnect the image and try again.`);
+      throw new Error(`Failed to read local image(status ${response.status}).Please reconnect the image and try again.`);
     }
     const blob = await response.blob();
     return await new Promise<string>((resolve, reject) => {
@@ -1107,6 +1113,150 @@ export function createPluginHandlers(
     }
   };
 
+  const onPersistNextSceneModalCreate = async (modal: NextSceneGenerator) => {
+    setters.setNextSceneGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create next-scene', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'next-scene-plugin',
+        x: modal.x,
+        y: modal.y,
+        nextSceneImageUrl: modal.nextSceneImageUrl || null,
+        sourceImageUrl: modal.sourceImageUrl || null,
+        localNextSceneImageUrl: modal.localNextSceneImageUrl || null,
+        mode: modal.mode || 'scene',
+        frameWidth: modal.frameWidth,
+        frameHeight: modal.frameHeight,
+        isProcessing: modal.isProcessing,
+      });
+    }
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'next-scene-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              nextSceneImageUrl: modal.nextSceneImageUrl || null,
+              sourceImageUrl: modal.sourceImageUrl || null,
+              localNextSceneImageUrl: modal.localNextSceneImageUrl || null,
+              mode: modal.mode || 'scene',
+              frameWidth: modal.frameWidth || 400,
+              frameHeight: modal.frameHeight || 500,
+              isProcessing: modal.isProcessing || false,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistNextSceneModalMove = async (id: string, updates: Partial<NextSceneGenerator>) => {
+    const prev = state.nextSceneGenerators.find(m => m.id === id);
+    setters.setNextSceneGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move next-scene', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      const existingMeta = {
+        nextSceneImageUrl: prev.nextSceneImageUrl || null,
+        sourceImageUrl: prev.sourceImageUrl || null,
+        localNextSceneImageUrl: prev.localNextSceneImageUrl || null,
+        mode: prev.mode || 'scene',
+        frameWidth: prev.frameWidth || 400,
+        frameHeight: prev.frameHeight || 500,
+        isProcessing: prev.isProcessing || false,
+      };
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+      const inverseMeta: any = {};
+      if ('nextSceneImageUrl' in updates) inverseMeta.nextSceneImageUrl = prev.nextSceneImageUrl || null;
+      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+      if ('localNextSceneImageUrl' in updates) inverseMeta.localNextSceneImageUrl = prev.localNextSceneImageUrl || null;
+      if ('mode' in updates) inverseMeta.mode = prev.mode || 'scene';
+      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
+      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
+      if ('isProcessing' in updates) inverseMeta.isProcessing = prev.isProcessing || false;
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistNextSceneModalDelete = async (id: string) => {
+    const prevItem = state.nextSceneGenerators.find(m => m.id === id);
+    setters.setNextSceneGenerators(prev => prev.filter(m => m.id !== id));
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete next-scene', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    await removeAndPersistConnectorsForElement(id);
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id: prevItem.id,
+              type: 'next-scene-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                nextSceneImageUrl: prevItem.nextSceneImageUrl || null,
+                sourceImageUrl: prevItem.sourceImageUrl || null,
+                localNextSceneImageUrl: prevItem.localNextSceneImageUrl || null,
+                mode: prevItem.mode,
+                frameWidth: prevItem.frameWidth,
+                frameHeight: prevItem.frameHeight,
+                isProcessing: prevItem.isProcessing,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
   const onVectorize = async (sourceImageUrl?: string, mode?: string) => {
     if (!sourceImageUrl || !projectId) {
       console.error('[onVectorize] Missing sourceImageUrl or projectId');
@@ -1129,6 +1279,167 @@ export function createPluginHandlers(
       throw error;
     }
   };
+
+  // Multiangle plugin handlers
+  const onPersistMultiangleModalCreate = async (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => {
+    // Optimistic update
+    setters.setMultiangleGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create multiangle', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'multiangle-plugin',
+        x: modal.x,
+        y: modal.y,
+        meta: {
+          multiangleImageUrl: modal.multiangleImageUrl || null,
+          frameWidth: modal.frameWidth || 400,
+          frameHeight: modal.frameHeight || 500,
+          isProcessing: modal.isProcessing || false,
+        },
+      });
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'multiangle-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              multiangleImageUrl: modal.multiangleImageUrl || null,
+              frameWidth: modal.frameWidth || 400,
+              frameHeight: modal.frameHeight || 500,
+              isProcessing: modal.isProcessing || false,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleModalMove = async (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => {
+    // 1. Capture previous state (for inverse op)
+    const prev = state.multiangleGenerators.find(m => m.id === id);
+
+    // 2. Optimistic update (triggers snapshot useEffect)
+    setters.setMultiangleGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+
+    // 3. Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move multiangle', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+
+    // 4. Append op for undo/redo
+    if (projectId && opManagerInitialized) {
+      const structuredUpdates: any = {};
+      const existingMeta = prev ? {
+        multiangleImageUrl: prev.multiangleImageUrl || null,
+        frameWidth: prev.frameWidth || 400,
+        frameHeight: prev.frameHeight || 500,
+        isProcessing: prev.isProcessing || false,
+      } : {
+        multiangleImageUrl: null,
+        frameWidth: 400,
+        frameHeight: 500,
+        isProcessing: false,
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      // Build inverse updates
+      const inverseUpdates: any = {};
+      if (prev) {
+        if ('x' in updates) inverseUpdates.x = prev.x;
+        if ('y' in updates) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('multiangleImageUrl' in updates) inverseMeta.multiangleImageUrl = prev.multiangleImageUrl || null;
+        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
+        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
+        if ('isProcessing' in updates) inverseMeta.isProcessing = prev.isProcessing || false;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: {
+          type: 'update',
+          elementId: id,
+          data: { updates: inverseUpdates },
+          requestId: '',
+          clientTs: 0,
+        } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleModalDelete = async (id: string) => {
+    console.log('[page.tsx] onPersistMultiangleModalDelete called', id);
+    const prevItem = state.multiangleGenerators.find(m => m.id === id);
+    // Update state IMMEDIATELY and SYNCHRONOUSLY
+    setters.setMultiangleGenerators(prev => {
+      const filtered = prev.filter(m => m.id !== id);
+      console.log('[page.tsx] multiangleGenerators updated, remaining:', filtered.length);
+      return filtered;
+    });
+    // Then do async operations
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete multiangle', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Remove connectors
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'multiangle-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                multiangleImageUrl: prevItem.multiangleImageUrl || null,
+                frameWidth: prevItem.frameWidth || 400,
+                frameHeight: prevItem.frameHeight || 500,
+                isProcessing: prevItem.isProcessing || false,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
+    }
+  };
+
 
   // Storyboard plugin handlers
   const onPersistStoryboardModalCreate = async (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => {
@@ -1181,7 +1492,7 @@ export function createPluginHandlers(
     // 4. Auto-create input nodes (Character, Background, Prompt)
     // Only do this for new creations (not hydration), which is implied since this handler is called on drop
     const createInputNode = async (label: string, yOffset: number, color: string, toAnchor: string) => {
-      const nodeId = `${label.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const nodeId = `${label.toLowerCase()} -${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const nodeX = modal.x - 350; // Position to the left
       const nodeY = modal.y + yOffset;
 
@@ -1225,7 +1536,7 @@ export function createPluginHandlers(
       }
 
       // Create connector
-      const connectorId = `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const connectorId = `conn - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const connector = {
         id: connectorId,
         from: nodeId,
@@ -1745,6 +2056,12 @@ export function createPluginHandlers(
     onPersistVectorizeModalCreate,
     onPersistVectorizeModalMove,
     onPersistVectorizeModalDelete,
+    onPersistNextSceneModalCreate,
+    onPersistNextSceneModalMove,
+    onPersistNextSceneModalDelete,
+    onPersistMultiangleModalCreate,
+    onPersistMultiangleModalMove,
+    onPersistMultiangleModalDelete,
     onUpscale,
     onRemoveBg,
     onErase,
@@ -1767,4 +2084,3 @@ export function createPluginHandlers(
     onPersistVideoEditorModalDelete,
   };
 }
-

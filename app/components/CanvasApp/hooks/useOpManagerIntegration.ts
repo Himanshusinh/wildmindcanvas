@@ -49,6 +49,7 @@ export function useOpManagerIntegration({
         const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
         const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
         const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
+        const newCanvasTextStates: Array<import('@/app/components/ModalOverlays/types').CanvasTextState> = [];
         const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
         const newScriptFrames: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
         const newSceneFrames: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }> = [];
@@ -80,6 +81,29 @@ export function useOpManagerIntegration({
               newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
             } else if (element.type === 'text-generator') {
               newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' });
+            } else if (element.type === 'canvas-text') {
+              const newCanvasText: import('@/app/components/ModalOverlays/types').CanvasTextState = {
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                text: element.meta?.text || 'add text here',
+                fontSize: element.meta?.fontSize || 24,
+                fontWeight: element.meta?.fontWeight || 'normal',
+                fontStyle: element.meta?.fontStyle || 'normal',
+                fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                styleType: element.meta?.styleType || 'paragraph',
+                textAlign: element.meta?.textAlign || 'left',
+                color: element.meta?.color || '#ffffff',
+                width: element.meta?.width || 300,
+                height: element.meta?.height || 100,
+              };
+              // Check if setCanvasTextStates exists in setters (it might not be in the interface yet)
+              if ((setters as any).setCanvasTextStates) {
+                (setters as any).setCanvasTextStates((prev: any) => {
+                  if (prev && prev.some((t: any) => t.id === element.id)) return prev;
+                  return [...(prev || []), newCanvasText];
+                });
+              }
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
             } else if (element.type === 'removebg-plugin') {
@@ -133,6 +157,10 @@ export function useOpManagerIntegration({
           setters.setVideoGenerators(newVideoGenerators);
           setters.setMusicGenerators(newMusicGenerators);
           setters.setTextGenerators(newTextGenerators);
+          // Restore canvas text states from snapshot
+          if ((setters as any).setCanvasTextStates) {
+            (setters as any).setCanvasTextStates(newCanvasTextStates);
+          }
         }
         // Always load plugins from snapshot (realtime doesn't handle plugins)
         setters.setUpscaleGenerators(newUpscaleGenerators);
@@ -191,6 +219,29 @@ export function useOpManagerIntegration({
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
           });
+        } else if (element.type === 'canvas-text') {
+          const newCanvasText: import('@/app/components/ModalOverlays/types').CanvasTextState = {
+            id: element.id,
+            x: element.x || 0,
+            y: element.y || 0,
+            text: element.meta?.text || 'add text here',
+            fontSize: element.meta?.fontSize || 24,
+            fontWeight: element.meta?.fontWeight || 'normal',
+            fontStyle: element.meta?.fontStyle || 'normal',
+            fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+            styleType: element.meta?.styleType || 'paragraph',
+            textAlign: element.meta?.textAlign || 'left',
+            color: element.meta?.color || '#ffffff',
+            width: element.meta?.width || 300,
+            height: element.meta?.height || 100,
+          };
+          // Check if setCanvasTextStates exists in setters
+          if ((setters as any).setCanvasTextStates) {
+            (setters as any).setCanvasTextStates((prev: any) => {
+              if (prev && prev.some((t: any) => t.id === element.id)) return prev;
+              return [...(prev || []), newCanvasText];
+            });
+          }
         } else if (element.type === 'removebg-plugin') {
           setters.setRemoveBgGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -264,6 +315,10 @@ export function useOpManagerIntegration({
         setters.setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setters.setTextGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        // Delete canvas text if present
+        if ((setters as any).setCanvasTextStates) {
+          (setters as any).setCanvasTextStates((prev: any) => (prev || []).filter((t: any) => t.id !== op.elementId));
+        }
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setters.setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
