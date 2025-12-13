@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface NextSceneImageFrameProps {
@@ -112,12 +112,7 @@ export const NextSceneImageFrame: React.FC<NextSceneImageFrameProps> = ({
         </div>
       )}
 
-      <ConnectionNodes
-        id={id}
-        scale={scale}
-        isHovered={isHovered}
-        isSelected={isSelected}
-      />
+
     </div>
   );
 };
