@@ -19,6 +19,7 @@ import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImag
 import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
 import { CanvasTextState } from '@/app/components/ModalOverlays/types';
 import { CanvasTextNode } from './CanvasTextNode';
+import { useCanvasHistory, CanvasHistoryState } from '@/app/hooks/useCanvasHistory';
 
 // ... (rest of imports)
 
@@ -430,34 +431,136 @@ export const Canvas: React.FC<CanvasProps> = ({
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  useEffect(() => {
-    if (externalVectorizeModals) {
-      setVectorizeModalStates(externalVectorizeModals);
-    }
-    if (externalNextSceneModals) {
-      setNextSceneModalStates(externalNextSceneModals);
-    }
-    if (externalMultiangleModals) {
-      setMultiangleModalStates(externalMultiangleModals);
-    }
-    if (externalVideoEditorModals) {
-      setVideoEditorModalStates(externalVideoEditorModals);
-    }
-  }, [externalVectorizeModals, externalNextSceneModals, externalMultiangleModals, externalVideoEditorModals]);
+  // --- HISTORY MANAGEMENT ---
 
-  const sanitizeScriptOutput = (value?: string | null) => {
-    if (!value) return '';
-    let cleaned = value;
-    cleaned = cleaned.replace(/###\s*B[\s\S]*$/i, '').trim();
-    cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
-    cleaned = cleaned.replace(/\*\*/g, '');
-    cleaned = cleaned.replace(/^#+\s*/gm, '');
-    cleaned = cleaned.replace(/^\s*[-*]\s+/gm, '- ');
-    cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
-    cleaned = cleaned.replace(/\{\s*|\s*\}/g, '');
-    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-    return cleaned.trim();
-  };
+  const getCurrentState = useCallback((): CanvasHistoryState => ({
+    images,
+    canvasTextStates: effectiveCanvasTextStates,
+    textInputStates,
+    imageModalStates,
+    videoModalStates,
+    musicModalStates,
+    storyboardModalStates,
+    scriptFrameModalStates,
+    sceneFrameModalStates,
+    connections,
+    upscaleModalStates,
+    removeBgModalStates,
+    eraseModalStates,
+    expandModalStates,
+    vectorizeModalStates,
+    nextSceneModalStates,
+    multiangleModalStates,
+    videoEditorModalStates,
+  }), [
+    images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, connections,
+    upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, multiangleModalStates, videoEditorModalStates
+  ]);
+
+  const isRestoring = useRef(false);
+
+  const handleRestore = useCallback((state: CanvasHistoryState) => {
+    isRestoring.current = true;
+
+    // Restore local states
+    effectiveSetCanvasTextStates(state.canvasTextStates || []);
+    setImageModalStates(state.imageModalStates || []);
+    setVideoModalStates(state.videoModalStates || []);
+    setMusicModalStates(state.musicModalStates || []);
+    setTextInputStates(state.textInputStates || []);
+    setStoryboardModalStates(state.storyboardModalStates || []);
+    setScriptFrameModalStates(state.scriptFrameModalStates || []);
+    setSceneFrameModalStates(state.sceneFrameModalStates || []);
+    setUpscaleModalStates(state.upscaleModalStates || []);
+    setRemoveBgModalStates(state.removeBgModalStates || []);
+    setEraseModalStates(state.eraseModalStates || []);
+    setExpandModalStates(state.expandModalStates || []);
+    setVectorizeModalStates(state.vectorizeModalStates || []);
+    setNextSceneModalStates(state.nextSceneModalStates || []);
+    setMultiangleModalStates(state.multiangleModalStates || []);
+    setVideoEditorModalStates(state.videoEditorModalStates || []);
+
+    if (onConnectionsChange && state.connections) {
+      onConnectionsChange(state.connections);
+    }
+
+    // Reconcile 'images' prop - skipped for now due to type mismatch
+    // if (state.images && images && onImageUpdate) {
+    //   state.images.forEach(savedImg => {
+    //     const currentImgIndex = images.findIndex(img => img.id === savedImg.id);
+    //     if (currentImgIndex !== -1) {
+    //       const currentImg = images[currentImgIndex];
+    //       // Check for significant differences to avoid spamming updates
+    //       if (currentImg.x !== savedImg.x || currentImg.y !== savedImg.y ||
+    //         currentImg.scaleX !== savedImg.scaleX || currentImg.scaleY !== savedImg.scaleY ||
+    //         currentImg.rotation !== savedImg.rotation) {
+    //         onImageUpdate(currentImgIndex, {
+    //           x: savedImg.x,
+    //           y: savedImg.y,
+    //           scaleX: savedImg.scaleX,
+    //           scaleY: savedImg.scaleY,
+    //           rotation: savedImg.rotation
+    //         });
+    //       }
+    //     }
+    //   });
+    // }
+
+    // Reset restoring flag after a tick to allow state updates to settle without triggering record()
+    setTimeout(() => {
+      isRestoring.current = false;
+    }, 100);
+  }, [effectiveSetCanvasTextStates, onConnectionsChange, images, onImageUpdate]);
+
+  const { record, undo, redo, canUndo, canRedo } = useCanvasHistory(
+    {
+      images,
+      canvasTextStates: effectiveCanvasTextStates,
+      textInputStates,
+      imageModalStates,
+      videoModalStates,
+      musicModalStates,
+      storyboardModalStates,
+      scriptFrameModalStates,
+      sceneFrameModalStates,
+      connections,
+      upscaleModalStates,
+      removeBgModalStates,
+      eraseModalStates,
+      expandModalStates,
+      vectorizeModalStates,
+      nextSceneModalStates,
+      multiangleModalStates,
+      videoEditorModalStates
+    },
+    handleRestore
+  );
+
+  // Auto-record history on state changes
+  useEffect(() => {
+    if (!isRestoring.current) {
+      // Debounce slightly or just record? 
+      // Use a timeout to coalesce rapid updates if necessary, 
+      // but for now direct record is safer for "dragEnd" type updates.
+      // Konva usually updates state on dragEnd, so simple record is fine.
+      const timer = setTimeout(() => {
+        if (!isRestoring.current) {
+          record(getCurrentState());
+        }
+      }, 300); // 300ms debounce to catch the "end" of an operation
+      return () => clearTimeout(timer);
+    }
+  }, [
+    images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, connections,
+    upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, multiangleModalStates, videoEditorModalStates,
+    record, getCurrentState
+  ]);
+
+
 
   const ensureScriptFrameForPlugin = (pluginId: string, script: string, isLoading: boolean = false) => {
     const plugin = storyboardModalStates.find(modal => modal.id === pluginId);
@@ -546,6 +649,20 @@ export const Canvas: React.FC<CanvasProps> = ({
       frameHeight,
       text: script
     };
+  };
+
+  const sanitizeScriptOutput = (value?: string | null) => {
+    if (!value) return '';
+    let cleaned = value;
+    cleaned = cleaned.replace(/###\s*B[\s\S]*$/i, '').trim();
+    cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
+    cleaned = cleaned.replace(/\*\*/g, '');
+    cleaned = cleaned.replace(/^#+\s*/gm, '');
+    cleaned = cleaned.replace(/^\s*[-*]\s+/gm, '- ');
+    cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
+    cleaned = cleaned.replace(/\{\s*|\s*\}/g, '');
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    return cleaned.trim();
   };
 
   const handleScriptGenerationStart = (textModalId: string) => {
@@ -3218,7 +3335,25 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
+    // Handle keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (canRedo) redo();
+        } else {
+          if (canUndo) undo();
+        }
+        return;
+      }
+      // Redo alternative (Ctrl+Y)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (canRedo) redo();
+        return;
+      }
+
       if (e.code === 'Space' && !e.repeat) {
         setIsSpacePressed(true);
         applyStageCursorWrapper('grab', true);
