@@ -188,6 +188,7 @@ export interface CanvasTextState {
   fontFamily?: string; // Font family name
   textAlign: 'left' | 'center' | 'right';
   color: string; // Kept for backward compatibility, but text color is now theme-aware
+  rotation?: number;
 }
 
 export interface ScriptFrameModalState {

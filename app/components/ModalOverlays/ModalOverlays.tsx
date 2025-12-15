@@ -18,7 +18,7 @@ import { VectorizeModalOverlays } from './VectorizeModalOverlays';
 import { NextSceneModalOverlays } from './NextSceneModalOverlays';
 import { MultiangleModalOverlays } from './MultiangleModalOverlays';
 import { StoryboardModalOverlays } from './StoryboardModalOverlays';
-import { CanvasTextOverlays } from './CanvasTextOverlays';
+
 import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
 import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
 import { ComponentCreationMenu } from './ComponentCreationMenu';
@@ -266,7 +266,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         selectedTextInputIds={selectedTextInputIds}
         clearAllSelections={clearAllSelections}
         setTextInputStates={setTextInputStates}
-        setSelectedTextInputId={setSelectedTextInputId} 
+        setSelectedTextInputId={setSelectedTextInputId}
         onTextCreate={onTextCreate}
         onPersistTextModalDelete={onPersistTextModalDelete}
         onPersistTextModalMove={onPersistTextModalMove}
@@ -535,29 +535,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onGenerateStoryboard={onGenerateStoryboard}
       />
       {/* Canvas Text Overlays */}
-      <CanvasTextOverlays
-        canvasTextStates={canvasTextStates || []}
-        selectedCanvasTextId={selectedCanvasTextId || null}
-        onSelect={setSelectedCanvasTextId || (() => { })}
-        onUpdate={(id, updates) => {
-          if (setCanvasTextStates) {
-            setCanvasTextStates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-          }
-          if (onPersistCanvasTextMove) {
-            onPersistCanvasTextMove(id, updates);
-          }
-        }}
-        onDelete={(id) => {
-          if (setCanvasTextStates) {
-            setCanvasTextStates(prev => prev.filter(t => t.id !== id));
-          }
-          if (onPersistCanvasTextDelete) {
-            onPersistCanvasTextDelete(id);
-          }
-        }}
-        scale={scale}
-        position={position}
-      />
+
       <ScriptFrameModalOverlays
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         onDelete={onDeleteScriptFrame}

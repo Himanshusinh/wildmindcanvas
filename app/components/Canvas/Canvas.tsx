@@ -18,6 +18,7 @@ import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/lib/api';
 import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
 import { CanvasTextState } from '@/app/components/ModalOverlays/types';
+import { CanvasTextNode } from './CanvasTextNode';
 
 // ... (rest of imports)
 
@@ -370,7 +371,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Local state for canvas text (fallback if props not provided)
   const [localCanvasTextStates, setLocalCanvasTextStates] = useState<Array<import('@/app/components/ModalOverlays/types').CanvasTextState>>([]);
   const [localSelectedCanvasTextId, setLocalSelectedCanvasTextId] = useState<string | null>(null);
-  
+
   // Use props if provided, otherwise use local state
   const effectiveCanvasTextStates = canvasTextStates ?? localCanvasTextStates;
   const effectiveSetCanvasTextStates = setCanvasTextStates ?? setLocalCanvasTextStates;
@@ -1992,7 +1993,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // Find a blank space for the text element (300px width, 100px height)
       const blankPos = findBlankSpaceWrapper(300, 100);
-      
+
       const newId = `text-${Date.now()}`;
       const newTextState: CanvasTextState = {
         id: newId,
@@ -2013,7 +2014,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.log('[Canvas] Auto-creating canvas text at:', blankPos, newTextState);
       effectiveSetCanvasTextStates(prev => {
         // Check if text already exists nearby using current state
-        if (prev.some(text => 
+        if (prev.some(text =>
           Math.abs(text.x - blankPos.x) < 350 && Math.abs(text.y - blankPos.y) < 150
         )) {
           console.log('[Canvas] Text already exists nearby, skipping creation');
@@ -3235,7 +3236,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const target = e.target as Element | null;
         const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
         // Check if target is contentEditable or inside a contentEditable element
-        const isContentEditable = target?.hasAttribute('contenteditable') || 
+        const isContentEditable = target?.hasAttribute('contenteditable') ||
           (target?.getAttribute('contenteditable') === 'true') ||
           (target?.closest && target.closest('[contenteditable="true"]') !== null);
         const isTyping = isInputElement || isContentEditable;
@@ -3330,7 +3331,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const target = e.target as Element | null;
         const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
         // Check if target is contentEditable or inside a contentEditable element
-        const isContentEditable = target?.hasAttribute('contenteditable') || 
+        const isContentEditable = target?.hasAttribute('contenteditable') ||
           (target?.getAttribute('contenteditable') === 'true') ||
           (target?.closest && target.closest('[contenteditable="true"]') !== null);
         if (isInputElement || isContentEditable) {
@@ -3976,7 +3977,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // Check if click is inside any modal component
       // Also check for contentEditable elements (canvas text components)
-      const isContentEditable = target.hasAttribute('contenteditable') || 
+      const isContentEditable = target.hasAttribute('contenteditable') ||
         target.getAttribute('contenteditable') === 'true' ||
         target.closest('[contenteditable="true"]') !== null;
       const isInsideModal =
@@ -4801,6 +4802,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const clickedOnEmpty = target === stage ||
       target.getClassName() === 'Stage' ||
       target.getClassName() === 'Layer' ||
+      target.name() === 'background-rect' ||
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
     // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool or Shift)
     const isMoveTool = selectedTool === 'move';
@@ -4871,11 +4873,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Clear selections when clicking on empty canvas space
     // Only skip clearing if:
     // 1. We're clicking on a resize handle
-    // 2. We're starting a selection box (cursor tool drag)
-    // 3. We're clicking inside an existing selection area
-    // 4. Current selection is a group (groups persist their border)
-    // 5. We're editing a group name (prevent deletion during editing)
-    if (clickedOnEmpty && !isResizeHandle && !isStartingSelection && !isInsideSelection && !isEditingGroup) {
+    // 2. We're clicking inside an existing selection area
+    // 3. Current selection is a group (groups persist their border)
+    // 4. We're editing a group name (prevent deletion during editing)
+    // 5. We are Panning (don't lose selection while moving canvas)
+    // 6. We are Shift-Selecting (adding to selection)
+    if (clickedOnEmpty && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection) {
       // Click is on empty canvas - clear everything including selection boxes
       // But don't clear if it's a group - groups should persist
       clearAllSelections(true);
@@ -5502,6 +5505,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               height={canvasSize.height}
               fillPatternImage={patternImage}
               fillPatternRepeat="repeat"
+              name="background-rect"
             />
           )}
           {/* Images and Videos */}
@@ -5562,6 +5566,17 @@ export const Canvas: React.FC<CanvasProps> = ({
                 />
               );
             })}
+          {/* Canvas Text Nodes (Konva-based) */}
+          {effectiveCanvasTextStates.map((textState) => (
+            <CanvasTextNode
+              key={textState.id}
+              data={textState}
+              isSelected={effectiveSelectedCanvasTextId === textState.id}
+              onSelect={(id) => effectiveSetSelectedCanvasTextId(id)}
+              onChange={(id, updates) => handleCanvasTextUpdate(id, updates)}
+              stageScale={scale}
+            />
+          ))}
           {/* Text Elements */}
           <TextElements
             images={images}

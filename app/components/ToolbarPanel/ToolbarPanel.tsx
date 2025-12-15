@@ -249,8 +249,8 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               backgroundColor: selectedTool === tool.id
                 ? (isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.3)')
                 : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)'),
-              color: selectedTool === tool.id 
-                ? (isDark ? '#60a5fa' : '#3b82f6') 
+              color: selectedTool === tool.id
+                ? (isDark ? '#60a5fa' : '#3b82f6')
                 : (isDark ? '#cccccc' : '#4b5563'),
               transition: 'all 0.3s ease',
               boxShadow: selectedTool === tool.id
@@ -260,7 +260,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             onMouseEnter={(e) => {
               // Force pointer cursor when hovering toolbar icons to avoid
               // global stage cursors (grab) leaking through.
-              try { document.body.style.cursor = 'pointer'; } catch (err) {}
+              try { document.body.style.cursor = 'pointer'; } catch (err) { }
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.18)';
                 e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937';
@@ -268,7 +268,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               }
             }}
             onMouseLeave={(e) => {
-              try { document.body.style.cursor = ''; } catch (err) {}
+              try { document.body.style.cursor = ''; } catch (err) { }
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
@@ -297,11 +297,11 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            try { document.body.style.cursor = 'pointer'; } catch (err) {}
+            try { document.body.style.cursor = 'pointer'; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.08)';
           }}
           onMouseLeave={(e) => {
-            try { document.body.style.cursor = ''; } catch (err) {}
+            try { document.body.style.cursor = ''; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
           }}
         >
@@ -323,7 +323,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             </svg>
           )}
         </button>
-        
+
         {/* Divider */}
         <div
           style={{
@@ -334,7 +334,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'background-color 0.3s ease',
           }}
         />
-        
+
         {/* Upload Button */}
         <button
           onClick={handleUploadClick}
@@ -353,13 +353,13 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            try { document.body.style.cursor = 'pointer'; } catch (err) {}
+            try { document.body.style.cursor = 'pointer'; } catch (err) { }
             e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
             e.currentTarget.style.color = '#22c55e';
             e.currentTarget.style.transform = 'scale(1.1)';
           }}
           onMouseLeave={(e) => {
-            try { document.body.style.cursor = ''; } catch (err) {}
+            try { document.body.style.cursor = ''; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
             e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
             e.currentTarget.style.transform = 'scale(1)';
