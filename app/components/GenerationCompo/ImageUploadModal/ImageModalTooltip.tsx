@@ -7,6 +7,7 @@ interface ImageModalTooltipProps {
   isUploadedImage: boolean;
   imageResolution: { width: number; height: number } | null;
   scale: number;
+  title?: string;
 }
 
 export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
@@ -14,6 +15,7 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
   isUploadedImage,
   imageResolution,
   scale,
+  title,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -46,7 +48,7 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
       }}
     >
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span>{isUploadedImage ? 'Media' : 'Image Generator'}</span>
+        <span>{title || (isUploadedImage ? 'Media' : 'Image Generator')}</span>
         {imageResolution && (
           <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
             {imageResolution.width} × {imageResolution.height}

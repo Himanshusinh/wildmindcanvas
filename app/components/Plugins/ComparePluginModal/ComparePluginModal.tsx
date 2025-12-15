@@ -173,9 +173,20 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
 
     // Helper to map display names to backend IDs
     const getModelId = (displayName: string) => {
+        const lower = displayName.toLowerCase();
+
         // Known mappings
         if (displayName === 'Runway Gen4 Image Turbo') return 'runway-gen4-turbo';
         if (displayName === 'Runway Gen4 Image') return 'runway-gen4-image';
+
+        // Match ImageModalControls behavior: append default resolution (2K) for models that require it
+        // This ensures backend receives the expected format (e.g. "Flux 2 Pro 2K")
+        if (lower.includes('flux 2 pro')) return `${displayName} 2K`;
+        if (lower.includes('flux pro 1.1')) return `${displayName} 2K`;
+        if (lower.includes('seedream') && !lower.includes('4k')) return `${displayName} 2K`; // Seedream v4 requires resolution? ImageModalControls appends it.
+        if (lower.includes('imagen')) return `${displayName} 2K`;
+        if (lower.includes('google nano banana pro')) return `${displayName} 2K`;
+
         // Backend likely handles others (Google Nano Banana, etc.) via its own mapping
         return displayName;
     };
@@ -216,7 +227,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                     frameWidth: 600,
                     frameHeight: 600,
                     model: model,
-                    frame: 'Frame', // Standard frame type
+                    frame: 'Compare', // Custom frame type for compare results
                     aspectRatio: '1:1',
                     prompt: prompt,
                     isGenerating: true, // Show loading state immediately
@@ -276,7 +287,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                         onUpdateImageModalState(newModalId, {
                             isGenerating: false,
                             generatedImageUrl: null,
-                            frame: 'Error',
+                            frame: 'Compare',
                         });
                     }
                 } catch (error) {
@@ -284,7 +295,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                     if (onUpdateImageModalState) {
                         onUpdateImageModalState(newModalId, {
                             isGenerating: false,
-                            frame: 'Error'
+                            frame: 'Compare'
                         });
                     }
                 }
