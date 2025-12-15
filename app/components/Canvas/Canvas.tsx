@@ -3315,6 +3315,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track if space key is pressed for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const [isTextInteracting, setIsTextInteracting] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
@@ -5945,6 +5946,8 @@ export const Canvas: React.FC<CanvasProps> = ({
               onSelect={(id) => effectiveSetSelectedCanvasTextId(id)}
               onChange={(id, updates) => handleCanvasTextUpdate(id, updates)}
               stageScale={scale}
+              onInteractionStart={() => setIsTextInteracting(true)}
+              onInteractionEnd={() => setIsTextInteracting(false)}
             />
           ))}
           {/* Text Elements */}
@@ -6437,7 +6440,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       />
 
       {/* Floating Text Formatting Toolbar */}
-      {effectiveSelectedCanvasTextId && (
+      {effectiveSelectedCanvasTextId && !isTextInteracting && (
         (() => {
           const selectedText = effectiveCanvasTextStates.find(t => t.id === effectiveSelectedCanvasTextId);
           if (!selectedText) return null;
@@ -6462,7 +6465,15 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedTextState={selectedText}
               onChange={(id, updates) => {
                 effectiveSetCanvasTextStates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-                // Also update persisted state if needed
+                // Update persisted state on move is handled by onDragEnd inside the node, 
+                // BUT we also need to trigger persistence on transform end.
+                // CanvasTextNode calls onChange for both transform and drag end.
+                // We should debounce or check if we need to persist here?
+                // The node calls onChange with final values.
+                // We should probably call the persistence callback here if it's a move/transform end?
+                // Actually, CanvasTextNode calls onChange frequently? 
+                // No, it calls onChange on dragEnd and transformEnd.
+
                 if (onPersistCanvasTextMove) {
                   onPersistCanvasTextMove(id, updates);
                 }

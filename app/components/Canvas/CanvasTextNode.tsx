@@ -9,6 +9,8 @@ interface CanvasTextNodeProps {
     onSelect: (id: string) => void;
     onChange: (id: string, updates: Partial<CanvasTextState>) => void;
     stageScale: number;
+    onInteractionStart?: () => void;
+    onInteractionEnd?: () => void;
 }
 
 // Simple HTML parser for basic styling (bold, italic, underline, color)
@@ -64,6 +66,8 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
     onSelect,
     onChange,
     stageScale,
+    onInteractionStart,
+    onInteractionEnd,
 }) => {
     const groupRef = useRef<Konva.Group>(null);
     const trRef = useRef<Konva.Transformer>(null);
@@ -76,6 +80,7 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
             trRef.current.getLayer()?.batchDraw();
         }
     }, [isSelected]);
+
 
     const editingDivRef = useRef<HTMLDivElement | null>(null);
 
@@ -294,8 +299,16 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                     onSelect(data.id);
                     e.cancelBubble = true;
                 }}
-                onDragEnd={handleDragEnd}
-                onTransformEnd={handleTransform}
+                onDragStart={() => onInteractionStart?.()}
+                onDragEnd={(e) => {
+                    handleDragEnd(e);
+                    onInteractionEnd?.();
+                }}
+                onTransformStart={() => onInteractionStart?.()}
+                onTransformEnd={() => {
+                    handleTransform();
+                    onInteractionEnd?.();
+                }}
             >
                 {/* Fallback or Rich Text Rendering */}
                 {segments ? (
