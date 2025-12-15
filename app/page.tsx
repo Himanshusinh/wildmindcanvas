@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { CompareGenerator } from '@/app/components/CanvasApp/types';
 import { Canvas } from '@/app/components/Canvas';
 import GenerationQueue, { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
 import { ToolbarPanel } from '@/app/components/ToolbarPanel';
@@ -37,6 +38,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [videoEditorGenerators, setVideoEditorGenerators] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [compareGenerators, setCompareGenerators] = useState<Array<{ id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
   const [eraseGenerators, setEraseGenerators] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
   const [expandGenerators, setExpandGenerators] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
@@ -112,6 +114,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newVideoEditorGenerators: Array<{ id: string; x: number; y: number }> = [];
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+        const newCompareGenerators: CompareGenerator[] = [];
 
         Object.values(elements).forEach((element: any) => {
           if (element && element.type) {
@@ -148,6 +151,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+            } else if (element.type === 'compare-plugin') {
+              newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: element.width, height: element.height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
             }
           }
         });
@@ -160,6 +165,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setVideoGenerators(newVideoGenerators);
           setMusicGenerators(newMusicGenerators);
           setUpscaleGenerators(newUpscaleGenerators);
+          setCompareGenerators(newCompareGenerators);
         }
         snapshotLoadedRef.current = true;
       } else if (op.type === 'create' && op.data.element) {
@@ -305,6 +311,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
               isProcessing: element.meta?.isProcessing
             }];
           });
+        } else if (element.type === 'compare-plugin') {
+          setCompareGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width,
+              height: element.height,
+              scale: element.meta?.scale
+            }];
+          });
         } else if (element.type === 'multiangle-plugin') {
           setMultiangleGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -388,6 +406,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setCompareGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setTextGenerators((prev) => prev.filter(t => t.id !== op.elementId));
         setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
@@ -484,6 +503,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           return prev;
         };
         setRemoveBgGenerators(updatePluginPosition);
+        setCompareGenerators(updatePluginPosition);
         setEraseGenerators(updatePluginPosition);
         setExpandGenerators(updatePluginPosition);
         setVectorizeGenerators(updatePluginPosition);
@@ -628,6 +648,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           textGenerators,
           connectors: filteredConnectors,
           generationQueue,
+          compareGenerators,
         });
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
       } catch (e) {
@@ -777,6 +798,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setVideoGenerators(prev => prev.filter(m => m.id !== evt.id));
         setMusicGenerators(prev => prev.filter(m => m.id !== evt.id));
         setTextGenerators(prev => prev.filter(t => t.id !== evt.id));
+        setUpscaleGenerators(prev => prev.filter(m => m.id !== evt.id));
+        setCompareGenerators(prev => prev.filter(m => m.id !== evt.id));
         // Remove any connectors referencing this overlay id
         setConnectors(prev => prev.filter(c => c.from !== evt.id && c.to !== evt.id));
       } else if (evt.type === 'media.create') {
@@ -828,10 +851,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (persistTimerRef.current) {
       window.clearTimeout(persistTimerRef.current);
     }
-    
+
     // Use longer debounce (1000ms) when only canvasTextStates changes to prevent lag during typing
     const debounceTime = 300;
-    
+
     persistTimerRef.current = window.setTimeout(async () => {
       try {
         const elements = buildSnapshotElements({
@@ -854,6 +877,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           canvasTextStates,
           connectors,
           generationQueue,
+          compareGenerators,
         });
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
@@ -866,7 +890,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, multiangleGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, multiangleGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -891,6 +915,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newSceneFrameGenerators: SceneFrameGenerator[] = [];
           const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
+          const newCompareGenerators: CompareGenerator[] = [];
           const newCanvasTextStates: Array<import('@/app/components/ModalOverlays/types').CanvasTextState> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
           // Track connector signatures to prevent duplicates: "from|to|toAnchor"
@@ -1148,6 +1173,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'compare-plugin') {
+                newCompareGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  width: element.width,
+                  height: element.height,
+                  scale: element.meta?.scale,
+                  prompt: element.meta?.prompt,
+                  model: element.meta?.model,
+                });
               }
             }
           });
@@ -1168,6 +1204,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setTextGenerators(newTextGenerators);
           setCanvasTextStates(newCanvasTextStates);
           setConnectors(newConnectors);
+          setCompareGenerators(newCompareGenerators);
 
         }
       } catch (e) {
@@ -1232,6 +1269,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     textGenerators,
     connectors,
     generationQueue,
+    compareGenerators,
   };
 
   const canvasSetters: CanvasAppSetters = {
@@ -1251,8 +1289,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setScriptFrameGenerators,
     setSceneFrameGenerators,
     setTextGenerators,
+    setCompareGenerators,
     setConnectors,
     setGenerationQueue,
+
   };
 
   // Create handlers using factory functions
@@ -2020,6 +2060,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalVideoEditorModals={videoEditorGenerators}
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
+              externalCompareModals={compareGenerators}
               externalRemoveBgModals={removeBgGenerators}
               externalEraseModals={eraseGenerators}
               externalExpandModals={expandGenerators}
@@ -2087,6 +2128,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         textGenerators,
                         connectors: [...connectors, connToAdd],
                         generationQueue,
+                        compareGenerators,
                       });
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
                       console.log('[Connector] apiSetCurrentSnapshot success', { projectId, ssRes });
@@ -2132,6 +2174,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         textGenerators,
                         connectors: connectors.filter(c => c.id !== connectorId),
                         generationQueue,
+                        compareGenerators,
                       });
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
                       console.log('[Connector] apiSetCurrentSnapshot success after delete', { projectId, ssRes });
@@ -2315,6 +2358,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistUpscaleModalMove={pluginHandlers.onPersistUpscaleModalMove}
               onPersistUpscaleModalDelete={pluginHandlers.onPersistUpscaleModalDelete}
               onUpscale={pluginHandlers.onUpscale}
+              onPersistCompareModalCreate={pluginHandlers.onPersistCompareModalCreate}
+              onPersistCompareModalMove={pluginHandlers.onPersistCompareModalMove}
+              onPersistCompareModalDelete={pluginHandlers.onPersistCompareModalDelete}
               onPersistRemoveBgModalCreate={pluginHandlers.onPersistRemoveBgModalCreate}
               onPersistRemoveBgModalMove={pluginHandlers.onPersistRemoveBgModalMove}
               onPersistRemoveBgModalDelete={pluginHandlers.onPersistRemoveBgModalDelete}
@@ -2548,6 +2594,73 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         frameWidth: 400,
                         frameHeight: 500,
                         isUpscaling: false,
+                      },
+                    },
+                  },
+                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+                });
+              }
+            })().catch(console.error);
+
+          } else if (plugin.id === 'compare') {
+            const viewportCenter = viewportCenterRef.current;
+            let modalX: number;
+            let modalY: number;
+
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+
+            const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newCompare = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              width: 600,
+              height: 400,
+              scale: 1,
+            };
+            console.log('[Plugin] 1. Creating compare modal at viewport center:', newCompare);
+            (async () => {
+              setCompareGenerators(prev => {
+                const next = [...prev, newCompare];
+                console.log('[Plugin] 2. Setting compareGenerators', next);
+                return next;
+              });
+              if (realtimeActive) {
+                console.log('[Realtime] broadcast create compare', modalId);
+                realtimeRef.current?.sendCreate({
+                  id: modalId,
+                  type: 'compare',
+                  x: modalX,
+                  y: modalY,
+                  width: 600,
+                  height: 400,
+                  scale: 1,
+                  prompt: '',
+                  model: 'base'
+                });
+              }
+              if (projectId && opManagerInitialized) {
+                await appendOp({
+                  type: 'create',
+                  elementId: modalId,
+                  data: {
+                    element: {
+                      id: modalId,
+                      type: 'compare-plugin',
+                      x: modalX,
+                      y: modalY,
+                      width: 600,
+                      height: 400,
+                      meta: {
+                        scale: 1,
+                        prompt: '',
+                        model: 'base'
                       },
                     },
                   },

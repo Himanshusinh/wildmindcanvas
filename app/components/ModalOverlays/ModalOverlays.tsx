@@ -18,6 +18,8 @@ import { VectorizeModalOverlays } from './VectorizeModalOverlays';
 import { NextSceneModalOverlays } from './NextSceneModalOverlays';
 import { MultiangleModalOverlays } from './MultiangleModalOverlays';
 import { StoryboardModalOverlays } from './StoryboardModalOverlays';
+import { CompareModalOverlays } from './CompareModalOverlays';
+import { CompareModalState } from './types';
 
 import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
 import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
@@ -38,7 +40,17 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   multiangleModalStates,
   storyboardModalStates,
   scriptFrameModalStates,
+  // scriptFrameModalStates, // Duplicate removed
   sceneFrameModalStates,
+  compareModalStates,  // New
+  selectedCompareModalId, // New
+  selectedCompareModalIds, // New
+  setCompareModalStates = () => { }, // New
+  setSelectedCompareModalId = () => { }, // New
+  setSelectedCompareModalIds = () => { }, // New
+  onPersistCompareModalCreate, // New
+  onPersistCompareModalMove, // New
+  onPersistCompareModalDelete, // New
   selectedTextInputId,
   selectedTextInputIds,
   selectedImageModalId,
@@ -199,6 +211,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPluginSidebarOpen,
   onScriptGenerationStart,
   onGenerateStoryboard,
+  projectId,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
 
@@ -471,6 +484,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
+
+
       <NextSceneModalOverlays
         nextSceneModalStates={nextSceneModalStates ?? []}
         selectedNextSceneModalId={selectedNextSceneModalId ?? null}
@@ -587,6 +602,26 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistNextSceneModalCreate={onPersistNextSceneModalCreate}
         setNextSceneModalStates={setNextSceneModalStates}
         onPersistMultiangleModalCreate={onPersistMultiangleModalCreate}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+      />
+
+      <CompareModalOverlays
+        compareModalStates={compareModalStates ?? []}
+        selectedCompareModalId={selectedCompareModalId ?? null}
+        selectedCompareModalIds={selectedCompareModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setCompareModalStates={setCompareModalStates}
+        setSelectedCompareModalId={setSelectedCompareModalId}
+        setSelectedCompareModalIds={setSelectedCompareModalIds}
+        onPersistCompareModalCreate={onPersistCompareModalCreate}
+        onPersistCompareModalMove={onPersistCompareModalMove}
+        onPersistCompareModalDelete={onPersistCompareModalDelete}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+        projectId={projectId}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onUpdateImageModalState={onUpdateImageModalState}
         onPersistConnectorCreate={onPersistConnectorCreate}
       />
     </>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, MultiangleGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, MultiangleGenerator, CompareGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -22,6 +22,7 @@ export function useCanvasState() {
   const [textGenerators, setTextGenerators] = useState<TextGenerator[]>([]);
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
+  const [compareGenerators, setCompareGenerators] = useState<CompareGenerator[]>([]);
 
   const state: CanvasAppState = {
     images,
@@ -30,6 +31,7 @@ export function useCanvasState() {
     videoEditorGenerators,
     musicGenerators,
     upscaleGenerators,
+    compareGenerators, // Added
     removeBgGenerators,
     eraseGenerators,
     expandGenerators,
@@ -51,6 +53,7 @@ export function useCanvasState() {
     setVideoEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
+    setCompareGenerators, // Added
     setRemoveBgGenerators,
     setEraseGenerators,
     setExpandGenerators,

@@ -39,6 +39,9 @@ export interface PluginHandlers {
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onVectorize: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
+  onPersistCompareModalCreate: (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => Promise<void>;
+  onPersistCompareModalMove: (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => Promise<void>;
+  onPersistCompareModalDelete: (id: string) => Promise<void>;
 }
 
 export function createPluginHandlers(
@@ -802,6 +805,9 @@ export function createPluginHandlers(
         type: 'video-editor',
         x: modal.x,
         y: modal.y,
+        width: modal.width,
+        height: modal.height,
+        color: modal.color
       });
     }
     if (projectId && opManagerInitialized) {
@@ -814,7 +820,11 @@ export function createPluginHandlers(
             type: 'video-editor-trigger',
             x: modal.x,
             y: modal.y,
-            meta: {},
+            width: modal.width,
+            height: modal.height,
+            meta: {
+              color: modal.color
+            }
           },
         },
         inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
@@ -833,24 +843,36 @@ export function createPluginHandlers(
     }
     if (projectId && opManagerInitialized && prev) {
       const structuredUpdates: any = {};
-      if ('x' in updates) structuredUpdates.x = updates.x;
-      if ('y' in updates) structuredUpdates.y = updates.y;
+      const existingMeta = {
+        color: prev.color || '#000000'
+      };
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
 
       const inverseUpdates: any = {};
       if ('x' in updates) inverseUpdates.x = prev.x;
       if ('y' in updates) inverseUpdates.y = prev.y;
+      if ('width' in updates) inverseUpdates.width = prev.width;
+      if ('height' in updates) inverseUpdates.height = prev.height;
+
+      const inverseMeta: any = {};
+      if ('color' in updates) inverseMeta.color = prev.color || '#000000';
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
 
       await appendOp({
         type: 'update',
         elementId: id,
         data: { updates: structuredUpdates },
-        inverse: {
-          type: 'update',
-          elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
       });
     }
   };
@@ -867,7 +889,7 @@ export function createPluginHandlers(
       await appendOp({
         type: 'delete',
         elementId: id,
-        data: {},
+        data: null,
         inverse: {
           type: 'create',
           elementId: id,
@@ -877,12 +899,159 @@ export function createPluginHandlers(
               type: 'video-editor-trigger',
               x: prevItem.x,
               y: prevItem.y,
-              meta: {},
-            },
-          },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+              width: prevItem.width,
+              height: prevItem.height,
+              meta: {
+                color: prevItem.color
+              }
+            }
+          }
+        } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalCreate = async (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => {
+    setters.setCompareGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    if (realtimeActive) {
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'compare',
+        x: modal.x,
+        y: modal.y,
+        width: modal.width,
+        height: modal.height,
+        scale: modal.scale,
+        prompt: modal.prompt,
+        model: modal.model
+      });
+    }
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'compare-plugin',
+            x: modal.x,
+            y: modal.y,
+            width: modal.width,
+            height: modal.height,
+            meta: {
+              scale: modal.scale,
+              prompt: modal.prompt,
+              model: modal.model
+            }
+          }
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalMove = async (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => {
+    setters.setCompareGenerators(prevState => {
+      const prev = prevState.find(m => m.id === id);
+      if (prev) {
+        if (realtimeActive) {
+          realtimeRef.current?.sendUpdate(id, updates as any);
+        }
+
+        // Handle persistence side-effect here or use a useEffect/separate handler
+        // But for now let's just update local state safely
+      }
+      return prevState.map(m => m.id === id ? { ...m, ...updates } : m);
+    });
+
+    // We need 'prev' for the logic below (sending to backend). 
+    // Since we can't easily extract it from the setter synchronously without ref access,
+    // let's try to access it via property if available, or just skip if missing.
+    // However, existing handlers use 'state.' which implies 'state' is a ref or fresh prop?
+    // Looking at file, 'state' is a prop. If it's stale, that's an issue.
+    // Let's protect the find.
+    const prev = state.compareGenerators?.find(m => m.id === id);
+    if (!prev) return;
+
+    setters.setCompareGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    if (realtimeActive) {
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      const existingMeta = {
+        scale: prev.scale ?? 1,
+        prompt: prev.prompt ?? '',
+        model: prev.model ?? 'base'
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+      if ('width' in updates) inverseUpdates.width = (prev as any).width;
+      if ('height' in updates) inverseUpdates.height = (prev as any).height;
+
+      const inverseMeta: any = {};
+      if ('scale' in updates) inverseMeta.scale = prev.scale ?? existingMeta.scale;
+      if ('prompt' in updates) inverseMeta.prompt = prev.prompt ?? existingMeta.prompt;
+      if ('model' in updates) inverseMeta.model = prev.model ?? existingMeta.model;
+
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalDelete = async (id: string) => {
+    const prevItem = state.compareGenerators.find(m => m.id === id);
+    setters.setCompareGenerators(prev => prev.filter(m => m.id !== id));
+    if (realtimeActive) {
+      realtimeRef.current?.sendDelete(id);
+    }
+    await removeAndPersistConnectorsForElement(id);
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: null,
+        inverse: {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id: prevItem.id,
+              type: 'compare-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              width: prevItem.width,
+              height: prevItem.height,
+              meta: {
+                scale: prevItem.scale,
+                prompt: prevItem.prompt,
+                model: prevItem.model
+              }
+            }
+          }
+        } as any
       });
     }
   };
@@ -2044,6 +2213,9 @@ export function createPluginHandlers(
   };
 
   return {
+    onPersistCompareModalCreate,
+    onPersistCompareModalMove,
+    onPersistCompareModalDelete,
     onPersistUpscaleModalCreate,
     onPersistUpscaleModalMove,
     onPersistUpscaleModalDelete,

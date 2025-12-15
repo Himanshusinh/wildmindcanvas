@@ -97,6 +97,18 @@ export interface RemoveBgModalState {
   isRemovingBg?: boolean;
 }
 
+export interface CompareModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  isOpen?: boolean;
+  prompt?: string;
+  model?: string;
+}
+
 export interface EraseModalState {
   id: string;
   x: number;
@@ -267,6 +279,18 @@ export interface ModalOverlaysProps {
   storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
+
+  // Compare Plugin
+  compareModalStates?: CompareModalState[];
+  selectedCompareModalId?: string | null;
+  selectedCompareModalIds?: string[];
+  setCompareModalStates?: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
+  setSelectedCompareModalId?: (id: string | null) => void;
+  setSelectedCompareModalIds?: (ids: string[]) => void;
+  onPersistCompareModalCreate?: (modal: CompareModalState) => void | Promise<void>;
+  onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
+  onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
+
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -441,4 +465,15 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
   onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
+  projectId?: string | null;
+}
+
+export interface CompareModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  isOpen?: boolean;
 }

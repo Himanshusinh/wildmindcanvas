@@ -17,7 +17,7 @@ import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
 import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY } from '@/lib/canvasHelpers';
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/lib/api';
 import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
-import { CanvasTextState } from '@/app/components/ModalOverlays/types';
+import { CanvasTextState, CompareModalState } from '@/app/components/ModalOverlays/types';
 import { CanvasTextNode } from './CanvasTextNode';
 import { useCanvasHistory, CanvasHistoryState } from '@/app/hooks/useCanvasHistory';
 import { TextFormattingToolbar } from './TextFormattingToolbar';
@@ -76,6 +76,7 @@ interface CanvasProps {
   externalVideoEditorModals?: Array<{ id: string; x: number; y: number }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
+  externalCompareModals?: Array<{ id: string; x: number; y: number; width?: number; height?: number; scale?: number }>;
   externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
   externalEraseModals?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>;
   externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
@@ -126,6 +127,10 @@ interface CanvasProps {
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
   onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
+  // Compare plugin persistence callbacks
+  onPersistCompareModalCreate?: (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => void | Promise<void>;
+  onPersistCompareModalMove?: (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => void | Promise<void>;
+  onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
   // Multiangle plugin persistence callbacks
   onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
@@ -144,6 +149,14 @@ interface CanvasProps {
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
+  // Compare plugin persistence callbacks
+  compareModalStates?: import('@/app/components/ModalOverlays/types').CompareModalState[];
+  setCompareModalStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CompareModalState[]>>;
+  selectedCompareModalId?: string | null;
+  selectedCompareModalIds?: string[];
+  setSelectedCompareModalId?: (id: string | null) => void;
+  setSelectedCompareModalIds?: (ids: string[]) => void;
+
   canvasTextStates?: import('@/app/components/ModalOverlays/types').CanvasTextState[];
   setCanvasTextStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CanvasTextState[]>>;
   selectedCanvasTextId?: string | null;
@@ -198,6 +211,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalVideoEditorModals,
   externalMusicModals,
   externalUpscaleModals,
+  externalCompareModals,
   externalRemoveBgModals,
   externalEraseModals,
   externalExpandModals,
@@ -259,6 +273,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
+  onPersistCompareModalCreate,
+  onPersistCompareModalMove,
+  onPersistCompareModalDelete,
   onPersistCanvasTextCreate,
   onPersistCanvasTextMove,
   onPersistCanvasTextDelete,
@@ -403,6 +420,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedNextSceneModalIds, setSelectedNextSceneModalIds] = useState<string[]>([]);
   const [selectedMultiangleModalId, setSelectedMultiangleModalId] = useState<string | null>(null);
   const [selectedMultiangleModalIds, setSelectedMultiangleModalIds] = useState<string[]>([]);
+
+  // Persistence using callback function references to avoid re-renders
+
+  // Compare Plugin
+  const [compareModalStates, setCompareModalStates] = useState<CompareModalState[]>([]);
+  const [selectedCompareModalId, setSelectedCompareModalId] = useState<string | null>(null);
+  const [selectedCompareModalIds, setSelectedCompareModalIds] = useState<string[]>([]);
+
   const [selectedStoryboardModalId, setSelectedStoryboardModalId] = useState<string | null>(null);
   const [selectedStoryboardModalIds, setSelectedStoryboardModalIds] = useState<string[]>([]);
   const [selectedScriptFrameModalId, setSelectedScriptFrameModalId] = useState<string | null>(null);
@@ -2384,6 +2409,29 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalUpscaleModals || [])]);
+
+  // Hydrate compare modals from external or localStorage
+  useEffect(() => {
+    // If externalCompareModals is provided (even if empty), sync to it immediately
+    if (externalCompareModals !== undefined) {
+      setCompareModalStates(externalCompareModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:compareModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as CompareModalState[];
+        if (Array.isArray(parsed)) {
+          setCompareModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted compare modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalCompareModals || [])]);
 
   // Hydrate vectorize modals from external or localStorage
   useEffect(() => {
@@ -5752,6 +5800,17 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setVectorizeModalStates(prev => [...prev, newVectorize]);
               Promise.resolve(onPersistVectorizeModalCreate(newVectorize)).catch(console.error);
+            } else if (data.plugin.id === 'compare' && onPersistCompareModalCreate) {
+              const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newCompare = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                width: 600,
+                height: 400,
+              };
+              setCompareModalStates(prev => [...prev, newCompare]);
+              Promise.resolve(onPersistCompareModalCreate(newCompare)).catch(console.error);
             }
             return;
           }
@@ -6114,6 +6173,18 @@ export const Canvas: React.FC<CanvasProps> = ({
         storyboardModalStates={storyboardModalStates}
         scriptFrameModalStates={scriptFrameModalStates}
         sceneFrameModalStates={sceneFrameModalStates}
+
+        // Compare Plugin
+        compareModalStates={compareModalStates}
+        selectedCompareModalId={selectedCompareModalId}
+        selectedCompareModalIds={selectedCompareModalIds}
+        setCompareModalStates={setCompareModalStates}
+        setSelectedCompareModalId={setSelectedCompareModalId}
+        setSelectedCompareModalIds={setSelectedCompareModalIds}
+        onPersistCompareModalCreate={onPersistCompareModalCreate}
+        onPersistCompareModalMove={onPersistCompareModalMove}
+        onPersistCompareModalDelete={onPersistCompareModalDelete}
+
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -6175,8 +6246,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         setNextSceneModalStates={setNextSceneModalStates}
         setSelectedNextSceneModalId={setSelectedNextSceneModalId}
         setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
-        setMultiangleModalStates={setMultiangleModalStates}
-        setSelectedMultiangleModalId={setSelectedMultiangleModalId}
+
+
+
         setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
         setStoryboardModalStates={setStoryboardModalStates}
         setScriptFrameModalStates={setScriptFrameModalStates}
@@ -6270,6 +6342,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
         onPluginSidebarOpen={onPluginSidebarOpen}
+        projectId={projectId}
         onGenerateStoryboard={handleGenerateStoryboard}
       />
       {/* Action Icons for Uploaded Media */}

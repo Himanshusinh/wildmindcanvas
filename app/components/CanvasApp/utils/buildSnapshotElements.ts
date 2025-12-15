@@ -205,6 +205,27 @@ export function buildSnapshotElements(
     };
   });
 
+  // Compare generators
+  state.compareGenerators.forEach((g) => {
+    const metaObj: any = {
+      scale: g.scale,
+      prompt: g.prompt,
+      model: g.model,
+    };
+    if (connectionsBySource[g.id] && connectionsBySource[g.id].length) {
+      metaObj.connections = connectionsBySource[g.id];
+    }
+    elements[g.id] = {
+      id: g.id,
+      type: 'compare-plugin',
+      x: g.x,
+      y: g.y,
+      width: g.width,
+      height: g.height,
+      meta: metaObj,
+    };
+  });
+
   // NextScene generators
   state.nextSceneGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;

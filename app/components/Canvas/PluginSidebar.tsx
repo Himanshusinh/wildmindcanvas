@@ -8,6 +8,10 @@ interface PluginSidebarProps {
   onSelectPlugin?: (plugin: { id: string; name: string; icon?: string }, x?: number, y?: number) => void;
   scale?: number;
   viewportCenter?: { x: number; y: number };
+
+  // Compare Plugin
+  setCompareModalStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CompareModalState[]>>;
+  onPersistCompareModalCreate?: (modal: import('@/app/components/ModalOverlays/types').CompareModalState) => void | Promise<void>;
 }
 
 interface Plugin {
@@ -18,7 +22,15 @@ interface Plugin {
   invertInDarkMode?: boolean;
 }
 
-const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelectPlugin, scale = 1, viewportCenter }) => {
+const PluginSidebar: React.FC<PluginSidebarProps> = ({
+  isOpen,
+  onClose,
+  onSelectPlugin,
+  scale = 1,
+  viewportCenter,
+  setCompareModalStates,
+  onPersistCompareModalCreate
+}) => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -86,6 +98,12 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
       description: 'Edit and assemble videos',
       icon: '/icons/video-editor.svg',
     },
+    {
+      id: 'compare',
+      name: 'Compare',
+      description: 'Compare two images side by side',
+      icon: '/icons/compare.svg',
+    },
   ]);
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pluginId: string } | null>(null);
@@ -123,10 +141,13 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({ isOpen, onClose, onSelect
   };
 
   const handlePluginClick = (plugin: Plugin, e?: React.MouseEvent) => {
+    // If viewportCenter is provided, use it; otherwise use click position
+    const x = viewportCenter?.x || (e ? e.clientX : 0);
+    const y = viewportCenter?.y || (e ? e.clientY : 0);
+
+
+
     if (onSelectPlugin) {
-      // If viewportCenter is provided, use it; otherwise use click position
-      const x = viewportCenter?.x || (e ? e.clientX : 0);
-      const y = viewportCenter?.y || (e ? e.clientY : 0);
       onSelectPlugin(plugin, x, y);
     }
     onClose();

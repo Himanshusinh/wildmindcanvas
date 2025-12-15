@@ -1,0 +1,98 @@
+import React from 'react';
+import { ComparePluginModal } from '@/app/components/Plugins/ComparePluginModal/ComparePluginModal';
+import { CompareModalState } from './types';
+
+interface CompareModalOverlaysProps {
+    compareModalStates: CompareModalState[];
+    selectedCompareModalId: string | null;
+    selectedCompareModalIds: string[];
+    clearAllSelections: () => void;
+    setCompareModalStates: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
+    setSelectedCompareModalId: (id: string | null) => void;
+    setSelectedCompareModalIds: (ids: string[]) => void;
+    onPersistCompareModalCreate?: (modal: CompareModalState) => void | Promise<void>;
+    onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
+    onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
+    stageRef?: any;
+    scale?: number;
+    position?: { x: number; y: number };
+    onPersistImageModalCreate?: (modal: any) => void | Promise<void>;
+    onUpdateImageModalState?: (id: string, updates: any) => void;
+    onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
+    projectId?: string | null;
+}
+
+export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
+    compareModalStates,
+    selectedCompareModalId,
+    selectedCompareModalIds,
+    clearAllSelections,
+    setCompareModalStates,
+    setSelectedCompareModalId,
+    setSelectedCompareModalIds,
+    onPersistCompareModalCreate,
+    onPersistCompareModalMove,
+    onPersistCompareModalDelete,
+    stageRef,
+    scale,
+    position,
+    projectId,
+    onPersistImageModalCreate,
+    onUpdateImageModalState,
+    onPersistConnectorCreate,
+}) => {
+    return (
+        <>
+            {compareModalStates.map((modalState) => (
+                <ComparePluginModal
+                    key={modalState.id}
+                    id={modalState.id}
+                    x={modalState.x}
+                    y={modalState.y}
+                    width={modalState.width}
+                    height={modalState.height}
+                    isOpen={true}
+                    isSelected={selectedCompareModalId === modalState.id || selectedCompareModalIds.includes(modalState.id)}
+                    stageRef={stageRef}
+                    scale={scale}
+                    position={position}
+                    onClose={() => {
+                        setCompareModalStates(prev => prev.filter(m => m.id !== modalState.id));
+                        if (onPersistCompareModalDelete) {
+                            onPersistCompareModalDelete(modalState.id);
+                        }
+                    }}
+                    onSelect={() => {
+                        clearAllSelections();
+                        setSelectedCompareModalId(modalState.id);
+                        setSelectedCompareModalIds([modalState.id]);
+                    }}
+                    onDelete={() => {
+                        setCompareModalStates(prev => prev.filter(m => m.id !== modalState.id));
+                        if (onPersistCompareModalDelete) {
+                            onPersistCompareModalDelete(modalState.id);
+                        }
+                    }}
+                    initialPrompt={modalState.prompt}
+                    initialModel={modalState.model}
+                    onUpdateModalState={(id, updates) => {
+                        setCompareModalStates(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+                        // TODO: Add persistence callback for updates if needed
+                    }}
+                    onPositionChange={(newX, newY) => {
+                        setCompareModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+                    }}
+                    onPositionCommit={(newX, newY) => {
+                        if (onPersistCompareModalMove) {
+                            onPersistCompareModalMove(modalState.id, { x: newX, y: newY });
+                        }
+                    }}
+                    projectId={projectId}
+                    onPersistImageModalCreate={onPersistImageModalCreate}
+                    onUpdateImageModalState={onUpdateImageModalState}
+                    onPersistConnectorCreate={onPersistConnectorCreate}
+                />
+            ))}
+        </>
+    );
+};

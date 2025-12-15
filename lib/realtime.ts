@@ -1,8 +1,10 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'multiangle' | 'next-scene-plugin';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'multiangle' | 'next-scene-plugin' | 'compare';
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   generatedImageUrl?: string | null;
   generatedVideoUrl?: string | null;
   generatedMusicUrl?: string | null;

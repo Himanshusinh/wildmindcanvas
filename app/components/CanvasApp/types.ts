@@ -141,6 +141,17 @@ export interface NextSceneGenerator {
   isProcessing?: boolean;
 }
 
+export interface CompareGenerator {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  prompt?: string;
+  model?: string;
+}
+
 export interface MultiangleGenerator {
   id: string;
   x: number;
@@ -230,6 +241,7 @@ export interface CanvasAppState {
   eraseGenerators: EraseGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
+  compareGenerators: CompareGenerator[];
   nextSceneGenerators: NextSceneGenerator[];
   multiangleGenerators: MultiangleGenerator[];
   storyboardGenerators: StoryboardGenerator[];
@@ -252,6 +264,7 @@ export interface CanvasAppSetters {
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
+  setCompareGenerators: React.Dispatch<React.SetStateAction<CompareGenerator[]>>;
   setNextSceneGenerators: React.Dispatch<React.SetStateAction<NextSceneGenerator[]>>;
   setMultiangleGenerators: React.Dispatch<React.SetStateAction<MultiangleGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;
