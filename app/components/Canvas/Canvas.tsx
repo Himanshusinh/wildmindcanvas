@@ -20,6 +20,7 @@ import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateSto
 import { CanvasTextState } from '@/app/components/ModalOverlays/types';
 import { CanvasTextNode } from './CanvasTextNode';
 import { useCanvasHistory, CanvasHistoryState } from '@/app/hooks/useCanvasHistory';
+import { TextFormattingToolbar } from './TextFormattingToolbar';
 
 // ... (rest of imports)
 
@@ -3455,6 +3456,240 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
             return;
           }
+
+          // Delete shortcut
+          if (e.key === 'Delete' || e.key === 'Backspace') {
+            // Prevent browser back navigation for Backspace
+            if (e.key === 'Backspace') {
+              // e.preventDefault(); // Don't prevent default blindly, might need it for text inputs? 
+              // We already checked !isTyping, so it's safe to prevent default here to avoid navigation
+              e.preventDefault();
+            }
+
+            let hasDeletions = false;
+
+            // 1. Canvas Text (Local & Persisted)
+            const textIdsToDelete = [...(selectedCanvasTextIds || [])];
+            if (selectedCanvasTextId) textIdsToDelete.push(selectedCanvasTextId);
+
+            if (textIdsToDelete.length > 0) {
+              hasDeletions = true;
+              if (effectiveSetCanvasTextStates) {
+                effectiveSetCanvasTextStates(prev => prev.filter(t => !textIdsToDelete.includes(t.id)));
+              }
+              if (effectiveSetSelectedCanvasTextId) {
+                effectiveSetSelectedCanvasTextId(null);
+              }
+              if (setSelectedCanvasTextIds) {
+                setSelectedCanvasTextIds([]);
+              }
+              textIdsToDelete.forEach(id => {
+                if (onPersistCanvasTextDelete) Promise.resolve(onPersistCanvasTextDelete(id)).catch(console.error);
+              });
+            }
+
+            // 2. Images (Indices & Modals)
+            // Images (CanvasImage)
+            const imageIndicesToDelete = [...selectedImageIndices];
+            if (selectedImageIndex !== null) imageIndicesToDelete.push(selectedImageIndex);
+
+            if (imageIndicesToDelete.length > 0) {
+              hasDeletions = true;
+              // Sort descending to delete without shifting indices
+              const sortedIndices = [...new Set(imageIndicesToDelete)].sort((a, b) => b - a);
+              sortedIndices.forEach(index => {
+                if (onImageDelete) onImageDelete(index);
+              });
+              setSelectedImageIndex(null);
+              setSelectedImageIndices([]);
+            }
+
+            // Image Modals
+            const imageModalIdsToDelete = [...selectedImageModalIds];
+            if (selectedImageModalId) imageModalIdsToDelete.push(selectedImageModalId);
+
+            if (imageModalIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setImageModalStates(prev => prev.filter(m => !imageModalIdsToDelete.includes(m.id)));
+              setSelectedImageModalId(null);
+              setSelectedImageModalIds([]);
+              imageModalIdsToDelete.forEach(id => {
+                if (onPersistImageModalDelete) Promise.resolve(onPersistImageModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 3. Video Modals
+            const videoModalIdsToDelete = [...selectedVideoModalIds];
+            if (selectedVideoModalId) videoModalIdsToDelete.push(selectedVideoModalId);
+
+            if (videoModalIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setVideoModalStates(prev => prev.filter(m => !videoModalIdsToDelete.includes(m.id)));
+              setSelectedVideoModalId(null);
+              setSelectedVideoModalIds([]);
+              videoModalIdsToDelete.forEach(id => {
+                if (onPersistVideoModalDelete) Promise.resolve(onPersistVideoModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 4. Music Modals
+            const musicModalIdsToDelete = [...selectedMusicModalIds];
+            if (selectedMusicModalId) musicModalIdsToDelete.push(selectedMusicModalId);
+
+            if (musicModalIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setMusicModalStates(prev => prev.filter(m => !musicModalIdsToDelete.includes(m.id)));
+              setSelectedMusicModalId(null);
+              setSelectedMusicModalIds([]);
+              musicModalIdsToDelete.forEach(id => {
+                if (onPersistMusicModalDelete) Promise.resolve(onPersistMusicModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 5. Text Inputs
+            const textInputIdsToDelete = [...selectedTextInputIds];
+            if (selectedTextInputId) textInputIdsToDelete.push(selectedTextInputId);
+
+            if (textInputIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setTextInputStates(prev => prev.filter(t => !textInputIdsToDelete.includes(t.id)));
+              setSelectedTextInputId(null);
+              setSelectedTextInputIds([]);
+              textInputIdsToDelete.forEach(id => {
+                if (onPersistTextModalDelete) Promise.resolve(onPersistTextModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 6. Storyboard Modals
+            const storyboardIdsToDelete = [...selectedStoryboardModalIds];
+            if (selectedStoryboardModalId) storyboardIdsToDelete.push(selectedStoryboardModalId);
+
+            if (storyboardIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setStoryboardModalStates(prev => prev.filter(s => !storyboardIdsToDelete.includes(s.id)));
+              setSelectedStoryboardModalId(null);
+              setSelectedStoryboardModalIds([]);
+              storyboardIdsToDelete.forEach(id => {
+                if (onPersistStoryboardModalDelete) Promise.resolve(onPersistStoryboardModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 7. Upscale Modals
+            const upscaleIdsToDelete = [...selectedUpscaleModalIds];
+            if (selectedUpscaleModalId) upscaleIdsToDelete.push(selectedUpscaleModalId);
+
+            if (upscaleIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setUpscaleModalStates(prev => prev.filter(m => !upscaleIdsToDelete.includes(m.id)));
+              setSelectedUpscaleModalId(null);
+              setSelectedUpscaleModalIds([]);
+              upscaleIdsToDelete.forEach(id => {
+                if (onPersistUpscaleModalDelete) Promise.resolve(onPersistUpscaleModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 8. RemoveBg Modals
+            const removeBgIdsToDelete = [...selectedRemoveBgModalIds];
+            if (selectedRemoveBgModalId) removeBgIdsToDelete.push(selectedRemoveBgModalId);
+
+            if (removeBgIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setRemoveBgModalStates(prev => prev.filter(m => !removeBgIdsToDelete.includes(m.id)));
+              setSelectedRemoveBgModalId(null);
+              setSelectedRemoveBgModalIds([]);
+              removeBgIdsToDelete.forEach(id => {
+                if (onPersistRemoveBgModalDelete) Promise.resolve(onPersistRemoveBgModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 9. Erase Modals
+            const eraseIdsToDelete = [...selectedEraseModalIds];
+            if (selectedEraseModalId) eraseIdsToDelete.push(selectedEraseModalId);
+
+            if (eraseIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setEraseModalStates(prev => prev.filter(m => !eraseIdsToDelete.includes(m.id)));
+              setSelectedEraseModalId(null);
+              setSelectedEraseModalIds([]);
+              eraseIdsToDelete.forEach(id => {
+                if (onPersistEraseModalDelete) Promise.resolve(onPersistEraseModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 10. Expand Modals
+            const expandIdsToDelete = [...selectedExpandModalIds];
+            if (selectedExpandModalId) expandIdsToDelete.push(selectedExpandModalId);
+
+            if (expandIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setExpandModalStates(prev => prev.filter(m => !expandIdsToDelete.includes(m.id)));
+              setSelectedExpandModalId(null);
+              setSelectedExpandModalIds([]);
+              expandIdsToDelete.forEach(id => {
+                if (onPersistExpandModalDelete) Promise.resolve(onPersistExpandModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 11. Vectorize Modals
+            const vectorizeIdsToDelete = [...selectedVectorizeModalIds];
+            if (selectedVectorizeModalId) vectorizeIdsToDelete.push(selectedVectorizeModalId);
+
+            if (vectorizeIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setVectorizeModalStates(prev => prev.filter(m => !vectorizeIdsToDelete.includes(m.id)));
+              setSelectedVectorizeModalId(null);
+              setSelectedVectorizeModalIds([]);
+              vectorizeIdsToDelete.forEach(id => {
+                if (onPersistVectorizeModalDelete) Promise.resolve(onPersistVectorizeModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 12. Next Scene Modals
+            const nextSceneIdsToDelete = [...selectedNextSceneModalIds];
+            if (selectedNextSceneModalId) nextSceneIdsToDelete.push(selectedNextSceneModalId);
+
+            if (nextSceneIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setNextSceneModalStates(prev => prev.filter(m => !nextSceneIdsToDelete.includes(m.id)));
+              setSelectedNextSceneModalId(null);
+              setSelectedNextSceneModalIds([]);
+              nextSceneIdsToDelete.forEach(id => {
+                if (onPersistNextSceneModalDelete) Promise.resolve(onPersistNextSceneModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 13. Multiangle Modals
+            const multiangleIdsToDelete = [...selectedMultiangleModalIds];
+            if (selectedMultiangleModalId) multiangleIdsToDelete.push(selectedMultiangleModalId);
+
+            if (multiangleIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setMultiangleModalStates(prev => prev.filter(m => !multiangleIdsToDelete.includes(m.id)));
+              setSelectedMultiangleModalId(null);
+              setSelectedMultiangleModalIds([]);
+              multiangleIdsToDelete.forEach(id => {
+                if (onPersistMultiangleModalDelete) Promise.resolve(onPersistMultiangleModalDelete(id)).catch(console.error);
+              });
+            }
+
+            // 14. Video Editor Modals
+            const videoEditorIdsToDelete = [...selectedVideoEditorModalIds];
+            if (selectedVideoEditorModalId) videoEditorIdsToDelete.push(selectedVideoEditorModalId);
+
+            if (videoEditorIdsToDelete.length > 0) {
+              hasDeletions = true;
+              setVideoEditorModalStates(prev => prev.filter(m => !videoEditorIdsToDelete.includes(m.id)));
+              setSelectedVideoEditorModalId(null);
+              setSelectedVideoEditorModalIds([]);
+              videoEditorIdsToDelete.forEach(id => {
+                if (onPersistVideoEditorModalDelete) Promise.resolve(onPersistVideoEditorModalDelete(id)).catch(console.error);
+              });
+            }
+
+            if (hasDeletions) {
+              return;
+            }
+          }
         }
       } catch (err) {
         // ignore any errors from DOM target checks
@@ -6201,6 +6436,45 @@ export const Canvas: React.FC<CanvasProps> = ({
         scale={scale}
       />
 
+      {/* Floating Text Formatting Toolbar */}
+      {effectiveSelectedCanvasTextId && (
+        (() => {
+          const selectedText = effectiveCanvasTextStates.find(t => t.id === effectiveSelectedCanvasTextId);
+          if (!selectedText) return null;
+
+          // Calculate screen position
+          // Canvas coordinates -> Screen coordinates
+          const screenX = (selectedText.x + position.x) * scale;
+          const screenY = (selectedText.y + position.y) * scale;
+
+          // Adjust for width/height to center or place above
+          // We passed position to toolbar, which expects screen coords relative to container
+          // But container is relative. Let's assume container is top-left 0,0 for now or use absolute positioning
+          // The toolbar uses absolute position inside the container.
+
+          // Actually, we need to consider the containerRef offset if necessary, 
+          // but since it's absolute inside the relative container, straightforward calculation should work.
+          // Wait, the containerRef has the stage.
+          // Let's place it inside the Main Container Div which is the parent of Stage.
+
+          return (
+            <TextFormattingToolbar
+              selectedTextState={selectedText}
+              onChange={(id, updates) => {
+                effectiveSetCanvasTextStates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+                // Also update persisted state if needed
+                if (onPersistCanvasTextMove) {
+                  onPersistCanvasTextMove(id, updates);
+                }
+              }}
+              position={{
+                x: selectedText.x * scale + position.x + (selectedText.width || 0) * scale / 2, // Center horizontal
+                y: selectedText.y * scale + position.y // Top of the text
+              }}
+            />
+          );
+        })()
+      )}
     </div>
   );
 };

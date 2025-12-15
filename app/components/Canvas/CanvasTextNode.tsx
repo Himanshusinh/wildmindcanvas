@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Text, Transformer } from 'react-konva';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Text, Group, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { CanvasTextState } from '@/app/components/ModalOverlays/types';
 
@@ -11,6 +11,53 @@ interface CanvasTextNodeProps {
     stageScale: number;
 }
 
+// Simple HTML parser for basic styling (bold, italic, underline, color)
+// returns array of text segments with style
+const parseHtmlToSegments = (html: string, baseStyle: Partial<CanvasTextState>) => {
+    // If no HTML, return single segment
+    if (!html || !html.includes('<')) {
+        return [{ text: html || '', ...baseStyle }];
+    }
+
+    // Crude parsing: split by tags
+    // This is NOT a full parser, handling nested tags correctly is hard without DOM
+    // For specific requirement "character level", we will use browser DOM to parse!
+    // We create a temporary hidden div, put HTML in it, and traverse nodes
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    const segments: Array<{ text: string } & Partial<CanvasTextState>> = [];
+
+    const traverse = (node: Node, currentStyle: Partial<CanvasTextState>) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            if (text) {
+                segments.push({
+                    text,
+                    ...currentStyle
+                });
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as HTMLElement;
+            const newStyle = { ...currentStyle };
+
+            // Map styles
+            const style = element.style;
+            if (style.fontWeight === 'bold' || element.tagName === 'B' || element.tagName === 'STRONG') newStyle.fontWeight = 'bold';
+            if (style.fontStyle === 'italic' || element.tagName === 'I' || element.tagName === 'EM') newStyle.fontStyle = 'italic';
+            if (style.textDecoration?.includes('underline') || element.tagName === 'U') newStyle.textDecoration = 'underline';
+            if (style.color) newStyle.color = style.color;
+            if (style.fontFamily) newStyle.fontFamily = style.fontFamily.replace(/['"]/g, '');
+
+            // Recurse
+            node.childNodes.forEach(child => traverse(child, newStyle));
+        }
+    };
+
+    traverse(tempDiv, baseStyle);
+    return segments;
+};
+
 export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
     data,
     isSelected,
@@ -18,200 +65,167 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
     onChange,
     stageScale,
 }) => {
-    const textRef = useRef<Konva.Text>(null);
+    const groupRef = useRef<Konva.Group>(null);
     const trRef = useRef<Konva.Transformer>(null);
+    // Fallback for simple text ref if needed
+    const textRef = useRef<Konva.Text>(null);
 
     useEffect(() => {
-        if (isSelected && trRef.current && textRef.current) {
-            trRef.current.nodes([textRef.current]);
+        if (isSelected && trRef.current && groupRef.current) {
+            trRef.current.nodes([groupRef.current]);
             trRef.current.getLayer()?.batchDraw();
         }
     }, [isSelected]);
 
-    const editingTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const editingDivRef = useRef<HTMLDivElement | null>(null);
 
-    const updateTextareaPosition = useCallback(() => {
-        const textarea = editingTextareaRef.current;
-        const textNode = textRef.current;
-        if (!textarea || !textNode) return;
+    const updateEditingDivPosition = useCallback(() => {
+        const div = editingDivRef.current;
+        const group = groupRef.current;
+        if (!div || !group) return;
 
-        const stage = textNode.getStage();
+        const stage = group.getStage();
         if (!stage) return;
 
         const scale = stage.scaleX();
+        // Use group position
+        const groupPosition = group.absolutePosition();
 
-        const textPosition = textNode.getAbsolutePosition();
-
-        // When appended to stage.container(), coordinate space matches getAbsolutePosition
-        // absolutePosition creates coords relative to valid container top-left
-        const areaPosition = {
-            x: textPosition.x,
-            y: textPosition.y,
-        };
-
-        Object.assign(textarea.style, {
+        Object.assign(div.style, {
             position: 'absolute',
-            top: areaPosition.y + 'px',
-            left: areaPosition.x + 'px',
-            width: textNode.width() * scale + 'px',
-            minHeight: textNode.height() * scale + 'px',
-            fontSize: textNode.fontSize() * scale + 'px',
-            lineHeight: String(textNode.lineHeight()),
-            height: 'auto',
-            transform: `rotate(${textNode.rotation()}deg)`,
+            top: groupPosition.y + 'px',
+            left: groupPosition.x + 'px',
+            width: (data.width || 200) * scale + 'px', // Use stored width
+            minHeight: '1em',
+            fontSize: data.fontSize * scale + 'px',
+            fontFamily: data.fontFamily,
+            lineHeight: '1.2',
+            transform: `rotate(${data.rotation || 0}deg)`,
             transformOrigin: 'left top',
-        });
-
-        textarea.style.height = textarea.scrollHeight + 'px';
-    }, []);
-
-    // Update position on every render (handles zoom/pan via props/state)
-    useEffect(() => {
-        if (editingTextareaRef.current) {
-            updateTextareaPosition();
-        }
-    }, [updateTextareaPosition, stageScale]);
-
-    // Also listen to dragmove if stage is dragging (pan) but no prop update yet
-    useEffect(() => {
-        const node = textRef.current;
-        if (!node) return;
-        const stage = node.getStage();
-        if (!stage) return;
-
-        const handleDrag = () => {
-            if (editingTextareaRef.current) {
-                updateTextareaPosition();
-            }
-        };
-
-        stage.on('dragmove', handleDrag);
-        return () => {
-            stage.off('dragmove', handleDrag);
-        };
-    }, [updateTextareaPosition]);
-
-    const handleTextDblClick = useCallback((e?: any) => {
-        if (e) e.cancelBubble = true;
-
-        const textNode = textRef.current;
-        if (!textNode) return;
-
-        const stage = textNode.getStage();
-        if (!stage) return;
-
-        // Hide node
-        textNode.hide();
-        textNode.draggable(false);
-        trRef.current?.hide();
-
-        const textarea = document.createElement('textarea');
-        stage.container().appendChild(textarea);
-        editingTextareaRef.current = textarea;
-
-        textarea.value = textNode.text();
-
-        Object.assign(textarea.style, {
-            position: 'absolute',
-            fontFamily: textNode.fontFamily(),
-            color: textNode.fill(),
-            padding: '0px',
-            margin: '0px',
+            color: data.color,
+            textAlign: data.textAlign,
+            outline: 'none',
+            border: 'none',
+            padding: '0',
+            margin: '0',
             overflow: 'hidden',
-            resize: 'none',
-            appearance: 'none',
-            webkitAppearance: 'none',
             whiteSpace: 'pre-wrap',
-            caretColor: textNode.fill(),
-            zIndex: '999999',
-            // Initial pos set by updateTextareaPosition below
+            wordWrap: 'break-word',
+            background: 'transparent'
         });
+    }, [data.width, data.fontSize, data.rotation, data.fontFamily, data.color, data.textAlign]);
 
-        // Force transparency with priority
-        textarea.style.setProperty('background-color', 'transparent', 'important');
-        textarea.style.setProperty('background', 'transparent', 'important');
-        textarea.style.setProperty('border', 'none', 'important');
-        textarea.style.setProperty('outline', 'none', 'important');
-        textarea.style.setProperty('box-shadow', 'none', 'important');
+    // Update position on render/zoom
+    useEffect(() => {
+        if (editingDivRef.current) {
+            updateEditingDivPosition();
+        }
+    }, [updateEditingDivPosition, stageScale]);
 
-        updateTextareaPosition();
-        textarea.focus();
+    const handleDblClick = useCallback((e?: any) => {
+        if (e) e.cancelBubble = true;
+        const group = groupRef.current;
+        if (!group) return;
+        const stage = group.getStage();
+        if (!stage) return;
 
-        const autoResize = () => {
-            textarea.style.height = 'auto';
-            textarea.style.height = textarea.scrollHeight + 'px';
+        // Hide Konva node
+        group.hide();
+        // Disable drag on transformer if attached? Actually transformer handles attached nodes. 
+        // We should detach transformer or hide it.
+        trRef.current?.hide();
+        group.draggable(false);
+
+        // Create contentEditable div
+        const div = document.createElement('div');
+        div.contentEditable = 'true';
+        stage.container().appendChild(div);
+        editingDivRef.current = div;
+
+        // Set content
+        if (data.htmlContent) {
+            div.innerHTML = data.htmlContent;
+        } else {
+            div.textContent = data.text;
+        }
+
+        updateEditingDivPosition();
+        div.focus();
+
+        // Select all text? Maybe just focus.
+
+        const saveAndClose = () => {
+            // Get content
+            const newHtml = div.innerHTML;
+            const newText = div.textContent || '';
+
+            onChange(data.id, {
+                text: newText,
+                htmlContent: newHtml
+            });
+
+            div.remove();
+            editingDivRef.current = null;
+
+            if (groupRef.current) {
+                groupRef.current.show();
+                groupRef.current.draggable(true);
+                if (isSelected) trRef.current?.show();
+            }
         };
 
-        textarea.addEventListener('input', autoResize);
-
-        const removeTextarea = (save = true) => {
-            if (save) {
-                onChange(data.id, { text: textarea.value });
-            }
-            textarea.remove();
-            editingTextareaRef.current = null;
-
-            // Check if node still exists before showing
-            if (textRef.current) {
-                textNode.show();
-                textNode.draggable(true);
-                trRef.current?.show();
-                textNode.getLayer()?.batchDraw();
-            }
-        };
-
-        textarea.addEventListener('keydown', (ev) => {
-            if (ev.key === 'Enter' && !ev.shiftKey) {
-                ev.preventDefault();
-                removeTextarea(true);
-            }
+        const handleKeyDown = (ev: KeyboardEvent) => {
+            // Escape to save and exit? Or cancel?
+            // Usually Escape cancels, Enter saves?
+            // For rich text blocks, Enter is newline. Ctrl+Enter saves.
             if (ev.key === 'Escape') {
-                removeTextarea(false);
+                saveAndClose();
             }
-        });
+        };
 
+        div.addEventListener('keydown', handleKeyDown);
+
+        // Handle clicking outside
         setTimeout(() => {
             const handleOutside = (ev: MouseEvent) => {
-                if (ev.target !== textarea) {
-                    removeTextarea(true);
+                const target = ev.target as Element;
+                if (target !== div && !div.contains(target as Node) &&
+                    // Don't close if clicking toolbar!
+                    !target.closest('#text-formatting-toolbar') &&
+                    !target.closest('.bg-zinc-900')) {
+                    saveAndClose();
                     window.removeEventListener('mousedown', handleOutside);
                 }
             };
             window.addEventListener('mousedown', handleOutside);
-        }, 200);
-    }, [data.id, onChange, updateTextareaPosition]);
+        }, 100);
 
-    const handleTextChange = useCallback((newText: string) => {
-        onChange(data.id, { text: newText });
-    }, [data.id, onChange]);
+    }, [data.id, data.text, data.htmlContent, updateEditingDivPosition, onChange, isSelected]);
 
+    // TRANSFORM LOGIC
     const handleTransform = useCallback(() => {
-        const node = textRef.current;
+        const node = groupRef.current;
         if (!node) return;
 
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
 
-        // Calculate new values
-        const newFontSize = Math.max(8, node.fontSize() * scaleY);
-        const newWidth = Math.max(30, node.width() * scaleX);
-
-        // Reset scale so text never stretches
+        // We update fontSize and Width
+        // The group itself shouldn't stay scaled, we reset scale and update props
         node.scaleX(1);
         node.scaleY(1);
 
-        // Apply real values
-        node.fontSize(newFontSize);
-        node.width(newWidth);
+        const newFontSize = Math.max(10, data.fontSize * scaleY);
+        const newWidth = Math.max(50, (data.width || 200) * scaleX);
 
         onChange(data.id, {
             x: node.x(),
             y: node.y(),
             rotation: node.rotation(),
-            width: newWidth,
             fontSize: newFontSize,
+            width: newWidth,
         });
-    }, [data.id, onChange]);
+    }, [data.id, data.fontSize, data.width, onChange]);
 
     const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
         onChange(data.id, {
@@ -220,23 +234,58 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
         });
     }, [data.id, onChange]);
 
+
+    // RENDER SEGMENTS
+    // We need to layout segments manually... automatic line wrapping with mixed fonts is VERY hard in Canvas.
+    // Simplifying Assumption: 
+    // If htmlContent exists, we try to use it.
+    // BUT Konva Text supports 'richText' strictly? No.
+    // For now, to support "Select character and change color", we must render segments.
+    // WARNING: Complex text layout (wrapping) for multiple segments is extremely difficult to do perfectly.
+    // Fallback: If no htmlContent, use standard Text.
+    // Implementation: simple horizontal flow with wrapping is complex.
+    // Trick: Use SVG image? Or simple character-by-character rendering?
+    // Let's rely on standard Text for the whole block if styles are uniform?
+    // User wants "1 character selected".
+
+    // Compromise for MVP Rich Text in Konva without plugin:
+    // Render text using standard Konva Text but allow HTML to define content.
+    // Wait, standard Konva Text doesn't render HTML.
+    // We will use the `parseHtmlToSegments` to get chunks.
+    // Then we need to position them.
+    // That needs a layout engine.
+
+    // Alternate: Use `html-to-image` approach?
+    // Or just simple standard Text if no HTML, and if HTML, render segments inline?
+    // Inline rendering without wrapping is easier. Wrapping is hard.
+
+    // IMPORTANT: For this specific request, I will simplify:
+    // Support Rich Text via multiple Text nodes ONLY IF they are on the same line or if I implement basic wrap.
+    // Let's implement a very basic flow layout.
+
+    // Memoize segments
+    const segments = useMemo(() => {
+        if (!data.htmlContent) return null;
+        return parseHtmlToSegments(data.htmlContent, {
+            fontSize: data.fontSize,
+            fontFamily: data.fontFamily,
+            color: data.color,
+            fontWeight: data.fontWeight,
+            fontStyle: data.fontStyle,
+            textDecoration: data.textDecoration
+        });
+    }, [data.htmlContent, data.fontSize, data.fontFamily, data.color, data.fontWeight, data.fontStyle, data.textDecoration]);
+
     return (
         <>
-            <Text
-                ref={textRef}
-                text={data.text}
+            <Group
+                ref={groupRef}
                 x={data.x}
                 y={data.y}
                 rotation={data.rotation}
-                fontSize={data.fontSize}
-                fontFamily={data.fontFamily}
-                fontStyle={data.fontStyle}
-                fill={data.color}
-                align={data.textAlign}
-                width={data.width}
                 draggable
-                onDblClick={handleTextDblClick}
-                onDblTap={handleTextDblClick}
+                onDblClick={handleDblClick}
+                onDblTap={handleDblClick}
                 onClick={(e) => {
                     onSelect(data.id);
                     e.cancelBubble = true;
@@ -245,25 +294,105 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                     onSelect(data.id);
                     e.cancelBubble = true;
                 }}
-                onTransformEnd={handleTransform}
                 onDragEnd={handleDragEnd}
-            />
+                onTransformEnd={handleTransform}
+            >
+                {/* Fallback or Rich Text Rendering */}
+                {segments ? (
+                    // Very naive rendering: just drawing texts on top of each other? No, need positioning.
+                    // Since implementing layout engine is too big used in one go, I will use a simplified approach:
+                    // Just render the plain text for visual selection in Canvas, but EDITING shows HTML.
+                    // WAIT, user wants to SEE the color change.
+                    // So I MUST render it.
+                    // Let's iterate segments and compute X offsets. (Ignoring wrap for MVP of rich text segments unless newline char)
+                    (() => {
+                        // Basic Layout Algo:
+                        // 1. Create a dummy canvas for measuring
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) return null;
+
+                        let cursorX = 0;
+                        let cursorY = 0;
+                        const components = [];
+
+                        // We need to approximate font string for measurement
+                        const getFontString = (seg: any) => {
+                            const style = seg.fontStyle || 'normal';
+                            const weight = seg.fontWeight || 'normal';
+                            const variant = 'normal'; // small-caps? ignoring for measure
+                            const size = (seg.fontSize || 16) + 'px';
+                            const family = seg.fontFamily || 'Arial';
+                            return `${style} ${weight} ${variant} ${size} ${family}`;
+                        };
+
+                        for (let i = 0; i < segments.length; i++) {
+                            const seg = segments[i];
+                            // Measuring
+                            ctx.font = getFontString(seg);
+                            const metrics = ctx.measureText(seg.text);
+                            const width = metrics.width;
+
+                            // Check for wrap? For MVP "character selected", we assume single line or manual newlines?
+                            // If seg.text is "\n", move cursorY down, cursorX = 0?
+                            // Dealing with wrapping without full engine is risky.
+                            // Let's assume single line for "Rich Text Color Change" feature for now unless explicit newline.
+
+                            const comp = (
+                                <Text
+                                    key={i}
+                                    text={seg.text}
+                                    x={cursorX}
+                                    y={cursorY}
+                                    fontSize={seg.fontSize}
+                                    fontFamily={seg.fontFamily}
+                                    fill={seg.color}
+                                    fontVariant={seg.fontWeight === 'bold' ? 'small-caps' : undefined}
+                                    fontStyle={`${seg.fontWeight || 'normal'} ${seg.fontStyle || 'normal'}`.trim()}
+                                    textDecoration={seg.textDecoration}
+                                />
+                            );
+                            components.push(comp);
+                            cursorX += width;
+                        }
+                        return components;
+                    })()
+                    // Since we can't measure easily for layout, let's revert to standard Text node if we fail layout?
+                    // No, let's use a trick: `html-to-image` is heavy.
+
+                    // Let's use the hidden Text node approach to measure?
+                    // Or just render a single Text node if no HTML?
+                    // Actually, if we use HTML content, we can use `Konva.Image` with an SVG containing the HTML via `foreignObject`.
+                    // This handles all rendering perfectly!
+                ) : (
+                    <Text
+                        text={data.text}
+                        width={data.width}
+                        fontSize={data.fontSize}
+                        fontFamily={data.fontFamily}
+                        fill={data.color}
+                        fontStyle={`${data.fontWeight || 'normal'} ${data.fontStyle || 'normal'}`.trim()}
+                        textDecoration={data.textDecoration}
+                        align={data.textAlign}
+                    />
+                )}
+
+                {/* SVG ForeignObject Rendering Strategy for Rich Text */}
+                {data.htmlContent && (
+                    <RichTextSVG
+                        data={data}
+                        width={data.width || 200}
+                    />
+                )}
+
+                {/* Rect for hit area if text is empty/transparent? */}
+            </Group>
             {isSelected && (
                 <Transformer
                     ref={trRef}
                     rotateEnabled
-                    enabledAnchors={[
-                        'top-left',
-                        'top-right',
-                        'bottom-left',
-                        'bottom-right',
-                        'middle-left',
-                        'middle-right',
-                    ]}
                     boundBoxFunc={(oldBox, newBox) => {
-                        if (newBox.width < 30 || newBox.height < 20) {
-                            return oldBox;
-                        }
+                        if (newBox.width < 30) return oldBox;
                         return newBox;
                     }}
                 />
@@ -271,3 +400,61 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
         </>
     );
 };
+
+// Helper component for ForeignObject rendering
+const RichTextSVG = ({ data, width }: { data: CanvasTextState, width: number }) => {
+    const [image] = useMemo(() => {
+        const svgString = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${Math.max(100, data.height || 100)}">
+          <foreignObject width="100%" height="100%">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="
+              font-size: ${data.fontSize}px;
+              font-family: ${data.fontFamily};
+              color: ${data.color};
+              text-align: ${data.textAlign};
+              width: ${width}px;
+              word-wrap: break-word;
+            ">
+              ${data.htmlContent}
+            </div>
+          </foreignObject>
+        </svg>`;
+
+        const img = new window.Image();
+        const src = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgString)));
+        img.src = src;
+        return [img];
+    }, [data, width]);
+
+    // We need to handle image load? 
+    // This approach is synchronous-ish but img load is async.
+    // use-image hook pattern?
+    // Let's just return nothing and rely on standard Text if this fails? 
+    // Or simpler: Just render the fallback Text if simple, and this if complex?
+
+    // Actually, ForeignObject can be tricky with external resources (fonts).
+    // But since we use system fonts/Google fonts loaded in DOM, it might work.
+
+    // Re-evaluating: The "Segments" approach is difficult without measurements.
+    // The SVG approach is difficult due to async loading and creating Image objects.
+
+    // Simplest robust solution for "Rich Text" where user just wants "Select character -> change color":
+    // Is simply NOT using Konva Canvas for text? 
+    // Overlaying HTML Divs on top of Canvas?
+    // Many apps do this. "Text Layers" are actually DOM elements floating on top.
+    // This allows perfect browser rendering, selection, and editing.
+    // We update `CanvasTextNode` to render a Div in the `ModalOverlays` layer instead of on Canvas?
+    // Or render a Transformer-like box on Canvas, but the content is an HTML overlay.
+    // BUT: export to image/video becomes hard. We need to rasterize for export.
+
+    // Let's stick to: Edit in HTML (contentEditable), Render in Canvas (Fallback Text OR Segmented Text).
+    // If I cannot do Segmented Text easily, I will just render standard Text (losing the rich formatting visually until edit).
+    // User explicitly asked "when i select some character then it should only implememnt in that text only".
+    // They expect to SEE it.
+
+    // I will try to implement a basic segment renderer that assumes single line or breaks.
+    // Actually, `react-konva-utils` has `Html` component? No.
+
+    return null;
+};
+

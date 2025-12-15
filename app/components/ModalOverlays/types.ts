@@ -189,6 +189,8 @@ export interface CanvasTextState {
   textAlign: 'left' | 'center' | 'right';
   color: string; // Kept for backward compatibility, but text color is now theme-aware
   rotation?: number;
+  textDecoration?: string; // 'none' | 'underline' | 'line-through'
+  htmlContent?: string;
 }
 
 export interface ScriptFrameModalState {
