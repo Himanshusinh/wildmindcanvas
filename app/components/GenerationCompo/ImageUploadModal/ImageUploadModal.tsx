@@ -7,6 +7,7 @@ import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 import { ImageModalFrame } from './ImageModalFrame';
 import { ImageModalNodes } from './ImageModalNodes';
 import { ImageModalControls } from './ImageModalControls';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -264,7 +265,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
   // Priority: Explicit model check first, then fallback detection
   // Priority: Explicit model check first, then fallback detection
-  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
+  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
   const isCompareResult = initialFrame === 'Compare' || selectedFrame === 'Compare';
   const isUploadedImage =
     initialModel === 'Library Image' ||
@@ -1023,17 +1024,24 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio);
   }, [initialAspectRatio]);
 
-  // Load image and get its resolution
+  // Load image and get its resolution (works for both generated and uploaded images)
   useEffect(() => {
     if (generatedImageUrl) {
       const img = new Image();
+      // Use the same URL handling as ImageModalFrame
+      const imageUrl = generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')
+        ? buildProxyResourceUrl(generatedImageUrl)
+        : generatedImageUrl;
+      img.crossOrigin = 'anonymous'; // Allow CORS for external images
       img.onload = () => {
-        setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
+        }
       };
       img.onerror = () => {
         setImageResolution(null);
       };
-      img.src = generatedImageUrl;
+      img.src = imageUrl;
     } else {
       setImageResolution(null);
     }
@@ -1348,7 +1356,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isUploadedImage={Boolean(isUploadedImage)}
         imageResolution={imageResolution}
         scale={scale}
-        title={isCompareResult ? selectedModel : undefined}
+        title={isCompareResult ? selectedModel : (PLUGIN_MODELS.includes(selectedModel || '') || PLUGIN_MODELS.includes(initialModel || '') ? (selectedModel || initialModel) : undefined)}
       />
 
       <ModalActionIcons
@@ -1358,6 +1366,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onTogglePin={!isUploadedImage ? () => setIsPinned(!isPinned) : undefined}
       />
 
       <div style={{ position: 'relative' }}>

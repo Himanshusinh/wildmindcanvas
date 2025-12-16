@@ -136,9 +136,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   const inputBg = isDark ? '#121212' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const inputText = isDark ? '#ffffff' : '#1f2937';
-  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
-  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
-  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
   const handleBg = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)';
 
   return (

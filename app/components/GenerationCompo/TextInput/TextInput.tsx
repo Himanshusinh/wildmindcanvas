@@ -293,6 +293,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         onDelete={onDelete}
         onDuplicate={onDuplicate}
         variant="default"
+        isPinned={isPinned}
+        onTogglePin={() => setIsPinned(!isPinned)}
       />
 
       <div style={{ position: 'relative' }}>
@@ -328,58 +330,6 @@ export const TextInput: React.FC<TextInputProps> = ({
           storyboardModalStates={storyboardModalStates}
           onHoverChange={requestHoverState}
         />
-
-        {/* Pin Icon Button - Below Input Box */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsPinned(!isPinned);
-          }}
-          style={{
-            position: 'absolute',
-            bottom: `${-32 * scale}px`,
-            right: `${8 * scale}px`,
-            width: `${28 * scale}px`,
-            height: `${28 * scale}px`,
-            borderRadius: `${6 * scale}px`,
-            backgroundColor: isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff'),
-            border: `1px solid ${isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)')}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 20,
-            opacity: isHovered ? 1 : 0,
-            transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
-            pointerEvents: 'auto',
-            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-          }}
-          onMouseEnter={(e) => {
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = pinBg;
-            }
-          }}
-          title={isPinned ? 'Unpin controls' : 'Pin controls'}
-        >
-          <svg
-            width={16 * scale}
-            height={16 * scale}
-            viewBox="0 0 24 24"
-            fill={isPinned ? '#437eb5' : 'none'}
-            stroke={isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563')}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-          </svg>
-        </button>
 
         <TextModalNodes
           id={id}

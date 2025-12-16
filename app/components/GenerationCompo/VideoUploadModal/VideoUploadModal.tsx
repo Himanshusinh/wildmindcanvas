@@ -178,6 +178,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     return `${width} / ${height}`;
   };
 
+
+
   const isDark = useIsDarkTheme();
 
   // Convert canvas coordinates to screen coordinates
@@ -353,12 +355,16 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
 
-  // Load video and get its resolution
+  // Load video and get its resolution (works for both generated and uploaded videos)
   useEffect(() => {
     if (generatedVideoUrl) {
       const video = document.createElement('video');
+      video.crossOrigin = 'anonymous'; // Allow CORS for external videos
+      video.preload = 'metadata'; // Only load metadata, not the full video
       video.onloadedmetadata = () => {
-        setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+        }
       };
       video.onerror = () => {
         setVideoResolution(null);
@@ -508,6 +514,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onTogglePin={!isUploadedVideo ? () => setIsPinned(!isPinned) : undefined}
       />
 
       <div style={{ position: 'relative' }}>
@@ -526,7 +534,6 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           frameBorderWidth={frameBorderWidth}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          onSetIsPinned={setIsPinned}
         />
 
         <VideoModalNodes

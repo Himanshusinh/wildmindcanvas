@@ -22,6 +22,7 @@ interface RemoveBgModalOverlaysProps {
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>) => void | Promise<void>;
   connections: Connection[];
   imageModalStates: ImageModalState[];
+  images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
@@ -44,6 +45,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
   onPersistImageModalMove,
   connections,
   imageModalStates,
+  images = [],
   onPersistConnectorCreate,
   stageRef,
   scale,
@@ -157,6 +159,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
           }}
           connections={connections}
           imageModalStates={imageModalStates}
+          images={images}
           onPersistConnectorCreate={onPersistConnectorCreate}
           stageRef={stageRef}
           scale={scale}

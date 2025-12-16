@@ -19,6 +19,7 @@ interface MultiangleModalOverlaysProps {
     onPersistMultiangleModalDelete?: (id: string) => void | Promise<void>;
     connections: Connection[];
     imageModalStates: ImageModalState[];
+    images?: Array<{ elementId?: string; url?: string; type?: string }>;
     onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
     stageRef: React.RefObject<Konva.Stage | null>;
     scale: number;
@@ -40,6 +41,7 @@ export const MultiangleModalOverlays: React.FC<MultiangleModalOverlaysProps> = (
     onPersistMultiangleModalDelete,
     connections,
     imageModalStates,
+    images = [],
     onPersistConnectorCreate,
     stageRef,
     scale,
@@ -128,6 +130,7 @@ export const MultiangleModalOverlays: React.FC<MultiangleModalOverlaysProps> = (
                     }}
                     connections={connections}
                     imageModalStates={imageModalStates}
+                    images={images}
                     onPersistConnectorCreate={onPersistConnectorCreate}
                     stageRef={stageRef}
                     scale={scale}

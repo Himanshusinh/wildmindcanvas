@@ -6,6 +6,7 @@ import { MultiangleControls } from './MultiangleControls';
 import { MultiangleImageFrame } from './MultiangleImageFrame';
 import { ConnectionNodes } from './ConnectionNodes';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface MultianglePluginModalProps {
     isOpen: boolean;
@@ -32,6 +33,7 @@ interface MultianglePluginModalProps {
     onUpdateModalState?: (modalId: string, updates: { multiangleImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
     connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
     imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
+    images?: Array<{ elementId?: string; url?: string; type?: string }>;
     onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
     onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
     onUpdateImageModalState?: (modalId: string, updates: Partial<{ generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }>) => void;
@@ -62,6 +64,7 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     onUpdateModalState,
     connections = [],
     imageModalStates = [],
+    images = [],
     onPersistConnectorCreate,
     onPersistImageModalCreate,
     onUpdateImageModalState,
@@ -118,14 +121,41 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
     const frameBorderWidth = 2;
 
-    // Detect connected image nodes
+    // Detect connected image nodes (from image generators or canvas images)
     const connectedImageSource = useMemo(() => {
-        if (!id || !imageModalStates) return null;
+        if (!id) return null;
         const conn = connections.find(c => c.to === id && c.from);
         if (!conn) return null;
-        const sourceModal = imageModalStates.find(m => m.id === conn.from);
-        return sourceModal?.generatedImageUrl || null;
-    }, [id, connections, imageModalStates]);
+
+        // First check if it's from an image generator modal
+        const sourceModal = imageModalStates?.find(m => m.id === conn.from);
+        if (sourceModal?.generatedImageUrl) {
+            // Use proxy URL for Zata URLs to avoid CORS issues
+            const url = sourceModal.generatedImageUrl;
+            if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+                return buildProxyResourceUrl(url);
+            }
+            return url;
+        }
+
+        // Then check if it's from a canvas image (uploaded image)
+        if (images && images.length > 0) {
+            const canvasImage = images.find(img => {
+                const imgId = img.elementId || (img as any).id;
+                return imgId === conn.from;
+            });
+            if (canvasImage?.url) {
+                // Use proxy URL for Zata URLs to avoid CORS issues
+                const url = canvasImage.url;
+                if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+                    return buildProxyResourceUrl(url);
+                }
+                return url;
+            }
+        }
+
+        return null;
+    }, [id, connections, imageModalStates, images]);
 
     // Handle source image updates from connections
     useEffect(() => {

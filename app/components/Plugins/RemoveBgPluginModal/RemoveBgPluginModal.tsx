@@ -8,6 +8,7 @@ import { RemoveBgControls } from './RemoveBgControls';
 import { RemoveBgImageFrame } from './RemoveBgImageFrame';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ interface RemoveBgPluginModalProps {
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
+  images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
 }
 
@@ -76,6 +78,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   onUpdateImageModalState,
   connections = [],
   imageModalStates = [],
+  images = [],
   onPersistConnectorCreate,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
@@ -130,14 +133,41 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   // Detect if this is a removed bg image result (media-like, no controls)
   const isRemovedBgImage = false; // Always show controls for the plugin
 
-  // Detect connected image nodes
+  // Detect connected image nodes (from image generators or canvas images)
   const connectedImageSource = useMemo(() => {
-    if (!id || !imageModalStates) return null;
+    if (!id) return null;
     const conn = connections.find(c => c.to === id && c.from);
     if (!conn) return null;
-    const sourceModal = imageModalStates.find(m => m.id === conn.from);
-    return sourceModal?.generatedImageUrl || null;
-  }, [id, connections, imageModalStates]);
+
+    // First check if it's from an image generator modal
+    const sourceModal = imageModalStates?.find(m => m.id === conn.from);
+    if (sourceModal?.generatedImageUrl) {
+      // Use proxy URL for Zata URLs to avoid CORS issues
+      const url = sourceModal.generatedImageUrl;
+      if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+        return buildProxyResourceUrl(url);
+      }
+      return url;
+    }
+
+    // Then check if it's from a canvas image (uploaded image)
+    if (images && images.length > 0) {
+      const canvasImage = images.find(img => {
+        const imgId = img.elementId || (img as any).id;
+        return imgId === conn.from;
+      });
+      if (canvasImage?.url) {
+        // Use proxy URL for Zata URLs to avoid CORS issues
+        const url = canvasImage.url;
+        if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+          return buildProxyResourceUrl(url);
+        }
+        return url;
+      }
+    }
+
+    return null;
+  }, [id, connections, imageModalStates, images]);
 
   // Restore images from props on mount or when props change
   useEffect(() => {
@@ -563,7 +593,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
               left: '50%',
               transform: 'translateX(-50%)',
               marginTop: `${-popupOverlap}px`,
-              zIndex: 15,
+              zIndex: 2002,
               width: controlsWidthPx,
               maxWidth: '90vw',
             }}

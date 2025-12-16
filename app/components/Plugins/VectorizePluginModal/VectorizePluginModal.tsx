@@ -8,6 +8,7 @@ import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
 import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface VectorizePluginModalProps {
   isOpen: boolean;
@@ -135,7 +136,12 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     // First check if it's from an image generator modal
     const sourceModal = imageModalStates?.find(m => m.id === conn.from);
     if (sourceModal?.generatedImageUrl) {
-      return sourceModal.generatedImageUrl;
+      // Use proxy URL for Zata URLs to avoid CORS issues
+      const url = sourceModal.generatedImageUrl;
+      if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+        return buildProxyResourceUrl(url);
+      }
+      return url;
     }
 
     // Then check if it's from a canvas image (uploaded image)
@@ -145,7 +151,12 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         return imgId === conn.from;
       });
       if (canvasImage?.url) {
-        return canvasImage.url;
+        // Use proxy URL for Zata URLs to avoid CORS issues
+        const url = canvasImage.url;
+        if (url && (url.includes('zata.ai') || url.includes('zata'))) {
+          return buildProxyResourceUrl(url);
+        }
+        return url;
       }
     }
 

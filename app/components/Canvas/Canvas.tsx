@@ -3992,7 +3992,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           selectedExpandModalIds.length > 0 ||
           selectedStoryboardModalIds.length > 0 ||
           selectedScriptFrameModalIds.length > 0 ||
-          selectedSceneFrameModalIds.length > 0;
+          selectedSceneFrameModalIds.length > 0 ||
+          selectedCompareModalIds.length > 0;
 
         if (hasMultipleSelections) {
           // Delete all selected components in the region
@@ -4079,6 +4080,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedVectorizeModalIds.forEach(id => onPersistVectorizeModalDelete && Promise.resolve(onPersistVectorizeModalDelete(id)).catch(console.error));
             setVectorizeModalStates(prev => prev.filter(m => !selectedVectorizeModalIds.includes(m.id)));
           }
+          if (selectedCompareModalIds.length > 0) {
+            selectedCompareModalIds.forEach(id => onPersistCompareModalDelete && Promise.resolve(onPersistCompareModalDelete(id)).catch(console.error));
+            setCompareModalStates(prev => prev.filter(m => !selectedCompareModalIds.includes(m.id)));
+          }
           if (selectedStoryboardModalIds.length > 0) {
             selectedStoryboardModalIds.forEach(id => onPersistStoryboardModalDelete && Promise.resolve(onPersistStoryboardModalDelete(id)).catch(console.error));
             setStoryboardModalStates(prev => prev.filter(m => !selectedStoryboardModalIds.includes(m.id)));
@@ -4112,6 +4117,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedRemoveBgModalId(null);
           setSelectedVectorizeModalIds([]);
           setSelectedVectorizeModalId(null);
+          setSelectedCompareModalIds([]);
+          setSelectedCompareModalId(null);
           setSelectedStoryboardModalIds([]);
           setSelectedStoryboardModalId(null);
           setSelectedScriptFrameModalIds([]);
@@ -4195,6 +4202,11 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (onPersistVectorizeModalDelete) Promise.resolve(onPersistVectorizeModalDelete(selectedVectorizeModalId)).catch(console.error);
             setVectorizeModalStates(prev => prev.filter(m => m.id !== selectedVectorizeModalId));
             setSelectedVectorizeModalId(null);
+          }
+          if (selectedCompareModalId !== null) {
+            if (onPersistCompareModalDelete) Promise.resolve(onPersistCompareModalDelete(selectedCompareModalId)).catch(console.error);
+            setCompareModalStates(prev => prev.filter(m => m.id !== selectedCompareModalId));
+            setSelectedCompareModalId(null);
           }
           if (selectedStoryboardModalId !== null) {
             if (onPersistStoryboardModalDelete) Promise.resolve(onPersistStoryboardModalDelete(selectedStoryboardModalId)).catch(console.error);
