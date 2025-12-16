@@ -588,7 +588,6 @@ export const Canvas: React.FC<CanvasProps> = ({
 
 
 
-
   // Helper function to get accurate dimensions for each component type
   // Accounts for hover states, open/closed states, and actual frame sizes
   const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
@@ -698,7 +697,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Expanded state: Includes the 500px wide popover below
         return {
-          width: 500, // Compact width
+          width: 500,
           height: 600
         };
       }
@@ -793,11 +792,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     const frameHeight = 260;
     const frameId = `script-${pluginId}`;
     const frameX = (plugin.x ?? 0) + offset;
-
     const frameY = plugin.y ?? 0;
-
-
-
 
     setScriptFrameModalStates(prev => {
       const existing = prev.find(frame => frame.pluginId === pluginId);
@@ -4698,8 +4693,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       rafId = null;
     };
 
-    // Helper function to get accurate dimensions for each component type
-    // Accounts for hover states, open/closed states, and actual frame sizes
 
 
     const handleMouseMove = (e: MouseEvent) => {
