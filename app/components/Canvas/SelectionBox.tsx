@@ -947,7 +947,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   // Show SelectionBox if:
   // 1. There's a selection rect AND it's a drag selection with 2+ components, OR
   // 2. There's a selection rect AND a group is selected (for group dragging and ungroup button)
-  if (selectionTightRect && isDragSelection && totalSelected >= 2) {
+  if (selectionTightRect) {
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
       <>
