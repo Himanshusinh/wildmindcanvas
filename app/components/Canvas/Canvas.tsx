@@ -588,6 +588,203 @@ export const Canvas: React.FC<CanvasProps> = ({
 
 
 
+
+  // Helper function to get accurate dimensions for each component type
+  // Accounts for hover states, open/closed states, and actual frame sizes
+  const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
+    switch (type) {
+      case 'image': {
+        const img = images[id as number];
+        if (!img) return { width: 0, height: 0 };
+
+        // Generation frames: 600px wide, height based on aspect ratio (min 400px)
+        // Add extra height for hover controls and UI elements
+        const baseWidth = img.width || 600;
+        const baseHeight = img.height || 400;
+
+        // For selection, use exact dimensions
+        return { width: baseWidth, height: baseHeight };
+      }
+
+      case 'imageModal': {
+        const modal = imageModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 600 };
+
+        // Image modals: 600px wide, height based on aspect ratio (min 400px)
+        // Add 100px for hover controls
+        return {
+          width: modal.frameWidth ?? 600,
+          height: (modal.frameHeight ?? 400) + 100
+        };
+      }
+
+      case 'videoModal': {
+        const modal = videoModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 500 };
+
+        // Video modals: 600px wide, 400px min height
+        return {
+          width: modal.frameWidth ?? 600,
+          height: modal.frameHeight ?? 400
+        };
+      }
+
+      case 'musicModal': {
+        const modal = musicModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 400 };
+
+        // Music modals: 600px wide, 300px high (fixed)
+        return {
+          width: modal.frameWidth ?? 600,
+          height: modal.frameHeight ?? 300
+        };
+      }
+
+      case 'textInput': {
+        // Text inputs: 400px min width, ~110-140px height
+        // Use conservative estimate for selection
+        return { width: 400, height: 110 };
+      }
+
+      case 'upscaleModal': {
+        const modal = upscaleModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'removeBgModal': {
+        const modal = removeBgModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'eraseModal': {
+        const modal = eraseModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'compareModal': {
+        const modal = compareModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 }; // Just the circle node
+        }
+
+        // Expanded state: Includes the 500px wide popover below
+        return {
+          width: 500, // Compact width
+          height: 600
+        };
+      }
+
+      case 'expandModal': {
+        const modal = expandModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'vectorizeModal': {
+        const modal = vectorizeModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'nextSceneModal': {
+        const modal = nextSceneModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'multiangleModal': {
+        const modal = multiangleModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'sceneFrameModal': {
+        const modal = sceneFrameModalStates.find(m => m.id === id);
+        if (!modal) return { width: 350, height: 300 };
+
+        // Scene frame: 350px wide, 300px high
+        return {
+          width: modal.frameWidth ?? 350,
+          height: modal.frameHeight ?? 300
+        };
+      }
+
+      case 'canvasText': {
+        const textState = effectiveCanvasTextStates.find(t => t.id === id);
+        if (!textState) return { width: 0, height: 0 };
+
+        const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
+        const height = textState.height || (textState.fontSize || 16) * 1.2;
+
+        return { width: estimatedWidth, height };
+      }
+
+      default:
+        return { width: 0, height: 0 };
+    }
+  };
+
   const ensureScriptFrameForPlugin = (pluginId: string, script: string, isLoading: boolean = false) => {
     const plugin = storyboardModalStates.find(modal => modal.id === pluginId);
     if (!plugin) return;
@@ -596,7 +793,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     const frameHeight = 260;
     const frameId = `script-${pluginId}`;
     const frameX = (plugin.x ?? 0) + offset;
+
     const frameY = plugin.y ?? 0;
+
+
+
 
     setScriptFrameModalStates(prev => {
       const existing = prev.find(frame => frame.pluginId === pluginId);
@@ -4499,199 +4700,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Helper function to get accurate dimensions for each component type
     // Accounts for hover states, open/closed states, and actual frame sizes
-    const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
-      switch (type) {
-        case 'image': {
-          const img = images[id as number];
-          if (!img) return { width: 0, height: 0 };
 
-          // Generation frames: 600px wide, height based on aspect ratio (min 400px)
-          // Add extra height for hover controls and UI elements
-          const baseWidth = img.width || 600;
-          const baseHeight = img.height || 400;
-
-          // For selection, use exact dimensions
-          return { width: baseWidth, height: baseHeight };
-        }
-
-        case 'imageModal': {
-          const modal = imageModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 600 };
-
-          // Image modals: 600px wide, height based on aspect ratio (min 400px)
-          // Add 100px for hover controls
-          return {
-            width: modal.frameWidth ?? 600,
-            height: (modal.frameHeight ?? 400) + 100
-          };
-        }
-
-        case 'videoModal': {
-          const modal = videoModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 500 };
-
-          // Video modals: 600px wide, 400px min height
-          return {
-            width: modal.frameWidth ?? 600,
-            height: modal.frameHeight ?? 400
-          };
-        }
-
-        case 'musicModal': {
-          const modal = musicModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 400 };
-
-          // Music modals: 600px wide, 300px high (fixed)
-          return {
-            width: modal.frameWidth ?? 600,
-            height: modal.frameHeight ?? 300
-          };
-        }
-
-        case 'textInput': {
-          // Text inputs: 400px min width, ~110-140px height
-          // Use conservative estimate for selection
-          return { width: 400, height: 110 };
-        }
-
-        case 'upscaleModal': {
-          const modal = upscaleModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'removeBgModal': {
-          const modal = removeBgModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'eraseModal': {
-          const modal = eraseModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'compareModal': {
-          const modal = compareModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 }; // Just the circle node
-          }
-
-          // Expanded state: Includes the 500px wide popover below
-          return {
-            width: 500,
-            height: 600
-          };
-        }
-
-        case 'expandModal': {
-          const modal = expandModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'vectorizeModal': {
-          const modal = vectorizeModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'nextSceneModal': {
-          const modal = nextSceneModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'multiangleModal': {
-          const modal = multiangleModalStates.find(m => m.id === id);
-          if (!modal) return { width: 100, height: 100 };
-
-          if (!modal.isExpanded) {
-            return { width: 100, height: 100 };
-          }
-
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'sceneFrameModal': {
-          const modal = sceneFrameModalStates.find(m => m.id === id);
-          if (!modal) return { width: 350, height: 300 };
-
-          // Scene frame: 350px wide, 300px high
-          return {
-            width: modal.frameWidth ?? 350,
-            height: modal.frameHeight ?? 300
-          };
-        }
-
-        case 'canvasText': {
-          const textState = effectiveCanvasTextStates.find(t => t.id === id);
-          if (!textState) return { width: 0, height: 0 };
-
-          const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
-          const height = textState.height || (textState.fontSize || 16) * 1.2;
-
-          return { width: estimatedWidth, height };
-        }
-
-        default:
-          return { width: 0, height: 0 };
-      }
-    };
 
     const handleMouseMove = (e: MouseEvent) => {
       const stage = stageRef.current;
