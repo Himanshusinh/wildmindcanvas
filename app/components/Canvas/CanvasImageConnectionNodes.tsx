@@ -194,12 +194,33 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   e.stopPropagation();
                   e.preventDefault();
                   const color = '#437eb5';
+                  const startX = e.clientX;
+                  const startY = e.clientY;
+                  const DRAG_THRESHOLD_PX = 1;
+                  let started = false;
+
+                  const maybeStart = (mx: number, my: number) => {
+                    if (started) return;
+                    const dx = Math.abs(mx - startX);
+                    const dy = Math.abs(my - startY);
+                    if (dx >= DRAG_THRESHOLD_PX || dy >= DRAG_THRESHOLD_PX) {
+                      started = true;
+                      window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id: nodeId, side: 'send', color, startX, startY } }));
+                    }
+                  };
+
+                  const handlePointerMove = (pe: PointerEvent) => {
+                    if (pe.pointerId !== pid) return;
+                    maybeStart(pe.clientX, pe.clientY);
+                  };
 
                   const handlePointerUp = (pe: any) => {
                     try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
                     try { delete (window as any).__canvas_active_capture; } catch (err) {}
                     window.removeEventListener('canvas-node-complete', handleComplete as any);
                     window.removeEventListener('pointerup', handlePointerUp as any);
+                    window.removeEventListener('pointercancel', handlePointerUp as any);
+                    window.removeEventListener('pointermove', handlePointerMove as any);
                   };
 
                   const handleComplete = () => {
@@ -207,12 +228,15 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                     try { delete (window as any).__canvas_active_capture; } catch (err) {}
                     window.removeEventListener('canvas-node-complete', handleComplete as any);
                     window.removeEventListener('pointerup', handlePointerUp as any);
+                    window.removeEventListener('pointercancel', handlePointerUp as any);
+                    window.removeEventListener('pointermove', handlePointerMove as any);
                   };
 
                   window.addEventListener('canvas-node-complete', handleComplete as any);
                   window.addEventListener('pointerup', handlePointerUp as any);
-
-                  window.dispatchEvent(new CustomEvent('canvas-node-start', { detail: { id: nodeId, side: 'send', color, startX: e.clientX, startY: e.clientY } }));
+                  window.addEventListener('pointercancel', handlePointerUp as any);
+                  window.addEventListener('pointermove', handlePointerMove as any, { passive: true } as any);
+                  // Do NOT start on simple click — only start once user drags while holding
                 }}
                 style={{
                   position: 'fixed',

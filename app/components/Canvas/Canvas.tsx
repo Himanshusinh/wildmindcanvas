@@ -2026,6 +2026,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedExpandModalIds([]);
     setSelectedVectorizeModalId(null);
     setSelectedVectorizeModalIds([]);
+    setSelectedCompareModalId(null);
+    setSelectedCompareModalIds([]);
+    setSelectedMultiangleModalId(null);
+    setSelectedMultiangleModalIds([]);
     setSelectedStoryboardModalId(null);
     setSelectedStoryboardModalIds([]);
     setSelectedVideoEditorModalId(null);
@@ -2693,7 +2697,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.warn('Failed to load persisted multiangle modals');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, JSON.stringify(externalMultiangleModals || [])]);
+  }, [projectId, externalMultiangleModals !== undefined]);
 
   // Hydrate storyboard modals from external or localStorage
   useEffect(() => {
@@ -3141,6 +3145,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [JSON.stringify(externalUpscaleModals || [])]);
 
+  // Also sync externalMultiangleModals changes to internal state (for real-time updates)
+  // Only sync if externalMultiangleModals is actually different to avoid overwriting local drag updates
+  useEffect(() => {
+    // Handle empty array - clear state immediately
+    if (externalMultiangleModals !== undefined && externalMultiangleModals.length === 0) {
+      console.log('[Canvas] Clearing multiangleModalStates (external is empty)');
+      setMultiangleModalStates([]);
+      return;
+    }
+    if (externalMultiangleModals && externalMultiangleModals.length > 0) {
+      setMultiangleModalStates(prev => {
+        const externalIds = new Set(externalMultiangleModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+
+        if (idsMatch) {
+          // Merge: keep local x,y during drag, but update other properties from external
+          return prev.map(prevModal => {
+            const externalModal = externalMultiangleModals.find(m => m.id === prevModal.id);
+            if (!externalModal) return prevModal;
+            return {
+              ...prevModal,
+              ...externalModal,
+              // Only update position if it's very close (committed) to avoid overwriting during drag
+              x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+              y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+            };
+          });
+        }
+        // IDs don't match, use external state
+        return externalMultiangleModals as any;
+      });
+    }
+  }, [JSON.stringify(externalMultiangleModals || [])]);
+
   // Also sync externalVectorizeModals changes to internal state (for real-time updates)
   // Only sync if externalVectorizeModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -3195,6 +3234,19 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.warn('Failed to persist upscale modals');
     }
   }, [upscaleModalStates, projectId]);
+
+  // Persist multiangle modals
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:multiangleModals`;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(multiangleModalStates));
+      }
+    } catch (e) {
+      console.warn('Failed to persist multiangle modals');
+    }
+  }, [multiangleModalStates, projectId]);
 
   // Persist music modals
   useEffect(() => {
@@ -4672,10 +4724,11 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    document.addEventListener('mouseup', handleMouseUp, true);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isSelecting, clearAllSelections]);
 
@@ -5214,11 +5267,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
       // Clean up any pending animation frame
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
@@ -5577,11 +5631,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isDraggingFromElement, mouseDownPos, selectedTool]);
 
@@ -5628,11 +5683,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMove, { passive: true });
-    window.addEventListener('mouseup', handleUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMove as any);
-      window.removeEventListener('mouseup', handleUp as any);
+      window.removeEventListener('mouseup', handleUp as any, true);
     };
   }, [pendingSelectionStartScreen, pendingSelectionStartCanvas, position.x, position.y, scale]);
 

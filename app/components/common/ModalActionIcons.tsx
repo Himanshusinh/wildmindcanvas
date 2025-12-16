@@ -67,7 +67,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     borderRadius: `${8 * scale}px`,
     color: textColor,
     cursor: 'pointer',
-    transition: isTextVariant ? 'box-shadow 0.12s, background-color 0.12s, color 0.12s' : 'all 0.3s ease',
+    transition: 'none',
     boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
     flexShrink: 0,
   };

@@ -4,6 +4,9 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { generateImageForCanvas } from '@/lib/api';
 import { ConnectionNodes } from './ConnectionNodes';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
+import { usePersistedPopupState } from '../PluginComponents';
+import { PluginNodeShell } from '../PluginComponents';
 
 interface ComparePluginModalProps {
     id: string;
@@ -56,29 +59,21 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     projectId,
 }) => {
     const isDark = useIsDarkTheme();
-    const [isDragging, setIsDragging] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    // Initialize from prop, default to false
-    const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+    const { isPopupOpen, setIsPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
     const containerRef = useRef<HTMLDivElement>(null);
-
-    // Sync prop changes to local state
-    useEffect(() => {
-        if (isExpanded !== undefined) {
-            setIsPopupOpen(isExpanded);
-        }
-    }, [isExpanded]);
-
-    // Helper to toggle popup and sync state
-    const togglePopup = (newState: boolean) => {
-        setIsPopupOpen(newState);
-        if (onUpdateModalState) {
-            onUpdateModalState(id, { isExpanded: newState });
-        }
-    };
-    const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-    const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
-    const hasDraggedRef = useRef(false);
+    const { onMouseDown: handleMouseDown } = useCanvasModalDrag({
+        enabled: isOpen,
+        x,
+        y,
+        scale,
+        position,
+        containerRef,
+        onPositionChange,
+        onPositionCommit,
+        onSelect,
+        onTap: () => togglePopup(),
+    });
 
     // New state for UI
     const [prompt, setPrompt] = useState(initialPrompt || '');
@@ -95,74 +90,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     const screenY = y * scale + position.y;
     const circleDiameter = 100 * scale;
 
-    useEffect(() => {
-        if (!isDragging) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!containerRef.current || !dragStartPosRef.current) return;
-
-            const dx = e.clientX - dragStartPosRef.current.x;
-            const dy = e.clientY - dragStartPosRef.current.y;
-
-            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-                hasDraggedRef.current = true;
-            }
-
-            // Convert delta to canvas units
-            const canvasDx = dx / scale;
-            const canvasDy = dy / scale;
-
-            const newCanvasX = (lastCanvasPosRef.current?.x || x) + canvasDx;
-            const newCanvasY = (lastCanvasPosRef.current?.y || y) + canvasDy;
-
-            onPositionChange(newCanvasX, newCanvasY);
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-            dragStartPosRef.current = null;
-
-            const wasDragging = hasDraggedRef.current;
-            hasDraggedRef.current = false;
-
-            if (lastCanvasPosRef.current) {
-                onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
-            } else {
-                onPositionCommit(x, y);
-            }
-
-            // Toggle popup if click (not drag)
-            if (!wasDragging) {
-                togglePopup(!isPopupOpen);
-            }
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging, scale, x, y, onPositionChange, onPositionCommit]);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        // Don't drag if interacting with inputs/selects in popup
-        if ((e.target as HTMLElement).tagName === 'INPUT' ||
-            (e.target as HTMLElement).tagName === 'SELECT' ||
-            (e.target as HTMLElement).tagName === 'BUTTON') {
-            return;
-        }
-
-        e.stopPropagation();
-        onSelect();
-
-        // Start dragging
-        setIsDragging(true);
-        dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-        lastCanvasPosRef.current = { x, y };
-        hasDraggedRef.current = false;
-    };
+    // Drag/select handled by shared canvas modal hook
 
     const handlePromptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
@@ -217,7 +145,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
 
         setIsGlobalGenerating(true);
         // Close popup after starting generation to clear the canvas view
-        togglePopup(false);
+        setIsPopupOpen(false);
 
         // Calculate positions for new nodes relative to current node
         const startX = x + 300; // Right of the compare node
@@ -344,15 +272,21 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div
-            ref={containerRef}
-            className="absolute flex flex-col items-center"
+        <PluginNodeShell
+            modalKey="compare"
+            id={id}
+            containerRef={containerRef as any}
+            screenX={screenX}
+            screenY={screenY}
+            isHovered={isHovered}
+            isSelected={Boolean(isSelected)}
+            onMouseDown={handleMouseDown}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="flex flex-col items-center"
             style={{
-                left: `${screenX}px`,
-                top: `${screenY}px`,
                 zIndex: isSelected || isPopupOpen ? 100 : 10,
                 transform: 'translate(-50%, -50%)',
-                // Ensure interactions don't bubble up to canvas in unwanted ways
                 pointerEvents: 'none',
             }}
         >
@@ -543,6 +477,6 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                     {/* No Results Grid */}
                 </div>
             )}
-        </div>
+        </PluginNodeShell>
     );
 };

@@ -341,11 +341,12 @@ export const CanvasText: React.FC<CanvasTextProps> = ({
         };
 
         window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
+        // Capture so stopPropagation can't block drag end
+        window.addEventListener('mouseup', handleMouseUp, true);
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('mouseup', handleMouseUp, true);
             // Clean up any pending updates
             if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);

@@ -89,7 +89,7 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           borderRadius: `${8 * scale}px`,
           color: textColor,
           cursor: 'pointer',
-          transition: 'all 0.3s ease',
+          transition: 'none',
           boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
         }}
         onMouseEnter={(e) => {
@@ -154,7 +154,7 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
             borderRadius: `${8 * scale}px`,
             color: textColor,
             cursor: 'pointer',
-            transition: 'all 0.3s ease',
+            transition: 'none',
             boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
           }}
           onMouseEnter={(e) => {
@@ -199,7 +199,7 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           borderRadius: `${8 * scale}px`,
           color: textColor,
           cursor: 'pointer',
-          transition: 'all 0.3s ease',
+          transition: 'none',
           boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
         }}
         onMouseEnter={(e) => {

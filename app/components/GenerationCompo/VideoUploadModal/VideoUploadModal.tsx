@@ -472,10 +472,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       }
     };
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation (e.g. connection nodes) can't block drag end
+    window.addEventListener('mouseup', handleMouseUp, true);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
       if (rafId != null) cancelAnimationFrame(rafId);
     };
   }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);

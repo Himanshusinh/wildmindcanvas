@@ -94,11 +94,20 @@ export function useConnectionManager({
 
     // Additional validation for media connections:
     // Check if source is media (Library Image or Uploaded Image)
+    // Use the same logic as ImageUploadModal to determine if it's media
+    const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
+    const GENERATION_MODELS = [
+      'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
+      'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
+      'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
+    ];
+    
     const fromModal = imageModalStates.find(m => m.id === fromId);
     const isFromMedia = fromModal && (
       fromModal.model === 'Library Image' ||
       fromModal.model === 'Uploaded Image' ||
-      (!fromModal.model && fromModal.generatedImageUrl && !fromModal.prompt)
+      PLUGIN_MODELS.includes(fromModal.model || '') ||
+      (!GENERATION_MODELS.includes(fromModal.model || '') && fromModal.generatedImageUrl && !fromModal.prompt)
     );
 
     // Check if target is image generation modal
@@ -107,7 +116,8 @@ export function useConnectionManager({
     const isToMedia = toModal && (
       toModal.model === 'Library Image' ||
       toModal.model === 'Uploaded Image' ||
-      (!toModal.model && toModal.generatedImageUrl && !toModal.prompt)
+      PLUGIN_MODELS.includes(toModal.model || '') ||
+      (!GENERATION_MODELS.includes(toModal.model || '') && toModal.generatedImageUrl && !toModal.prompt)
     );
 
     // Block: Image generation cannot connect to media
@@ -116,6 +126,7 @@ export function useConnectionManager({
     }
 
     // Block: Media cannot connect to image generation that already has an image
+    // BUT: Allow image-to-image connections when both are image generation (not media)
     if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
       return false;
     }
@@ -199,11 +210,20 @@ export function useConnectionManager({
         return;
       }
 
+      // Use the same logic as ImageUploadModal to determine if it's media
+      const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
+      const GENERATION_MODELS = [
+        'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
+        'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
+        'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
+      ];
+      
       const fromModal = imageModalStates.find(m => m.id === activeDrag.from);
       const isFromMedia = fromModal && (
         fromModal.model === 'Library Image' ||
         fromModal.model === 'Uploaded Image' ||
-        (!fromModal.model && fromModal.generatedImageUrl && !fromModal.prompt) // Fallback: has image but no prompt = uploaded
+        PLUGIN_MODELS.includes(fromModal.model || '') ||
+        (!GENERATION_MODELS.includes(fromModal.model || '') && fromModal.generatedImageUrl && !fromModal.prompt)
       );
 
       // Check if target is image generation modal
@@ -212,7 +232,8 @@ export function useConnectionManager({
       const isToMedia = toModal && (
         toModal.model === 'Library Image' ||
         toModal.model === 'Uploaded Image' ||
-        (!toModal.model && toModal.generatedImageUrl && !toModal.prompt) // Fallback: has image but no prompt = uploaded
+        PLUGIN_MODELS.includes(toModal.model || '') ||
+        (!GENERATION_MODELS.includes(toModal.model || '') && toModal.generatedImageUrl && !toModal.prompt)
       );
 
       // Block: Image generation cannot connect to media
@@ -223,6 +244,7 @@ export function useConnectionManager({
       }
 
       // Block: Media cannot connect to image generation that already has an image
+      // BUT: Allow image-to-image connections when both are image generation (not media)
       if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
@@ -290,18 +312,25 @@ export function useConnectionManager({
           try { Promise.resolve(onPersistConnectorCreate(newConn)).catch(console.error); } catch (e) { console.error('onPersistConnectorCreate failed', e); }
         }
 
-        // Clear dimming after successful connection
+        // Clear dimming after successful connection for both source and target
+        // Clear target dimming
         if (dimmedFrameId === id) {
           try {
             window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: id, dimmed: false } }));
           } catch (err) { }
           setDimmedFrameId(null);
         }
+        // Also clear source dimming if it was dimmed
+        if (dimmedFrameId === activeDrag.from) {
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: activeDrag.from, dimmed: false } }));
+          } catch (err) { }
+        }
       }
       setActiveDrag(null);
       try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
     };
-    const handleMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent | PointerEvent) => {
       if (!activeDrag) return;
       setActiveDrag(d => d ? { ...d, currentX: e.clientX, currentY: e.clientY } : d);
 
@@ -372,7 +401,7 @@ export function useConnectionManager({
         }
       }
     };
-    const handleUp = (e?: MouseEvent) => {
+    const handleUp = (e?: MouseEvent | PointerEvent) => {
       if (activeDrag) {
         // Check if we're releasing in empty space (not on a node)
         // If so, show component creation menu
@@ -434,12 +463,19 @@ export function useConnectionManager({
     window.addEventListener('canvas-node-start', handleStart as any);
     window.addEventListener('canvas-node-complete', handleComplete as any);
     window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp as any);
+    window.addEventListener('pointermove', handleMove as any, { passive: true } as any);
+    // Capture so node stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleUp as any, true);
+    window.addEventListener('pointerup', handleUp as any, true);
+    window.addEventListener('pointercancel', handleUp as any, true);
     return () => {
       window.removeEventListener('canvas-node-start', handleStart as any);
       window.removeEventListener('canvas-node-complete', handleComplete as any);
       window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('pointermove', handleMove as any);
+      window.removeEventListener('mouseup', handleUp as any, true);
+      window.removeEventListener('pointerup', handleUp as any, true);
+      window.removeEventListener('pointercancel', handleUp as any, true);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
   }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);

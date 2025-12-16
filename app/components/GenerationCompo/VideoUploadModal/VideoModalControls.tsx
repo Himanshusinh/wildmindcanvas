@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useEffect, Fragment, useState } from 'react';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 import {
   getModelDurations,
   getModelDefaultDuration,
@@ -12,6 +13,14 @@ import {
   isValidAspectRatioForModel,
   isValidResolutionForModel,
 } from '@/lib/videoModelConfig';
+
+const toPreviewImageUrl = (url: string): string => {
+  // Already proxied (local API) - keep as-is
+  if (url.includes('/api/proxy/resource/')) return url;
+  // Zata URLs often need proxying (CORS / cert issues)
+  if (url.includes('zata.ai') || url.includes('zata')) return buildProxyResourceUrl(url);
+  return url;
+};
 
 interface VideoModalControlsProps {
   scale: number;
@@ -754,7 +763,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                       {slot.url ? (
                         <img
                           key={`${slot.label}-img-${isFrameOrderSwapped}-${slot.url}`}
-                          src={slot.url}
+                          src={toPreviewImageUrl(slot.url)}
                           alt={slot.label}
                           style={{
                             position: 'absolute',

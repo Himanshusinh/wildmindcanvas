@@ -77,6 +77,7 @@ export const MultiangleModalOverlays: React.FC<MultiangleModalOverlaysProps> = (
                             modalId: modalState.id,
                         });
                         setSelectedMultiangleModalId(null);
+                        setSelectedMultiangleModalIds([]);
                         if (onPersistMultiangleModalDelete) {
                             console.log('[MultiangleModalOverlays] Calling onPersistMultiangleModalDelete', modalState.id);
                             const result = onPersistMultiangleModalDelete(modalState.id);
@@ -105,7 +106,7 @@ export const MultiangleModalOverlays: React.FC<MultiangleModalOverlaysProps> = (
                             Promise.resolve(onPersistMultiangleModalCreate(duplicated)).catch(console.error);
                         }
                     }}
-                    isSelected={selectedMultiangleModalId === modalState.id}
+                    isSelected={selectedMultiangleModalId === modalState.id || (selectedMultiangleModalIds || []).includes(modalState.id)}
                     initialSourceImageUrl={modalState.sourceImageUrl}
                     initialLocalMultiangleImageUrl={modalState.localMultiangleImageUrl}
                     onOptionsChange={(opts) => {

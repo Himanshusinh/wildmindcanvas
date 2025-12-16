@@ -5,8 +5,10 @@ import '../../common/canvasCaptureGuard';
 import { MultiangleControls } from './MultiangleControls';
 import { MultiangleImageFrame } from './MultiangleImageFrame';
 import { ConnectionNodes } from './ConnectionNodes';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
-import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
+import { PluginNodeShell } from '../PluginComponents';
 
 interface MultianglePluginModalProps {
     isOpen: boolean;
@@ -70,41 +72,17 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     onUpdateImageModalState,
 }) => {
     // ... (existing state) ...
-    const [isDraggingContainer, setIsDraggingContainer] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-    const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isDimmed, setIsDimmed] = useState(false);
-    const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
-
-    // Sync prop changes to local state
-    useEffect(() => {
-        if (isExpanded !== undefined) {
-            setIsPopupOpen(isExpanded);
-        }
-    }, [isExpanded]);
-
-    const togglePopup = (newState: boolean) => {
-        setIsPopupOpen(newState);
-        if (onUpdateModalState && id) {
-            onUpdateModalState(id, { isExpanded: newState });
-        }
-    };
+    const { isDimmed, setIsDimmed } = useCanvasFrameDim(id);
+    const { isPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
     const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
     const [localMultiangleImageUrl, setLocalMultiangleImageUrl] = useState<string | null>(initialLocalMultiangleImageUrl ?? null);
-    const onOptionsChangeRef = useRef(onOptionsChange);
-    const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-    const hasDraggedRef = useRef(false);
+    const onOptionsChangeRef = useLatestRef(onOptionsChange);
     const [rotateDegrees, setRotateDegrees] = useState(0);
     const [prompt, setPrompt] = useState<string>('');
     const [loraScale, setLoraScale] = useState<number>(2.0);
-
-    // Update ref when callback changes
-    useEffect(() => {
-        onOptionsChangeRef.current = onOptionsChange;
-    }, [onOptionsChange]);
 
     // Sync external isProcessing state
     useEffect(() => {
@@ -121,41 +99,7 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     const frameBorderColor = isDark ? '#3a3a3a' : '#a0a0a0';
     const frameBorderWidth = 2;
 
-    // Detect connected image nodes (from image generators or canvas images)
-    const connectedImageSource = useMemo(() => {
-        if (!id) return null;
-        const conn = connections.find(c => c.to === id && c.from);
-        if (!conn) return null;
-
-        // First check if it's from an image generator modal
-        const sourceModal = imageModalStates?.find(m => m.id === conn.from);
-        if (sourceModal?.generatedImageUrl) {
-            // Use proxy URL for Zata URLs to avoid CORS issues
-            const url = sourceModal.generatedImageUrl;
-            if (url && (url.includes('zata.ai') || url.includes('zata'))) {
-                return buildProxyResourceUrl(url);
-            }
-            return url;
-        }
-
-        // Then check if it's from a canvas image (uploaded image)
-        if (images && images.length > 0) {
-            const canvasImage = images.find(img => {
-                const imgId = img.elementId || (img as any).id;
-                return imgId === conn.from;
-            });
-            if (canvasImage?.url) {
-                // Use proxy URL for Zata URLs to avoid CORS issues
-                const url = canvasImage.url;
-                if (url && (url.includes('zata.ai') || url.includes('zata'))) {
-                    return buildProxyResourceUrl(url);
-                }
-                return url;
-            }
-        }
-
-        return null;
-    }, [id, connections, imageModalStates, images]);
+    const connectedImageSource = useConnectedSourceImage({ id, connections, imageModalStates, images });
 
     // Handle source image updates from connections
     useEffect(() => {
@@ -169,99 +113,18 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
         }
     }, [connectedImageSource, initialSourceImageUrl, sourceImageUrl]);
 
-    // Listen for dimming events
-    useEffect(() => {
-        const handleDim = (e: CustomEvent) => {
-            if (e.detail?.frameId === id) {
-                setIsDimmed(e.detail?.dimmed === true);
-            }
-        };
-        window.addEventListener('canvas-frame-dim' as any, handleDim);
-        return () => {
-            window.removeEventListener('canvas-frame-dim' as any, handleDim);
-        };
-    }, [id]);
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-        const isButton = target.tagName === 'BUTTON' || target.closest('button');
-        const isImage = target.tagName === 'IMG';
-        const isControls = target.closest('.controls-overlay');
-        const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-
-        if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
-            onSelect();
-        }
-
-        if (!isInput && !isButton && !isImage && !isControls) {
-            dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-            hasDraggedRef.current = false;
-
-            setIsDraggingContainer(true);
-            const rect = containerRef.current?.getBoundingClientRect();
-            if (rect) {
-                setDragOffset({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                });
-            }
-            lastCanvasPosRef.current = { x, y };
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    };
-
-    // Handle drag
-    useEffect(() => {
-        if (!isDraggingContainer) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!containerRef.current || !onPositionChange) return;
-
-            if (dragStartPosRef.current) {
-                const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-                const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-                if (dx > 5 || dy > 5) {
-                    hasDraggedRef.current = true;
-                }
-            }
-
-            const newScreenX = e.clientX - dragOffset.x;
-            const newScreenY = e.clientY - dragOffset.y;
-            const newCanvasX = (newScreenX - position.x) / scale;
-            const newCanvasY = (newScreenY - position.y) / scale;
-
-            onPositionChange(newCanvasX, newCanvasY);
-            lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-        };
-
-        const handleMouseUp = () => {
-            const wasDragging = hasDraggedRef.current;
-            setIsDraggingContainer(false);
-            dragStartPosRef.current = null;
-
-            if (!wasDragging) {
-                togglePopup(!isPopupOpen);
-            }
-
-            if (onPositionCommit) {
-                const finalX = lastCanvasPosRef.current?.x ?? x;
-                const finalY = lastCanvasPosRef.current?.y ?? y;
-                onPositionCommit(finalX, finalY);
-            }
-
-            hasDraggedRef.current = false;
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
+    const { isDragging: isDraggingContainer, onMouseDown: handleMouseDown } = useCanvasModalDrag({
+        enabled: isOpen,
+        x,
+        y,
+        scale,
+        position,
+        containerRef,
+        onPositionChange,
+        onPositionCommit,
+        onSelect,
+        onTap: () => togglePopup(),
+    });
 
     // Handle Generate Action
     const handleGenerate = async (params?: any) => {
@@ -368,22 +231,18 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     const screenY = y * scale + position.y;
 
     return (
-        <div
-            ref={containerRef}
-            data-modal-component=".multiangle"
-            data-overlay-id={id}
+        <PluginNodeShell
+            modalKey=".multiangle"
+            id={id}
+            containerRef={containerRef}
+            screenX={screenX}
+            screenY={screenY}
+            isHovered={isHovered}
+            isSelected={Boolean(isSelected)}
+            isDimmed={isDimmed}
             onMouseDown={handleMouseDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            style={{
-                position: 'absolute',
-                left: `${screenX}px`,
-                top: `${screenY}px`,
-                zIndex: isHovered || isSelected ? 2001 : 2000,
-                userSelect: 'none',
-                opacity: isDimmed ? 0.4 : 1,
-                transition: 'opacity 0.2s ease',
-            }}
         >
             {/* Plugin node design with icon and label */}
             <div
@@ -615,6 +474,6 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
                     </div>
                 )}
             </div>
-        </div >
+        </PluginNodeShell>
     );
 };
