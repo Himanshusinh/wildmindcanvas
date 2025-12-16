@@ -56,6 +56,7 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
         <ExpandPluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setExpandModalStates(prev => prev.filter(m => m.id !== modalState.id));
@@ -109,6 +110,12 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
           images={images}
           onPersistConnectorCreate={onPersistConnectorCreate}
           onExpand={onExpand}
+          onUpdateModalState={(modalId, updates) => {
+            setExpandModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+            if (onPersistExpandModalMove) {
+              Promise.resolve(onPersistExpandModalMove(modalId, updates)).catch(console.error);
+            }
+          }}
           onPersistImageModalCreate={onPersistImageModalCreate}
           onUpdateImageModalState={(modalId, updates) => {
             console.log('[ExpandModalOverlays] onUpdateImageModalState called:', {

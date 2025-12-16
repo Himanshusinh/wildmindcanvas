@@ -57,6 +57,7 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
         <ErasePluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setEraseModalStates(prev => prev.filter(m => m.id !== modalState.id));

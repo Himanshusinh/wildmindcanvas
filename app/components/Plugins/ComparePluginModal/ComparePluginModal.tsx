@@ -12,6 +12,7 @@ interface ComparePluginModalProps {
     width?: number;
     height?: number;
     isOpen: boolean;
+    isExpanded?: boolean;
     onClose: () => void;
     onSelect: () => void;
     onDelete: () => void;
@@ -37,6 +38,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     x,
     y,
     isOpen,
+    isExpanded,
     onSelect,
     onDelete,
     isSelected,
@@ -56,8 +58,24 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     const isDark = useIsDarkTheme();
     const [isDragging, setIsDragging] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [isPopupOpen, setIsPopupOpen] = useState(false);
+    // Initialize from prop, default to false
+    const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Sync prop changes to local state
+    useEffect(() => {
+        if (isExpanded !== undefined) {
+            setIsPopupOpen(isExpanded);
+        }
+    }, [isExpanded]);
+
+    // Helper to toggle popup and sync state
+    const togglePopup = (newState: boolean) => {
+        setIsPopupOpen(newState);
+        if (onUpdateModalState) {
+            onUpdateModalState(id, { isExpanded: newState });
+        }
+    };
     const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
     const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
     const hasDraggedRef = useRef(false);
@@ -115,7 +133,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
 
             // Toggle popup if click (not drag)
             if (!wasDragging) {
-                setIsPopupOpen(prev => !prev);
+                togglePopup(!isPopupOpen);
             }
         };
 
@@ -199,7 +217,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
 
         setIsGlobalGenerating(true);
         // Close popup after starting generation to clear the canvas view
-        setIsPopupOpen(false);
+        togglePopup(false);
 
         // Calculate positions for new nodes relative to current node
         const startX = x + 300; // Right of the compare node

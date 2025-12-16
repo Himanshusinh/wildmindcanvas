@@ -57,6 +57,7 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
         <VectorizePluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setVectorizeModalStates(prev => prev.filter(m => m.id !== modalState.id));

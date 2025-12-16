@@ -12,6 +12,7 @@ import { API_BASE_URL } from '@/lib/api';
 
 interface NextScenePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   // onVectorize removed - specific handler not needed for UI-only
@@ -60,7 +61,7 @@ interface NextScenePluginModalProps {
     aspectRatio?: string;
     loraScale?: number;
   }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -71,6 +72,7 @@ interface NextScenePluginModalProps {
 
 export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   nextSceneImageUrl,
@@ -111,7 +113,21 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+
+  // Sync prop changes to local state
+  useEffect(() => {
+    if (isExpanded !== undefined) {
+      setIsPopupOpen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const togglePopup = (newState: boolean) => {
+    setIsPopupOpen(newState);
+    if (onUpdateModalState && id) {
+      onUpdateModalState(id, { isExpanded: newState });
+    }
+  };
   const [mode, setMode] = useState<string>(initialMode ?? 'scene'); // Default mode 'scene'
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localNextSceneImageUrl, setLocalNextSceneImageUrl] = useState<string | null>(initialLocalNextSceneImageUrl ?? null);
@@ -310,7 +326,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
 
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
+        togglePopup(!isPopupOpen);
       }
 
       if (onPositionCommit && lastCanvasPosRef.current) {

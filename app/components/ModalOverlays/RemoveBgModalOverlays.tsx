@@ -55,6 +55,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
         <RemoveBgPluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setRemoveBgModalStates(prev => prev.filter(m => m.id !== modalState.id));

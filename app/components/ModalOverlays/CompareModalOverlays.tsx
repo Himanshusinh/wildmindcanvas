@@ -52,6 +52,7 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     width={modalState.width}
                     height={modalState.height}
                     isOpen={true}
+                    isExpanded={modalState.isExpanded}
                     isSelected={selectedCompareModalId === modalState.id || selectedCompareModalIds.includes(modalState.id)}
                     stageRef={stageRef}
                     scale={scale}

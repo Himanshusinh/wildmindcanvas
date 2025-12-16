@@ -43,6 +43,7 @@ export interface VideoModalState {
   generationId?: string;
   status?: string;
   provider?: string;
+  isExpanded?: boolean;
 }
 
 export interface VideoEditorModalState {
@@ -66,6 +67,7 @@ export interface MusicModalState {
   aspectRatio?: string;
   prompt?: string;
   isGenerating?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface UpscaleModalState {
@@ -80,6 +82,7 @@ export interface UpscaleModalState {
   frameWidth?: number;
   frameHeight?: number;
   isUpscaling?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface RemoveBgModalState {
@@ -95,6 +98,7 @@ export interface RemoveBgModalState {
   frameWidth?: number;
   frameHeight?: number;
   isRemovingBg?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface CompareModalState {
@@ -107,6 +111,7 @@ export interface CompareModalState {
   isOpen?: boolean;
   prompt?: string;
   model?: string;
+  isExpanded?: boolean;
 }
 
 export interface EraseModalState {
@@ -120,6 +125,7 @@ export interface EraseModalState {
   frameWidth?: number;
   frameHeight?: number;
   isErasing?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface ExpandModalState {
@@ -133,6 +139,7 @@ export interface ExpandModalState {
   frameWidth?: number;
   frameHeight?: number;
   isExpanding?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface VectorizeModalState {
@@ -146,6 +153,7 @@ export interface VectorizeModalState {
   frameWidth?: number;
   frameHeight?: number;
   isVectorizing?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface NextSceneModalState {
@@ -159,6 +167,7 @@ export interface NextSceneModalState {
   frameWidth?: number;
   frameHeight?: number;
   isProcessing?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface MultiangleModalState {
@@ -171,6 +180,7 @@ export interface MultiangleModalState {
   frameWidth?: number;
   frameHeight?: number;
   isProcessing?: boolean;
+  isExpanded?: boolean;
 }
 
 

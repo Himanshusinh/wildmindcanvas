@@ -55,6 +55,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                 <NextScenePluginModal
                     key={modalState.id}
                     isOpen={true}
+                    isExpanded={modalState.isExpanded}
                     id={modalState.id}
                     onClose={() => {
                         setNextSceneModalStates(prev => prev.filter(m => m.id !== modalState.id));

@@ -11,6 +11,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
@@ -35,7 +36,7 @@ interface RemoveBgPluginModalProps {
   initialLocalRemovedBgImageUrl?: string | null;
   onOptionsChange?: (opts: { model?: string; backgroundType?: string; scaleValue?: number; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { removedBgImageUrl?: string | null; isRemovingBg?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { removedBgImageUrl?: string | null; isRemovingBg?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -45,6 +46,7 @@ interface RemoveBgPluginModalProps {
 
 export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onRemoveBg,
@@ -89,7 +91,21 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
   const [isDimmed, setIsDimmed] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localRemovedBgImageUrl, setLocalRemovedBgImageUrl] = useState<string | null>(initialLocalRemovedBgImageUrl ?? null);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+
+  // Sync prop changes to local state
+  useEffect(() => {
+    if (isExpanded !== undefined) {
+      setIsPopupOpen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const togglePopup = (newState: boolean) => {
+    setIsPopupOpen(newState);
+    if (onUpdateModalState && id) {
+      onUpdateModalState(id, { isExpanded: newState });
+    }
+  };
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const hasDraggedRef = useRef(false);
@@ -265,7 +281,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
 
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
+        togglePopup(!isPopupOpen);
       }
 
       if (onPositionCommit) {

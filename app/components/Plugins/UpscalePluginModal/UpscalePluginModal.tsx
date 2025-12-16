@@ -11,6 +11,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscalePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
@@ -34,7 +35,7 @@ interface UpscalePluginModalProps {
   initialLocalUpscaledImageUrl?: string | null;
   onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean }) => void;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -44,6 +45,7 @@ interface UpscalePluginModalProps {
 
 export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onUpscale,
@@ -84,8 +86,22 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
+
+  // Sync prop changes to local state
+  useEffect(() => {
+    if (isExpanded !== undefined) {
+      setIsPopupOpen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const togglePopup = (newState: boolean) => {
+    setIsPopupOpen(newState);
+    if (onUpdateModalState && id) {
+      onUpdateModalState(id, { isExpanded: newState });
+    }
+  };
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useRef(onOptionsChange);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -264,7 +280,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
+        togglePopup(!isPopupOpen);
       }
 
       if (onPositionCommit) {

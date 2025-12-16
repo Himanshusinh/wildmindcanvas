@@ -11,6 +11,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
@@ -33,7 +34,7 @@ interface VectorizePluginModalProps {
   initialLocalVectorizedImageUrl?: string | null;
   onOptionsChange?: (opts: { mode?: string; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; isVectorizing?: boolean }) => void;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -44,6 +45,7 @@ interface VectorizePluginModalProps {
 
 export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onVectorize,
@@ -82,7 +84,21 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+
+  // Sync prop changes to local state
+  useEffect(() => {
+    if (isExpanded !== undefined) {
+      setIsPopupOpen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const togglePopup = (newState: boolean) => {
+    setIsPopupOpen(newState);
+    if (onUpdateModalState && id) {
+      onUpdateModalState(id, { isExpanded: newState });
+    }
+  };
   const [mode, setMode] = useState<string>(initialMode ?? 'simple');
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localVectorizedImageUrl, setLocalVectorizedImageUrl] = useState<string | null>(initialLocalVectorizedImageUrl ?? null);
@@ -273,7 +289,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
 
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
+        togglePopup(!isPopupOpen);
       }
 
       if (onPositionCommit && lastCanvasPosRef.current) {

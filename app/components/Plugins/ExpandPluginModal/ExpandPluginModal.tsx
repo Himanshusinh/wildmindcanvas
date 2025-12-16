@@ -12,6 +12,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandPluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
@@ -34,7 +35,7 @@ interface ExpandPluginModalProps {
   initialLocalExpandedImageUrl?: string | null;
   onOptionsChange?: (opts: { model?: string; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; isExpanding?: boolean }) => void;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; isExpanding?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { expandedImageUrl?: string | null; isExpanding?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { expandedImageUrl?: string | null; isExpanding?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -45,6 +46,7 @@ interface ExpandPluginModalProps {
 
 export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onExpand,
@@ -85,7 +87,21 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   const [isDimmed, setIsDimmed] = useState(false);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localExpandedImageUrl, setLocalExpandedImageUrl] = useState<string | null>(initialLocalExpandedImageUrl ?? null);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+
+  // Sync prop changes to local state
+  useEffect(() => {
+    if (isExpanded !== undefined) {
+      setIsPopupOpen(isExpanded);
+    }
+  }, [isExpanded]);
+
+  const togglePopup = (newState: boolean) => {
+    setIsPopupOpen(newState);
+    if (onUpdateModalState && id) {
+      onUpdateModalState(id, { isExpanded: newState });
+    }
+  };
   const [expandPrompt, setExpandPrompt] = useState('');
   const aspectPresets = {
     custom: { label: 'Custom', sizeLabel: 'Custom', width: 1024, height: 1024, aspectRatio: 1 },
@@ -379,7 +395,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
 
       // Only toggle popup if it was a click (not a drag)
       if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
+        togglePopup(!isPopupOpen);
       }
 
       if (lastCanvasPosRef.current && onPositionCommit) {
@@ -401,7 +417,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   const handleExpand = async () => {
     const effectiveSourceImageUrl = sourceImageUrl || connectedImageSource;
     if (!onExpand || !effectiveSourceImageUrl) {
-      setIsPopupOpen(false);
+      togglePopup(false);
       return;
     }
 
@@ -415,7 +431,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
     }
 
     // Close popup after starting expand
-    setIsPopupOpen(false);
+    togglePopup(false);
 
     // Calculate frame dimensions (same as erase/replace)
     const frameWidth = 600;
@@ -722,7 +738,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
           }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setIsPopupOpen(false);
+              togglePopup(false);
             }
           }}
           onWheel={(e) => {
@@ -760,150 +776,150 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             }
           }}
         >
-        {hasSourceImage ? (
+          {hasSourceImage ? (
+            <div
+              style={{
+                backgroundColor: isDark ? '#121212' : 'white',
+                borderRadius: '16px',
+                padding: '24px',
+                width: '90vw',
+                maxWidth: '1200px',
+                height: '85vh',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+                overflow: 'hidden',
+                pointerEvents: 'auto',
+                transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => {
+                // Only prevent default if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              onTouchMove={(e) => {
+                // Only prevent default if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
+              onMouseDown={(e) => {
+                // Only prevent propagation if the event is NOT on the canvas or its container
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.stopPropagation();
+                }
+              }}
+              onMouseMove={(e) => {
+                // Prevent mouse move events from reaching main canvas
+                const target = e.target as HTMLElement;
+                const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
+                if (!isCanvas) {
+                  e.stopPropagation();
+                }
+              }}
+            >
+              {/* Header with Controls */}
+              <ExpandControls
+                aspectPreset={aspectPreset}
+                expandPrompt={expandPrompt}
+                isExpanding={isExpanding}
+                externalIsExpanding={externalIsExpanding}
+                sourceImageUrl={sourceImageUrl || connectedImageSource}
+                onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
+                onExpandPromptChange={setExpandPrompt}
+                onExpand={handleExpand}
+                onClose={() => setIsPopupOpen(false)}
+                aspectPresets={aspectPresets}
+                customWidth={customWidth}
+                customHeight={customHeight}
+                onCustomWidthChange={setCustomWidth}
+                onCustomHeightChange={setCustomHeight}
+                imageSize={imageSize}
+              />
+
+              {/* Image Preview with Canvas */}
               <div
                 style={{
-                  backgroundColor: isDark ? '#121212' : 'white',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  width: '90vw',
-                  maxWidth: '1200px',
-                  height: '85vh',
-                  maxHeight: '90vh',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.6)' : '0 8px 32px rgba(0, 0, 0, 0.3)',
+                  position: 'relative',
+                  width: '100%',
+                  flex: 1,
+                  minHeight: 0,
                   overflow: 'hidden',
-                  pointerEvents: 'auto',
-                  transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onWheel={(e) => {
-                  // Only prevent default if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                onTouchMove={(e) => {
-                  // Only prevent default if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                onMouseDown={(e) => {
-                  // Only prevent propagation if the event is NOT on the canvas or its container
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.stopPropagation();
-                  }
-                }}
-                onMouseMove={(e) => {
-                  // Prevent mouse move events from reaching main canvas
-                  const target = e.target as HTMLElement;
-                  const isCanvas = target.tagName === 'CANVAS' || target.closest('canvas') || target.closest('[data-expand-canvas-container]');
-                  if (!isCanvas) {
-                    e.stopPropagation();
-                  }
+                  borderRadius: '8px',
+                  border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
+                  backgroundColor: isDark ? '#1a1a1a' : '#f9fafb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.3s ease, border-color 0.3s ease',
                 }}
               >
-                {/* Header with Controls */}
-                <ExpandControls
-                  aspectPreset={aspectPreset}
-                  expandPrompt={expandPrompt}
-                  isExpanding={isExpanding}
-                  externalIsExpanding={externalIsExpanding}
+                <ExpandImageFrame
                   sourceImageUrl={sourceImageUrl || connectedImageSource}
-                  onAspectPresetChange={(preset) => handleAspectPresetChange(preset as AspectPreset)}
-                  onExpandPromptChange={setExpandPrompt}
-                  onExpand={handleExpand}
-                  onClose={() => setIsPopupOpen(false)}
+                  localExpandedImageUrl={localExpandedImageUrl}
+                  expandedImageUrl={expandedImageUrl}
+                  aspectPreset={aspectPreset}
                   aspectPresets={aspectPresets}
                   customWidth={customWidth}
                   customHeight={customHeight}
-                  onCustomWidthChange={setCustomWidth}
-                  onCustomHeightChange={setCustomHeight}
-                  imageSize={imageSize}
+                  onFrameInfoChange={setFrameInfo}
+                  onImageSizeChange={setImageSize}
                 />
-
-                {/* Image Preview with Canvas */}
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: 'hidden',
-                    borderRadius: '8px',
-                    border: isDark ? '2px solid rgba(255, 255, 255, 0.2)' : '2px solid #e5e7eb',
-                    backgroundColor: isDark ? '#1a1a1a' : '#f9fafb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background-color 0.3s ease, border-color 0.3s ease',
-                  }}
-                >
-                  <ExpandImageFrame
-                    sourceImageUrl={sourceImageUrl || connectedImageSource}
-                    localExpandedImageUrl={localExpandedImageUrl}
-                    expandedImageUrl={expandedImageUrl}
-                    aspectPreset={aspectPreset}
-                    aspectPresets={aspectPresets}
-                    customWidth={customWidth}
-                    customHeight={customHeight}
-                    onFrameInfoChange={setFrameInfo}
-                    onImageSizeChange={setImageSize}
-                  />
-                </div>
               </div>
-        ) : (
-          <div
-            style={{
-              backgroundColor: isDark ? '#121212' : 'white',
-              borderRadius: '16px',
-              padding: '32px',
-              width: 'min(420px, 90vw)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              alignItems: 'center',
-              textAlign: 'center',
-              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
-              pointerEvents: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
-              Connect an image to expand
-            </h3>
-            <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
-              Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
-            </p>
-            <button
-              onClick={() => setIsPopupOpen(false)}
+            </div>
+          ) : (
+            <div
               style={{
-                marginTop: '8px',
-                padding: '10px 20px',
-                borderRadius: '999px',
-                border: 'none',
-                backgroundColor: '#437eb5',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 500,
+                backgroundColor: isDark ? '#121212' : 'white',
+                borderRadius: '16px',
+                padding: '32px',
+                width: 'min(420px, 90vw)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                alignItems: 'center',
+                textAlign: 'center',
+                boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.3)',
+                pointerEvents: 'auto',
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              Close
-            </button>
-          </div>
-        )}
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: isDark ? '#ffffff' : '#111827' }}>
+                Connect an image to expand
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: isDark ? '#cccccc' : '#4b5563' }}>
+                Use the connection nodes to attach an image or generated frame. Once connected, the expand workspace will appear here.
+              </p>
+              <button
+                onClick={() => setIsPopupOpen(false)}
+                style={{
+                  marginTop: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  backgroundColor: '#437eb5',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

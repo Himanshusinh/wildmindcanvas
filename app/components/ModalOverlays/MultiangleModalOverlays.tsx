@@ -53,6 +53,7 @@ export const MultiangleModalOverlays: React.FC<MultiangleModalOverlaysProps> = (
                 <MultianglePluginModal
                     key={modalState.id}
                     isOpen={true}
+                    isExpanded={modalState.isExpanded}
                     id={modalState.id}
                     onClose={() => {
                         setMultiangleModalStates(prev => prev.filter(m => m.id !== modalState.id));

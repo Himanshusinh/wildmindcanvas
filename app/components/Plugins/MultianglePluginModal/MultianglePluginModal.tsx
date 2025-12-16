@@ -9,6 +9,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface MultianglePluginModalProps {
     isOpen: boolean;
+    isExpanded?: boolean;
     id?: string;
     onClose: () => void;
     multiangleImageUrl?: string | null;
@@ -28,7 +29,7 @@ interface MultianglePluginModalProps {
     initialSourceImageUrl?: string | null;
     initialLocalMultiangleImageUrl?: string | null;
     onOptionsChange?: (opts: { sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; isProcessing?: boolean }) => void;
-    onUpdateModalState?: (modalId: string, updates: { multiangleImageUrl?: string | null; isProcessing?: boolean }) => void;
+    onUpdateModalState?: (modalId: string, updates: { multiangleImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
     connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
     imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
     onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
@@ -38,6 +39,7 @@ interface MultianglePluginModalProps {
 
 export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     isOpen,
+    isExpanded,
     id,
     onClose,
     multiangleImageUrl,
@@ -72,7 +74,21 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDimmed, setIsDimmed] = useState(false);
-    const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const [isPopupOpen, setIsPopupOpen] = useState(isExpanded || false);
+
+    // Sync prop changes to local state
+    useEffect(() => {
+        if (isExpanded !== undefined) {
+            setIsPopupOpen(isExpanded);
+        }
+    }, [isExpanded]);
+
+    const togglePopup = (newState: boolean) => {
+        setIsPopupOpen(newState);
+        if (onUpdateModalState && id) {
+            onUpdateModalState(id, { isExpanded: newState });
+        }
+    };
     const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
     const [localMultiangleImageUrl, setLocalMultiangleImageUrl] = useState<string | null>(initialLocalMultiangleImageUrl ?? null);
     const onOptionsChangeRef = useRef(onOptionsChange);
@@ -196,7 +212,7 @@ export const MultianglePluginModal: React.FC<MultianglePluginModalProps> = ({
             dragStartPosRef.current = null;
 
             if (!wasDragging) {
-                setIsPopupOpen(prev => !prev);
+                togglePopup(!isPopupOpen);
             }
 
             if (onPositionCommit) {

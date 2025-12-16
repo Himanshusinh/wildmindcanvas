@@ -55,6 +55,7 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
         <UpscalePluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
