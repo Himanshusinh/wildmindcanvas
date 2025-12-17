@@ -212,6 +212,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   }, []);
 
   // Calculate total number of selected items
+  // Note: selectedCanvasTextIds is not passed to this component, so it's not included in the count
+  // This is intentional as canvas text uses a different selection system
   const totalSelected = selectedImageIndices.length +
     selectedImageModalIds.length +
     selectedVideoModalIds.length +

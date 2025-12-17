@@ -3586,6 +3586,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [transformerUpdateKey, setTransformerUpdateKey] = useState(0);
   // Track real-time position of selected image during drag
   const [selectedImageRealTimePosition, setSelectedImageRealTimePosition] = useState<{ x: number; y: number } | null>(null);
+  
+  // Region selection rectangle (Konva pattern)
+  const selectionRectangleRef = useRef<Konva.Rect>(null);
+  const [selectionRectCoords, setSelectionRectCoords] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   // Track middle button state globally to prevent zoom when scrolling while holding middle button
   useEffect(() => {
@@ -3733,6 +3737,21 @@ export const Canvas: React.FC<CanvasProps> = ({
               e.preventDefault();
             }
 
+            // Clear the blue selection rectangle if it's visible
+            if (selectionRectCoords) {
+              setSelectionRectCoords(null);
+            }
+            // Also clear selection box if it exists
+            if (selectionBox) {
+              setSelectionBox(null);
+              setIsSelecting(false);
+            }
+            // Clear smart selection (selectionTightRect) if it exists
+            if (selectionTightRect) {
+              setSelectionTightRect(null);
+              setIsDragSelection(false);
+            }
+
             let hasDeletions = false;
 
             // 1. Canvas Text (Local & Persisted)
@@ -3761,7 +3780,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (selectedImageIndex !== null) imageIndicesToDelete.push(selectedImageIndex);
 
             if (imageIndicesToDelete.length > 0) {
-              hasDeletions = true;
+              hasDeletions = true; 
               // Sort descending to delete without shifting indices
               const sortedIndices = [...new Set(imageIndicesToDelete)].sort((a, b) => b - a);
               sortedIndices.forEach(index => {
@@ -3970,6 +3989,21 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         e.preventDefault();
 
+        // Clear the blue selection rectangle if it's visible
+        if (selectionRectCoords) {
+          setSelectionRectCoords(null);
+        }
+        // Also clear selection box if it exists
+        if (selectionBox) {
+          setSelectionBox(null);
+          setIsSelecting(false);
+        }
+        // Clear smart selection (selectionTightRect) if it exists
+        if (selectionTightRect) {
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
+        }
+
         // Check if there's a selected region (multiple components)
         const hasMultipleSelections = selectedImageIndices.length > 0 ||
           selectedTextInputIds.length > 0 ||
@@ -4113,6 +4147,10 @@ export const Canvas: React.FC<CanvasProps> = ({
           setSelectedStoryboardModalIds([]);
           setSelectedStoryboardModalId(null);
           setSelectedScriptFrameModalIds([]);
+          
+          // Clear smart selection (selectionTightRect) after deleting components
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
           setSelectedScriptFrameModalId(null);
           setSelectedSceneFrameModalIds([]);
           setSelectedSceneFrameModalId(null);
@@ -4673,13 +4711,29 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Handle selection box mouse move - Freepik Spaces style
   useEffect(() => {
-    if (!isSelecting || !selectionBox) return;
+    if (!isSelecting || !selectionBox) {
+      // Clear selection rectangle if not selecting
+      if (selectionRectCoords) {
+        setSelectionRectCoords(null);
+      }
+      return;
+    }
 
     // Use requestAnimationFrame to throttle updates for smooth performance
     let rafId: number | null = null;
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
+    
+    // Store initial selection rectangle coordinates if not set
+    if (!selectionRectCoords) {
+      setSelectionRectCoords({
+        x1: selectionBox.startX,
+        y1: selectionBox.startY,
+        x2: selectionBox.currentX,
+        y2: selectionBox.currentY,
+      });
+    }
 
     const updateSelectionBox = () => {
       // Store pending update in a local variable to avoid race conditions
@@ -4721,6 +4775,26 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
+        
+        // Also update selection rectangle coordinates (Konva pattern) - update immediately
+        setSelectionRectCoords(prev => {
+          if (!prev) {
+            // Initialize if not set
+            return {
+              x1: selectionBox.startX,
+              y1: selectionBox.startY,
+              x2: canvasX,
+              y2: canvasY,
+            };
+          }
+          // Update x2, y2 with current mouse position
+          return {
+            x1: prev.x1,
+            y1: prev.y1,
+            x2: canvasX,
+            y2: canvasY,
+          };
+        });
 
         // Schedule update using requestAnimationFrame for smooth performance
         if (rafId === null) {
@@ -5192,12 +5266,22 @@ export const Canvas: React.FC<CanvasProps> = ({
                 height: Math.max(1, maxY - minY),
               });
               selectionDragOriginRef.current = { x: minX, y: minY };
+              // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+              setSelectionBox(null);
+              setIsDragSelection(true);
+            } else {
+              // If no valid tight rect could be computed, keep the selection box visible
+              // This ensures the user can see what they selected even if tight rect calculation fails
             }
+          } else {
+            // If no components were selected, clear the selection box
+            setSelectionBox(null);
+            setIsSelecting(false);
           }
-
-          // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+        } else {
+          // If selection box was too small (just a click), clear it
           setSelectionBox(null);
-          setIsDragSelection(true);
+          setIsSelecting(false);
         }
       }
 
@@ -5218,7 +5302,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         rafId = null;
       }
     };
-  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
+  }, [isSelecting, selectionBox, selectionRectCoords, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
 
   // Attach Transformer to selected nodes
   useEffect(() => {
@@ -5388,7 +5472,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     // 4. We're editing a group name (prevent deletion during editing)
     // 5. We are Panning (don't lose selection while moving canvas)
     // 6. We are Shift-Selecting (adding to selection)
-    if (clickedOnEmpty && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection) {
+    // 7. We are starting a selection (cursor tool or Shift + Left Click)
+    if (clickedOnEmpty && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
       // Click is on empty canvas - clear everything including selection boxes
       // But don't clear if it's a group - groups should persist
       clearAllSelections(true);
@@ -5480,20 +5565,33 @@ export const Canvas: React.FC<CanvasProps> = ({
     // If cursor tool is selected, prepare marquee selection but defer creating
     // the visible selection box until the pointer moves beyond a small threshold.
     if (isCursorTool && e.evt.button === 0) {
-      if (clickedOnEmpty) {
-        if (pointerPos) {
-          setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
-          setPendingSelectionStartCanvas({ x: (pointerPos.x - position.x) / scale, y: (pointerPos.y - position.y) / scale });
-          setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
-          setSelectionBox(null);
-          // Don't clear selection box if it's a group - groups persist
-          {
-            setSelectionTightRect(null);
-            setIsDragSelection(false);
-          }
-        }
+      // Do nothing if we mousedown on any shape (like in Konva example)
+      if (!clickedOnEmpty) {
         return;
       }
+      
+      if (pointerPos) {
+        // Initialize region selection rectangle (Konva pattern)
+        const canvasX = (pointerPos.x - position.x) / scale;
+        const canvasY = (pointerPos.y - position.y) / scale;
+        setSelectionRectCoords({
+          x1: canvasX,
+          y1: canvasY,
+          x2: canvasX,
+          y2: canvasY,
+        });
+        
+        setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
+        setPendingSelectionStartCanvas({ x: canvasX, y: canvasY });
+        setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
+        setSelectionBox(null);
+        // Don't clear selection box if it's a group - groups persist
+        {
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
+        }
+      }
+      return;
     }
 
     // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
@@ -5615,6 +5713,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           currentY: pendingSelectionStartCanvas.y,
         });
         setIsSelecting(true);
+        
+        // Update selection rectangle coordinates
+        setSelectionRectCoords({
+          x1: pendingSelectionStartCanvas.x,
+          y1: pendingSelectionStartCanvas.y,
+          x2: pendingSelectionStartCanvas.x,
+          y2: pendingSelectionStartCanvas.y,
+        });
 
         // Clear pending markers
         setPendingSelectionStartScreen(null);
@@ -5638,6 +5744,52 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, [pendingSelectionStartScreen, pendingSelectionStartCanvas, position.x, position.y, scale]);
 
+  // Update selection rectangle coordinates when selectionBox updates (sync with existing selection logic)
+  useEffect(() => {
+    if (selectionBox && selectionRectCoords) {
+      // Keep selectionRectCoords in sync with selectionBox
+      setSelectionRectCoords({
+        x1: selectionRectCoords.x1,
+        y1: selectionRectCoords.y1,
+        x2: selectionBox.currentX,
+        y2: selectionBox.currentY,
+      });
+    }
+  }, [selectionBox?.currentX, selectionBox?.currentY]);
+
+  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Selection rectangle is now updated via the useEffect that syncs with selectionBox
+    // This handler is kept for any other mousemove logic if needed
+  };
+
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // If we are selecting with rect, do nothing (like in Konva example)
+    if (selectionRectCoords) {
+      const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
+      const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+      if (rectWidth > 0 && rectHeight > 0) {
+        return; // Don't process click if selection rectangle was visible
+      }
+    }
+
+    const target = e.target;
+    const stage = target.getStage();
+    const clickedOnEmpty = target === stage ||
+      target.getClassName() === 'Stage' ||
+      target.getClassName() === 'Layer' ||
+      target.name() === 'background-rect' ||
+      (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
+
+    // If click on empty area - remove all selections
+    if (clickedOnEmpty) {
+      clearAllSelections();
+      return;
+    }
+
+    // The rest of click handling is done at component level (CanvasImage, etc.)
+    // This handler mainly prevents clicks when selection rectangle is visible
+  };
+
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     // Reset middle button state when mouse button is released
     if (e.evt.button === 1) {
@@ -5650,7 +5802,201 @@ export const Canvas: React.FC<CanvasProps> = ({
     const stage = e.target.getStage();
     const target = e.target;
 
-    // Check for intersection with generated selection box
+    // Handle region selection rectangle (Konva pattern)
+    // Process this BEFORE the existing selectionBox logic to ensure it works
+    if (selectionRectCoords) {
+      const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
+      const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+      
+      // Only process selection if rectangle has meaningful size (at least 5px to avoid accidental clicks)
+      if (rectWidth >= 5 && rectHeight >= 5) {
+        const selectionRect = {
+          x: Math.min(selectionRectCoords.x1, selectionRectCoords.x2),
+          y: Math.min(selectionRectCoords.y1, selectionRectCoords.y2),
+          width: rectWidth,
+          height: rectHeight,
+        };
+
+        const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+
+        // Initialize selection containers
+        const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
+        const newSelectedImageModalIds: string[] = isMultiSelect ? [...selectedImageModalIds] : [];
+        const newSelectedVideoModalIds: string[] = isMultiSelect ? [...selectedVideoModalIds] : [];
+        const newSelectedMusicModalIds: string[] = isMultiSelect ? [...selectedMusicModalIds] : [];
+        const newSelectedTextInputIds: string[] = isMultiSelect ? [...selectedTextInputIds] : [];
+        const newSelectedUpscaleModalIds: string[] = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+        const newSelectedRemoveBgModalIds: string[] = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
+        const newSelectedEraseModalIds: string[] = isMultiSelect ? [...selectedEraseModalIds] : [];
+        const newSelectedExpandModalIds: string[] = isMultiSelect ? [...selectedExpandModalIds] : [];
+        const newSelectedVectorizeModalIds: string[] = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+        const newSelectedStoryboardModalIds: string[] = isMultiSelect ? [...selectedStoryboardModalIds] : [];
+        const newSelectedScriptFrameModalIds: string[] = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
+        const newSelectedSceneFrameModalIds: string[] = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
+        const newSelectedCanvasTextIds: string[] = isMultiSelect ? [...(selectedCanvasTextIds || [])] : [];
+
+        // Helper to check intersection using Konva.Util.haveIntersection
+        // This checks if the selection rectangle intersects with the component's bounding box
+        const checkIntersection = (itemRect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
+          // Use getClientRect to handle rotation properly
+          const componentRect = getClientRect(itemRect);
+          // Check if selection rectangle intersects with component's bounding box
+          return Konva.Util.haveIntersection(selectionRect, componentRect);
+        };
+
+        // Find all selectable components and check intersection
+        // Images
+        images.forEach((img, idx) => {
+          if (img.type === 'image' || img.type === 'video') {
+            const dims = getComponentDimensions('image', idx);
+            if (checkIntersection({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height, rotation: img.rotation || 0 })) {
+              if (!newSelectedIndices.includes(idx)) newSelectedIndices.push(idx);
+            }
+          }
+        });
+
+        // Canvas Text Nodes
+        effectiveCanvasTextStates.forEach((textState) => {
+          const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
+          const height = textState.height || (textState.fontSize || 16) * 1.2;
+          if (checkIntersection({ x: textState.x, y: textState.y, width: estimatedWidth, height: height, rotation: textState.rotation || 0 })) {
+            if (!newSelectedCanvasTextIds.includes(textState.id)) newSelectedCanvasTextIds.push(textState.id);
+          }
+        });
+
+        // Text Input Overlays
+        textInputStates.forEach((text) => {
+          if (checkIntersection({ x: text.x, y: text.y, width: 600, height: 400 })) {
+            if (!newSelectedTextInputIds.includes(text.id)) newSelectedTextInputIds.push(text.id);
+          }
+        });
+
+        // Image Modals
+        imageModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('imageModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedImageModalIds.includes(modal.id)) newSelectedImageModalIds.push(modal.id);
+          }
+        });
+
+        // Video Modals
+        videoModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('videoModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedVideoModalIds.includes(modal.id)) newSelectedVideoModalIds.push(modal.id);
+          }
+        });
+
+        // Music Modals
+        musicModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('musicModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
+          }
+        });
+
+        // Upscale Modals
+        upscaleModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('upscaleModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
+          }
+        });
+
+        // Remove BG Modals
+        removeBgModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('removeBgModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
+          }
+        });
+
+        // Erase Modals
+        eraseModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('eraseModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
+          }
+        });
+
+        // Expand Modals
+        expandModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('expandModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
+          }
+        });
+
+        // Vectorize Modals
+        vectorizeModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('vectorizeModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
+          }
+        });
+
+        // Storyboard Modals
+        storyboardModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('storyboardModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
+          }
+        });
+
+        // Script Frame Modals
+        scriptFrameModalStates.forEach((modal) => {
+          if (checkIntersection({ x: modal.x, y: modal.y, width: modal.frameWidth, height: modal.frameHeight })) {
+            if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
+          }
+        });
+
+        // Scene Frame Modals
+        sceneFrameModalStates.forEach((modal) => {
+          if (checkIntersection({ x: modal.x, y: modal.y, width: modal.frameWidth, height: modal.frameHeight })) {
+            if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
+          }
+        });
+
+        // Apply selections
+        setSelectedImageIndices(newSelectedIndices);
+        if (newSelectedIndices.length > 0) {
+          setSelectedImageIndex(newSelectedIndices[0]);
+        }
+        setSelectedTextInputIds(newSelectedTextInputIds);
+        setSelectedImageModalIds(newSelectedImageModalIds);
+        setSelectedVideoModalIds(newSelectedVideoModalIds);
+        setSelectedMusicModalIds(newSelectedMusicModalIds);
+        setSelectedUpscaleModalIds(newSelectedUpscaleModalIds);
+        setSelectedRemoveBgModalIds(newSelectedRemoveBgModalIds);
+        setSelectedEraseModalIds(newSelectedEraseModalIds);
+        setSelectedExpandModalIds(newSelectedExpandModalIds);
+        setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
+        setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
+        setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
+        setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
+        setSelectedCanvasTextIds?.(newSelectedCanvasTextIds);
+        if (newSelectedCanvasTextIds.length > 0) {
+          setSelectedCanvasTextId?.(newSelectedCanvasTextIds[0]);
+        }
+        
+        // Hide selection rectangle after processing (with timeout like in example)
+        setTimeout(() => {
+          setSelectionRectCoords(null);
+        }, 0);
+        
+        // Clear selectionBox to prevent double processing
+        setSelectionBox(null);
+        setIsSelecting(false);
+        
+        // Return early to skip the existing selectionBox logic below
+        return;
+      } else {
+        // If rectangle was too small, just clear it
+        setSelectionRectCoords(null);
+      }
+    }
+
+    // Check for intersection with generated selection box (only if selectionRectCoords wasn't processed)
     if (selectionBox) {
       const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
       const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
@@ -5874,8 +6220,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         effectiveSetSelectedCanvasTextId(newSelectedCanvasTextIds.length > 0 ? newSelectedCanvasTextIds[0] : null);
       }
 
-      // Reset selection box
-      setSelectionBox(null);
+      // Don't clear selection box here - let the selection box mouse move handler compute tight rect first
+      // The selection box will be cleared after tight rect is computed in handleMouseUp of the selection box effect
       setIsSelecting(false);
     }
 
@@ -6413,7 +6759,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         y={position.y}
         draggable={isPanning}
         onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onClick={handleStageClick}
+        onTap={handleStageClick}
         onDragMove={handleStageDragMove}
         onDragEnd={handleStageDragEnd}
         style={{
@@ -6597,6 +6946,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistScriptFrameModalMove={handleScriptFrameModalMove}
             onPersistSceneFrameModalMove={handleSceneFrameModalMove}
           />
+          {/* Region selection rectangle (Konva pattern) */}
+          {selectionRectCoords && (
+            <Rect
+              ref={selectionRectangleRef}
+              x={Math.min(selectionRectCoords.x1, selectionRectCoords.x2)}
+              y={Math.min(selectionRectCoords.y1, selectionRectCoords.y2)}
+              width={Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1)}
+              height={Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1)}
+              fill="rgba(59,130,246,0.15)"
+              visible={true}
+              listening={false}
+            />
+          )}
           {/* Transformer for selected nodes - only for non-uploaded images */}
           {selectedImageIndices.length > 0 && (() => {
             // Check if any selected image is NOT uploaded (has resize enabled)
