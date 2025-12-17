@@ -26,6 +26,8 @@ interface TextModalFrameProps {
   connections?: Array<{ from: string; to: string }>;
   storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
   onHoverChange?: (hovered: boolean) => void;
+  onSendPrompt?: () => void;
+  hasConnectedComponents?: boolean;
 }
 
 export const TextModalFrame: React.FC<TextModalFrameProps> = ({
@@ -52,6 +54,8 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   connections = [],
   storyboardModalStates = [],
   onHoverChange,
+  onSendPrompt,
+  hasConnectedComponents = false,
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSettingHeightRef = useRef(false); // Flag to prevent ResizeObserver from firing during programmatic changes
@@ -171,127 +175,180 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         />
       </div>
 
-      <textarea
-        ref={inputRef}
-        value={text}
-        onChange={(e) => {
-          const v = e.target.value;
-          onTextChange(v);
+      <div style={{ position: 'relative', width: '100%' }}>
+        <textarea
+          ref={inputRef}
+          value={text}
+          onChange={(e) => {
+            const v = e.target.value;
+            onTextChange(v);
 
-          // Check for mention trigger
-          const cursor = e.target.selectionStart;
-          setCursorPosition(cursor);
+            // Check for mention trigger
+            const cursor = e.target.selectionStart;
+            setCursorPosition(cursor);
 
-          const textBeforeCursor = v.slice(0, cursor);
-          const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+            const textBeforeCursor = v.slice(0, cursor);
+            const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
 
-          if (lastAtSymbol !== -1) {
-            const query = textBeforeCursor.slice(lastAtSymbol + 1);
-            // Only show suggestions if there's no space after @ (or typing a name)
-            if (!query.includes(' ')) {
-              setMentionQuery(query);
+            if (lastAtSymbol !== -1) {
+              const query = textBeforeCursor.slice(lastAtSymbol + 1);
+              // Only show suggestions if there's no space after @ (or typing a name)
+              if (!query.includes(' ')) {
+                setMentionQuery(query);
 
-              // Find connected storyboards
-              const connectedStoryboardIds = connections
-                .filter(c => c.from === id || c.to === id)
-                .map(c => c.from === id ? c.to : c.from);
+                // Find connected storyboards
+                const connectedStoryboardIds = connections
+                  .filter(c => c.from === id || c.to === id)
+                  .map(c => c.from === id ? c.to : c.from);
 
-              const relevantStoryboards = storyboardModalStates.filter(s => connectedStoryboardIds.includes(s.id));
+                const relevantStoryboards = storyboardModalStates.filter(s => connectedStoryboardIds.includes(s.id));
 
-              // Collect all names
-              const allNames: string[] = [];
-              relevantStoryboards.forEach(s => {
-                if (s.characterNamesMap) {
-                  Object.values(s.characterNamesMap).forEach(name => {
-                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
-                      allNames.push(name);
-                    }
-                  });
+                // Collect all names
+                const allNames: string[] = [];
+                relevantStoryboards.forEach(s => {
+                  if (s.characterNamesMap) {
+                    Object.values(s.characterNamesMap).forEach(name => {
+                      if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                        allNames.push(name);
+                      }
+                    });
+                  }
+                  if (s.propsNamesMap) {
+                    Object.values(s.propsNamesMap).forEach(name => {
+                      if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                        allNames.push(name);
+                      }
+                    });
+                  }
+                  if (s.backgroundNamesMap) {
+                    Object.values(s.backgroundNamesMap).forEach(name => {
+                      if (name && name.toLowerCase().includes(query.toLowerCase())) {
+                        allNames.push(name);
+                      }
+                    });
+                  }
+                });
+
+                const uniqueNames = Array.from(new Set(allNames));
+
+                if (uniqueNames.length > 0) {
+                  setSuggestions(uniqueNames);
+                  setShowSuggestions(true);
+                  setSuggestionIndex(0);
+                } else {
+                  setShowSuggestions(false);
                 }
-                if (s.propsNamesMap) {
-                  Object.values(s.propsNamesMap).forEach(name => {
-                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
-                      allNames.push(name);
-                    }
-                  });
-                }
-                if (s.backgroundNamesMap) {
-                  Object.values(s.backgroundNamesMap).forEach(name => {
-                    if (name && name.toLowerCase().includes(query.toLowerCase())) {
-                      allNames.push(name);
-                    }
-                  });
-                }
-              });
-
-              const uniqueNames = Array.from(new Set(allNames));
-
-              if (uniqueNames.length > 0) {
-                setSuggestions(uniqueNames);
-                setShowSuggestions(true);
-                setSuggestionIndex(0);
               } else {
                 setShowSuggestions(false);
               }
             } else {
               setShowSuggestions(false);
             }
-          } else {
-            setShowSuggestions(false);
-          }
-        }}
-        onFocus={onTextFocus}
-        onBlur={() => {
-          onTextBlur();
-          // Delay hiding suggestions to allow click event
-          setTimeout(() => setShowSuggestions(false), 200);
-        }}
-        onKeyDown={(e) => {
-          if (showSuggestions) {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              setSuggestionIndex(prev => (prev + 1) % suggestions.length);
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-              e.preventDefault();
-              const selectedName = suggestions[suggestionIndex];
-              if (selectedName) {
-                const textBeforeCursor = text.slice(0, cursorPosition);
-                const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
-                const newText = text.slice(0, lastAtSymbol) + '@' + selectedName + ' ' + text.slice(cursorPosition);
-                onTextChange(newText);
+          }}
+          onFocus={onTextFocus}
+          onBlur={() => {
+            onTextBlur();
+            // Delay hiding suggestions to allow click event
+            setTimeout(() => setShowSuggestions(false), 200);
+          }}
+          onKeyDown={(e) => {
+            if (showSuggestions) {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSuggestionIndex(prev => (prev + 1) % suggestions.length);
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
+              } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const selectedName = suggestions[suggestionIndex];
+                if (selectedName) {
+                  const textBeforeCursor = text.slice(0, cursorPosition);
+                  const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+                  const newText = text.slice(0, lastAtSymbol) + '@' + selectedName + ' ' + text.slice(cursorPosition);
+                  onTextChange(newText);
+                  setShowSuggestions(false);
+                  // Need to update cursor position manually if possible, but React state update might make it tricky
+                }
+              } else if (e.key === 'Escape') {
                 setShowSuggestions(false);
-                // Need to update cursor position manually if possible, but React state update might make it tricky
               }
-            } else if (e.key === 'Escape') {
-              setShowSuggestions(false);
+            } else {
+              onKeyDown(e);
             }
-          } else {
-            onKeyDown(e);
-          }
-        }}
-        placeholder="Enter text here..."
-        onMouseDown={(e) => e.stopPropagation()}
-        style={{
-          background: inputBg,
-          border: `${1 * scale}px solid ${inputBorder}`,
-          borderRadius: `${8 * scale}px`,
-          padding: `${10 * scale}px`,
-          color: inputText,
-          fontSize: `${16 * scale}px`,
-          fontFamily: 'Arial, sans-serif',
-          outline: 'none',
-          resize: 'vertical',
-          minHeight: `${80 * scale}px`,
-          height: textareaHeight !== null ? `${textareaHeight * scale}px` : `${80 * scale}px`,
-          width: '100%',
-          boxSizing: 'border-box',
-          cursor: isTextFocused ? 'text' : 'default',
-          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
-        }}
-      />
+          }}
+          placeholder="Enter text here..."
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            background: inputBg,
+            border: `${1 * scale}px solid ${inputBorder}`,
+            borderRadius: `${8 * scale}px`,
+            padding: `${10 * scale}px`,
+            paddingRight: onSendPrompt ? `${40 * scale}px` : `${10 * scale}px`,
+            color: inputText,
+            fontSize: `${16 * scale}px`,
+            fontFamily: 'Arial, sans-serif',
+            outline: 'none',
+            resize: 'vertical',
+            minHeight: `${80 * scale}px`,
+            height: textareaHeight !== null ? `${textareaHeight * scale}px` : `${80 * scale}px`,
+            width: '100%',
+            boxSizing: 'border-box',
+            cursor: isTextFocused ? 'text' : 'default',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
+          }}
+        />
+        
+        {/* Right-facing arrow icon for sending prompt to connected components */}
+        {onSendPrompt && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (!text.trim() || !hasConnectedComponents) return;
+              onSendPrompt();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            title={hasConnectedComponents ? "Send prompt to connected components" : "No connected components"}
+            style={{
+              position: 'absolute',
+              right: `${8 * scale}px`,
+              top: `${8 * scale}px`,
+              width: `${24 * scale}px`,
+              height: `${24 * scale}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: `${6 * scale}px`,
+              color: isDark ? '#9ca3af' : '#6b7280',
+              cursor: (!text.trim() || !hasConnectedComponents) ? 'not-allowed' : 'pointer',
+              padding: 0,
+              opacity: (!text.trim() || !hasConnectedComponents) ? 0.4 : 1,
+              transition: 'color 0.2s ease, opacity 0.2s ease',
+              zIndex: 10,
+            }}
+            disabled={!text.trim() || !hasConnectedComponents}
+            onMouseEnter={(e) => {
+              if (text.trim() && hasConnectedComponents) {
+                (e.currentTarget as HTMLElement).style.color = isDark ? '#ffffff' : '#1f2937';
+              }
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = isDark ? '#9ca3af' : '#6b7280';
+            }}
+          >
+            <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" />
+              <path d="M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Suggestions Dropdown */}
       {showSuggestions && (

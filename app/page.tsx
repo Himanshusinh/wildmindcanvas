@@ -1624,6 +1624,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (tool === selectedTool) {
       setToolClickCounter(prev => prev + 1);
     }
+    
+    // Update previousToolRef when user manually selects a tool (unless Space is currently pressed)
+    // This ensures proper restoration when Space is released
+    // Note: We update for all tools, so if user manually selects 'move', then presses Space,
+    // when Space is released we restore to 'move' (the tool they manually selected)
+    if (!isSpacePressedRef.current) {
+      previousToolRef.current = tool;
+    }
+    
     setSelectedTool(tool);
     console.log('Selected tool:', tool);
 
@@ -1677,11 +1686,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
       isSpacePressedRef.current = true;
       
       // Save current tool (only if not already in move mode)
+      // This ensures we restore to the correct tool when Space is released
       const currentTool = selectedToolRef.current;
       if (currentTool !== 'move') {
         previousToolRef.current = currentTool;
         setSelectedTool('move');
       }
+      // If already in move mode, don't change anything (user might have manually selected move)
     };
     
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -2429,9 +2440,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   await appendOp({ type: 'create', elementId: modal.id, data: { element: { id: modal.id, type: 'text-generator', x: modal.x, y: modal.y, meta: { value: modal.value || '' } } }, inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any });
                 }
               }}
-              onPersistTextModalMove={async (id, updates) => {
+              onPersistTextModalMove={async (id, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string }>) => {
                 // Optimistic update with capture of previous state for correct inverse
-                let capturedPrev: { id: string; x: number; y: number; value?: string } | undefined = undefined;
+                let capturedPrev: { id: string; x: number; y: number; value?: string; sentValue?: string } | undefined = undefined;
                 setTextGenerators((prev) => {
                   const found = prev.find(t => t.id === id);
                   capturedPrev = found ? { ...found } : undefined;

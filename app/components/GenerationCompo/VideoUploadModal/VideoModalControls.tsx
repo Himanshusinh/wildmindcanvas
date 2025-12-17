@@ -199,7 +199,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               onGenerate();
             }
           }}
-          placeholder={isPromptDisabled ? "Connected to text input..." : "Enter prompt here..."}
+          placeholder="Enter prompt here..."
           disabled={isPromptDisabled}
           style={{
             flex: 1,

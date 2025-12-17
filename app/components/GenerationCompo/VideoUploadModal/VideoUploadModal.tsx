@@ -67,7 +67,7 @@ interface VideoUploadModalProps {
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: ImageUpload[];
-  textInputStates?: Array<{ id: string; value?: string }>;
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -143,11 +143,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     return textInput || null;
   }, [id, connections, textInputStates]);
 
-  // Use connected text as prompt if connected, otherwise use local prompt state
-  const effectivePrompt = connectedTextInput?.value || prompt;
-
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
   const onOptionsChangeRef = useRef(onOptionsChange);
   
   // Update ref when onOptionsChange changes
@@ -155,22 +153,29 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when connected text changes (only when value actually changes)
+  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
   useEffect(() => {
-    const currentValue = connectedTextInput?.value;
-    // Only update if the value actually changed
-    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentValue;
-      setPrompt(currentValue);
-      // Only call onOptionsChange if the prompt value actually changed
-      if (onOptionsChangeRef.current && currentValue !== prompt) {
-        onOptionsChangeRef.current({ prompt: currentValue });
+    const currentSentValue = connectedTextInput?.sentValue;
+    // Only update if the sentValue actually changed
+    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentSentValue;
+      lastReceivedSentValueRef.current = currentSentValue;
+      // Always update the prompt, replacing any existing value
+      setPrompt(currentSentValue);
+      // Always call onOptionsChange to persist the change
+      if (onOptionsChangeRef.current) {
+        onOptionsChangeRef.current({ prompt: currentSentValue });
       }
-    } else if (currentValue === undefined) {
-      // Reset ref when disconnected
+    } else if (currentSentValue === undefined && connectedTextInput === null) {
+      // Reset refs when disconnected
       prevConnectedTextValueRef.current = undefined;
+      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
+  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+
+  // Use local prompt for display - user can edit independently after receiving sentValue
+  // sentValue is only used to initially populate the prompt when arrow is clicked
+  const effectivePrompt = prompt;
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
@@ -553,7 +558,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isUploadedVideo={!!isUploadedVideo}
         isSelected={Boolean(isSelected)}
         prompt={effectivePrompt}
-        isPromptDisabled={!!connectedTextInput}
+        isPromptDisabled={false}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}

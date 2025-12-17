@@ -14,7 +14,7 @@ interface TextInputOverlaysProps {
   setSelectedTextInputId: (id: string | null) => void;
   onTextCreate?: (text: string, x: number, y: number) => void;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string }>) => void | Promise<void>;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -122,6 +122,13 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             setTextInputStates(prev => prev.map(t => t.id === textState.id ? { ...t, value: val } : t));
             if (onPersistTextModalMove) {
               Promise.resolve(onPersistTextModalMove(textState.id, { value: val })).catch(console.error);
+            }
+          }}
+          onSendPrompt={(sentText) => {
+            // Update sentValue when arrow is clicked - this triggers sync in connected components
+            setTextInputStates(prev => prev.map(t => t.id === textState.id ? { ...t, sentValue: sentText } : t));
+            if (onPersistTextModalMove) {
+              Promise.resolve(onPersistTextModalMove(textState.id, { sentValue: sentText })).catch(console.error);
             }
           }}
           stageRef={stageRef}

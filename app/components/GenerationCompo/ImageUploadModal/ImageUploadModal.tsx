@@ -50,7 +50,7 @@ interface ImageUploadModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
-  textInputStates?: Array<{ id: string; value?: string }>;
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
   sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
@@ -183,7 +183,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     : selectedAspectRatio;
 
   // Detect connected text input
-  const connectedTextInput = useMemo(() => {
+  const connectedTextInput = useMemo<{ id: string; value?: string; sentValue?: string } | null>(() => {
     if (!id || !connections || connections.length === 0) return null;
 
     // Find connection where this modal is the target (to === id)
@@ -192,20 +192,31 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     // First try to find a matching text input state
     const textInput = (textInputStates || []).find(t => t.id === connection.from);
-    if (textInput) return textInput;
+    if (textInput) {
+      return {
+        id: textInput.id,
+        value: textInput.value,
+        sentValue: 'sentValue' in textInput ? (textInput as any).sentValue : undefined
+      };
+    }
 
     // Next, try to find a matching scene frame and expose its content as a text input-like object
     const scene = (sceneFrameModalStates || []).find(s => s.id === connection.from);
-    if (scene) return { id: scene.id, value: scene.content };
+    if (scene) {
+      const sceneContent = scene.content || '';
+      return { 
+        id: scene.id, 
+        value: sceneContent, 
+        sentValue: sceneContent 
+      };
+    }
 
     return null;
   }, [id, connections, textInputStates, sceneFrameModalStates]);
 
-  // Use connected text as prompt if connected, otherwise use local prompt state
-  const effectivePrompt = connectedTextInput?.value || prompt;
-
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
   const onOptionsChangeRef = useRef(onOptionsChange);
 
   // Update ref when onOptionsChange changes
@@ -213,23 +224,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when connected text changes (only when value actually changes)
+  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
   useEffect(() => {
-    const currentValue = connectedTextInput?.value;
-    // Only update if the value actually changed
-    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentValue;
-      setPrompt(currentValue);
-      // Only call onOptionsChange if the prompt value actually changed
-      if (onOptionsChangeRef.current && currentValue !== prompt) {
-        const opts: any = { prompt: currentValue };
+    const currentSentValue = connectedTextInput?.sentValue;
+    // Only update if the sentValue actually changed
+    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentSentValue;
+      lastReceivedSentValueRef.current = currentSentValue;
+      // Always update the prompt, replacing any existing value
+      setPrompt(currentSentValue);
+      // Always call onOptionsChange to persist the change
+      if (onOptionsChangeRef.current) {
+        const opts: any = { prompt: currentSentValue };
         onOptionsChangeRef.current(opts);
       }
-    } else if (currentValue === undefined) {
-      // Reset ref when disconnected
+    } else if (currentSentValue === undefined && connectedTextInput === null) {
+      // Reset refs when disconnected
       prevConnectedTextValueRef.current = undefined;
+      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
+  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+
+  // Use local prompt for display - user can edit independently after receiving sentValue
+  // sentValue is only used to initially populate the prompt when arrow is clicked
+  const effectivePrompt = prompt;
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -1406,7 +1424,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             isUploadedImage={Boolean(isUploadedImage)}
             isSelected={Boolean(isSelected)}
             prompt={effectivePrompt}
-            isPromptDisabled={!!connectedTextInput}
+            isPromptDisabled={false}
             selectedModel={selectedModel}
             selectedAspectRatio={selectedAspectRatio}
             selectedFrame={selectedFrame}

@@ -6,6 +6,7 @@ export interface TextModalState {
   x: number;
   y: number;
   value?: string;
+  sentValue?: string; // Value sent to connected components (only updated when arrow is clicked)
   autoFocusInput?: boolean;
 }
 
@@ -436,7 +437,7 @@ export interface ModalOverlaysProps {
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   connections?: Connection[];
   onConnectionsChange?: (connections: Connection[]) => void;

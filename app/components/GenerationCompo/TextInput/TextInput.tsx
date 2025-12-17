@@ -21,6 +21,7 @@ interface TextInputProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onValueChange?: (value: string) => void;
+  onSendPrompt?: (text: string) => void;
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
@@ -43,6 +44,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   onDelete,
   onDuplicate,
   onValueChange,
+  onSendPrompt,
   stageRef,
   scale,
   position,
@@ -188,15 +190,15 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
 
     setIsEnhancing(true);
-    setEnhanceStatus('Preparing storyboard script...');
+    setEnhanceStatus('Enhancing prompt...');
     try {
       const { queryCanvasPrompt } = await import('@/lib/api');
       const result = await queryCanvasPrompt(text, undefined, {
         onAttempt: (attempt, maxAttempts) => {
           if (attempt === 1) {
-            setEnhanceStatus('Generating storyboard scenes...');
+            setEnhanceStatus('Enhancing prompt...');
           } else {
-            setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+            setEnhanceStatus(`Enhancing (${attempt}/${maxAttempts})...`);
           }
         },
       });
@@ -205,6 +207,12 @@ export const TextInput: React.FC<TextInputProps> = ({
         (typeof result?.response === 'string' && result.response.trim());
 
       if (enhancedText) {
+        // Update the text in the same input box
+        setText(enhancedText);
+        if (onValueChange) {
+          onValueChange(enhancedText);
+        }
+        // Also call onScriptGenerated for backwards compatibility
         if (onScriptGenerated) {
           onScriptGenerated(id, enhancedText);
         }
@@ -218,6 +226,20 @@ export const TextInput: React.FC<TextInputProps> = ({
     } finally {
       setIsEnhancing(false);
       setEnhanceStatus('');
+    }
+  };
+
+  // Find connected components (image/video modals)
+  const connectedComponents = connections.filter(c => c.from === id);
+  const hasConnectedComponents = connectedComponents.length > 0;
+
+  const handleSendPrompt = () => {
+    if (!text.trim() || !hasConnectedComponents) return;
+    
+    // Call onSendPrompt to update sentValue in the parent state
+    // This will trigger the useEffect in connected components to sync the prompt
+    if (onSendPrompt) {
+      onSendPrompt(text);
     }
   };
 
@@ -330,6 +352,8 @@ export const TextInput: React.FC<TextInputProps> = ({
           connections={connections}
           storyboardModalStates={storyboardModalStates}
           onHoverChange={requestHoverState}
+          onSendPrompt={handleSendPrompt}
+          hasConnectedComponents={hasConnectedComponents}
         />
 
         <TextModalNodes
@@ -361,6 +385,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}
         onEnhance={handleEnhance}
+        onSendPrompt={handleSendPrompt}
+        hasConnectedComponents={hasConnectedComponents}
       />
     </div>
   );
