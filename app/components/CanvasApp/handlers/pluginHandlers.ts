@@ -1,4 +1,5 @@
 import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
+import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -239,6 +240,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `upscale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'upscale',
+      operationName: 'Upscaling',
+      model: model || 'Crystal Upscaler',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
       const { upscaleImageForCanvas } = await import('@/lib/api');
@@ -250,12 +263,16 @@ export function createPluginHandlers(
       );
 
       console.log('[onUpscale] Upscale completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       // Extract URL from result - result should be the data object with url property
       const upscaledUrl = result?.url || (typeof result === 'string' ? result : null);
       console.log('[onUpscale] Extracted URL:', upscaledUrl);
       return upscaledUrl;
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -452,6 +469,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `removebg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'removebg',
+      operationName: 'Removing Background',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onRemoveBg] Starting remove bg:', { model, backgroundType, scaleValue, sourceImageUrl });
       const { removeBgImageForCanvas } = await import('@/lib/api');
@@ -464,9 +493,16 @@ export function createPluginHandlers(
       );
 
       console.log('[onRemoveBg] Remove bg completed:', result);
+      // Mark as completed instead of removing immediately
+      const completedAt = Date.now();
+      setters.setGenerationQueue((prev) =>
+        prev.map((item) => (item.id === queueId ? { ...item, completed: true, completedAt } : item))
+      );
       return result.url || null;
     } catch (error: any) {
       console.error('[onRemoveBg] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -619,6 +655,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `erase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'erase',
+      operationName: 'Erasing',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     // Mask is now optional - image is composited with white mask overlay
     // The composited image already contains the mask, so mask parameter is not required
     console.log('[onErase] Starting erase:', {
@@ -647,9 +695,13 @@ export function createPluginHandlers(
       );
 
       console.log('[onErase] Erase completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onErase] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -1072,6 +1124,18 @@ export function createPluginHandlers(
       throw new Error('Frame information is required for expand. Please ensure the image is positioned in the frame.');
     }
 
+    const queueId = `expand-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'expand',
+      operationName: 'Expanding',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     console.log('[onExpand] Starting expand:', {
       model,
       sourceImageUrl: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'null',
@@ -1095,9 +1159,13 @@ export function createPluginHandlers(
       );
 
       console.log('[onExpand] Expand completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onExpand] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -1429,6 +1497,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `vectorize-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'vectorize',
+      operationName: 'Vectorizing',
+      model: mode || 'simple',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onVectorize] Starting vectorize:', { sourceImageUrl, mode });
       const { vectorizeImageForCanvas } = await import('@/lib/api');
@@ -1439,9 +1519,13 @@ export function createPluginHandlers(
       );
 
       console.log('[onVectorize] Vectorize completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onVectorize] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };

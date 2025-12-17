@@ -1557,14 +1557,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          // Calculate frame dimensions based on selected aspect ratio to ensure correct frame size
-          // This prevents the frame from changing when image is generated (e.g., 1:1 stays 1:1, not 16:9)
+          // If an image already exists, use existing frame dimensions to prevent visual frame size change
+          // If no image exists, calculate from selected aspect ratio
           width={(() => {
-            // Always calculate from selected aspect ratio, not from props which might be stale
-            return 600; // Fixed width
+            // If image exists, keep existing frame width; otherwise calculate from aspect ratio
+            if (generatedImageUrl && frameWidth) {
+              return frameWidth; // Keep existing frame width when image is present
+            }
+            return 600; // Fixed width for new frames
           })()}
           height={(() => {
-            // Always calculate from selected aspect ratio, not from props which might be stale
+            // If image exists, keep existing frame height; otherwise calculate from aspect ratio
+            if (generatedImageUrl && frameHeight) {
+              return frameHeight; // Keep existing frame height when image is present
+            }
+            // Calculate from selected aspect ratio for new frames
             const [w, h] = selectedAspectRatio.split(':').map(Number);
             const ar = w && h ? (w / h) : 1;
             const rawHeight = ar ? Math.round(600 / ar) : 600;
@@ -1720,16 +1727,38 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               setSelectedAspectRatio(ratio);
               setIsAspectRatioDropdownOpen(false);
               if (onOptionsChange) {
-                const [w, h] = ratio.split(':').map(Number);
-                const frameWidth = 600;
-                const ar = w && h ? (w / h) : 1;
-                const rawHeight = Math.round(frameWidth / ar);
-                const frameHeight = Math.max(400, rawHeight);
-                const opts: any = { model: selectedModel, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
-                if (!generatedImageUrl) {
-                  opts.aspectRatio = ratio;
+                // If an image already exists, don't change frame dimensions
+                // The aspect ratio change should only affect the next generation (image-to-image)
+                if (generatedImageUrl) {
+                  // Keep existing frame dimensions, only update aspect ratio for next generation
+                  const opts: any = { 
+                    model: selectedModel, 
+                    frame: selectedFrame, 
+                    prompt, 
+                    aspectRatio: ratio, // Update aspect ratio for next generation
+                    frameWidth: frameWidth, // Keep existing frame width
+                    frameHeight: frameHeight, // Keep existing frame height
+                    imageCount 
+                  };
+                  onOptionsChange(opts);
+                } else {
+                  // No image exists yet - calculate new frame dimensions based on aspect ratio
+                  const [w, h] = ratio.split(':').map(Number);
+                  const calculatedFrameWidth = 600;
+                  const ar = w && h ? (w / h) : 1;
+                  const rawHeight = Math.round(calculatedFrameWidth / ar);
+                  const calculatedFrameHeight = Math.max(400, rawHeight);
+                  const opts: any = { 
+                    model: selectedModel, 
+                    frame: selectedFrame, 
+                    prompt, 
+                    aspectRatio: ratio,
+                    frameWidth: calculatedFrameWidth, 
+                    frameHeight: calculatedFrameHeight, 
+                    imageCount 
+                  };
+                  onOptionsChange(opts);
                 }
-                onOptionsChange(opts);
               }
             }}
             onImageCountChange={(count) => {

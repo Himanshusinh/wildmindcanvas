@@ -2021,6 +2021,20 @@ export function CanvasApp({ user }: CanvasAppProps) {
       return { generationId: undefined, taskId: undefined };
     }
 
+    // Add to generation queue
+    const queueId = `video-${modalId || 'video'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'video',
+      operationName: 'Generating Video',
+      prompt: prompt.trim(),
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
 
@@ -2038,6 +2052,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
       console.log('Video generation started:', result);
 
+      // Keep in queue - will be removed when video generation completes (handled by polling in VideoModalOverlays)
+      // The queue item will remain visible until completion
+
       // Return provider info so frontend knows which service to poll
       return {
         generationId: result.generationId,
@@ -2046,6 +2063,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
       };
     } catch (error: any) {
       console.error('Error generating video:', error);
+      // Remove from queue on error
+      setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       alert(error.message || 'Failed to generate video. Please try again.');
       return { generationId: undefined, taskId: undefined };
     }

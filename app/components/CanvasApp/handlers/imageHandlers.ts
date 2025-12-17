@@ -259,6 +259,8 @@ export function createImageHandlers(
     const baseId = `${modalId || 'image'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const jobEntries: any[] = Array.from({ length: queuedCount }, (_, idx) => ({
       id: `${baseId}-${idx}`,
+      type: 'image' as const,
+      operationName: 'Generating Image',
       prompt: (prompt || '').trim() || 'Untitled prompt',
       model,
       total: queuedCount,
@@ -346,6 +348,11 @@ export function createImageHandlers(
       );
 
       console.log('Image generated successfully:', result);
+      
+      // Remove queue items immediately after generation completes
+      const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
+      setters.setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+
       // Return URL(s) for generator overlay
       // Always return images array if present (even for single image when imageCount > 1)
       if (result.images && Array.isArray(result.images) && result.images.length > 0) {
@@ -358,11 +365,11 @@ export function createImageHandlers(
       return { url: result.url };
     } catch (error: any) {
       console.error('Error generating image:', error);
-      alert(error.message || 'Failed to generate image. Please try again.');
-      throw error; // Re-throw to let the modal handle the error display
-    } finally {
+      // Remove from queue on error
       const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
       setters.setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+      alert(error.message || 'Failed to generate image. Please try again.');
+      throw error; // Re-throw to let the modal handle the error display
     }
   };
 
