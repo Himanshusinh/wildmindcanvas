@@ -3493,6 +3493,18 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (!stage) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // If middle button is pressed, treat wheel as panning, not zooming
+      if (isMiddleButtonPressed) {
+        e.preventDefault();
+        // Pan the canvas when middle button is held and scrolling
+        setPosition(prev => {
+          const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+          setTimeout(() => updateViewportCenter(newPos, scale), 0);
+          return newPos;
+        });
+        return;
+      }
+
       e.preventDefault();
 
       const stage = stageRef.current;
@@ -3556,6 +3568,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [isTextInteracting, setIsTextInteracting] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [isMiddleButtonPressed, setIsMiddleButtonPressed] = useState(false);
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
   // Selection box state (marquee)
@@ -3573,6 +3586,20 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [transformerUpdateKey, setTransformerUpdateKey] = useState(0);
   // Track real-time position of selected image during drag
   const [selectedImageRealTimePosition, setSelectedImageRealTimePosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Track middle button state globally to prevent zoom when scrolling while holding middle button
+  useEffect(() => {
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        setIsMiddleButtonPressed(false);
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp, true);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp, true);
+    };
+  }, []);
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
@@ -5488,6 +5515,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (shouldPan) {
       const stage = e.target.getStage();
       if (stage) {
+        // Track middle button state - prevent zoom when scrolling while holding middle button
+        if (e.evt.button === 1) {
+          setIsMiddleButtonPressed(true);
+          // Prevent default middle button behavior (browser back/forward, auto-scroll)
+          e.evt.preventDefault();
+          e.evt.stopPropagation();
+        }
         setIsPanning(true);
         stage.draggable(true);
         applyStageCursorWrapper('grabbing', true);
@@ -5605,6 +5639,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   }, [pendingSelectionStartScreen, pendingSelectionStartCanvas, position.x, position.y, scale]);
 
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Reset middle button state when mouse button is released
+    if (e.evt.button === 1) {
+      setIsMiddleButtonPressed(false);
+      // Prevent default browser behavior (navigation)
+      e.evt.preventDefault();
+      e.evt.stopPropagation();
+    }
+    
     const stage = e.target.getStage();
     const target = e.target;
 
@@ -5919,6 +5961,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       setPosition(newPos);
       updateViewportCenter(newPos, scale);
     }
+    
+    // Reset panning state
+    setIsPanning(false);
   };
 
   // Calculate and expose viewport center
