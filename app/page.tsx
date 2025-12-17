@@ -83,6 +83,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
   const [isVideoEditorOpen, setIsVideoEditorOpen] = useState(false);
 
+  // Clear all state when project changes (new project or switching projects)
+  useEffect(() => {
+    if (projectId) {
+      // Reset all state to empty when project changes
+      console.log('[Project] Clearing state for new project:', projectId);
+      setImages([]);
+      setImageGenerators([]);
+      setVideoGenerators([]);
+      setVideoEditorGenerators([]);
+      setMusicGenerators([]);
+      setUpscaleGenerators([]);
+      setCompareGenerators([]);
+      setRemoveBgGenerators([]);
+      setEraseGenerators([]);
+      setExpandGenerators([]);
+      setVectorizeGenerators([]);
+      setNextSceneGenerators([]);
+      setStoryboardGenerators([]);
+      setScriptFrameGenerators([]);
+      setSceneFrameGenerators([]);
+      setCanvasTextStates([]);
+      setSelectedCanvasTextId(null);
+      setGenerationQueue([]);
+      setTextGenerators([]);
+      setRefImages({});
+      setConnectors([]);
+      snapshotLoadedRef.current = false;
+      // Reset viewport to center
+      viewportCenterRef.current = {
+        x: 500000,
+        y: 500000,
+        scale: 1,
+      };
+    }
+  }, [projectId]); // Only run when projectId changes
 
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
     viewportCenterRef.current = { x: center.x, y: center.y, scale };
