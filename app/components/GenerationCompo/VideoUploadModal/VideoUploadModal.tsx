@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/app/components/common/canvasCaptureGuard';
 import { VideoModalTooltip } from './VideoModalTooltip';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
@@ -58,7 +58,7 @@ interface VideoUploadModalProps {
   onAddToCanvas?: (url: string) => void;
   isSelected?: boolean;
   initialModel?: string;
-  initialFrame?: string;
+  initialFrame?: string; 
   initialAspectRatio?: string;
   initialPrompt?: string;
   initialDuration?: number;

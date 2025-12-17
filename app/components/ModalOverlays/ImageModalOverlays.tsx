@@ -457,27 +457,32 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                       : [];
 
                   // CRITICAL: Update the TARGET frame (which may be a new frame), not the current frame
+                  // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
+                  // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
+                  const [w, h] = aspectRatio.split(':').map(Number);
+                  const frameWidth = 600;
+                  const ar = w && h ? (w / h) : 1;
+                  const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
+                  const frameHeight = Math.max(400, rawHeight);
+                  
                   setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
                     ...m,
                     generatedImageUrl: imageUrls[0] || null,
                     generatedImageUrls: imageUrls,
                     isGenerating: false,
+                    aspectRatio, // Preserve aspect ratio
+                    frameWidth, // Update frame dimensions based on aspect ratio
+                    frameHeight, // Update frame dimensions based on aspect ratio
                   } : m));
                   if (onPersistImageModalMove) {
-                    // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
-                    const [w, h] = aspectRatio.split(':').map(Number);
-                    const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 1;
-                    const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
-                    const frameHeight = Math.max(400, rawHeight);
                     Promise.resolve(onPersistImageModalMove(targetFrameId, {
                       generatedImageUrl: imageUrls[0] || null,
                       generatedImageUrls: imageUrls,
                       model,
                       frame,
-                      aspectRatio,
-                      frameWidth,
-                      frameHeight,
+                      aspectRatio, // Preserve aspect ratio
+                      frameWidth, // Use calculated dimensions based on aspect ratio
+                      frameHeight, // Use calculated dimensions based on aspect ratio
                       prompt,
                       isGenerating: false,
                     } as any)).catch(console.error);

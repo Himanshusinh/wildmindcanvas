@@ -467,7 +467,9 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                   transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
                 }}
               >
-                <span>{selectedResolution}</span>
+                <span>
+                  {availableResolutions.find(r => r.value === selectedResolution)?.label || selectedResolution}
+                </span>
                 <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isResolutionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -498,7 +500,10 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                       key={resolution.value}
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
+                        // Change resolution immediately
                         onResolutionChange(resolution.value);
+                        // Close dropdown after state update
                         onSetIsResolutionDropdownOpen(false);
                       }}
                       style={{

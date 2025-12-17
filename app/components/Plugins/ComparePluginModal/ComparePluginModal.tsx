@@ -114,7 +114,9 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
         'Flux Pro 1.1',
         'Seedream v4 4K',
         'Runway Gen4 Image',
-        'Runway Gen4 Image Turbo'
+        'Runway Gen4 Image Turbo',
+        'Z Image Turbo',
+        'P-Image'
     ];
 
     // Helper to map display names to backend IDs
@@ -124,6 +126,14 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
         // Known mappings
         if (displayName === 'Runway Gen4 Image Turbo') return 'runway-gen4-turbo';
         if (displayName === 'Runway Gen4 Image') return 'runway-gen4-image';
+
+        // Z Image Turbo and P-Image - map to their canonical names (backend handles these)
+        if (lower.includes('z image turbo') || lower.includes('z-image-turbo')) {
+            return 'Z Image Turbo';
+        }
+        if (lower.includes('p-image') && !lower.includes('p-image-edit')) {
+            return 'P-Image';
+        }
 
         // Match ImageModalControls behavior: append default resolution (2K) for models that require it
         // This ensures backend receives the expected format (e.g. "Flux 2 Pro 2K")
