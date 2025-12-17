@@ -492,10 +492,10 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
             zIndex: 20,
           }}
         >
-          {/* Use Vector icon for now or placeholder */}
+          {/* Next Scene icon */}
           <img
-            src="/icons/vector.svg"
-            alt="NextScene"
+            src="/icons/film-editing.svg"
+            alt="Next Scene"
             style={{
               width: `${40 * scale}px`,
               height: `${40 * scale}px`,

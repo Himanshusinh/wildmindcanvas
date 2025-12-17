@@ -34,7 +34,7 @@ export const NextSceneLabel: React.FC<NextSceneLabelProps> = ({
       }}
     >
       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-        <span>Vectorize</span>
+        <span>Next Scene</span>
         {imageResolution && (
           <span style={{ marginLeft: 'auto', opacity: 0.7, fontWeight: '500' }}>
             {imageResolution.width} × {imageResolution.height}

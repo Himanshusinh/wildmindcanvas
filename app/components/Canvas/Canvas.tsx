@@ -2670,6 +2670,30 @@ export const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalStoryboardModals || [])]);
 
+  // Hydrate next scene modals from external or localStorage
+  useEffect(() => {
+    // If externalNextSceneModals is provided (even if empty), sync to it immediately
+    if (externalNextSceneModals !== undefined) {
+      console.log('[Canvas] Syncing nextSceneModalStates with externalNextSceneModals', externalNextSceneModals.length);
+      setNextSceneModalStates(externalNextSceneModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:nextSceneModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
+        if (Array.isArray(parsed)) {
+          setNextSceneModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('[Canvas] Failed to load persisted next scene modals', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalNextSceneModals || [])]);
+
   // Also sync externalStoryboardModals changes to internal state (for real-time updates)
   useEffect(() => {
     // Handle empty array - clear state immediately
@@ -6206,6 +6230,43 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setCompareModalStates(prev => [...prev, newCompare]);
               Promise.resolve(onPersistCompareModalCreate(newCompare)).catch(console.error);
+            } else if (data.plugin.id === 'next-scene' && onPersistNextSceneModalCreate) {
+              const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newNextScene = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                nextSceneImageUrl: null,
+                sourceImageUrl: null,
+                localNextSceneImageUrl: null,
+                mode: 'scene',
+                frameWidth: 400,
+                frameHeight: 500,
+                isProcessing: false,
+              };
+              setNextSceneModalStates(prev => [...prev, newNextScene]);
+              Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
+            } else if (data.plugin.id === 'storyboard' && onPersistStoryboardModalCreate) {
+              const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newStoryboard = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                frameWidth: 400,
+                frameHeight: 500,
+                scriptText: null,
+              };
+              setStoryboardModalStates(prev => [...prev, newStoryboard]);
+              Promise.resolve(onPersistStoryboardModalCreate(newStoryboard)).catch(console.error);
+            } else if (data.plugin.id === 'video-editor' && onPersistVideoEditorModalCreate) {
+              const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newVideoEditor = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+              };
+              setVideoEditorModalStates(prev => [...prev, newVideoEditor]);
+              Promise.resolve(onPersistVideoEditorModalCreate(newVideoEditor)).catch(console.error);
             }
             return;
           }
