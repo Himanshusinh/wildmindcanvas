@@ -1601,6 +1601,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
+  const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
+  const isSpacePressedRef = useRef(false);
+  const selectedToolRef = useRef(selectedTool);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedToolRef.current = selectedTool;
+  }, [selectedTool]);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
@@ -1644,6 +1652,79 @@ export function CanvasApp({ user }: CanvasAppProps) {
       setIsPluginSidebarOpen(true);
     }
   };
+
+  // Space key hold for temporary move mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle Space key
+      if (e.code !== 'Space' && e.key !== ' ') return;
+      
+      // Don't activate if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      const isContentEditable = target?.hasAttribute('contenteditable') || target?.getAttribute('contenteditable') === 'true';
+      
+      if (isInputElement || isContentEditable) {
+        return; // Let Space work normally in inputs
+      }
+      
+      // Prevent default browser behavior (scrolling)
+      e.preventDefault();
+      
+      // If Space is already pressed, ignore
+      if (isSpacePressedRef.current) return;
+      
+      isSpacePressedRef.current = true;
+      
+      // Save current tool (only if not already in move mode)
+      const currentTool = selectedToolRef.current;
+      if (currentTool !== 'move') {
+        previousToolRef.current = currentTool;
+        setSelectedTool('move');
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Only handle Space key
+      if (e.code !== 'Space' && e.key !== ' ') return;
+      
+      // Don't interfere if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+      const isContentEditable = target?.hasAttribute('contenteditable') || target?.getAttribute('contenteditable') === 'true';
+      
+      if (isInputElement || isContentEditable) {
+        return; // Let Space work normally in inputs
+      }
+      
+      // Prevent default browser behavior
+      e.preventDefault();
+      
+      // If Space was pressed, restore previous tool
+      if (isSpacePressedRef.current) {
+        isSpacePressedRef.current = false;
+        // Only restore if we're currently in move mode (to avoid overriding manual tool selection)
+        const currentTool = selectedToolRef.current;
+        if (currentTool === 'move') {
+          setSelectedTool(previousToolRef.current);
+        }
+      }
+    };
+    
+    // Use capture phase to catch events early
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    window.addEventListener('keyup', handleKeyUp, { capture: true });
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
+      window.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
+      
+      // Cleanup: if Space was held when component unmounts, restore tool
+      if (isSpacePressedRef.current && selectedToolRef.current === 'move') {
+        setSelectedTool(previousToolRef.current);
+      }
+    };
+  }, []); // Empty deps - we use refs to avoid stale closures
 
 
   const handleToolbarUpload = (files: File[]) => {
