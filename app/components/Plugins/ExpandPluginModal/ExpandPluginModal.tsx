@@ -6,10 +6,10 @@ import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { ExpandButton } from './ExpandButton';
 import { ExpandImageFrame } from './ExpandImageFrame';
 import { ExpandControls } from './ExpandControls';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ExpandPluginModalProps {
@@ -562,7 +562,7 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}

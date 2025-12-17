@@ -27,8 +27,6 @@ interface ComponentCreationMenuProps {
   setVectorizeModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   setNextSceneModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
-  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
-  setMultiangleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setStoryboardModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
@@ -57,8 +55,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setVectorizeModalStates,
   onPersistNextSceneModalCreate,
   setNextSceneModalStates,
-  onPersistMultiangleModalCreate,
-  setMultiangleModalStates,
   onPersistStoryboardModalCreate,
   setStoryboardModalStates,
   onPersistConnectorCreate,
@@ -111,7 +107,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
     { id: 'vectorize-plugin', label: 'Vectorize Plugin', type: 'plugin' },
     { id: 'next-scene-plugin', label: 'Next Scene Plugin', type: 'plugin' },
-    { id: 'multiangle-plugin', label: 'Multiangle Plugin', type: 'plugin' },
     { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
 
@@ -411,21 +406,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setNextSceneModalStates(prev => [...prev, newNextScene]);
                 Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
-              } else if (comp.id === 'multiangle-plugin' && comp.type === 'plugin' && onPersistMultiangleModalCreate && setMultiangleModalStates) {
-                newComponentId = `multiangle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const newMultiangle = {
-                  id: newComponentId,
-                  x: canvasX,
-                  y: canvasY,
-                  multiangleImageUrl: null,
-                  sourceImageUrl: null,
-                  localMultiangleImageUrl: null,
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isProcessing: false,
-                };
-                setMultiangleModalStates(prev => [...prev, newMultiangle]);
-                Promise.resolve(onPersistMultiangleModalCreate(newMultiangle)).catch(console.error);
               } else if (comp.id === 'storyboard-plugin' && comp.type === 'plugin' && onPersistStoryboardModalCreate && setStoryboardModalStates) {
                 newComponentId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 const newStoryboard = {

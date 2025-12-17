@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { SceneFrame } from '@/app/components/Plugins/StoryboardPluginModal/SceneFrame';
-import { ConnectionNodes } from '@/app/components/Plugins/UpscalePluginModal/ConnectionNodes';
+import { PluginConnectionNodes } from '@/app/components/Plugins/PluginComponents';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 
 interface SceneFrameModalState {
@@ -319,7 +319,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     pointerEvents: 'auto',
                 }}
             >
-                <ConnectionNodes
+                <PluginConnectionNodes
                     id={frame.id}
                     scale={scale}
                     isHovered={isHovered}

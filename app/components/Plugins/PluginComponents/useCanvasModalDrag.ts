@@ -158,6 +158,8 @@ export function useCanvasModalDrag({
     (e: React.PointerEvent) => {
       if (!enabled) return;
       if (e.button !== 0) return; // left click only
+      // Avoid double-start when both pointer+mouse events fire
+      if (activePointerIdRef.current != null) return;
 
       const target = e.target as Element | null;
       const ignore = shouldIgnoreTargetRef.current?.(target) ?? false;
@@ -189,8 +191,13 @@ export function useCanvasModalDrag({
       } catch {}
 
       // Capture pointer so we keep receiving move/up events
+      // Try to capture on the target element (where the event originated) if it supports it
+      // This works even if containerRef has pointerEvents: 'none'
       try {
-        if (typeof (el as any).setPointerCapture === 'function') {
+        const targetEl = e.target as HTMLElement;
+        if (targetEl && typeof (targetEl as any).setPointerCapture === 'function') {
+          (targetEl as any).setPointerCapture(e.pointerId);
+        } else if (typeof (el as any).setPointerCapture === 'function') {
           (el as any).setPointerCapture(e.pointerId);
         }
       } catch {}
@@ -242,6 +249,8 @@ export function useCanvasModalDrag({
     (e: React.MouseEvent) => {
       if (!enabled) return;
       if (e.button !== 0) return; // left click only
+      // Avoid double-start when both pointer+mouse events fire
+      if (activePointerIdRef.current != null) return;
 
       const target = e.target as Element | null;
       const ignore = shouldIgnoreTargetRef.current?.(target) ?? false;

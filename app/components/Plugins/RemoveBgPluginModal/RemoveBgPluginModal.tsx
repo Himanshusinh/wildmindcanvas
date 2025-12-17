@@ -6,10 +6,10 @@ import { RemoveBgLabel } from './RemoveBgLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { RemoveBgControls } from './RemoveBgControls';
 import { RemoveBgImageFrame } from './RemoveBgImageFrame';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface RemoveBgPluginModalProps {
@@ -408,7 +408,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}

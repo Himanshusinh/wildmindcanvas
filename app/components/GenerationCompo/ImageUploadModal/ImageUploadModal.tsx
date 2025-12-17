@@ -265,7 +265,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
   // Priority: Explicit model check first, then fallback detection
   // Priority: Explicit model check first, then fallback detection
-  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
+  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
   const isCompareResult = initialFrame === 'Compare' || selectedFrame === 'Compare';
   const isUploadedImage =
     initialModel === 'Library Image' ||

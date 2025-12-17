@@ -6,10 +6,10 @@ import { VectorizeLabel } from './VectorizeLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizePluginModalProps {
@@ -408,7 +408,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}

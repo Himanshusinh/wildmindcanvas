@@ -51,8 +51,7 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
 }) => {
   const isDark = useIsDarkTheme();
 
-  // Base values (similar to MultiangleControls)
-  // We largely ignore scale for internal UI elements to match MultiangleControls fixed look
+  // Base values for fixed-width UI elements
   const basePadding = 16;
   const computedTopPadding = Math.max(basePadding, (extraTopPadding ? extraTopPadding / scale : basePadding));
   const topRadius = 16; // Fixed radius
@@ -74,7 +73,7 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
       className="controls-overlay"
       style={{
         position: 'relative',
-        width: '400px', // Fixed width to match MultiangleControls
+        width: '400px', // Fixed width
         maxWidth: '90vw',
         backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',

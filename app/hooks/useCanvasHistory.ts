@@ -20,7 +20,6 @@ export interface CanvasHistoryState {
     expandModalStates: any[];
     vectorizeModalStates: any[];
     nextSceneModalStates: any[];
-    multiangleModalStates: any[];
     videoEditorModalStates: any[];
 }
 

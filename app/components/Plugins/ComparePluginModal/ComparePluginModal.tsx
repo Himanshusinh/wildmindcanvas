@@ -3,10 +3,10 @@ import { GitCompare, Trash2, X, Check } from 'lucide-react';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { generateImageForCanvas } from '@/lib/api';
-import { ConnectionNodes } from './ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 
 interface ComparePluginModalProps {
     id: string;
@@ -62,7 +62,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     const [isHovered, setIsHovered] = useState(false);
     const { isPopupOpen, setIsPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
     const containerRef = useRef<HTMLDivElement>(null);
-    const { onMouseDown: handleMouseDown } = useCanvasModalDrag({
+    const { onMouseDown: handleMouseDown, onPointerDown: handlePointerDown } = useCanvasModalDrag({
         enabled: isOpen,
         x,
         y,
@@ -281,18 +281,19 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
             isHovered={isHovered}
             isSelected={Boolean(isSelected)}
             onMouseDown={handleMouseDown}
+            onPointerDown={handlePointerDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             className="flex flex-col items-center"
             style={{
                 zIndex: isSelected || isPopupOpen ? 100 : 10,
-                transform: 'translate(-50%, -50%)',
                 pointerEvents: 'none',
             }}
         >
             {/* Plugin Node (Clickable) */}
             <div
                 onMouseDown={handleMouseDown}
+                onPointerDown={handlePointerDown}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 style={{
@@ -347,7 +348,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                     />
 
                     {/* Add Connection Nodes for visual anchors */}
-                    <ConnectionNodes
+                    <PluginConnectionNodes
                         id={id}
                         scale={scale}
                         isHovered={isHovered}

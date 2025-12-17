@@ -12,7 +12,7 @@ const ARRANGE_ANIMATION_DURATION = 420;
 const BUTTON_OVERFLOW_PADDING = 72;
 
 interface SelectedComponent {
-  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'multiangleModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
   id: number | string;
   key: string;
   width: number;
@@ -64,7 +64,6 @@ interface SelectionBoxProps {
   selectedEraseModalIds: string[];
   selectedExpandModalIds: string[];
   selectedVectorizeModalIds: string[];
-  selectedMultiangleModalIds: string[];
   selectedStoryboardModalIds: string[];
   selectedScriptFrameModalIds: string[];
   selectedSceneFrameModalIds: string[];
@@ -73,7 +72,6 @@ interface SelectionBoxProps {
   eraseModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   vectorizeModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  multiangleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   storyboardModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   scriptFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
   sceneFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
@@ -82,7 +80,6 @@ interface SelectionBoxProps {
   setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setVectorizeModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setMultiangleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setStoryboardModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setScriptFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
   setSceneFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
@@ -91,7 +88,6 @@ interface SelectionBoxProps {
   setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVectorizeModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedMultiangleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedStoryboardModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedScriptFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedSceneFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -100,7 +96,6 @@ interface SelectionBoxProps {
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
-  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistSceneFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;

@@ -152,17 +152,6 @@ export interface CompareGenerator {
   model?: string;
 }
 
-export interface MultiangleGenerator {
-  id: string;
-  x: number;
-  y: number;
-  multiangleImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localMultiangleImageUrl?: string | null;
-  frameWidth?: number;
-  frameHeight?: number;
-  isProcessing?: boolean;
-}
 
 export interface StoryboardGenerator {
   id: string;
@@ -243,7 +232,6 @@ export interface CanvasAppState {
   vectorizeGenerators: VectorizeGenerator[];
   compareGenerators: CompareGenerator[];
   nextSceneGenerators: NextSceneGenerator[];
-  multiangleGenerators: MultiangleGenerator[];
   storyboardGenerators: StoryboardGenerator[];
   scriptFrameGenerators: ScriptFrameGenerator[];
   sceneFrameGenerators: SceneFrameGenerator[];
@@ -266,7 +254,6 @@ export interface CanvasAppSetters {
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
   setCompareGenerators: React.Dispatch<React.SetStateAction<CompareGenerator[]>>;
   setNextSceneGenerators: React.Dispatch<React.SetStateAction<NextSceneGenerator[]>>;
-  setMultiangleGenerators: React.Dispatch<React.SetStateAction<MultiangleGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;
   setScriptFrameGenerators: React.Dispatch<React.SetStateAction<ScriptFrameGenerator[]>>;
   setSceneFrameGenerators: React.Dispatch<React.SetStateAction<SceneFrameGenerator[]>>;

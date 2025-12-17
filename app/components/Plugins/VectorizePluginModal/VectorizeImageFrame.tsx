@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizeImageFrameProps {
@@ -110,7 +110,7 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
         </div>
       )}
 
-      <ConnectionNodes
+      <PluginConnectionNodes
         id={id}
         scale={scale}
         isHovered={isHovered}

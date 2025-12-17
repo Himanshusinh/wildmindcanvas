@@ -82,10 +82,10 @@ export function useConnectionManager({
     // Check basic allowed connections
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music', 'storyboard'],
-      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
+      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
       video: ['video'],
       music: ['video'],
-      nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
+      nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
     };
 
     if (!allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
@@ -95,7 +95,7 @@ export function useConnectionManager({
     // Additional validation for media connections:
     // Check if source is media (Library Image or Uploaded Image)
     // Use the same logic as ImageUploadModal to determine if it's media
-    const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
+    const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
     const GENERATION_MODELS = [
       'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
       'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
@@ -197,10 +197,10 @@ export function useConnectionManager({
 
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music', 'storyboard'],
-        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
+        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
         video: ['video'],
         music: ['video'],
-        nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'multiangle', 'storyboard'],
+        nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
       };
 
       if (!fromType || !toType || !allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
@@ -211,7 +211,7 @@ export function useConnectionManager({
       }
 
       // Use the same logic as ImageUploadModal to determine if it's media
-      const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle'];
+      const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
       const GENERATION_MODELS = [
         'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
         'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',

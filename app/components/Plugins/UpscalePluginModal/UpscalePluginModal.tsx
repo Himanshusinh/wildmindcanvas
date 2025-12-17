@@ -6,10 +6,10 @@ import { UpscaleLabel } from './UpscaleLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { UpscaleControls } from './UpscaleControls';
 import { UpscaleImageFrame } from './UpscaleImageFrame';
-import { ConnectionNodes } from './ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscalePluginModalProps {
@@ -420,7 +420,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}

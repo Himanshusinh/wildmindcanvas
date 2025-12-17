@@ -6,10 +6,10 @@ import { NextSceneLabel } from './NextSceneLabel';
 // import { ModalActionIcons } from '../../common/ModalActionIcons'; // Not used in Vectorize either
 import { NextSceneControls } from './NextSceneControls';
 import { NextSceneImageFrame } from './NextSceneImageFrame';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImages, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import { API_BASE_URL } from '@/lib/api';
 
@@ -511,7 +511,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}

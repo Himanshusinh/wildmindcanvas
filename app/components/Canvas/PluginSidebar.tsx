@@ -81,12 +81,6 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
       icon: '/icons/film-editing.svg',
     },
     {
-      id: 'multiangle',
-      name: 'Multiangle',
-      description: 'Process images with multiangle view',
-      icon: '/icons/multiangle.svg',
-    },
-    {
       id: 'storyboard',
       name: 'Storyboard',
       description: 'Create storyboard frames for your project',

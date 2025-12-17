@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import '../../common/canvasCaptureGuard';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
 import { defaultShouldIgnoreCanvasDragTarget, useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { normalizeCanvasMediaUrl, useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ErasePluginModalProps {
@@ -760,7 +760,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}
