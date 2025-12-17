@@ -151,12 +151,12 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
       <div
         className="text-input-header"
         style={{
-          height: ``,
+          height: `${16 * scale}px`,
           cursor: 'grab',
           display: 'flex',
           alignItems: 'center',
-          padding: `0 ${4 * scale}px`,
-          marginBottom: `${-4 * scale}px`,
+          padding: `${8 * scale}px ${4 * scale}px`,
+          marginBottom: `${4 * scale}px`,
         }}
         onMouseDown={(e) => {
           e.stopPropagation();
@@ -245,7 +245,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
               setShowSuggestions(false);
             }
           }}
-          onFocus={onTextFocus}
           onBlur={() => {
             onTextBlur();
             // Delay hiding suggestions to allow click event
@@ -295,7 +294,13 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             width: '100%',
             boxSizing: 'border-box',
             cursor: isTextFocused ? 'text' : 'default',
-            transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
+            transition: 'background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
+          }}
+          onFocus={(e) => {
+            onTextFocus();
+            // Keep border color the same on focus (prevent blue border)
+            e.currentTarget.style.border = `${1 * scale}px solid ${inputBorder}`;
+            e.currentTarget.style.borderColor = inputBorder;
           }}
         />
         

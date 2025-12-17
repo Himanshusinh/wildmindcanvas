@@ -79,6 +79,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         left: `${-2 * scale}px`,
         width: `${400 * scale}px`,
         padding: `${12 * scale}px`,
+        paddingTop: `${16 * scale}px`,
+        paddingBottom: `${16 * scale}px`,
         backgroundColor: controlsBg,
         
         border: 'none',
