@@ -540,6 +540,98 @@ export async function vectorizeImageForCanvas(
 }
 
 /**
+ * Multiangle camera image generation for Canvas
+ */
+export async function multiangleImageForCanvas(
+  image: string,
+  projectId: string,
+  prompt?: string,
+  loraScale?: number,
+  aspectRatio?: string,
+  moveForward?: number,
+  verticalTilt?: number,
+  rotateDegrees?: number,
+  useWideAngle?: boolean
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/replicate/multiangle`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        prompt: prompt || '',
+        lora_scale: loraScale !== undefined ? loraScale : 1.25,
+        aspect_ratio: aspectRatio || 'match_input_image',
+        move_forward: moveForward !== undefined ? Math.max(0, Math.min(10, moveForward)) : 0,
+        vertical_tilt: verticalTilt !== undefined ? verticalTilt : 0,
+        rotate_degrees: rotateDegrees !== undefined ? Math.max(-90, Math.min(90, rotateDegrees)) : 0,
+        wide_angle: useWideAngle === true,
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate multiangle image');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate multiangle image');
+    }
+
+    // Return the data object directly (contains url, storagePath, mediaId, generationId)
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Multiangle generation is taking too long. Please try again.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to generate multiangle image. Please check your connection and try again.');
+  }
+}
+
+/**
  * Remove background from image for Canvas
  */
 export async function removeBgImageForCanvas(

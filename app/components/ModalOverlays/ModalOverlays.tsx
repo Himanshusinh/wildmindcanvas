@@ -18,6 +18,7 @@ import { VectorizeModalOverlays } from './VectorizeModalOverlays';
 import { NextSceneModalOverlays } from './NextSceneModalOverlays';
 import { StoryboardModalOverlays } from './StoryboardModalOverlays';
 import { CompareModalOverlays } from './CompareModalOverlays';
+import { MultiangleCameraModalOverlays } from './MultiangleCameraModalOverlays';
 import { CompareModalState } from './types';
 
 import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
@@ -49,6 +50,15 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistCompareModalCreate, // New
   onPersistCompareModalMove, // New
   onPersistCompareModalDelete, // New
+  multiangleCameraModalStates, // Multiangle Camera Plugin
+  selectedMultiangleCameraModalId, // Multiangle Camera Plugin
+  selectedMultiangleCameraModalIds, // Multiangle Camera Plugin
+  setMultiangleCameraModalStates = () => { }, // Multiangle Camera Plugin
+  setSelectedMultiangleCameraModalId = () => { }, // Multiangle Camera Plugin
+  setSelectedMultiangleCameraModalIds = () => { }, // Multiangle Camera Plugin
+  onPersistMultiangleCameraModalCreate, // Multiangle Camera Plugin
+  onPersistMultiangleCameraModalMove, // Multiangle Camera Plugin
+  onPersistMultiangleCameraModalDelete, // Multiangle Camera Plugin
   selectedTextInputId,
   selectedTextInputIds,
   selectedImageModalId,
@@ -159,6 +169,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistUpscaleModalMove,
   onPersistUpscaleModalDelete,
   onUpscale,
+  onMultiangleCamera,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
   onPersistRemoveBgModalDelete,
@@ -226,6 +237,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     videoModalStates,
     musicModalStates,
     upscaleModalStates,
+    multiangleCameraModalStates: multiangleCameraModalStates ?? [],
     removeBgModalStates: removeBgModalStates ?? [],
     eraseModalStates: eraseModalStates ?? [],
     expandModalStates: expandModalStates ?? [],
@@ -252,6 +264,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         videoModalStates={videoModalStates}
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
+        multiangleCameraModalStates={multiangleCameraModalStates ?? []}
         removeBgModalStates={removeBgModalStates ?? []}
         eraseModalStates={eraseModalStates ?? []}
         expandModalStates={expandModalStates ?? []}
@@ -476,7 +489,28 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
-
+      <MultiangleCameraModalOverlays
+        multiangleCameraModalStates={multiangleCameraModalStates ?? []}
+        selectedMultiangleCameraModalId={selectedMultiangleCameraModalId ?? null}
+        selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds ?? []}
+        clearAllSelections={clearAllSelections}
+        setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+        setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
+        setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
+        onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
+        onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
+        onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
+        onMultiangleCamera={onMultiangleCamera}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        connections={externalConnections ?? []}
+        imageModalStates={imageModalStates}
+        images={images}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        stageRef={stageRef}
+        scale={scale}
+        position={position}
+      />
 
       <NextSceneModalOverlays
         nextSceneModalStates={nextSceneModalStates ?? []}

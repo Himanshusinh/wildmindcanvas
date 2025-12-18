@@ -74,6 +74,13 @@ export interface UpscaleGenerator {
   isUpscaling?: boolean;
 }
 
+export interface MultiangleCameraGenerator {
+  id: string;
+  x: number;
+  y: number;
+  sourceImageUrl?: string | null;
+}
+
 export interface RemoveBgGenerator {
   id: string;
   x: number;
@@ -226,6 +233,7 @@ export interface CanvasAppState {
   videoEditorGenerators: VideoEditorGenerator[];
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
+  multiangleCameraGenerators: MultiangleCameraGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
   eraseGenerators: EraseGenerator[];
   expandGenerators: ExpandGenerator[];
@@ -248,6 +256,7 @@ export interface CanvasAppSetters {
   setVideoEditorGenerators: React.Dispatch<React.SetStateAction<VideoEditorGenerator[]>>;
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
+  setMultiangleCameraGenerators: React.Dispatch<React.SetStateAction<MultiangleCameraGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;

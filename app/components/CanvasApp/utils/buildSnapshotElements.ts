@@ -104,6 +104,25 @@ export function buildSnapshotElements(
     };
   });
 
+  // Multiangle Camera generators
+  state.multiangleCameraGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      sourceImageUrl: modal.sourceImageUrl || null,
+    };
+    // Attach any connections originating from this element into its meta
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'multiangle-camera-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+
   // Remove BG generators
   state.removeBgGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;

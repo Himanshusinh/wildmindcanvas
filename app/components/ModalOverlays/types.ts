@@ -86,6 +86,14 @@ export interface UpscaleModalState {
   isExpanded?: boolean;
 }
 
+export interface MultiangleCameraModalState {
+  id: string;
+  x: number;
+  y: number;
+  sourceImageUrl?: string | null;
+  isExpanded?: boolean;
+}
+
 export interface RemoveBgModalState {
   id: string;
   x: number;
@@ -289,6 +297,18 @@ export interface ModalOverlaysProps {
   onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
   onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
 
+  // Multiangle Camera Plugin
+  multiangleCameraModalStates?: MultiangleCameraModalState[];
+  selectedMultiangleCameraModalId?: string | null;
+  selectedMultiangleCameraModalIds?: string[];
+  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
+  setSelectedMultiangleCameraModalId?: (id: string | null) => void;
+  setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
+  onPersistMultiangleCameraModalCreate?: (modal: MultiangleCameraModalState) => void | Promise<void>;
+  onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
+  onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
+  onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -313,6 +333,8 @@ export interface ModalOverlaysProps {
   selectedNextSceneModalIds?: string[];
   selectedStoryboardModalId?: string | null;
   selectedStoryboardModalIds?: string[];
+  selectedMultiangleCameraModalId?: string | null;
+  selectedMultiangleCameraModalIds?: string[];
   clearAllSelections: () => void;
   setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
   setSelectedTextInputId: (id: string | null) => void;

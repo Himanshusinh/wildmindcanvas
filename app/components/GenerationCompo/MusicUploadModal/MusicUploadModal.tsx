@@ -122,6 +122,20 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedMusicModalIds } = ce.detail || {};
+      // Check if this modal is selected
+      if (selectedMusicModalIds && Array.isArray(selectedMusicModalIds) && selectedMusicModalIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
   useEffect(() => { if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel); }, [initialModel]);
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
 

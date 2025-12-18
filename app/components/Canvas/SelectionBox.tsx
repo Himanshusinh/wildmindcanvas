@@ -12,7 +12,7 @@ const ARRANGE_ANIMATION_DURATION = 420;
 const BUTTON_OVERFLOW_PADDING = 72;
 
 interface SelectedComponent {
-  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'multiangleCameraModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
   id: number | string;
   key: string;
   width: number;
@@ -60,6 +60,7 @@ interface SelectionBoxProps {
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
   selectedUpscaleModalIds: string[];
+  selectedMultiangleCameraModalIds: string[];
   selectedRemoveBgModalIds: string[];
   selectedEraseModalIds: string[];
   selectedExpandModalIds: string[];
@@ -68,6 +69,7 @@ interface SelectionBoxProps {
   selectedScriptFrameModalIds: string[];
   selectedSceneFrameModalIds: string[];
   upscaleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  multiangleCameraModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   removeBgModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   eraseModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
@@ -76,6 +78,7 @@ interface SelectionBoxProps {
   scriptFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
   sceneFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
   setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
@@ -84,6 +87,7 @@ interface SelectionBoxProps {
   setScriptFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
   setSceneFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
   setSelectedUpscaleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedMultiangleCameraModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -92,6 +96,7 @@ interface SelectionBoxProps {
   setSelectedScriptFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedSceneFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
@@ -183,6 +188,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     videoModals: Map<string, { x: number; y: number }>;
     musicModals: Map<string, { x: number; y: number }>;
     upscaleModals: Map<string, { x: number; y: number }>;
+    multiangleCameraModals: Map<string, { x: number; y: number }>;
     removeBgModals: Map<string, { x: number; y: number }>;
     eraseModals: Map<string, { x: number; y: number }>;
     expandModals: Map<string, { x: number; y: number }>;
@@ -370,6 +376,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         key: `upscaleModal-${id}`,
         width: modal.frameWidth || 600,
         height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedMultiangleCameraModalIds.forEach((id) => {
+      const modal = multiangleCameraModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'multiangleCameraModal',
+        id,
+        key: `multiangleCameraModal-${id}`,
+        width: 100,
+        height: 100,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -981,6 +1001,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               videoModals: new Map<string, { x: number; y: number }>(),
               musicModals: new Map<string, { x: number; y: number }>(),
               upscaleModals: new Map<string, { x: number; y: number }>(),
+              multiangleCameraModals: new Map<string, { x: number; y: number }>(),
               removeBgModals: new Map<string, { x: number; y: number }>(),
               eraseModals: new Map<string, { x: number; y: number }>(),
               expandModals: new Map<string, { x: number; y: number }>(),
@@ -1035,6 +1056,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const modalState = upscaleModalStates.find(m => m.id === modalId);
               if (modalState) {
                 originalPositions.upscaleModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original multiangle camera modal positions
+            selectedMultiangleCameraModalIds.forEach(modalId => {
+              const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y });
               }
             });
 
@@ -1176,6 +1205,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const originalPos = originalPositions.upscaleModals.get(modalId);
               if (originalPos) {
                 setUpscaleModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected multiangle camera modals by delta in real-time
+            selectedMultiangleCameraModalIds.forEach(modalId => {
+              const originalPos = originalPositions.multiangleCameraModals.get(modalId);
+              if (originalPos) {
+                setMultiangleCameraModalStates((prev) =>
                   prev.map((modalState) =>
                     modalState.id === modalId
                       ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
@@ -1353,6 +1396,15 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 const modalState = upscaleModalStates.find(m => m.id === modalId);
                 if (modalState) {
                   Promise.resolve(onPersistUpscaleModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for multiangle camera modals
+            if (onPersistMultiangleCameraModalMove) {
+              selectedMultiangleCameraModalIds.forEach((modalId) => {
+                const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistMultiangleCameraModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
                 }
               });
             }

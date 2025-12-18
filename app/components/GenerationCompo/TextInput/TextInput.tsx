@@ -81,6 +81,20 @@ export const TextInput: React.FC<TextInputProps> = ({
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
 
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedTextInputIds } = ce.detail || {};
+      // Check if this text input is selected
+      if (selectedTextInputIds && Array.isArray(selectedTextInputIds) && selectedTextInputIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
+
 
   const isDark = useIsDarkTheme();
 
@@ -302,9 +316,12 @@ export const TextInput: React.FC<TextInputProps> = ({
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
+        minWidth: `${400 * scale}px`,
+        maxWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
         overflow: 'visible',
+        boxSizing: 'border-box',
       }}
     >
       <TextModalTooltip

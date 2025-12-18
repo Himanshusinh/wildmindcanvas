@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Konva from 'konva';
 import { Connection, ActiveDrag, ImageModalState, ComponentMenu, NextSceneModalState } from './types';
 import { getComponentType, computeNodeCenter } from './utils';
@@ -16,6 +16,7 @@ interface UseConnectionManagerProps {
   videoModalStates: any[];
   musicModalStates: any[];
   upscaleModalStates?: any[];
+  multiangleCameraModalStates?: any[];
   removeBgModalStates?: any[];
   eraseModalStates?: any[];
   expandModalStates?: any[];
@@ -39,6 +40,7 @@ export function useConnectionManager({
   videoModalStates,
   musicModalStates,
   upscaleModalStates,
+  multiangleCameraModalStates,
   removeBgModalStates,
   eraseModalStates,
   expandModalStates,
@@ -54,6 +56,7 @@ export function useConnectionManager({
   const [dimmedFrameId, setDimmedFrameId] = useState<string | null>(null);
   const [componentMenu, setComponentMenu] = useState<ComponentMenu | null>(null);
   const [componentMenuSearch, setComponentMenuSearch] = useState('');
+  const processingConnectionRef = useRef(false);
 
   const effectiveConnections = connections ?? localConnections;
 
@@ -80,13 +83,13 @@ export function useConnectionManager({
     }
 
     // Check basic allowed connections
-    const allowedMap: Record<string, string[]> = {
-      text: ['image', 'video', 'music', 'storyboard'],
-      image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-      video: ['video'],
-      music: ['video'],
-      nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-    };
+      const allowedMap: Record<string, string[]> = {
+        text: ['image', 'video', 'music', 'storyboard'],
+        image: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+        video: ['video'],
+        music: ['video'],
+        nextscene: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      };
 
     if (!allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
       return false;
@@ -110,9 +113,10 @@ export function useConnectionManager({
       (!GENERATION_MODELS.includes(fromModal.model || '') && fromModal.generatedImageUrl && !fromModal.prompt)
     );
 
-    // Check if target is image generation modal
+    // Check if target is image generation modal (not a plugin)
     const toModal = imageModalStates.find(m => m.id === toId);
     const isToImageGeneration = toType === 'image' && toModal;
+    const isToPlugin = ['upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene'].includes(toType);
     const isToMedia = toModal && (
       toModal.model === 'Library Image' ||
       toModal.model === 'Uploaded Image' ||
@@ -120,14 +124,15 @@ export function useConnectionManager({
       (!GENERATION_MODELS.includes(toModal.model || '') && toModal.generatedImageUrl && !toModal.prompt)
     );
 
-    // Block: Image generation cannot connect to media
-    if (fromType === 'image' && fromModal && !isFromMedia && isToMedia) {
+    // Block: Image generation cannot connect to media (but allow to plugins)
+    if (fromType === 'image' && fromModal && !isFromMedia && isToMedia && !isToPlugin) {
       return false;
     }
 
     // Block: Media cannot connect to image generation that already has an image
     // BUT: Allow image-to-image connections when both are image generation (not media)
-    if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
+    // AND: Always allow connections to plugins (they can accept any image)
+    if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl && !isToPlugin) {
       return false;
     }
 
@@ -151,13 +156,21 @@ export function useConnectionManager({
     const handleComplete = (e: Event) => {
       const ce = e as CustomEvent;
       const { id, side } = ce.detail || {};
-      if (!activeDrag) return;
-      if (!side || !side.startsWith('receive')) return;
+      if (!activeDrag) {
+        // If activeDrag is null, connection might have been handled already
+        return;
+      }
+      if (!side || !side.startsWith('receive')) {
+        return;
+      }
       if (id === activeDrag.from) { // ignore self
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
       }
+      
+      // Mark that we're processing this connection to prevent handleUp from interfering
+      processingConnectionRef.current = true;
 
       // Determine component types for both ends and enforce allowed connections
       const fromType = getComponentType(activeDrag.from);
@@ -197,10 +210,10 @@ export function useConnectionManager({
 
       const allowedMap: Record<string, string[]> = {
         text: ['image', 'video', 'music', 'storyboard'],
-        image: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+        image: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
         video: ['video'],
         music: ['video'],
-        nextscene: ['image', 'video', 'upscale', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+        nextscene: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
       };
 
       if (!fromType || !toType || !allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
@@ -226,9 +239,10 @@ export function useConnectionManager({
         (!GENERATION_MODELS.includes(fromModal.model || '') && fromModal.generatedImageUrl && !fromModal.prompt)
       );
 
-      // Check if target is image generation modal
+      // Check if target is image generation modal (not a plugin)
       const toModal = imageModalStates.find(m => m.id === id);
       const isToImageGeneration = toType === 'image' && toModal;
+      const isToPlugin = ['upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene'].includes(toType);
       const isToMedia = toModal && (
         toModal.model === 'Library Image' ||
         toModal.model === 'Uploaded Image' ||
@@ -236,8 +250,8 @@ export function useConnectionManager({
         (!GENERATION_MODELS.includes(toModal.model || '') && toModal.generatedImageUrl && !toModal.prompt)
       );
 
-      // Block: Image generation cannot connect to media
-      if (fromType === 'image' && fromModal && !isFromMedia && isToMedia) {
+      // Block: Image generation cannot connect to media (but allow to plugins)
+      if (fromType === 'image' && fromModal && !isFromMedia && isToMedia && !isToPlugin) {
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
@@ -245,21 +259,24 @@ export function useConnectionManager({
 
       // Block: Media cannot connect to image generation that already has an image
       // BUT: Allow image-to-image connections when both are image generation (not media)
-      if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl) {
+      // AND: Always allow connections to plugins (they can accept any image)
+      if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl && !isToPlugin) {
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
       }
 
       // Determine the specific target anchor (side)
-      // We need to find the specific receive node we dropped on, similar to handleMove
-      let targetSide = 'receive';
+      // When dropping directly on a receive node, the event provides the id and side
+      // We should trust that and use it directly, but also verify by finding the closest node
+      let targetSide = side || 'receive';
       const receiveNodes = Array.from(document.querySelectorAll('[data-node-side^="receive"]'));
       let minDistance = Infinity;
       let closestNodeId = null;
+      const PROXIMITY_THRESHOLD = 150; // pixels - increased threshold for better connection detection
 
-      // If we dropped on a specific node ID, try to find the closest receive point for that ID
-      // or just find the closest receive point overall if ID matches
+      // Try to find the receive node that was actually dropped on
+      // This helps when the event id might not match exactly or for proximity-based drops
       for (const node of receiveNodes) {
         const nodeId = node.getAttribute('data-node-id');
         if (nodeId !== id) continue; // Only look at nodes belonging to the target component
@@ -274,16 +291,121 @@ export function useConnectionManager({
           Math.pow(activeDrag.currentX - nodeCenterX, 2) + Math.pow(activeDrag.currentY - nodeCenterY, 2)
         );
 
-        if (distance < minDistance) {
+        if (distance < minDistance && distance < PROXIMITY_THRESHOLD) {
           minDistance = distance;
           closestNodeId = nodeId;
-          targetSide = node.getAttribute('data-node-side') || 'receive';
+          const nodeSide = node.getAttribute('data-node-side') || 'receive';
+          // If we found a close node, use its side (this is more accurate than the event side)
+          targetSide = nodeSide;
         }
       }
 
+      // If we didn't find a close node by proximity but the event was triggered from a receive node,
+      // trust the event's side (this handles direct drops on nodes where proximity might fail)
+      if (minDistance === Infinity && side && side.startsWith('receive')) {
+        targetSide = side;
+      }
+
       // Add connection if not duplicate
-      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      // Always create connection if we have valid from/to and validation passed
+      const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+      
+      // If we couldn't compute centers, try to get them from the actual DOM nodes
+      let finalFromCenter = fromCenter;
+      let finalToCenter = toCenter;
+      
+      if (!finalFromCenter) {
+        const fromNode = document.querySelector(`[data-node-id="${activeDrag.from}"][data-node-side="send"]`);
+        if (fromNode) {
+          const rect = fromNode.getBoundingClientRect();
+          finalFromCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        }
+      }
+      
+      if (!finalToCenter) {
+        const toNode = document.querySelector(`[data-node-id="${id}"][data-node-side="${targetSide}"]`);
+        if (toNode) {
+          const rect = toNode.getBoundingClientRect();
+          finalToCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        }
+      }
+      
+      // Only proceed if we have both centers
+      // If we can't compute centers, try one more time with a small delay (DOM might not be ready)
+      if (!finalFromCenter || !finalToCenter) {
+        // Retry once after a brief delay to allow DOM to update
+        setTimeout(() => {
+          if (!activeDrag) return; // Connection might have been created already
+          
+          const retryFromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+          const retryToCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+          
+          let retryFinalFromCenter = retryFromCenter;
+          let retryFinalToCenter = retryToCenter;
+          
+          if (!retryFinalFromCenter) {
+            const fromNode = document.querySelector(`[data-node-id="${activeDrag.from}"][data-node-side="send"]`);
+            if (fromNode) {
+              const rect = fromNode.getBoundingClientRect();
+              retryFinalFromCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }
+          }
+          
+          if (!retryFinalToCenter) {
+            const toNode = document.querySelector(`[data-node-id="${id}"][data-node-side="${targetSide}"]`);
+            if (toNode) {
+              const rect = toNode.getBoundingClientRect();
+              retryFinalToCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }
+          }
+          
+          if (retryFinalFromCenter && retryFinalToCenter) {
+            const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+            const newConn: Connection = {
+              id: connectorId,
+              from: activeDrag.from,
+              to: id,
+              color: activeDrag.color,
+              fromX: retryFinalFromCenter.x,
+              fromY: retryFinalFromCenter.y,
+              toX: retryFinalToCenter.x,
+              toY: retryFinalToCenter.y,
+              toAnchor: targetSide
+            };
+            
+            const exists = effectiveConnections.find((c: any) => c.from === activeDrag.from && c.to === id && c.toAnchor === targetSide);
+            if (!exists) {
+              if (onConnectionsChange) {
+                try { onConnectionsChange([...effectiveConnections, newConn]); } catch (e) { console.warn('onConnectionsChange failed', e); }
+              } else {
+                setLocalConnections(prev => [...prev, newConn]);
+              }
+              
+              if (onPersistConnectorCreate) {
+                try { Promise.resolve(onPersistConnectorCreate(newConn)).catch(console.error); } catch (e) { console.error('onPersistConnectorCreate failed', e); }
+              }
+            }
+            
+            processingConnectionRef.current = false;
+            setActiveDrag(null);
+            try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+          } else {
+            console.warn('[useConnectionManager] Could not compute node centers after retry', {
+              from: activeDrag.from,
+              to: id,
+              fromCenter: retryFinalFromCenter,
+              toCenter: retryFinalToCenter
+            });
+            processingConnectionRef.current = false;
+            setActiveDrag(null);
+            try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+          }
+        }, 50);
+        processingConnectionRef.current = true; // Mark as processing before the retry
+        return; // Exit early, will retry in setTimeout
+      }
+      
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
       // Include toAnchor in the connection
@@ -292,10 +414,10 @@ export function useConnectionManager({
         from: activeDrag.from,
         to: id,
         color: activeDrag.color,
-        fromX: fromCenter?.x,
-        fromY: fromCenter?.y,
-        toX: toCenter?.x,
-        toY: toCenter?.y,
+        fromX: finalFromCenter.x,
+        fromY: finalFromCenter.y,
+        toX: finalToCenter.x,
+        toY: finalToCenter.y,
         toAnchor: targetSide
       };
 
@@ -326,7 +448,14 @@ export function useConnectionManager({
             window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: activeDrag.from, dimmed: false } }));
           } catch (err) { }
         }
+      } else {
+        // Connection already exists, but still clear the drag state
+        processingConnectionRef.current = false;
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+        return; // Exit early if connection already exists
       }
+      processingConnectionRef.current = false;
       setActiveDrag(null);
       try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
     };
@@ -402,55 +531,12 @@ export function useConnectionManager({
       }
     };
     const handleUp = (e?: MouseEvent | PointerEvent) => {
-      if (activeDrag) {
-        // Check if we're releasing in empty space (not on a node)
-        // If so, show component creation menu
-        if (e) {
-          const mouseX = e.clientX;
-          const mouseY = e.clientY;
-
-          // Check if we're near any receive node
-          const receiveNodes = Array.from(document.querySelectorAll('[data-node-side^="receive"]'));
-          let nearNode = false;
-          const proximityThreshold = 60;
-
-          for (const node of receiveNodes) {
-            const rect = node.getBoundingClientRect();
-            const nodeCenterX = rect.left + rect.width / 2;
-            const nodeCenterY = rect.top + rect.height / 2;
-            const distance = Math.sqrt(
-              Math.pow(mouseX - nodeCenterX, 2) + Math.pow(mouseY - nodeCenterY, 2)
-            );
-            if (distance < proximityThreshold) {
-              nearNode = true;
-              break;
-            }
-          }
-
-          // If not near any node, show component creation menu
-          if (!nearNode) {
-            // Convert screen coordinates to canvas coordinates
-            const stage = stageRef.current;
-            if (stage) {
-              const stageBox = stage.container().getBoundingClientRect();
-              const canvasX = (mouseX - stageBox.left - position.x) / scale;
-              const canvasY = (mouseY - stageBox.top - position.y) / scale;
-              setComponentMenu({
-                x: mouseX,
-                y: mouseY,
-                canvasX,
-                canvasY,
-                sourceNodeId: activeDrag.from,
-                sourceNodeType: getComponentType(activeDrag.from) || undefined,
-                connectionColor: activeDrag.color
-              });
-            }
-          }
-        }
-
+      if (!activeDrag) return;
+      
+      if (!e) {
+        // No event data, just clean up
         setActiveDrag(null);
-        document.body.style.cursor = ''; // Reset cursor
-        // Clear dimmed frame
+        document.body.style.cursor = '';
         if (dimmedFrameId) {
           try {
             window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
@@ -458,27 +544,148 @@ export function useConnectionManager({
           setDimmedFrameId(null);
         }
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+        return;
       }
+      
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+      
+      // Check if we're near any receive node (fallback for when pointer capture prevents node's onPointerUp from firing)
+      const receiveNodes = Array.from(document.querySelectorAll('[data-node-side^="receive"]'));
+      let nearestNode: { id: string; side: string; distance: number } | null = null;
+      const proximityThreshold = 100; // pixels
+
+      for (const node of receiveNodes) {
+        const nodeId = node.getAttribute('data-node-id');
+        const nodeSide = node.getAttribute('data-node-side') || 'receive';
+        if (!nodeId) continue;
+
+        const rect = node.getBoundingClientRect();
+        const nodeCenterX = rect.left + rect.width / 2;
+        const nodeCenterY = rect.top + rect.height / 2;
+        const distance = Math.sqrt(
+          Math.pow(mouseX - nodeCenterX, 2) + Math.pow(mouseY - nodeCenterY, 2)
+        );
+        
+        if (distance < proximityThreshold) {
+          if (!nearestNode || distance < nearestNode.distance) {
+            nearestNode = { id: nodeId, side: nodeSide, distance };
+          }
+        }
+      }
+      
+      // If we found a nearby receive node, try to connect to it
+      if (nearestNode && nearestNode.id !== activeDrag.from) {
+        // Use the same validation logic as handleComplete
+        const isValid = checkConnectionValidity(activeDrag.from, nearestNode.id, nearestNode.side);
+        
+        if (isValid) {
+          // Manually trigger the connection by dispatching canvas-node-complete
+          // This ensures the connection is created even if the node's onPointerUp didn't fire
+          // handleComplete will process this event and perform all validation
+          try {
+            window.dispatchEvent(new CustomEvent('canvas-node-complete', { 
+              detail: { 
+                id: nearestNode.id, 
+                side: nearestNode.side 
+              } 
+            }));
+          } catch (err) {
+            console.warn('Failed to dispatch canvas-node-complete', err);
+          }
+          
+          // Give handleComplete time to process
+          setTimeout(() => {
+            if (activeDrag && !processingConnectionRef.current) {
+              setActiveDrag(null);
+              document.body.style.cursor = '';
+              if (dimmedFrameId) {
+                try {
+                  window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
+                } catch (err) { }
+                setDimmedFrameId(null);
+              }
+              try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+            }
+          }, 100);
+          return;
+        }
+      }
+      
+      // Check if pointer was directly on a receive node element
+      const target = e.target as HTMLElement;
+      const receiveNode = target.closest('[data-node-side^="receive"]');
+      
+      if (receiveNode || processingConnectionRef.current) {
+        // If dropping on a node or connection is being processed, give handleComplete time to process
+        // handleComplete will clear activeDrag when connection is created
+        setTimeout(() => {
+          // Only clean up if activeDrag still exists and connection processing is done
+          if (activeDrag && !processingConnectionRef.current) {
+            setActiveDrag(null);
+            document.body.style.cursor = '';
+            if (dimmedFrameId) {
+              try {
+                window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
+              } catch (err) { }
+              setDimmedFrameId(null);
+            }
+            try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+          }
+        }, 150);
+        return; // Exit early to let handleComplete handle it
+      }
+
+      // Not near any node - show component creation menu
+      const stage = stageRef.current;
+      if (stage) {
+        const stageBox = stage.container().getBoundingClientRect();
+        const canvasX = (mouseX - stageBox.left - position.x) / scale;
+        const canvasY = (mouseY - stageBox.top - position.y) / scale;
+        setComponentMenu({
+          x: mouseX,
+          y: mouseY,
+          canvasX,
+          canvasY,
+          sourceNodeId: activeDrag.from,
+          sourceNodeType: getComponentType(activeDrag.from) || undefined,
+          connectionColor: activeDrag.color
+        });
+      }
+
+      setActiveDrag(null);
+      document.body.style.cursor = ''; // Reset cursor
+      // Clear dimmed frame
+      if (dimmedFrameId) {
+        try {
+          window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
+        } catch (err) { }
+        setDimmedFrameId(null);
+      }
+      try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
     };
     window.addEventListener('canvas-node-start', handleStart as any);
     window.addEventListener('canvas-node-complete', handleComplete as any);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('pointermove', handleMove as any, { passive: true } as any);
-    // Capture so node stopPropagation can't block cleanup
-    window.addEventListener('mouseup', handleUp as any, true);
-    window.addEventListener('pointerup', handleUp as any, true);
-    window.addEventListener('pointercancel', handleUp as any, true);
+    // Use bubbling phase (not capture) so node's onPointerUp can fire first
+    // The node's onPointerUp will dispatch canvas-node-complete, which handleComplete processes
+    // Then handleUp will run to clean up if no connection was made
+    // Use a longer delay to ensure handleComplete has time to process
+    window.addEventListener('mouseup', handleUp as any, false);
+    window.addEventListener('pointerup', handleUp as any, false);
+    window.addEventListener('pointercancel', handleUp as any, false);
     return () => {
       window.removeEventListener('canvas-node-start', handleStart as any);
       window.removeEventListener('canvas-node-complete', handleComplete as any);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('pointermove', handleMove as any);
-      window.removeEventListener('mouseup', handleUp as any, true);
-      window.removeEventListener('pointerup', handleUp as any, true);
-      window.removeEventListener('pointercancel', handleUp as any, true);
+      window.removeEventListener('mouseup', handleUp as any, false);
+      window.removeEventListener('pointerup', handleUp as any, false);
+      window.removeEventListener('pointercancel', handleUp as any, false);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
+  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {

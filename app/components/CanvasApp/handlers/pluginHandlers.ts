@@ -1,10 +1,13 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
   onPersistUpscaleModalMove: (id: string, updates: Partial<UpscaleGenerator>) => Promise<void>;
   onPersistUpscaleModalDelete: (id: string) => Promise<void>;
+  onPersistMultiangleCameraModalCreate: (modal: MultiangleCameraGenerator) => Promise<void>;
+  onPersistMultiangleCameraModalMove: (id: string, updates: Partial<MultiangleCameraGenerator>) => Promise<void>;
+  onPersistMultiangleCameraModalDelete: (id: string) => Promise<void>;
   onPersistRemoveBgModalCreate: (modal: RemoveBgGenerator) => Promise<void>;
   onPersistRemoveBgModalMove: (id: string, updates: Partial<RemoveBgGenerator>) => Promise<void>;
   onPersistRemoveBgModalDelete: (id: string) => Promise<void>;
@@ -33,6 +36,7 @@ export interface PluginHandlers {
   onPersistVideoEditorModalMove: (id: string, updates: Partial<VideoEditorGenerator>) => Promise<void>;
   onPersistVideoEditorModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onMultiangleCamera: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
@@ -271,6 +275,174 @@ export function createPluginHandlers(
       return upscaledUrl;
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      throw error;
+    }
+  };
+
+  const onPersistMultiangleCameraModalCreate = async (modal: MultiangleCameraGenerator) => {
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create multiangle-camera', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'multiangle-camera',
+        x: modal.x,
+        y: modal.y,
+        sourceImageUrl: modal.sourceImageUrl || null,
+      });
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'multiangle-camera-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              sourceImageUrl: modal.sourceImageUrl || null,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleCameraModalMove = async (id: string, updates: Partial<MultiangleCameraGenerator>) => {
+    const prevItem = state.multiangleCameraGenerators.find(m => m.id === id);
+    if (!prevItem) {
+      console.warn('[onPersistMultiangleCameraModalMove] Modal not found:', id);
+      return;
+    }
+
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move multiangle-camera', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      const inverseUpdates: any = {};
+      for (const k of Object.keys(updates)) {
+        (inverseUpdates as any)[k] = (prevItem as any)[k];
+      }
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates },
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleCameraModalDelete = async (id: string) => {
+    const prevItem = state.multiangleCameraGenerators.find(m => m.id === id);
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.filter(m => m.id !== id));
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete multiangle-camera', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Also remove any connectors that referenced this element
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'multiangle-camera-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                sourceImageUrl: prevItem.sourceImageUrl || null,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
+    }
+  };
+
+  const onMultiangleCamera = async (
+    sourceImageUrl?: string,
+    prompt?: string,
+    loraScale?: number,
+    aspectRatio?: string,
+    moveForward?: number,
+    verticalTilt?: number,
+    rotateDegrees?: number,
+    useWideAngle?: boolean
+  ) => {
+    if (!sourceImageUrl || !projectId) {
+      console.error('[onMultiangleCamera] Missing sourceImageUrl or projectId');
+      return null;
+    }
+
+    const queueId = `multiangle-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'image', // Use 'image' type as multiangle generates images
+      operationName: 'Multiangle Camera',
+      model: 'Qwen Multiangle',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
+    try {
+      console.log('[onMultiangleCamera] Starting multiangle generation:', {
+        sourceImageUrl,
+        prompt,
+        loraScale,
+        aspectRatio,
+        moveForward,
+        verticalTilt,
+        rotateDegrees,
+        useWideAngle,
+      });
+      const { multiangleImageForCanvas } = await import('@/lib/api');
+      const result = await multiangleImageForCanvas(
+        sourceImageUrl,
+        projectId,
+        prompt,
+        loraScale,
+        aspectRatio,
+        moveForward,
+        verticalTilt,
+        rotateDegrees,
+        useWideAngle
+      );
+
+      console.log('[onMultiangleCamera] Multiangle generation completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      // Extract URL from result
+      const resultUrl = result?.url || (typeof result === 'string' ? result : null);
+      console.log('[onMultiangleCamera] Extracted URL:', resultUrl);
+      return resultUrl;
+    } catch (error: any) {
+      console.error('[onMultiangleCamera] Error:', error);
       // Remove from queue on error
       setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
@@ -2141,6 +2313,9 @@ export function createPluginHandlers(
     onPersistUpscaleModalCreate,
     onPersistUpscaleModalMove,
     onPersistUpscaleModalDelete,
+    onPersistMultiangleCameraModalCreate,
+    onPersistMultiangleCameraModalMove,
+    onPersistMultiangleCameraModalDelete,
     onPersistRemoveBgModalCreate,
     onPersistRemoveBgModalMove,
     onPersistRemoveBgModalDelete,
@@ -2154,6 +2329,7 @@ export function createPluginHandlers(
     onPersistNextSceneModalMove,
     onPersistNextSceneModalDelete,
     onUpscale,
+    onMultiangleCamera,
     onRemoveBg,
     onErase,
     onPersistExpandModalCreate,

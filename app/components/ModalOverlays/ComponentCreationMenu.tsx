@@ -45,6 +45,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   onPersistMusicModalCreate,
   onPersistUpscaleModalCreate,
   setUpscaleModalStates,
+  onPersistMultiangleCameraModalCreate,
+  setMultiangleCameraModalStates,
   onPersistRemoveBgModalCreate,
   setRemoveBgModalStates,
   onPersistEraseModalCreate,
@@ -102,6 +104,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'video', label: 'Video Generation', type: 'video' },
     { id: 'music', label: 'Music Generation', type: 'music' },
     { id: 'upscale-plugin', label: 'Upscale Plugin', type: 'plugin' },
+    { id: 'multiangle-camera-plugin', label: 'Multiangle Camera Plugin', type: 'plugin' },
     { id: 'removebg-plugin', label: 'Remove BG Plugin', type: 'plugin' },
     { id: 'erase-plugin', label: 'Erase Plugin', type: 'plugin' },
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
@@ -126,7 +129,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
         return ['image', 'video', 'music', 'storyboard-plugin'];
 
       case 'image':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin', 'storyboard-plugin'];
+        return ['image', 'video', 'upscale-plugin', 'multiangle-camera-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin', 'storyboard-plugin'];
 
       case 'video':
       case 'music':
@@ -138,7 +141,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
       case 'expand':
       case 'vectorize':
       case 'nextscene':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin'];
+      case 'multiangle-camera':
+        return ['image', 'video', 'upscale-plugin', 'multiangle-camera-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin'];
 
       default:
         return null;
@@ -322,6 +326,18 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setUpscaleModalStates(prev => [...prev, newUpscale]);
                 Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+              } else if (comp.id === 'multiangle-camera-plugin' && comp.type === 'plugin' && onPersistMultiangleCameraModalCreate && setMultiangleCameraModalStates) {
+                // Create multiangle camera plugin modal
+                newComponentId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const newMultiangleCamera = {
+                  id: newComponentId,
+                  x: canvasX,
+                  y: canvasY,
+                  sourceImageUrl: null,
+                  isExpanded: false,
+                };
+                setMultiangleCameraModalStates(prev => [...prev, newMultiangleCamera]);
+                Promise.resolve(onPersistMultiangleCameraModalCreate(newMultiangleCamera)).catch(console.error);
               } else if (comp.id === 'removebg-plugin' && comp.type === 'plugin' && onPersistRemoveBgModalCreate && setRemoveBgModalStates) {
                 // Create remove bg plugin modal
                 newComponentId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

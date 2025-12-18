@@ -1056,6 +1056,20 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     window.addEventListener('canvas-frame-dim', handleDim as any);
     return () => window.removeEventListener('canvas-frame-dim', handleDim as any);
   }, [id]);
+
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedImageModalIds } = ce.detail || {};
+      // Check if this modal is selected
+      if (selectedImageModalIds && Array.isArray(selectedImageModalIds) && selectedImageModalIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
   // Helper to parse model string into base model and resolution
   const parseModelAndResolution = (modelString: string) => {
     if (!modelString) return { model: 'Google Nano Banana', resolution: '2K' };

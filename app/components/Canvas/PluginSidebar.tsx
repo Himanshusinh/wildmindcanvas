@@ -48,55 +48,61 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
       id: 'upscale',
       name: 'Upscale',
       description: 'Enhance image resolution and quality',
-      icon: '/icons/upscale.svg',
+      icon: '/pluginimages/upscale.png',
+    },
+    {
+      id: 'multiangle-camera',
+      name: 'Multiangle Camera',
+      description: 'Generate multiple camera angles from an image',
+      icon: '/pluginimages/camaraangle.png',
     },
     {
       id: 'removebg',
       name: 'Remove BG',
       description: 'Remove background from images',
-      icon: '/icons/removebg.svg',
+      icon: '/pluginimages/removebg.png',
     },
     {
       id: 'erase',
       name: 'Erase / Replace',
       description: 'Erase or replace parts of images using AI',
-      icon: '/icons/erase.svg',
+      icon: '/pluginimages/erase.png',
     },
     {
       id: 'expand',
       name: 'Expand',
       description: 'Reserve empty frames for future edits',
-      icon: '/icons/resize.svg',
+      icon: '/pluginimages/expand.png',
     },
     {
       id: 'vectorize',
       name: 'Vectorize',
       description: 'Convert images to vector format',
-      icon: '/icons/vector.svg',
+      icon: '/pluginimages/vectorize.png',
     },
     {
       id: 'next-scene',
       name: 'Next Scene',
       description: 'Generate next scene based on current scene',
-      icon: '/icons/film-editing.svg',
+      icon: '/pluginimages/nextscene.png',
     },
     {
       id: 'storyboard',
       name: 'Storyboard',
       description: 'Create storyboard frames for your project',
-      icon: '/icons/film-editing.svg',
+      icon: '/pluginimages/storyboard.png',
     },
     {
       id: 'video-editor',
       name: 'Video Editor',
       description: 'Edit and assemble videos',
-      icon: '/icons/video-editor.svg',
+      icon: '/pluginimages/videoeditor.png',
     },
     {
       id: 'compare',
       name: 'Compare',
       description: 'Compare two images side by side',
-      icon: '/icons/compare.svg',
+      icon: '/pluginimages/compare.png',
     },
   ]);
 
@@ -179,7 +185,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
             onDragStart={(e) => handleDragStart(e, item)}
             style={{
               aspectRatio: '1',
-              overflow: 'hidden',
+              overflow: 'visible',
               cursor: 'pointer',
               background: cardBg,
               borderRadius: '12px',
@@ -188,9 +194,10 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
               position: 'relative',
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '12px',
+              alignItems: 'stretch',
+              justifyContent: 'stretch',
+              padding: '0',
+              marginTop: '24px',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';
@@ -201,15 +208,17 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            {/* Plugin Icon - centered */}
+            {/* Plugin Image - fills the entire card */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: '8px',
-                width: '32px',
-                height: '32px',
+                width: '100%',
+                height: '100%',
+                overflow: 'hidden',
+                borderRadius: '10px',
+                position: 'relative',
               }}
             >
               <img
@@ -218,9 +227,9 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'contain',
-                  filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
-                  transition: 'filter 0.3s ease',
+                  objectFit: 'cover',
+                  display: 'block',
+                  transition: 'opacity 0.3s ease',
                 }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -233,7 +242,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
                 }}
               />
             </div>
-            {/* Plugin Name - centered below icon */}
+            {/* Plugin Name - centered above image, outside the box */}
             <div
               style={{
                 fontSize: '11px',
@@ -242,6 +251,11 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
                 textAlign: 'center',
                 transition: 'color 0.3s ease',
                 lineHeight: '1.2',
+                position: 'absolute',
+                top: '-20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                whiteSpace: 'nowrap',
               }}
             >
               {item.name}

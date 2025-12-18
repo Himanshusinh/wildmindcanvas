@@ -48,6 +48,7 @@ export const computeNodeCenter = (
   videoModalStates: VideoModalState[],
   musicModalStates: MusicModalState[],
   upscaleModalStates?: UpscaleModalState[],
+  multiangleCameraModalStates?: any[],
   removeBgModalStates?: RemoveBgModalState[],
   eraseModalStates?: EraseModalState[],
   expandModalStates?: ExpandModalState[],
@@ -104,6 +105,8 @@ export const computeNodeCenter = (
         if (mm) return { x: mm.x, y: mm.y, width: mm.frameWidth || 600, height: mm.frameHeight || 300 };
         const um = upscaleModalStates?.find(m => m.id === id);
         if (um) return { x: um.x, y: um.y, width: um.frameWidth || 400, height: um.frameHeight || 500 };
+        const mcm = multiangleCameraModalStates?.find(m => m.id === id);
+        if (mcm) return { x: mcm.x, y: mcm.y, width: 400, height: 500 };
         const rm = removeBgModalStates?.find(m => m.id === id);
         if (rm) return { x: rm.x, y: rm.y, width: rm.frameWidth || 400, height: rm.frameHeight || 500 };
         const em = eraseModalStates?.find(m => m.id === id);

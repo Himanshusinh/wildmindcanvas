@@ -15,6 +15,7 @@ export interface CanvasHistoryState {
     sceneFrameModalStates: any[];
     connections: any[];
     upscaleModalStates: any[];
+    multiangleCameraModalStates: any[];
     removeBgModalStates: any[];
     eraseModalStates: any[];
     expandModalStates: any[];

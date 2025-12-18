@@ -59,6 +59,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isSettingHeightRef = useRef(false); // Flag to prevent ResizeObserver from firing during programmatic changes
+  const previousScaleRef = useRef(scale); // Track previous scale to detect scale changes
   const isDark = useIsDarkTheme();
   const [textareaHeight, setTextareaHeight] = useState<number | null>(null); // Store height in canvas coordinates (will be scaled)
 
@@ -104,19 +105,29 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     const resizeObserver = new ResizeObserver((entries) => {
       // Ignore if we're programmatically setting the height
       if (isSettingHeightRef.current) return;
+      
+      // Ignore if scale has changed (this is a scale change, not a user resize)
+      if (previousScaleRef.current !== scale) {
+        previousScaleRef.current = scale;
+        return;
+      }
 
       for (const entry of entries) {
         const height = entry.contentRect.height;
-        // Convert screen pixels to canvas coordinates by dividing by scale
+        // Convert screen pixels to canvas coordinates by dividing by current scale
         const canvasHeight = height / scale;
         // Only update if height changed significantly (user manually resized)
-        if (canvasHeight > 0 && (textareaHeight === null || Math.abs(canvasHeight - textareaHeight) > 2 / scale)) {
+        // Use a larger threshold to avoid small fluctuations
+        if (canvasHeight > 0 && (textareaHeight === null || Math.abs(canvasHeight - textareaHeight) > 5 / scale)) {
           setTextareaHeight(canvasHeight); // Store in canvas coordinates
         }
       }
     });
 
     resizeObserver.observe(textarea);
+    
+    // Update previous scale ref
+    previousScaleRef.current = scale;
 
     return () => {
       resizeObserver.disconnect();
@@ -129,12 +140,22 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     if (!textarea || textareaHeight === null) return;
 
     // When scale changes, convert canvas height to screen pixels
+    // Set flag to prevent ResizeObserver from interfering
     isSettingHeightRef.current = true;
-    textarea.style.height = `${textareaHeight * scale}px`; // Scale canvas height to screen
-    // Reset flag after a brief delay
+    const newHeight = textareaHeight * scale;
+    textarea.style.height = `${newHeight}px`; // Scale canvas height to screen
+    // Also ensure width is properly constrained
+    textarea.style.width = '100%';
+    textarea.style.maxWidth = '100%';
+    textarea.style.minWidth = '0';
+    
+    // Update previous scale ref immediately
+    previousScaleRef.current = scale;
+    
+    // Reset flag after a longer delay to ensure ResizeObserver doesn't interfere
     setTimeout(() => {
       isSettingHeightRef.current = false;
-    }, 50);
+    }, 150);
   }, [scale, textareaHeight]);
 
   const inputBg = isDark ? '#121212' : '#ffffff';
@@ -175,7 +196,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         />
       </div>
 
-      <div style={{ position: 'relative', width: '100%' }}>
+      <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
         <textarea
           ref={inputRef}
           value={text}
@@ -292,9 +313,12 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             minHeight: `${80 * scale}px`,
             height: textareaHeight !== null ? `${textareaHeight * scale}px` : `${80 * scale}px`,
             width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
             boxSizing: 'border-box',
             cursor: isTextFocused ? 'text' : 'default',
             transition: 'background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
+            overflow: 'auto',
           }}
           onFocus={(e) => {
             onTextFocus();

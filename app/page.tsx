@@ -11,7 +11,7 @@ import { Profile } from '@/app/components/Profile/Profile';
 import LibrarySidebar from '@/app/components/Canvas/LibrarySidebar';
 import PluginSidebar from '@/app/components/Canvas/PluginSidebar';
 import { ImageUpload } from '@/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/lib/canvasApi';
 import { ProjectSelector } from '@/app/components/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
@@ -38,6 +38,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [videoEditorGenerators, setVideoEditorGenerators] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
+  const [multiangleCameraGenerators, setMultiangleCameraGenerators] = useState<Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }>>([]);
   const [compareGenerators, setCompareGenerators] = useState<Array<{ id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
   const [eraseGenerators, setEraseGenerators] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
@@ -94,6 +95,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       setVideoEditorGenerators([]);
       setMusicGenerators([]);
       setUpscaleGenerators([]);
+      setMultiangleCameraGenerators([]);
       setCompareGenerators([]);
       setRemoveBgGenerators([]);
       setEraseGenerators([]);
@@ -148,6 +150,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newVideoEditorGenerators: Array<{ id: string; x: number; y: number }> = [];
         const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+        const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
         const newCompareGenerators: CompareGenerator[] = [];
 
         Object.values(elements).forEach((element: any) => {
@@ -185,6 +188,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+            } else if (element.type === 'multiangle-camera-plugin') {
+              newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
             } else if (element.type === 'compare-plugin') {
               newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: element.width, height: element.height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
             }
@@ -199,6 +204,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setVideoGenerators(newVideoGenerators);
           setMusicGenerators(newMusicGenerators);
           setUpscaleGenerators(newUpscaleGenerators);
+          setMultiangleCameraGenerators(newMultiangleCameraGenerators || []);
           setCompareGenerators(newCompareGenerators);
         }
         snapshotLoadedRef.current = true;
@@ -655,6 +661,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           videoEditorGenerators,
           musicGenerators,
           upscaleGenerators,
+          multiangleCameraGenerators,
           removeBgGenerators,
           eraseGenerators,
           expandGenerators,
@@ -803,6 +810,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setMusicGenerators(prev => prev.some(m => m.id === o.id) ? prev : [...prev, { id: o.id, x: o.x, y: o.y, generatedMusicUrl: o.generatedMusicUrl || null, frameWidth: (o as any).frameWidth, frameHeight: (o as any).frameHeight, model: (o as any).model, frame: (o as any).frame, aspectRatio: (o as any).aspectRatio, prompt: (o as any).prompt }]);
         } else if (o.type === 'text') {
           setTextGenerators(prev => prev.some(t => t.id === o.id) ? prev : [...prev, { id: o.id, x: o.x, y: o.y, value: (o as any).value }]);
+        } else if (o.type === 'upscale') {
+          setUpscaleGenerators(prev => prev.some(m => m.id === o.id) ? prev : [...prev, { id: o.id, x: o.x, y: o.y, upscaledImageUrl: (o as any).upscaledImageUrl || null, sourceImageUrl: (o as any).sourceImageUrl || null, localUpscaledImageUrl: (o as any).localUpscaledImageUrl || null, model: (o as any).model, scale: (o as any).scale, frameWidth: (o as any).frameWidth, frameHeight: (o as any).frameHeight, isUpscaling: (o as any).isUpscaling }]);
+        } else if (o.type === 'multiangle-camera') {
+          setMultiangleCameraGenerators(prev => prev.some(m => m.id === o.id) ? prev : [...prev, { id: o.id, x: o.x, y: o.y, sourceImageUrl: (o as any).sourceImageUrl || null }]);
         }
       } else if (evt.type === 'generator.update') {
         console.log('[Realtime] update', evt.id, Object.keys(evt.updates || {}));
@@ -810,6 +821,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setVideoGenerators(prev => prev.map(m => m.id === evt.id ? { ...m, ...evt.updates } : m));
         setMusicGenerators(prev => prev.map(m => m.id === evt.id ? { ...m, ...evt.updates } : m));
         setTextGenerators(prev => prev.map(t => t.id === evt.id ? { ...t, ...evt.updates } : t));
+        setUpscaleGenerators(prev => prev.map(m => m.id === evt.id ? { ...m, ...evt.updates } : m));
+        setMultiangleCameraGenerators(prev => prev.map(m => m.id === evt.id ? { ...m, ...evt.updates } : m));
       } else if (evt.type === 'generator.delete') {
         console.log('[Realtime] delete', evt.id);
         setImageGenerators(prev => prev.filter(m => m.id !== evt.id));
@@ -817,6 +830,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setMusicGenerators(prev => prev.filter(m => m.id !== evt.id));
         setTextGenerators(prev => prev.filter(t => t.id !== evt.id));
         setUpscaleGenerators(prev => prev.filter(m => m.id !== evt.id));
+        setMultiangleCameraGenerators(prev => prev.filter(m => m.id !== evt.id));
         setCompareGenerators(prev => prev.filter(m => m.id !== evt.id));
         // Remove any connectors referencing this overlay id
         setConnectors(prev => prev.filter(c => c.from !== evt.id && c.to !== evt.id));
@@ -882,6 +896,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           videoEditorGenerators,
           musicGenerators,
           upscaleGenerators,
+          multiangleCameraGenerators,
           removeBgGenerators,
           eraseGenerators,
           expandGenerators,
@@ -907,7 +922,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -922,6 +937,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
           const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+          const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
           const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
           const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
@@ -1040,6 +1056,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'upscale-plugin') {
                 newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'multiangle-camera-plugin') {
+                newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
@@ -1193,6 +1214,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setVideoGenerators(newVideoGenerators);
           setMusicGenerators(newMusicGenerators);
           setUpscaleGenerators(newUpscaleGenerators);
+          setMultiangleCameraGenerators(newMultiangleCameraGenerators);
           setRemoveBgGenerators(newRemoveBgGenerators);
           setEraseGenerators(newEraseGenerators);
           setExpandGenerators(newExpandGenerators);
@@ -1257,6 +1279,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     videoEditorGenerators,
     musicGenerators,
     upscaleGenerators,
+    multiangleCameraGenerators,
     removeBgGenerators,
     eraseGenerators,
     expandGenerators,
@@ -1278,6 +1301,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setVideoEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
+    setMultiangleCameraGenerators,
     setRemoveBgGenerators,
     setEraseGenerators,
     setExpandGenerators,
@@ -2154,6 +2178,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalVideoEditorModals={videoEditorGenerators}
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
+              externalMultiangleCameraModals={multiangleCameraGenerators}
               externalCompareModals={compareGenerators}
               externalRemoveBgModals={removeBgGenerators}
               externalEraseModals={eraseGenerators}
@@ -2209,6 +2234,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoEditorGenerators,
                         musicGenerators,
                         upscaleGenerators,
+                        multiangleCameraGenerators,
                         removeBgGenerators,
                         eraseGenerators,
                         expandGenerators,
@@ -2254,6 +2280,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         videoEditorGenerators,
                         musicGenerators,
                         upscaleGenerators,
+                        multiangleCameraGenerators,
                         removeBgGenerators,
                         eraseGenerators,
                         expandGenerators,
@@ -2449,6 +2476,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistUpscaleModalMove={pluginHandlers.onPersistUpscaleModalMove}
               onPersistUpscaleModalDelete={pluginHandlers.onPersistUpscaleModalDelete}
               onUpscale={pluginHandlers.onUpscale}
+              onPersistMultiangleCameraModalCreate={pluginHandlers.onPersistMultiangleCameraModalCreate}
+              onPersistMultiangleCameraModalMove={pluginHandlers.onPersistMultiangleCameraModalMove}
+              onPersistMultiangleCameraModalDelete={pluginHandlers.onPersistMultiangleCameraModalDelete}
+              onMultiangleCamera={pluginHandlers.onMultiangleCamera}
               onPersistCompareModalCreate={pluginHandlers.onPersistCompareModalCreate}
               onPersistCompareModalMove={pluginHandlers.onPersistCompareModalMove}
               onPersistCompareModalDelete={pluginHandlers.onPersistCompareModalDelete}
@@ -2688,6 +2719,32 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
                 });
               }
+            })().catch(console.error);
+
+          } else if (plugin.id === 'multiangle-camera') {
+            const viewportCenter = viewportCenterRef.current;
+            let modalX: number;
+            let modalY: number;
+
+            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            } else {
+              modalX = viewportCenter.x;
+              modalY = viewportCenter.y;
+            }
+
+            const modalId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const newMultiangleCamera = {
+              id: modalId,
+              x: modalX,
+              y: modalY,
+              sourceImageUrl: null,
+            };
+            console.log('[Plugin] Creating multiangle camera modal at viewport center:', newMultiangleCamera, 'viewportCenter:', viewportCenter);
+            // Use pluginHandlers for persistence
+            (async () => {
+              await pluginHandlers.onPersistMultiangleCameraModalCreate(newMultiangleCamera);
             })().catch(console.error);
 
           } else if (plugin.id === 'compare') {
