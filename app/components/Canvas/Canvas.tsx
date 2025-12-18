@@ -3493,27 +3493,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (!stage) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // If middle button is pressed, treat wheel as panning, not zooming
+      // Disabled: Middle button wheel scrolling to prevent glitches
+      // If middle button is pressed, ignore wheel events (don't pan or zoom)
       if (isMiddleButtonPressed) {
         e.preventDefault();
         e.stopPropagation();
-        
-        // Disable stage dragging to prevent conflicts with wheel-based panning
-        const stage = stageRef.current;
-        if (stage) {
-          stage.draggable(false);
-          setIsPanning(false);
-        }
-        
-        // Pan the canvas when middle button is held and scrolling
-        // Use requestAnimationFrame for smooth updates
-        requestAnimationFrame(() => {
-          setPosition(prev => {
-            const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-            setTimeout(() => updateViewportCenter(newPos, scale), 0);
-            return newPos;
-          });
-        });
+        // Just prevent default behavior, don't pan the canvas
         return;
       }
 
@@ -3612,25 +3597,39 @@ export const Canvas: React.FC<CanvasProps> = ({
   const selectionRectangleRef = useRef<Konva.Rect>(null);
   const [selectionRectCoords, setSelectionRectCoords] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
-  // Track middle button state globally to prevent zoom when scrolling while holding middle button
+  // Track middle button state globally - always reset to prevent stuck state
   useEffect(() => {
     const handleGlobalMouseUp = (e: MouseEvent) => {
       if (e.button === 1) {
+        // Always reset middle button state to prevent stuck selection
         setIsMiddleButtonPressed(false);
         setIsPanning(false);
-        // Re-enable stage dragging if move tool is selected
+        
+        // Disable stage dragging to ensure clean state
         const stage = stageRef.current;
-        if (stage && selectedTool === 'move') {
+        if (stage) {
           stage.draggable(false);
         }
       }
     };
 
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        // Prevent default middle button behavior (browser back/forward, auto-scroll)
+        e.preventDefault();
+        e.stopPropagation();
+        // Set state but don't enable panning
+        setIsMiddleButtonPressed(true);
+      }
+    };
+
     window.addEventListener('mouseup', handleGlobalMouseUp, true);
+    window.addEventListener('mousedown', handleGlobalMouseDown, true);
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp, true);
+      window.removeEventListener('mousedown', handleGlobalMouseDown, true);
     };
-  }, [selectedTool]);
+  }, []);
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
@@ -5425,11 +5424,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       target.getClassName() === 'Layer' ||
       target.name() === 'background-rect' ||
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
-    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool or Shift)
+    // Panning: only with move tool, Ctrl/Cmd, or Space key (NOT with cursor tool, Shift, or middle mouse)
+    // Middle mouse button (button === 1) is DISABLED to prevent glitches
     const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
     // Cursor tool and Shift + Left Click should NEVER pan - only selection
-    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    // Middle mouse button is disabled - removed: || e.evt.button === 1
+    const isPanKey = isMoveTool || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
     // Shift + Left Click is for selection, not panning
     const isShiftSelection = e.evt.shiftKey && e.evt.button === 0;
     const clickedOnElement = !clickedOnEmpty;
@@ -5640,12 +5641,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (shouldPan) {
       const stage = e.target.getStage();
       if (stage) {
-        // Track middle button state - prevent zoom when scrolling while holding middle button
+        // Disabled: Middle button panning to prevent glitches
+        // Don't enable panning if middle button is pressed
         if (e.evt.button === 1) {
-          setIsMiddleButtonPressed(true);
-          // Prevent default middle button behavior (browser back/forward, auto-scroll)
+          // Prevent default middle button behavior but don't enable panning
           e.evt.preventDefault();
           e.evt.stopPropagation();
+          setIsMiddleButtonPressed(true);
+          // Don't enable panning - just prevent default behavior
+          return;
         }
         setIsPanning(true);
         stage.draggable(true);
@@ -5820,17 +5824,22 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
     // Reset middle button state when mouse button is released
     if (e.evt.button === 1) {
+      // Always reset middle button state and panning state
       setIsMiddleButtonPressed(false);
       setIsPanning(false);
-      // Re-enable stage dragging if move tool is selected
+      
+      // Disable stage dragging to ensure clean state
       const stage = e.target.getStage();
-      if (stage && selectedTool === 'move') {
-        // Don't enable dragging immediately - let user click again if needed
+      if (stage) {
         stage.draggable(false);
       }
+      
       // Prevent default browser behavior (navigation)
       e.evt.preventDefault();
       e.evt.stopPropagation();
+      
+      // Return early to prevent any other mouse up handling
+      return;
     }
     
     const stage = e.target.getStage();
