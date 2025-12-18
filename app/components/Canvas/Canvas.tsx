@@ -3496,11 +3496,23 @@ export const Canvas: React.FC<CanvasProps> = ({
       // If middle button is pressed, treat wheel as panning, not zooming
       if (isMiddleButtonPressed) {
         e.preventDefault();
+        e.stopPropagation();
+        
+        // Disable stage dragging to prevent conflicts with wheel-based panning
+        const stage = stageRef.current;
+        if (stage) {
+          stage.draggable(false);
+          setIsPanning(false);
+        }
+        
         // Pan the canvas when middle button is held and scrolling
-        setPosition(prev => {
-          const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-          setTimeout(() => updateViewportCenter(newPos, scale), 0);
-          return newPos;
+        // Use requestAnimationFrame for smooth updates
+        requestAnimationFrame(() => {
+          setPosition(prev => {
+            const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+            setTimeout(() => updateViewportCenter(newPos, scale), 0);
+            return newPos;
+          });
         });
         return;
       }
@@ -3518,13 +3530,22 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // If on Mac, no modifier keys, and we have horizontal/vertical deltas from touchpad, treat as pan
       if (isMac && !isModifier && (absDeltaX > 0 || absDeltaY > 0) && Math.max(absDeltaX, absDeltaY) < 400) {
+        // Disable stage dragging during trackpad pan to prevent conflicts
+        if (stage) {
+          stage.draggable(false);
+          setIsPanning(false);
+        }
+        
         // Adjust position by wheel deltas (invert sign if needed based on UX)
-        setPosition(prev => {
-          // Invert deltas so two-finger drag direction matches canvas movement
-          // (drag up → canvas moves up, drag left → canvas moves left)
-          const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-          setTimeout(() => updateViewportCenter(newPos, scale), 0);
-          return newPos;
+        // Use requestAnimationFrame for smooth updates
+        requestAnimationFrame(() => {
+          setPosition(prev => {
+            // Invert deltas so two-finger drag direction matches canvas movement
+            // (drag up → canvas moves up, drag left → canvas moves left)
+            const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+            setTimeout(() => updateViewportCenter(newPos, scale), 0);
+            return newPos;
+          });
         });
         return;
       }
@@ -3596,6 +3617,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     const handleGlobalMouseUp = (e: MouseEvent) => {
       if (e.button === 1) {
         setIsMiddleButtonPressed(false);
+        setIsPanning(false);
+        // Re-enable stage dragging if move tool is selected
+        const stage = stageRef.current;
+        if (stage && selectedTool === 'move') {
+          stage.draggable(false);
+        }
       }
     };
 
@@ -3603,7 +3630,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp, true);
     };
-  }, []);
+  }, [selectedTool]);
 
   // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
   useEffect(() => {
@@ -5794,6 +5821,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Reset middle button state when mouse button is released
     if (e.evt.button === 1) {
       setIsMiddleButtonPressed(false);
+      setIsPanning(false);
+      // Re-enable stage dragging if move tool is selected
+      const stage = e.target.getStage();
+      if (stage && selectedTool === 'move') {
+        // Don't enable dragging immediately - let user click again if needed
+        stage.draggable(false);
+      }
       // Prevent default browser behavior (navigation)
       e.evt.preventDefault();
       e.evt.stopPropagation();
