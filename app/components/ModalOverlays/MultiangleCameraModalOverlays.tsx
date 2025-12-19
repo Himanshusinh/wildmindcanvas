@@ -83,15 +83,23 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
               timestamp: Date.now(),
               modalId: modalState.id,
             });
+            // Clear selection immediately
             setSelectedMultiangleCameraModalId(null);
+            setSelectedMultiangleCameraModalIds([]);
+            // Call persist delete - it updates parent state (multiangleCameraGenerators) which flows down as externalMultiangleCameraModals
+            // Canvas will sync multiangleCameraModalStates with externalMultiangleCameraModals via useEffect
             if (onPersistMultiangleCameraModalDelete) {
+              console.log('[MultiangleCameraModalOverlays] Calling onPersistMultiangleCameraModalDelete', modalState.id);
+              // Call synchronously - the handler updates parent state immediately
               const result = onPersistMultiangleCameraModalDelete(modalState.id);
+              // If it returns a promise, handle it
               if (result && typeof result.then === 'function') {
                 Promise.resolve(result).catch((err) => {
                   console.error('[ModalOverlays] Error in onPersistMultiangleCameraModalDelete', err);
                 });
               }
             }
+            // DO NOT update local state here - let parent state flow down through props
           }}
           onDownload={async () => {
             // Download functionality can be added later

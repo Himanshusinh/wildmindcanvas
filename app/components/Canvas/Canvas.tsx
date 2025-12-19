@@ -2031,6 +2031,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedExpandModalIds([]);
     setSelectedVectorizeModalId(null);
     setSelectedVectorizeModalIds([]);
+    setSelectedNextSceneModalId(null);
+    setSelectedNextSceneModalIds([]);
     setSelectedCompareModalId(null);
     setSelectedCompareModalIds([]);
     setSelectedStoryboardModalId(null);
@@ -3846,6 +3848,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     handleDeleteSceneFrame,
     setSelectedSceneFrameModalId,
     setSelectedSceneFrameModalIds,
+    selectedNextSceneModalIds,
+    selectedNextSceneModalId,
+    nextSceneModalStates,
+    setNextSceneModalStates,
+    setSelectedNextSceneModalId,
+    setSelectedNextSceneModalIds,
+    onPersistNextSceneModalDelete,
     selectedCompareModalIds,
     selectedCompareModalId,
     compareModalStates,
@@ -4084,6 +4093,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const selectedExpandModalIdsList: string[] = [];
         const selectedVectorizeModalIdsList: string[] = [];
         const selectedNextSceneModalIdsList: string[] = [];
+        const selectedCompareModalIdsList: string[] = [];
         const selectedStoryboardModalIdsList: string[] = [];
         const selectedScriptFrameModalIdsList: string[] = [];
         const selectedSceneFrameModalIdsList: string[] = [];
@@ -4202,7 +4212,25 @@ export const Canvas: React.FC<CanvasProps> = ({
         nextSceneModalStates.forEach((modal) => {
           const dims = getComponentDimensions('nextSceneModal', modal.id);
           if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
-            selectedNextSceneModalIdsList.push(modal.id);
+            if (!selectedNextSceneModalIdsList.includes(modal.id)) {
+              selectedNextSceneModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        });
+
+        // Check compare modals
+        compareModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('compareModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            if (!selectedCompareModalIdsList.includes(modal.id)) {
+              selectedCompareModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
           }
         });
 
@@ -4230,6 +4258,17 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         });
 
+        // Check video editor modals
+        videoEditorModalStates.forEach((modal) => {
+          // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+          // Total bounding box: 100px width, 120px height (100px circle + label space)
+          const modalWidth = 100;
+          const modalHeight = 120; // 100px circle + ~20px for label
+          if (hasOverlap(modal.x, modal.y, modalWidth, modalHeight)) {
+            selectedVideoEditorModalIdsList.push(modal.id);
+          }
+        });
+
         // Update selections in real-time (Freepik Spaces behavior)
         setSelectedImageIndices(selectedIndices);
         setSelectedImageModalIds(selectedImageModalIdsList);
@@ -4243,7 +4282,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedEraseModalIds(selectedEraseModalIdsList);
         setSelectedExpandModalIds(selectedExpandModalIdsList);
         setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
-        setSelectedNextSceneModalIds(selectedNextSceneModalIdsList);
+        // Merge with existing selections for NextScene and Compare to accumulate across handler runs
+        const mergedNextSceneIds = [...new Set([...selectedNextSceneModalIds, ...selectedNextSceneModalIdsList])];
+        const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
+        setSelectedNextSceneModalIds(mergedNextSceneIds);
+        setSelectedCompareModalIds?.(mergedCompareIds);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -4684,6 +4730,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const selectedExpandModalIdsList: string[] = [];
         const selectedVectorizeModalIdsList: string[] = [];
         const selectedNextSceneModalIdsList: string[] = [];
+        const selectedCompareModalIdsList: string[] = [];
         const selectedStoryboardModalIdsList: string[] = [];
         const selectedScriptFrameModalIdsList: string[] = [];
         const selectedSceneFrameModalIdsList: string[] = [];
@@ -4802,7 +4849,25 @@ export const Canvas: React.FC<CanvasProps> = ({
         nextSceneModalStates.forEach((modal) => {
           const dims = getComponentDimensions('nextSceneModal', modal.id);
           if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
-            selectedNextSceneModalIdsList.push(modal.id);
+            if (!selectedNextSceneModalIdsList.includes(modal.id)) {
+              selectedNextSceneModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        });
+
+        // Check compare modals
+        compareModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('compareModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            if (!selectedCompareModalIdsList.includes(modal.id)) {
+              selectedCompareModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
           }
         });
 
@@ -4830,6 +4895,17 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         });
 
+        // Check video editor modals
+        videoEditorModalStates.forEach((modal) => {
+          // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+          // Total bounding box: 100px width, 120px height (100px circle + label space)
+          const modalWidth = 100;
+          const modalHeight = 120; // 100px circle + ~20px for label
+          if (hasOverlap(modal.x, modal.y, modalWidth, modalHeight)) {
+            selectedVideoEditorModalIdsList.push(modal.id);
+          }
+        });
+
         // Update selections in real-time (Freepik Spaces behavior)
         setSelectedImageIndices(selectedIndices);
         setSelectedImageModalIds(selectedImageModalIdsList);
@@ -4843,7 +4919,14 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedEraseModalIds(selectedEraseModalIdsList);
         setSelectedExpandModalIds(selectedExpandModalIdsList);
         setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
-        setSelectedNextSceneModalIds(selectedNextSceneModalIdsList);
+        // Merge with existing selections for NextScene and Compare to accumulate across handler runs
+        const mergedNextSceneIds = [...new Set([...selectedNextSceneModalIds, ...selectedNextSceneModalIdsList])];
+        const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
+        setSelectedNextSceneModalIds(mergedNextSceneIds);
+        setSelectedCompareModalIds?.(mergedCompareIds);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -5079,6 +5162,34 @@ export const Canvas: React.FC<CanvasProps> = ({
                 y: modal.y,
                 width: dims.width,
                 height: dims.height,
+              });
+            }
+          });
+
+          selectedCompareModalIds.forEach(id => {
+            const modal = compareModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('compareModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedVideoEditorModalIds.forEach(id => {
+            const modal = videoEditorModalStates.find(m => m.id === id);
+            if (modal) {
+              // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+              const modalWidth = 100;
+              const modalHeight = 120; // 100px circle + ~20px for label
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: modalWidth,
+                height: modalHeight,
               });
             }
           });
@@ -5727,6 +5838,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         const newSelectedEraseModalIds: string[] = isMultiSelect ? [...selectedEraseModalIds] : [];
         const newSelectedExpandModalIds: string[] = isMultiSelect ? [...selectedExpandModalIds] : [];
         const newSelectedVectorizeModalIds: string[] = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+        const newSelectedNextSceneModalIds: string[] = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+        const newSelectedCompareModalIds: string[] = isMultiSelect ? [...(selectedCompareModalIds || [])] : [];
         const newSelectedStoryboardModalIds: string[] = isMultiSelect ? [...selectedStoryboardModalIds] : [];
         const newSelectedScriptFrameModalIds: string[] = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
         const newSelectedSceneFrameModalIds: string[] = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
@@ -5892,6 +6005,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedEraseModalIds(newSelectedEraseModalIds);
         setSelectedExpandModalIds(newSelectedExpandModalIds);
         setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
+        setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
+        setSelectedCompareModalIds?.(newSelectedCompareModalIds);
         setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
         setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
         setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
@@ -5940,10 +6055,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       const newSelectedMusicModalIds: string[] = isMultiSelect ? [...selectedMusicModalIds] : [];
       const newSelectedTextInputIds: string[] = isMultiSelect ? [...selectedTextInputIds] : [];
       const newSelectedUpscaleModalIds: string[] = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+      const newSelectedMultiangleCameraModalIds: string[] = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
       const newSelectedRemoveBgModalIds: string[] = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
       const newSelectedEraseModalIds: string[] = isMultiSelect ? [...selectedEraseModalIds] : [];
       const newSelectedExpandModalIds: string[] = isMultiSelect ? [...selectedExpandModalIds] : [];
       const newSelectedVectorizeModalIds: string[] = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+      const newSelectedNextSceneModalIds: string[] = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+      const newSelectedCompareModalIds: string[] = isMultiSelect ? [...(selectedCompareModalIds || [])] : [];
       const newSelectedStoryboardModalIds: string[] = isMultiSelect ? [...selectedStoryboardModalIds] : [];
       const newSelectedScriptFrameModalIds: string[] = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
       const newSelectedSceneFrameModalIds: string[] = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
@@ -6055,6 +6173,22 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       });
 
+      // NextScene Modals
+      nextSceneModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('nextSceneModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedNextSceneModalIds.includes(modal.id)) newSelectedNextSceneModalIds.push(modal.id);
+        }
+      });
+
+      // Compare Modals
+      compareModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('compareModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedCompareModalIds.includes(modal.id)) newSelectedCompareModalIds.push(modal.id);
+        }
+      });
+
       // Storyboard Modals
       storyboardModalStates.forEach((modal) => {
         const dims = getComponentDimensions('storyboardModal', modal.id);
@@ -6149,6 +6283,16 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (newSelectedVectorizeModalIds.length > 0 || !isMultiSelect) {
         setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
         setSelectedVectorizeModalId(newSelectedVectorizeModalIds.length > 0 ? newSelectedVectorizeModalIds[0] : null);
+      }
+
+      if (newSelectedNextSceneModalIds.length > 0 || !isMultiSelect) {
+        setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
+        setSelectedNextSceneModalId(newSelectedNextSceneModalIds.length > 0 ? newSelectedNextSceneModalIds[0] : null);
+      }
+
+      if (newSelectedCompareModalIds.length > 0 || !isMultiSelect) {
+        setSelectedCompareModalIds?.(newSelectedCompareModalIds);
+        setSelectedCompareModalId?.(newSelectedCompareModalIds.length > 0 ? newSelectedCompareModalIds[0] : null);
       }
 
       if (newSelectedStoryboardModalIds.length > 0 || !isMultiSelect) {
@@ -6835,6 +6979,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedImageIndices={selectedImageIndices}
             selectedImageModalIds={selectedImageModalIds}
             selectedVideoModalIds={selectedVideoModalIds}
+            selectedVideoEditorModalIds={selectedVideoEditorModalIds}
             selectedMusicModalIds={selectedMusicModalIds}
             selectedTextInputIds={selectedTextInputIds}
             images={images}
@@ -6845,6 +6990,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             setTextInputStates={setTextInputStates}
             setImageModalStates={setImageModalStates}
             setVideoModalStates={setVideoModalStates}
+            videoEditorModalStates={videoEditorModalStates}
+            setVideoEditorModalStates={setVideoEditorModalStates}
             setMusicModalStates={setMusicModalStates}
             textInputStates={textInputStates}
             imageModalStates={imageModalStates}
@@ -6854,8 +7001,11 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedTextInputIds={setSelectedTextInputIds}
             setSelectedImageModalIds={setSelectedImageModalIds}
             setSelectedVideoModalIds={setSelectedVideoModalIds}
+            setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
             setSelectedMusicModalIds={setSelectedMusicModalIds}
             onPersistImageModalMove={onPersistImageModalMove}
+            onPersistVideoModalMove={onPersistVideoModalMove}
+            onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
             onPersistTextModalMove={onPersistTextModalMove}
             onImageUpdate={onImageUpdate}
             // Pass all other modal states and setters for full selection support
@@ -6865,6 +7015,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedEraseModalIds={selectedEraseModalIds}
             selectedExpandModalIds={selectedExpandModalIds}
             selectedVectorizeModalIds={selectedVectorizeModalIds}
+            selectedNextSceneModalIds={selectedNextSceneModalIds || []}
+            selectedCompareModalIds={selectedCompareModalIds || []}
             selectedStoryboardModalIds={selectedStoryboardModalIds}
             selectedScriptFrameModalIds={selectedScriptFrameModalIds}
             selectedSceneFrameModalIds={selectedSceneFrameModalIds}
@@ -6874,6 +7026,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             eraseModalStates={eraseModalStates}
             expandModalStates={expandModalStates}
             vectorizeModalStates={vectorizeModalStates}
+            nextSceneModalStates={nextSceneModalStates || []}
+            compareModalStates={compareModalStates || []}
             storyboardModalStates={storyboardModalStates}
             scriptFrameModalStates={scriptFrameModalStates}
             sceneFrameModalStates={sceneFrameModalStates}
@@ -6883,14 +7037,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             setEraseModalStates={setEraseModalStates}
             setExpandModalStates={setExpandModalStates}
             setVectorizeModalStates={setVectorizeModalStates}
+            setNextSceneModalStates={setNextSceneModalStates}
+            setCompareModalStates={setCompareModalStates}
             setStoryboardModalStates={setStoryboardModalStates}
             setScriptFrameModalStates={setScriptFrameModalStates as any}
             setSceneFrameModalStates={setSceneFrameModalStates as any}
             setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+            setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
             setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
             setSelectedEraseModalIds={setSelectedEraseModalIds}
             setSelectedExpandModalIds={setSelectedExpandModalIds}
             setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+            setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
+            setSelectedCompareModalIds={setSelectedCompareModalIds}
             setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
             setSelectedScriptFrameModalIds={setSelectedScriptFrameModalIds}
             setSelectedSceneFrameModalIds={setSelectedSceneFrameModalIds}
@@ -6900,6 +7059,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistEraseModalMove={handleEraseModalMove}
             onPersistExpandModalMove={handleExpandModalMove}
             onPersistVectorizeModalMove={handleVectorizeModalMove}
+            onPersistNextSceneModalMove={handleNextSceneModalMove}
+            onPersistCompareModalMove={handleCompareModalMove}
             onPersistStoryboardModalMove={handleStoryboardModalMove}
             onPersistScriptFrameModalMove={handleScriptFrameModalMove}
             onPersistSceneFrameModalMove={handleSceneFrameModalMove}
@@ -7136,9 +7297,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistUpscaleModalMove={handleUpscaleModalMove}
         onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
         onUpscale={onUpscale}
-        onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
-        onPersistMultiangleCameraModalMove={handleMultiangleCameraModalMove}
-        onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
         onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
         onPersistRemoveBgModalMove={handleRemoveBgModalMove}
         onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}

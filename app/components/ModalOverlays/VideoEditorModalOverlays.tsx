@@ -66,10 +66,27 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                         }
                     }}
                     onDelete={() => {
+                        console.log('[VideoEditorModalOverlays] onDelete called', {
+                            timestamp: Date.now(),
+                            modalId: modalState.id,
+                        });
+                        // Clear selection immediately
                         setSelectedVideoEditorModalId(null);
+                        setSelectedVideoEditorModalIds([]);
+                        // Call persist delete - it updates parent state (videoEditorGenerators) which flows down as externalVideoEditorModals
+                        // Canvas will sync videoEditorModalStates with externalVideoEditorModals via useEffect
                         if (onPersistVideoEditorModalDelete) {
-                            Promise.resolve(onPersistVideoEditorModalDelete(modalState.id)).catch(console.error);
+                            console.log('[VideoEditorModalOverlays] Calling onPersistVideoEditorModalDelete', modalState.id);
+                            // Call synchronously - the handler updates parent state immediately
+                            const result = onPersistVideoEditorModalDelete(modalState.id);
+                            // If it returns a promise, handle it
+                            if (result && typeof result.then === 'function') {
+                                Promise.resolve(result).catch((err) => {
+                                    console.error('[ModalOverlays] Error in onPersistVideoEditorModalDelete', err);
+                                });
+                            }
                         }
+                        // DO NOT update local state here - let parent state flow down through props
                     }}
                 />
             ))}

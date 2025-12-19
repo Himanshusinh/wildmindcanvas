@@ -88,6 +88,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
             });
             // Clear selection immediately
             setSelectedRemoveBgModalId(null);
+            setSelectedRemoveBgModalIds([]);
             // Call persist delete - it updates parent state (removeBgGenerators) which flows down as externalRemoveBgModals
             // Canvas will sync removeBgModalStates with externalRemoveBgModals via useEffect
             if (onPersistRemoveBgModalDelete) {

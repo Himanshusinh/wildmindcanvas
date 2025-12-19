@@ -236,7 +236,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     textInputStates,
     videoModalStates,
     musicModalStates,
-    upscaleModalStates,
+    upscaleModalStates: upscaleModalStates ?? [],
     multiangleCameraModalStates: multiangleCameraModalStates ?? [],
     removeBgModalStates: removeBgModalStates ?? [],
     eraseModalStates: eraseModalStates ?? [],

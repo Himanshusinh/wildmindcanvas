@@ -78,6 +78,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                         });
                         // Clear selection immediately
                         setSelectedNextSceneModalId(null);
+                        setSelectedNextSceneModalIds([]);
                         // Call persist delete - it updates parent state (nextSceneGenerators) which flows down as externalNextSceneModals
                         // Canvas will sync nextSceneModalStates with externalNextSceneModals via useEffect
                         if (onPersistNextSceneModalDelete) {
@@ -124,6 +125,9 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     position={position}
                     x={modalState.x}
                     y={modalState.y}
+                    // #region agent log
+                    // Log position props to verify they're updating
+                    // #endregion
                     onPositionChange={(newX, newY) => {
                         setNextSceneModalStates(prev =>
                             prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m)

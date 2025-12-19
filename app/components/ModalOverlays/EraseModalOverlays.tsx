@@ -88,6 +88,7 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
             });
             // Clear selection immediately
             setSelectedEraseModalId(null);
+            setSelectedEraseModalIds([]);
             // Call persist delete - it updates parent state (eraseGenerators) which flows down as externalEraseModals
             // Canvas will sync eraseModalStates with externalEraseModals via useEffect
             if (onPersistEraseModalDelete) {

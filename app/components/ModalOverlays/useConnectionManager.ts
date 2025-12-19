@@ -39,16 +39,16 @@ export function useConnectionManager({
   textInputStates,
   videoModalStates,
   musicModalStates,
-  upscaleModalStates,
-  multiangleCameraModalStates,
-  removeBgModalStates,
-  eraseModalStates,
-  expandModalStates,
-  vectorizeModalStates,
-  nextSceneModalStates,
-  storyboardModalStates,
-  scriptFrameModalStates,
-  sceneFrameModalStates,
+  upscaleModalStates = [],
+  multiangleCameraModalStates = [],
+  removeBgModalStates = [],
+  eraseModalStates = [],
+  expandModalStates = [],
+  vectorizeModalStates = [],
+  nextSceneModalStates = [],
+  storyboardModalStates = [],
+  scriptFrameModalStates = [],
+  sceneFrameModalStates = [],
 }: UseConnectionManagerProps) {
   const [localConnections, setLocalConnections] = useState<Connection[]>([]);
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -628,7 +628,7 @@ export function useConnectionManager({
               try {
                 window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
               } catch (err) { }
-              setDimmedFrameId(null);
+              setDimmedFrameId(null); 
             }
             try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
           }
@@ -685,7 +685,7 @@ export function useConnectionManager({
       window.removeEventListener('pointercancel', handleUp as any, false);
       document.body.style.cursor = ''; // Reset cursor on cleanup
     };
-  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, vectorizeModalStates, storyboardModalStates, sceneFrameModalStates]);
+  }, [activeDrag, effectiveConnections, imageModalStates, onConnectionsChange, onPersistConnectorCreate, checkConnectionValidity, dimmedFrameId, stageRef, position, scale, textInputStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates]);
 
   // Handle connection deletion
   const handleDeleteConnection = useCallback((connectionId: string) => {

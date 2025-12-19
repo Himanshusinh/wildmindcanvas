@@ -163,6 +163,14 @@ interface UseKeyboardShortcutsProps {
   setSelectedSceneFrameModalId: (id: string | null) => void;
   setSelectedSceneFrameModalIds: (ids: string[]) => void;
 
+  selectedNextSceneModalIds: string[];
+  selectedNextSceneModalId: string | null;
+  nextSceneModalStates: any[];
+  setNextSceneModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedNextSceneModalId: (id: string | null) => void;
+  setSelectedNextSceneModalIds: (ids: string[]) => void;
+  onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
+
   selectedCompareModalIds: string[];
   selectedCompareModalId: string | null;
   compareModalStates: any[];
@@ -264,6 +272,13 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedUpscaleModalId,
     setSelectedUpscaleModalIds,
     onPersistUpscaleModalDelete,
+    selectedMultiangleCameraModalIds = [],
+    selectedMultiangleCameraModalId,
+    multiangleCameraModalStates = [],
+    setMultiangleCameraModalStates,
+    setSelectedMultiangleCameraModalId,
+    setSelectedMultiangleCameraModalIds,
+    onPersistMultiangleCameraModalDelete,
     selectedRemoveBgModalIds,
     selectedRemoveBgModalId,
     removeBgModalStates,
@@ -316,6 +331,13 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedCompareModalId,
     setSelectedCompareModalIds,
     onPersistCompareModalDelete,
+    selectedNextSceneModalIds = [],
+    selectedNextSceneModalId,
+    nextSceneModalStates = [],
+    setNextSceneModalStates,
+    setSelectedNextSceneModalId,
+    setSelectedNextSceneModalIds,
+    onPersistNextSceneModalDelete,
     images,
     textInputStates,
     imageModalStates,
@@ -691,6 +713,13 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             selectedSceneFrameModalIds.forEach(id => handleDeleteSceneFrame(id));
             setSelectedSceneFrameModalId(null);
             setSelectedSceneFrameModalIds([]);
+          }
+          if (selectedNextSceneModalIds.length > 0) {
+            hasDeletions = true;
+            selectedNextSceneModalIds.forEach(id => onPersistNextSceneModalDelete && Promise.resolve(onPersistNextSceneModalDelete(id)).catch(console.error));
+            setNextSceneModalStates(prev => prev.filter(m => !selectedNextSceneModalIds.includes(m.id)));
+            setSelectedNextSceneModalId(null);
+            setSelectedNextSceneModalIds([]);
           }
           if (selectedCompareModalIds.length > 0) {
             hasDeletions = true;
@@ -1142,6 +1171,13 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedUpscaleModalId,
     setSelectedUpscaleModalIds,
     onPersistUpscaleModalDelete,
+    selectedMultiangleCameraModalIds,
+    selectedMultiangleCameraModalId,
+    multiangleCameraModalStates,
+    setMultiangleCameraModalStates,
+    setSelectedMultiangleCameraModalId,
+    setSelectedMultiangleCameraModalIds,
+    onPersistMultiangleCameraModalDelete,
     selectedRemoveBgModalIds,
     selectedRemoveBgModalId,
     removeBgModalStates,

@@ -69,10 +69,27 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                         setSelectedCompareModalIds([modalState.id]);
                     }}
                     onDelete={() => {
-                        setCompareModalStates(prev => prev.filter(m => m.id !== modalState.id));
+                        console.log('[CompareModalOverlays] onDelete called', {
+                            timestamp: Date.now(),
+                            modalId: modalState.id,
+                        });
+                        // Clear selection immediately
+                        setSelectedCompareModalId(null);
+                        setSelectedCompareModalIds([]);
+                        // Call persist delete - it updates parent state (compareGenerators) which flows down as externalCompareModals
+                        // Canvas will sync compareModalStates with externalCompareModals via useEffect
                         if (onPersistCompareModalDelete) {
-                            onPersistCompareModalDelete(modalState.id);
+                            console.log('[CompareModalOverlays] Calling onPersistCompareModalDelete', modalState.id);
+                            // Call synchronously - the handler updates parent state immediately
+                            const result = onPersistCompareModalDelete(modalState.id);
+                            // If it returns a promise, handle it
+                            if (result && typeof result.then === 'function') {
+                                Promise.resolve(result).catch((err) => {
+                                    console.error('[ModalOverlays] Error in onPersistCompareModalDelete', err);
+                                });
+                            }
                         }
+                        // DO NOT update local state here - let parent state flow down through props
                     }}
                     initialPrompt={modalState.prompt}
                     initialModel={modalState.model}

@@ -88,6 +88,7 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
             });
             // Clear selection immediately
             setSelectedUpscaleModalId(null);
+            setSelectedUpscaleModalIds([]);
             // Call persist delete - it updates parent state (upscaleGenerators) which flows down as externalUpscaleModals
             // Canvas will sync upscaleModalStates with externalUpscaleModals via useEffect
             if (onPersistUpscaleModalDelete) {

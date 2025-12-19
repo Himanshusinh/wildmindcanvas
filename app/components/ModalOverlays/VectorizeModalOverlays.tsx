@@ -88,6 +88,7 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
             });
             // Clear selection immediately
             setSelectedVectorizeModalId(null);
+            setSelectedVectorizeModalIds([]);
             // Call persist delete - it updates parent state (vectorizeGenerators) which flows down as externalVectorizeModals
             // Canvas will sync vectorizeModalStates with externalVectorizeModals via useEffect
             if (onPersistVectorizeModalDelete) {
