@@ -82,6 +82,15 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
       setProjects(prev => [project, ...prev]);
       setShowCreateModal(false);
       setNewProjectName('Untitled');
+      
+      // Clear any old projectId from URL before selecting new project
+      if (typeof window !== 'undefined') {
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('projectId'); // Clear old projectId
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+      
+      // Select the newly created project (this will update URL with new projectId)
       onProjectSelect(project);
     } catch (error: any) {
       console.error('Failed to create project:', error);

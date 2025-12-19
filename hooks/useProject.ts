@@ -111,18 +111,27 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
   }, [currentUser]); // Only depend on currentUser, not projectId
 
   const handleProjectSelect = (project: CanvasProject) => {
-    setProjectId(project.id);
-    setProjectName(project.name);
-    setShowProjectSelector(false);
-    localStorage.setItem('canvas-project-id', project.id);
-    localStorage.setItem('canvas-project-name', project.name);
+    console.log('[useProject] Selecting project:', { id: project.id, name: project.name });
+    
+    // Clear any existing project state first
+    setProjectId(null);
+    
+    // Use setTimeout to ensure state clears before setting new project
+    setTimeout(() => {
+      setProjectId(project.id);
+      setProjectName(project.name);
+      setShowProjectSelector(false);
+      localStorage.setItem('canvas-project-id', project.id);
+      localStorage.setItem('canvas-project-name', project.name);
 
-    // Update URL without reloading page
-    if (typeof window !== 'undefined') {
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set('projectId', project.id);
-      window.history.pushState({}, '', newUrl.toString());
-    }
+      // Update URL without reloading page - use replaceState to avoid back button issues
+      if (typeof window !== 'undefined') {
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('projectId', project.id);
+        window.history.replaceState({}, '', newUrl.toString());
+        console.log('[useProject] Updated URL with projectId:', project.id);
+      }
+    }, 0);
   };
 
   return {

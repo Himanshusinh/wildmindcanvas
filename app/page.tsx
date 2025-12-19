@@ -84,11 +84,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
   const [isVideoEditorOpen, setIsVideoEditorOpen] = useState(false);
 
+  // Track previous projectId to detect changes
+  const prevProjectIdRef = useRef<string | null>(null);
+
   // Clear all state when project changes (new project or switching projects)
   useEffect(() => {
-    if (projectId) {
+    // Only clear if projectId actually changed (not on initial mount with same projectId)
+    if (projectId && prevProjectIdRef.current !== projectId) {
       // Reset all state to empty when project changes
-      console.log('[Project] Clearing state for new project:', projectId);
+      console.log('[Project] Clearing state for project change:', {
+        from: prevProjectIdRef.current,
+        to: projectId,
+      });
       setImages([]);
       setImageGenerators([]);
       setVideoGenerators([]);
@@ -118,6 +125,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         y: 500000,
         scale: 1,
       };
+      
+      // Update ref to track current projectId
+      prevProjectIdRef.current = projectId;
+    } else if (!projectId) {
+      // If projectId is cleared, reset the ref
+      prevProjectIdRef.current = null;
     }
   }, [projectId]); // Only run when projectId changes
 
@@ -928,8 +941,35 @@ export function CanvasApp({ user }: CanvasAppProps) {
   useEffect(() => {
     const hydrate = async () => {
       if (!projectId) return;
+      
+      // Store the projectId at the start of this effect to prevent race conditions
+      const currentProjectId = projectId;
+      
+      // Small delay to ensure state has been cleared first
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Double-check projectId hasn't changed during the delay
+      if (currentProjectId !== projectId) {
+        console.log('[Project] ProjectId changed during snapshot load, aborting:', {
+          started: currentProjectId,
+          current: projectId,
+        });
+        return;
+      }
+      
       try {
-        const { snapshot } = await apiGetCurrentSnapshot(projectId);
+        console.log('[Project] Loading snapshot for project:', currentProjectId);
+        const { snapshot } = await apiGetCurrentSnapshot(currentProjectId);
+        
+        // Triple-check projectId hasn't changed after async call
+        if (currentProjectId !== projectId) {
+          console.log('[Project] ProjectId changed after snapshot fetch, ignoring snapshot:', {
+            fetched: currentProjectId,
+            current: projectId,
+          });
+          return;
+        }
+        
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
           const newImages: ImageUpload[] = [];
