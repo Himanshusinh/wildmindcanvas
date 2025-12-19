@@ -940,13 +940,23 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // Hydrate from current snapshot on project load
   useEffect(() => {
     const hydrate = async () => {
-      if (!projectId) return;
+      if (!projectId) {
+        // If projectId is cleared, reset the loaded flag
+        snapshotLoadedRef.current = false;
+        return;
+      }
       
       // Store the projectId at the start of this effect to prevent race conditions
       const currentProjectId = projectId;
       
+      // Skip if we already loaded this project's snapshot
+      if (snapshotLoadedRef.current) {
+        console.log('[Project] Snapshot already loaded for project:', currentProjectId);
+        return;
+      }
+      
       // Small delay to ensure state has been cleared first
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 150));
       
       // Double-check projectId hasn't changed during the delay
       if (currentProjectId !== projectId) {
@@ -967,6 +977,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
             fetched: currentProjectId,
             current: projectId,
           });
+          return;
+        }
+        
+        // For new projects, snapshot should be null or empty - don't load anything
+        if (!snapshot || !snapshot.elements || Object.keys(snapshot.elements).length === 0) {
+          console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
+          snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
           return;
         }
         

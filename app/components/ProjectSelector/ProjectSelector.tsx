@@ -78,19 +78,29 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
     try {
       creatingRef.current = true;
       setIsCreating(true);
+      
+      // Clear localStorage and URL BEFORE creating project to ensure clean state
+      if (typeof window !== 'undefined') {
+        // Clear old project data from localStorage
+        localStorage.removeItem('canvas-project-id');
+        localStorage.removeItem('canvas-project-name');
+        
+        // Clear URL parameters
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('projectId');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+      
+      console.log('[ProjectSelector] Creating new project:', newProjectName.trim());
       const project = await createProject(newProjectName.trim());
+      console.log('[ProjectSelector] New project created:', { id: project.id, name: project.name });
+      
       setProjects(prev => [project, ...prev]);
       setShowCreateModal(false);
       setNewProjectName('Untitled');
       
-      // Clear any old projectId from URL before selecting new project
-      if (typeof window !== 'undefined') {
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('projectId'); // Clear old projectId
-        window.history.replaceState({}, '', newUrl.toString());
-      }
-      
-      // Select the newly created project (this will update URL with new projectId)
+      // Select the newly created project immediately (no delay needed since we already cleared localStorage)
+      console.log('[ProjectSelector] Selecting newly created project:', project.id);
       onProjectSelect(project);
     } catch (error: any) {
       console.error('Failed to create project:', error);
