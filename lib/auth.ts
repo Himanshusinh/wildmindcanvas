@@ -69,7 +69,30 @@ async function getFirebaseIdToken(): Promise<string | null> {
       return null;
     }
 
-    // Try to get token from localStorage first (faster)
+    // First, check if token was passed via URL hash (from parent window when opening project)
+    // This allows cross-subdomain authentication when localStorage isn't shared
+    if (typeof window !== 'undefined') {
+      try {
+        const hash = window.location.hash;
+        const authTokenMatch = hash.match(/authToken=([^&]+)/);
+        if (authTokenMatch) {
+          const passedToken = decodeURIComponent(authTokenMatch[1]);
+          if (passedToken && passedToken.startsWith('eyJ')) {
+            // Store it for future use
+            try {
+              localStorage.setItem('authToken', passedToken);
+            } catch {}
+            // Clear hash to avoid exposing token
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            return passedToken;
+          }
+        }
+      } catch (e) {
+        // Ignore hash parsing errors
+      }
+    }
+
+    // Try to get token from localStorage (faster)
     // These are set by the main www.wildmindai.com app when user logs in
     const storedToken = localStorage.getItem('authToken');
     if (storedToken && storedToken.startsWith('eyJ')) {
