@@ -116,27 +116,14 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
           onClick={async (e) => {
             e.stopPropagation();
             try {
-              const response = await fetch(selectedImage.url!);
-              const blob = await response.blob();
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              const extension = selectedImage.type === 'video' ? 'mp4' : 'png';
-              link.download = `media-${selectedImageIndex}-${Date.now()}.${extension}`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
+              const { downloadFile, generateDownloadFilename } = await import('@/lib/downloadUtils');
+              const extension = selectedImage.type === 'video' ? 'mp4' : selectedImage.type === 'model3d' ? 'gltf' : 'png';
+              const prefix = selectedImage.type === 'video' ? 'video' : selectedImage.type === 'model3d' ? 'model' : 'image';
+              const filename = generateDownloadFilename(prefix, `media-${selectedImageIndex}`, extension);
+              await downloadFile(selectedImage.url!, filename);
             } catch (error) {
               console.error('Failed to download media:', error);
-              const link = document.createElement('a');
-              link.href = selectedImage.url!;
-              const extension = selectedImage.type === 'video' ? 'mp4' : 'png';
-              link.download = `media-${selectedImageIndex}-${Date.now()}.${extension}`;
-              link.target = '_blank';
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              alert('Failed to download. Please try again.');
             }
           }}
           title="Download"

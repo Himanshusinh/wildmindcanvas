@@ -7389,7 +7389,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setContextMenuModalType(null);
           }
         }}
-        onDownload={() => {
+        onDownload={async () => {
           // Handle download for actual images/videos
           if (contextMenuImageIndex !== null && onImageDownload) {
             onImageDownload(contextMenuImageIndex);
@@ -7409,17 +7409,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
 
             if (urlToDownload) {
-              // Download the file
-              const link = document.createElement('a');
-              link.href = urlToDownload;
-              link.download = contextMenuModalType === 'image'
-                ? `image-${Date.now()}.png`
-                : contextMenuModalType === 'video'
-                  ? `video-${Date.now()}.mp4`
-                  : `music-${Date.now()}.mp3`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              try {
+                // Download the file using proper download utilities
+                const { downloadFile, generateDownloadFilename } = await import('@/lib/downloadUtils');
+                const extension = contextMenuModalType === 'image' ? 'png' : contextMenuModalType === 'video' ? 'mp4' : 'mp3';
+                const prefix = contextMenuModalType === 'image' ? 'image' : contextMenuModalType === 'video' ? 'video' : 'music';
+                const filename = generateDownloadFilename(prefix, contextMenuModalId || 'unknown', extension);
+                await downloadFile(urlToDownload, filename);
+              } catch (error) {
+                console.error('Failed to download:', error);
+                alert('Failed to download. Please try again.');
+              }
             }
           }
         }}

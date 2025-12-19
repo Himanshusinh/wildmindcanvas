@@ -143,46 +143,22 @@ export function createImageHandlers(
     if (!imageData?.url) return;
 
     try {
-      let downloadUrl: string;
+      const { downloadFile, generateDownloadFilename } = await import('@/lib/downloadUtils');
+      
+      // Determine file extension based on type
+      const extension = imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png';
+      const prefix = imageData.type === 'video' ? 'video' : imageData.type === 'model3d' ? 'model' : 'image';
+      
+      // Generate filename
       let filename: string;
-
-      if (imageData.url.startsWith('blob:')) {
-        // For blob URLs, download directly (local files)
-        const response = await fetch(imageData.url);
-        const blob = await response.blob();
-        filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png'}`;
-
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        return;
+      if (imageData.file?.name) {
+        filename = imageData.file.name;
       } else {
-        // Use proxy download endpoint for Zata URLs and external URLs
-        const { buildProxyDownloadUrl } = await import('@/lib/proxyUtils');
-        downloadUrl = buildProxyDownloadUrl(imageData.url);
-
-        // Extract filename from URL or use default
-        try {
-          const urlObj = new URL(imageData.url);
-          filename = urlObj.pathname.split('/').pop() || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        } catch {
-          filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        }
+        filename = generateDownloadFilename(prefix, `image-${index}`, extension);
       }
 
-      // Create download link using proxy
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      a.target = '_blank'; // Open in new tab as fallback
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Use downloadFile utility which handles Zata URLs, CORS, and proper download
+      await downloadFile(imageData.url, filename);
     } catch (error) {
       console.error('Failed to download:', error);
       alert('Failed to download. Please try again.');

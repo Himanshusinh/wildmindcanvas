@@ -4,6 +4,7 @@ import React from 'react';
 import { MusicUploadModal } from '@/app/components/GenerationCompo/MusicUploadModal';
 import Konva from 'konva';
 import { MusicModalState } from './types';
+import { downloadAudio, generateDownloadFilename } from '@/lib/downloadUtils';
 
 interface MusicModalOverlaysProps {
   musicModalStates: MusicModalState[];
@@ -112,6 +113,13 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             }
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync musicModalStates with externalMusicModals
+          }}
+          onDownload={async () => {
+            // Download the generated music if available
+            if (modalState.generatedMusicUrl) {
+              const filename = generateDownloadFilename('generated-music', modalState.id, 'mp3');
+              await downloadAudio(modalState.generatedMusicUrl, filename);
+            }
           }}
           onDuplicate={() => {
             const duplicated = {

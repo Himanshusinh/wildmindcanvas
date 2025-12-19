@@ -267,29 +267,9 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           onDownload={async () => {
             // Download the generated video if available
             if (modalState.generatedVideoUrl) {
-              try {
-                // Fetch the video to handle CORS issues
-                const response = await fetch(modalState.generatedVideoUrl);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `generated-video-${modalState.id}-${Date.now()}.mp4`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-              } catch (error) {
-                console.error('Failed to download video:', error);
-                // Fallback: try direct download
-                const link = document.createElement('a');
-                link.href = modalState.generatedVideoUrl!;
-                link.download = `generated-video-${modalState.id}-${Date.now()}.mp4`;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
+              const { downloadVideo, generateDownloadFilename } = await import('@/lib/downloadUtils');
+              const filename = generateDownloadFilename('generated-video', modalState.id, 'mp4');
+              await downloadVideo(modalState.generatedVideoUrl, filename);
             }
           }}
           onDuplicate={() => {
