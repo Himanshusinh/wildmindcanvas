@@ -139,10 +139,11 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         } else {
           // Production: Try API check first (even without cookie, in case cookie is on different subdomain)
           // The API will return 401 if no valid session, but we should still try
-          logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain)');
+          // NEW: Also check for Bearer token in case cookies aren't working
+          logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain, will also try Bearer token)');
 
           try {
-            logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API)');
+            logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API, with Bearer token fallback)');
             const isValid = await checkAuthStatus();
             logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
 
@@ -157,7 +158,20 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               setIsChecking(false);
               return;
             } else {
-              logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session');
+              logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session (cookie or Bearer token)');
+              
+              // Check if we have a token in localStorage that we can try
+              const hasToken = typeof window !== 'undefined' && (
+                localStorage.getItem('authToken') ||
+                localStorage.getItem('idToken') ||
+                localStorage.getItem('user')
+              );
+              
+              if (hasToken) {
+                logDebug('[AuthGuard] Prod mode: Token found in localStorage but API check failed - token may be expired or invalid');
+              } else {
+                logDebug('[AuthGuard] Prod mode: No token in localStorage - user needs to authenticate on www.wildmindai.com first');
+              }
             }
           } catch (apiError) {
             logDebug('[AuthGuard] Prod mode: API auth check threw error', {
@@ -227,9 +241,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           debugInfo
         });
 
-        // Add longer delay to allow logs to be read (10 seconds)
-        logDebug('[AuthGuard] Waiting 10 seconds before redirect - check debug panel below');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Shorter delay for better UX (was 10 seconds, now 2 seconds)
+        logDebug('[AuthGuard] Waiting 2 seconds before redirect - check debug panel below');
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         logDebug('[AuthGuard] Executing redirect now');
         // Encode debug info in URL so it can be read on redirect page
