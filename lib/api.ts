@@ -282,6 +282,53 @@ export async function generateImageForCanvas(
     console.warn('[generateImageForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
   }
 
+  // Helper function to convert blob URLs to data URIs
+  const convertBlobUrlToDataUri = async (blobUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('[generateImageForCanvas] Failed to convert blob URL to data URI:', error);
+      throw new Error('Failed to convert blob URL to data URI. Please try again.');
+    }
+  };
+
+  // Convert blob URLs to data URIs before sending to backend
+  let processedSourceImageUrl = sourceImageUrl;
+  if (sourceImageUrl && sourceImageUrl.startsWith('blob:')) {
+    console.log('[generateImageForCanvas] Converting blob URL to data URI:', sourceImageUrl.substring(0, 50));
+    try {
+      // Handle comma-separated blob URLs
+      const urls = sourceImageUrl.split(',').map(url => url.trim());
+      const convertedUrls = await Promise.all(
+        urls.map(url => url.startsWith('blob:') ? convertBlobUrlToDataUri(url) : url)
+      );
+      processedSourceImageUrl = convertedUrls.join(',');
+      console.log('[generateImageForCanvas] ✅ Successfully converted blob URL(s) to data URI(s)');
+    } catch (error: any) {
+      console.error('[generateImageForCanvas] ❌ Failed to convert blob URL:', error);
+      throw new Error('Failed to process image URL. Please try again or use a different image.');
+    }
+  }
+
+  let processedPreviousSceneImageUrl = previousSceneImageUrl;
+  if (previousSceneImageUrl && previousSceneImageUrl.startsWith('blob:')) {
+    console.log('[generateImageForCanvas] Converting previous scene blob URL to data URI');
+    try {
+      processedPreviousSceneImageUrl = await convertBlobUrlToDataUri(previousSceneImageUrl);
+      console.log('[generateImageForCanvas] ✅ Successfully converted previous scene blob URL to data URI');
+    } catch (error: any) {
+      console.error('[generateImageForCanvas] ❌ Failed to convert previous scene blob URL:', error);
+      throw new Error('Failed to process previous scene image URL. Please try again.');
+    }
+  }
+
   try {
     const requestBody = {
       prompt,
@@ -290,9 +337,9 @@ export async function generateImageForCanvas(
       height,
       aspectRatio, // Pass aspectRatio for proper model mapping
       imageCount, // Pass imageCount to generate multiple images
-      sourceImageUrl, // Pass comma-separated reference image URLs (backend will split them)
+      sourceImageUrl: processedSourceImageUrl, // Use processed URL (data URI instead of blob URL)
       sceneNumber, // Scene number for storyboard generation
-      previousSceneImageUrl, // Previous scene's generated image URL (for Scene 2+)
+      previousSceneImageUrl: processedPreviousSceneImageUrl, // Use processed URL (data URI instead of blob URL)
       storyboardMetadata, // Metadata for storyboard (character, background, etc.)
       meta: {
         source: 'canvas',
