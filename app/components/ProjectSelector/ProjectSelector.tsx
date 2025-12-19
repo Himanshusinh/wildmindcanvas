@@ -43,6 +43,22 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
       }
     } catch (error) {
       console.error('Failed to load projects:', error);
+      
+      // Handle authentication errors specifically
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        // Check if we're on a different subdomain and might need to log in
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        const isStudioSubdomain = hostname.includes('studio.wildmindai.com') || hostname.includes('studio');
+        
+        if (isStudioSubdomain) {
+          console.warn('[ProjectSelector] Authentication failed - user may need to log in on main site first', {
+            hostname,
+            error: error.message,
+          });
+          // Don't show error to user - they might be able to continue with a new project
+          // The error is logged for debugging
+        }
+      }
     } finally {
       setLoading(false);
     }

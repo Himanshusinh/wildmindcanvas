@@ -203,16 +203,54 @@ export async function listProjects(limit: number = 20): Promise<CanvasProject[]>
     try {
       const response = await fetch(`${CANVAS_API}/projects?limit=${limit}`, {
         credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
+        // Handle 401 Unauthorized specifically
+        if (response.status === 401) {
+          console.error('[CanvasAPI] 401 Unauthorized - Authentication required', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+          });
+          
+          // Try to get error message from response
+          let errorMessage = 'Unauthorized';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData?.message || errorData?.error || 'Unauthorized';
+          } catch {
+            // If JSON parsing fails, use status text
+            errorMessage = response.statusText || 'Unauthorized';
+          }
+          
+          // Throw a specific error that can be caught by callers
+          throw new Error(`Authentication required: ${errorMessage}. Please log in again.`);
+        }
+        
+        // For other errors, log and return empty array (existing behavior)
+        console.warn('[CanvasAPI] Failed to fetch projects:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+        });
         return [];
       }
 
       const result = await response.json();
       return result.data?.projects || [];
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      // Re-throw authentication errors so callers can handle them
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        throw error;
+      }
+      
+      // For other errors, log and return empty array
+      console.error('[CanvasAPI] Error fetching projects:', error);
       return [];
     }
   })();
