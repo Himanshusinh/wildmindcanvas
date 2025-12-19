@@ -177,14 +177,25 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
 
             if (isValid) {
               // Fetch user info
-              const user = await getCurrentUser();
-              logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username });
-              if (user && onUserLoaded) {
-                onUserLoaded(user);
+              try {
+                const user = await getCurrentUser();
+                logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
+                
+                if (user && user.uid) {
+                  if (onUserLoaded) {
+                    onUserLoaded(user);
+                  }
+                  setIsAuth(true);
+                  setIsChecking(false);
+                  return;
+                } else {
+                  logDebug('[AuthGuard] Prod mode: getCurrentUser returned empty/invalid user object - authentication may have failed');
+                  // Continue to redirect
+                }
+              } catch (userError) {
+                logDebug('[AuthGuard] Prod mode: Error fetching user info', { error: String(userError) });
+                // Continue to redirect
               }
-              setIsAuth(true);
-              setIsChecking(false);
-              return;
             } else {
               logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session (cookie or Bearer token)');
               
@@ -204,14 +215,23 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
                 logDebug('[AuthGuard] Prod mode: Retry checkAuthStatus result', { retryIsValid });
                 
                 if (retryIsValid) {
-                  const user = await getCurrentUser();
-                  logDebug('[AuthGuard] Prod mode: Retry succeeded, fetched user', { uid: user?.uid, username: user?.username });
-                  if (user && onUserLoaded) {
-                    onUserLoaded(user);
+                  try {
+                    const user = await getCurrentUser();
+                    logDebug('[AuthGuard] Prod mode: Retry succeeded, fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
+                    
+                    if (user && user.uid) {
+                      if (onUserLoaded) {
+                        onUserLoaded(user);
+                      }
+                      setIsAuth(true);
+                      setIsChecking(false);
+                      return;
+                    } else {
+                      logDebug('[AuthGuard] Prod mode: Retry getCurrentUser returned empty/invalid user object');
+                    }
+                  } catch (userError) {
+                    logDebug('[AuthGuard] Prod mode: Error fetching user info on retry', { error: String(userError) });
                   }
-                  setIsAuth(true);
-                  setIsChecking(false);
-                  return;
                 } else {
                   logDebug('[AuthGuard] Prod mode: Retry also failed - token may be expired or invalid');
                 }

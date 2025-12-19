@@ -266,8 +266,29 @@ export async function checkAuthStatus(): Promise<boolean> {
 
       if (response.ok) {
         const data = await response.json();
-        logDebug('Response data', { hasUser: !!data?.data?.user, userId: data?.data?.user?.uid });
-        return !!data?.data?.user;
+        const hasUser = !!data?.data?.user;
+        const userId = data?.data?.user?.uid;
+        
+        logDebug('Response data', { 
+          hasUser, 
+          userId,
+          responseStatus: data?.responseStatus,
+          hasData: !!data?.data,
+          userKeys: data?.data?.user ? Object.keys(data.data.user) : [],
+        });
+        
+        // CRITICAL: Only return true if we have a valid user with required fields
+        if (hasUser && userId && data?.data?.user?.username && data?.data?.user?.email) {
+          return true;
+        } else {
+          logDebug('Response OK but user object is invalid or missing required fields', {
+            hasUser,
+            hasUserId: !!userId,
+            hasUsername: !!data?.data?.user?.username,
+            hasEmail: !!data?.data?.user?.email,
+          });
+          return false;
+        }
       }
 
       // 401 or other error means not authenticated

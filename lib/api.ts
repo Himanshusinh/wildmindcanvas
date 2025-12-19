@@ -1537,37 +1537,152 @@ export async function getReplicateQueueResult(requestId: string): Promise<any> {
 export async function getCurrentUser(): Promise<{ uid: string; username: string; email: string; credits?: number } | null> {
   const cacheKey = 'getCurrentUser';
 
-  // Check cache first
+  // Check cache first (but only if it's a valid user object, not null or empty)
   const cached = getCachedRequest<{ uid: string; username: string; email: string; credits?: number } | null>(cacheKey);
   if (cached) {
-    return cached;
+    const cachedValue = await cached;
+    // Only return cached value if it's a valid user object
+    if (cachedValue && cachedValue.uid && cachedValue.username && cachedValue.email) {
+      return cachedValue;
+    }
+    // If cached value is null or invalid, don't use it - make a fresh request
+  }
+
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  let bearerToken: string | null = null;
+  try {
+    // Use the same token retrieval logic as checkAuthStatus
+    if (typeof window !== 'undefined') {
+      // Check URL hash first (token passed from parent window)
+      try {
+        const hash = window.location.hash;
+        const authTokenMatch = hash.match(/authToken=([^&]+)/);
+        if (authTokenMatch) {
+          const passedToken = decodeURIComponent(authTokenMatch[1]);
+          if (passedToken && passedToken.startsWith('eyJ')) {
+            bearerToken = passedToken;
+            // Store it for future use
+            try {
+              localStorage.setItem('authToken', passedToken);
+            } catch {}
+          }
+        }
+      } catch {}
+
+      // Try localStorage
+      if (!bearerToken) {
+        const storedToken = localStorage.getItem('authToken');
+        if (storedToken && storedToken.startsWith('eyJ')) {
+          bearerToken = storedToken;
+        }
+      }
+
+      // Try user object
+      if (!bearerToken) {
+        const userString = localStorage.getItem('user');
+        if (userString) {
+          try {
+            const userObj = JSON.parse(userString);
+            const token = userObj?.idToken || userObj?.token || null;
+            if (token && token.startsWith('eyJ')) {
+              bearerToken = token;
+            }
+          } catch {}
+        }
+      }
+
+      // Try idToken directly
+      if (!bearerToken) {
+        const idToken = localStorage.getItem('idToken');
+        if (idToken && idToken.startsWith('eyJ')) {
+          bearerToken = idToken;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[getCurrentUser] Failed to get Bearer token:', error);
   }
 
   // Create new request
   const requestPromise = (async () => {
     try {
+      // Build headers with Bearer token if available
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (bearerToken) {
+        headers['Authorization'] = `Bearer ${bearerToken}`;
+        console.log('[getCurrentUser] Using Bearer token authentication');
+      }
+
       const response = await fetch(`${API_GATEWAY_URL}/auth/me`, {
         method: 'GET',
-        credentials: 'include', // Include cookies (app_session)
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include', // Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
+        headers,
       });
 
       if (!response.ok) {
+        // If 401 and we have a Bearer token, the token might be invalid
+        if (response.status === 401) {
+          const errorText = await response.text().catch(() => '');
+          let errorData: any = null;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {}
+          
+          const errorMessage = errorData?.message || errorText || 'Unauthorized';
+          console.warn('[getCurrentUser] 401 Unauthorized', {
+            hasBearerToken: !!bearerToken,
+            errorMessage,
+            note: bearerToken ? 'Bearer token provided but rejected - token may be expired or invalid' : 'No Bearer token available - cookies not working'
+          });
+        }
         return null;
       }
 
-      const result = await response.json();
+      const result = await response.json().catch(() => {
+        console.error('[getCurrentUser] Failed to parse JSON response');
+        return null;
+      });
+
+      if (!result) {
+        console.warn('[getCurrentUser] No response data');
+        return null;
+      }
+
       if (result.responseStatus === 'success' && result.data?.user) {
-        return {
+        const user = {
           uid: result.data.user.uid,
           username: result.data.user.username,
           email: result.data.user.email,
           credits: result.data.credits,
         };
+        
+        // Validate user object has required fields
+        if (!user.uid || !user.username || !user.email) {
+          console.warn('[getCurrentUser] User object missing required fields', user);
+          return null;
+        }
+        
+        return user;
       }
 
+      // If responseStatus is 'error', log the error message
+      if (result.responseStatus === 'error') {
+        console.warn('[getCurrentUser] API returned error status', {
+          message: result.message,
+          hasData: !!result.data,
+        });
+      } else {
+        console.warn('[getCurrentUser] Response not in expected format', {
+          responseStatus: result.responseStatus,
+          hasData: !!result.data,
+          hasUser: !!result.data?.user,
+          resultKeys: Object.keys(result || {}),
+        });
+      }
+      
       return null;
     } catch (error) {
       console.error('Error fetching user info:', error);
@@ -1576,7 +1691,29 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
   })();
 
   // Cache the request
-  return setCachedRequest(cacheKey, requestPromise);
+  const cachedPromise = setCachedRequest(cacheKey, requestPromise);
+  
+  // Validate the result before returning (don't cache invalid responses)
+  return cachedPromise.then(result => {
+    // If result is null or invalid, don't cache it
+    if (!result || !result.uid || !result.username || !result.email) {
+      // Clear cache if invalid data was stored
+      try {
+        const { clearCache } = require('./apiCache');
+        clearCache(cacheKey);
+      } catch {}
+      return null;
+    }
+    return result;
+  }).catch(error => {
+    // On error, clear cache and return null
+    try {
+      const { clearCache } = require('./apiCache');
+      clearCache(cacheKey);
+    } catch {}
+    console.error('[getCurrentUser] Request failed:', error);
+    return null;
+  });
 }
 
 /**
