@@ -271,8 +271,9 @@ export async function generateImageForCanvas(
   storyboardMetadata?: Record<string, string>
 ): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
+  // Increased to 10 minutes for image-to-image generation which can take longer
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout (600 seconds)
 
   // Get Bearer token for authentication (fallback when cookies don't work)
   const bearerToken = await getBearerTokenForCanvas();
@@ -382,7 +383,7 @@ export async function generateImageForCanvas(
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout. Image generation is taking too long. Please try again.');
+      throw new Error('Request timeout. Image generation is taking longer than expected (10 minutes). This may happen with complex image-to-image generation. Please try again or use a simpler prompt.');
     }
 
     if (error.message) {
