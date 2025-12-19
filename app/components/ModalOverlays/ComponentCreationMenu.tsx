@@ -17,6 +17,8 @@ interface ComponentCreationMenuProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setUpscaleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }) => void | Promise<void>;
+  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;

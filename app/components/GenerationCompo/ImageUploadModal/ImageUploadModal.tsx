@@ -267,6 +267,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Google nano banana pro',
     'Flux 2 pro',
     'Seedream v4',
+    'Seedream 4.5',
     'Imagen 4 Ultra',
     'Imagen 4',
     'Imagen 4 Fast',
@@ -337,6 +338,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Max',
     'Flux Kontext Pro',
     'Seedream v4 4K',
+    'Seedream 4.5',
     'Runway Gen4 Image',
     'Runway Gen4 Image Turbo'
   ];
@@ -345,6 +347,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Google nano banana pro',
     'Flux 2 pro',
     'Seedream v4',
+    'Seedream 4.5',
     'Imagen 4 Ultra',
     'Imagen 4',
     'Imagen 4 Fast',
@@ -1099,11 +1102,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }
     }
 
-    // Special handling for "Google nano banana pro" which might be lowercased in some contexts
+    // Special handling for model names which might be lowercased in some contexts
     if (baseModel.toLowerCase() === 'google nano banana pro') {
       baseModel = 'Google nano banana pro';
     } else if (baseModel.toLowerCase() === 'flux 2 pro') {
       baseModel = 'Flux 2 pro';
+    } else if (baseModel.toLowerCase().includes('seedream') && (baseModel.toLowerCase().includes('4.5') || baseModel.toLowerCase().includes('v4.5') || baseModel.toLowerCase().includes('v45'))) {
+      baseModel = 'Seedream 4.5';
     }
 
     return { model: baseModel, resolution: foundResolution };
@@ -1303,7 +1308,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
-    // Seedream, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
+    // Seedream 4.5 supports 1K, 2K, 4K (check before general seedream)
+    if (
+      modelLower.includes('seedream-4.5') ||
+      modelLower.includes('seedream_v45') ||
+      modelLower.includes('seedreamv45') ||
+      (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+    ) {
+      return [
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
+      ];
+    }
+
+    // Seedream v4, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
     if (
       modelLower.includes('seedream') ||
       modelLower.includes('imagen') ||
@@ -1359,7 +1378,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       return `Flux 2 Pro ${selectedResolution}`;
     }
 
-    // For Seedream, Imagen, and Flux Pro 1.1, append resolution
+    // For Seedream 4.5, append resolution (check before general seedream)
+    if (
+      modelLower.includes('seedream-4.5') ||
+      modelLower.includes('seedream_v45') ||
+      modelLower.includes('seedreamv45') ||
+      (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+    ) {
+      return `Seedream 4.5 ${selectedResolution}`;
+    }
+
+    // For Seedream v4, Imagen, and Flux Pro 1.1, append resolution
     if (
       modelLower.includes('seedream') ||
       modelLower.includes('imagen') ||
@@ -1705,6 +1734,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   { value: '2K', label: '2K' },
                   { value: '1024x2048', label: '1024x2048' },
                 ];
+              } else if (
+                modelLower.includes('seedream-4.5') ||
+                modelLower.includes('seedream_v45') ||
+                modelLower.includes('seedreamv45') ||
+                (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+              ) {
+                // Seedream 4.5 supports 1K, 2K, 4K
+                availableResolutionsForModel = [
+                  { value: '1K', label: '1K' },
+                  { value: '2K', label: '2K' },
+                  { value: '4K', label: '4K' },
+                ];
               } else if (modelLower.includes('seedream') || modelLower.includes('imagen') || modelLower.includes('flux pro 1.1')) {
                 availableResolutionsForModel = [
                   { value: '1K', label: '1K' },
@@ -1794,6 +1835,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   const modelLower = selectedModel.toLowerCase();
                   if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
                   if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
+                  // Seedream 4.5 (check before general seedream)
+                  if (
+                    modelLower.includes('seedream-4.5') ||
+                    modelLower.includes('seedream_v45') ||
+                    modelLower.includes('seedreamv45') ||
+                    (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+                  ) {
+                    return `Seedream 4.5 ${res}`;
+                  }
                   if (
                     modelLower.includes('seedream') ||
                     modelLower.includes('imagen') ||

@@ -1,6 +1,6 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'next-scene-plugin' | 'compare';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'multiangle-camera' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'next-scene-plugin' | 'compare';
   x: number;
   y: number;
   width?: number;

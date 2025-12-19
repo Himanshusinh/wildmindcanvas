@@ -62,6 +62,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
   onOptionsChange,
   onPersistMultiangleCameraModalCreate,
   onUpdateModalState,
+  onMultiangleCamera,
   onPersistImageModalCreate,
   onUpdateImageModalState,
   connections = [],

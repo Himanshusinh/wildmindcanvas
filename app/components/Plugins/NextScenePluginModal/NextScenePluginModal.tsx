@@ -123,8 +123,23 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   const [aspectRatio, setAspectRatio] = useState<string>(initialAspectRatio || '1:1');
   const [loraScale, setLoraScale] = useState<number>(initialLoraScale !== undefined ? initialLoraScale : 1.15);
   const [trueGuidanceScale, setTrueGuidanceScale] = useState<number>(0);
+  const [resolution, setResolution] = useState<'1K' | '2K' | '4K'>('2K'); // Multi-angle resolution
+  const [multiangleModel, setMultiangleModel] = useState<string>('Google nano banana pro'); // Multi-angle model
 
   const onOptionsChangeRef = useLatestRef(onOptionsChange);
+
+  // Multi-angle shot prompts
+  const MULTIANGLE_SHOT_PROMPTS = [
+    { shot: 1, type: 'Establishing Shot', prompt: 'Wide angle, full body shot, showing the character in the environment, cinematic scale.' },
+    { shot: 2, type: 'Medium Shot', prompt: 'Waist-up framing, natural pose, eye-level camera, balanced composition.' },
+    { shot: 3, type: 'Close-up', prompt: 'Head and shoulders portrait, shallow depth of field, sharp focus on facial details.' },
+    { shot: 4, type: '180° Shift', prompt: 'View from behind the subject, looking away from camera, showing back of clothing and hair.' },
+    { shot: 5, type: 'Low Angle', prompt: 'Worm\'s-eye view looking up at the subject, making them appear heroic and powerful.' },
+    { shot: 6, type: 'High Angle', prompt: 'Bird\'s-eye view looking down from above, showing the subject and the floor/ground.' },
+    { shot: 7, type: '3/4 Profile', prompt: 'Subject turned at a 45-degree angle, highlighting facial contours and side profile.' },
+    { shot: 8, type: 'OTS Shot', prompt: 'Exact same character, standing in profile view from the side, clear silhouette, cinematic lighting, maintaining all clothing and facial details.' },
+    { shot: 9, type: 'Extreme Close-up', prompt: 'Extreme close-up of the subject\'s face, focusing on the eyes and skin texture, maintaining identical features and lighting from the original image, bokeh background.' },
+  ];
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -220,7 +235,9 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       sourceImageUrl,
       prompt,
       aspectRatio,
-      loraScale
+      loraScale,
+      mode,
+      resolution
     });
 
     if (isProcessing || externalIsProcessing) {
@@ -233,19 +250,151 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       return;
     }
 
-    // Prompt is optional
-    /*
-    if (mode === 'scene' && !prompt) {
-      alert('Please enter a prompt');
-      return;
-    }
-    */
-
     setIsProcessing(true);
     if (onOptionsChange) {
       onOptionsChange({ isProcessing: true } as any);
     }
 
+    // Handle multi-angle mode - generate 9 different shots
+    if (mode === 'multiangle') {
+      try {
+        const projectId = window.location.pathname.split('/project/')[1] || 'default-project';
+        const { generateImageForCanvas } = await import('@/lib/api');
+        
+        // Calculate frame dimensions based on aspect ratio
+        const [w, h] = aspectRatio.split(':').map(Number);
+        const ar = w && h ? (w / h) : 1;
+        const baseSize = 600;
+        const frameWidth = Math.round(baseSize);
+        const frameHeight = Math.round(baseSize / ar);
+
+        // Create 9 image modals in a 3x3 grid
+        const modalIds: string[] = [];
+        const gridCols = 3;
+        const gridGap = 650; // Gap between modals
+        const startX = x + (400 * scale + 50) / scale; // Start to the right of plugin
+        const startY = y - (gridGap * 1.5) / scale; // Center vertically
+
+        // Create all 9 modals first (optimistic UI)
+        for (let i = 0; i < 9; i++) {
+          const col = i % gridCols;
+          const row = Math.floor(i / gridCols);
+          const modalId = `image-multiangle-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+          modalIds.push(modalId);
+          
+          const targetX = startX + (col * gridGap) / scale;
+          const targetY = startY + (row * gridGap) / scale;
+
+          if (onPersistImageModalCreate) {
+            onPersistImageModalCreate({
+              id: modalId,
+              x: targetX,
+              y: targetY,
+              generatedImageUrl: null,
+              frameWidth,
+              frameHeight,
+              model: multiangleModel === 'Google nano banana pro' 
+                ? `Google nano banana pro ${resolution}` 
+                : multiangleModel === 'Seedream 4.5'
+                ? `Seedream 4.5 ${resolution}`
+                : multiangleModel, // Use selected model (with resolution appended for Seedream 4.5)
+              frame: 'Frame',
+              aspectRatio: aspectRatio || '1:1',
+              prompt: MULTIANGLE_SHOT_PROMPTS[i].prompt,
+              isGenerating: true,
+            });
+          }
+
+          // Connect plugin to each modal
+          if (onPersistConnectorCreate && id) {
+            onPersistConnectorCreate({
+              from: id,
+              to: modalId,
+              color: '#437eb5',
+              fromX: x + (100 * scale) + 20,
+              fromY: y + (50 * scale),
+              toX: targetX,
+              toY: targetY + (frameHeight / 2),
+              fromAnchor: 'send',
+              toAnchor: 'receive',
+            });
+          }
+        }
+
+        // Generate all 9 images in parallel
+        console.log('[NextScenePluginModal] Generating 9 multi-angle shots in parallel...');
+        
+        // Build model string based on selected model
+        let modelString = multiangleModel;
+        if (multiangleModel === 'Google nano banana pro') {
+          modelString = `Google nano banana pro ${resolution}`;
+        } else if (multiangleModel === 'Seedream 4.5') {
+          modelString = `Seedream 4.5 ${resolution}`;
+        }
+        
+        const generationPromises = MULTIANGLE_SHOT_PROMPTS.map(async (shot, index) => {
+          const shotPrompt = shot.prompt;
+          const modalId = modalIds[index];
+          
+          try {
+            const result = await generateImageForCanvas(
+              shotPrompt,
+              modelString, // Use selected model (with resolution for nano banana pro)
+              aspectRatio,
+              projectId,
+              undefined, // width
+              undefined, // height
+              1, // imageCount
+              sourceImageUrl, // sourceImageUrl for image-to-image
+              undefined, // sceneNumber
+              undefined, // previousSceneImageUrl
+              undefined // storyboardMetadata
+            );
+
+            // Update the modal with the result
+            if (onUpdateImageModalState) {
+              onUpdateImageModalState(modalId, {
+                generatedImageUrl: result.url,
+                isGenerating: false,
+              });
+            }
+
+            return { index, success: true, url: result.url };
+          } catch (error: any) {
+            console.error(`[NextScenePluginModal] Failed to generate shot ${shot.shot}:`, error);
+            // Update modal to show error
+            if (onUpdateImageModalState) {
+              onUpdateImageModalState(modalId, {
+                isGenerating: false,
+              });
+            }
+            return { index, success: false, error: error.message };
+          }
+        });
+
+        const results = await Promise.all(generationPromises);
+        const successCount = results.filter(r => r.success).length;
+        console.log(`[NextScenePluginModal] Multi-angle generation completed: ${successCount}/9 successful`);
+
+        if (successCount === 0) {
+          alert('All multi-angle generations failed. Please try again.');
+        } else if (successCount < 9) {
+          alert(`${successCount}/9 images generated successfully. Some generations failed.`);
+        }
+
+      } catch (error: any) {
+        console.error('[NextScenePluginModal] Multi-angle generation error:', error);
+        alert(`Multi-angle generation failed: ${error.message}`);
+      } finally {
+        setIsProcessing(false);
+        if (onOptionsChange) {
+          onOptionsChange({ isProcessing: false } as any);
+        }
+      }
+      return; // Exit early for multi-angle mode
+    }
+
+    // Original single scene/nextscene logic below
     // 1. Create a new image modal placeholder immediately (Optimistic UI)
     const newModalId = `image-nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const frameWidth = 600;
@@ -583,6 +732,14 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
                 onTrueGuidanceScaleChange={(val) => {
                   setTrueGuidanceScale(val);
                   // if (onOptionsChange) onOptionsChange({ trueGuidanceScale: val } as any); // If we add it to interface later
+                }}
+                resolution={resolution}
+                onResolutionChange={(val) => {
+                  setResolution(val);
+                }}
+                model={multiangleModel}
+                onModelChange={(val) => {
+                  setMultiangleModel(val);
                 }}
               />
               <NextSceneImageFrame

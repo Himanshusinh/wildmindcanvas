@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/types/canvas';
 import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, CompareGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, CompareGenerator, MultiangleCameraGenerator, Connector, CanvasAppState, CanvasAppSetters } from '../types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
@@ -10,6 +10,7 @@ export function useCanvasState() {
   const [videoEditorGenerators, setVideoEditorGenerators] = useState<VideoEditorGenerator[]>([]);
   const [musicGenerators, setMusicGenerators] = useState<MusicGenerator[]>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<UpscaleGenerator[]>([]);
+  const [multiangleCameraGenerators, setMultiangleCameraGenerators] = useState<MultiangleCameraGenerator[]>([]);
   const [removeBgGenerators, setRemoveBgGenerators] = useState<RemoveBgGenerator[]>([]);
   const [eraseGenerators, setEraseGenerators] = useState<EraseGenerator[]>([]);
   const [expandGenerators, setExpandGenerators] = useState<ExpandGenerator[]>([]);
@@ -30,6 +31,7 @@ export function useCanvasState() {
     videoEditorGenerators,
     musicGenerators,
     upscaleGenerators,
+    multiangleCameraGenerators,
     compareGenerators, // Added
     removeBgGenerators,
     eraseGenerators,
@@ -51,6 +53,7 @@ export function useCanvasState() {
     setVideoEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
+    setMultiangleCameraGenerators,
     setCompareGenerators, // Added
     setRemoveBgGenerators,
     setEraseGenerators,

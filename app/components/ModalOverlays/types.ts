@@ -333,8 +333,6 @@ export interface ModalOverlaysProps {
   selectedNextSceneModalIds?: string[];
   selectedStoryboardModalId?: string | null;
   selectedStoryboardModalIds?: string[];
-  selectedMultiangleCameraModalId?: string | null;
-  selectedMultiangleCameraModalIds?: string[];
   clearAllSelections: () => void;
   setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
   setSelectedTextInputId: (id: string | null) => void;
