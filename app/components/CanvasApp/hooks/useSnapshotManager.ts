@@ -471,6 +471,42 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'image-generator') {
+                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
+                let aspectRatio = element.meta?.aspectRatio;
+                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
+                  const width = element.meta.frameWidth;
+                  const height = element.meta.frameHeight;
+                  const ratio = width / height;
+                  const tolerance = 0.01;
+                  const commonRatios: Array<{ ratio: number; label: string }> = [
+                    { ratio: 1.0, label: '1:1' },
+                    { ratio: 4 / 3, label: '4:3' },
+                    { ratio: 3 / 4, label: '3:4' },
+                    { ratio: 16 / 9, label: '16:9' },
+                    { ratio: 9 / 16, label: '9:16' },
+                    { ratio: 3 / 2, label: '3:2' },
+                    { ratio: 2 / 3, label: '2:3' },
+                    { ratio: 21 / 9, label: '21:9' },
+                    { ratio: 9 / 21, label: '9:21' },
+                    { ratio: 16 / 10, label: '16:10' },
+                    { ratio: 10 / 16, label: '10:16' },
+                    { ratio: 5 / 4, label: '5:4' },
+                    { ratio: 4 / 5, label: '4:5' },
+                  ];
+                  for (const common of commonRatios) {
+                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
+                      aspectRatio = common.label;
+                      break;
+                    }
+                  }
+                  if (!aspectRatio) {
+                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+                    const divisor = gcd(width, height);
+                    const w = width / divisor;
+                    const h = height / divisor;
+                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
+                  }
+                }
                 newImageGenerators.push({ 
                   id: element.id, 
                   x: element.x || 0, 
@@ -481,7 +517,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
                   frameHeight: element.meta?.frameHeight, 
                   model: element.meta?.model, 
                   frame: element.meta?.frame, 
-                  aspectRatio: element.meta?.aspectRatio, 
+                  aspectRatio: aspectRatio, 
                   prompt: element.meta?.prompt 
                 } as any);
                 // Skip restoring connections from element.meta.connections
@@ -490,12 +526,84 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
               } else if (element.type === 'connector') {
                 // Skip - already processed in first pass
               } else if (element.type === 'video-generator') {
-                newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
+                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
+                let aspectRatio = element.meta?.aspectRatio;
+                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
+                  const width = element.meta.frameWidth;
+                  const height = element.meta.frameHeight;
+                  const ratio = width / height;
+                  const tolerance = 0.01;
+                  const commonRatios: Array<{ ratio: number; label: string }> = [
+                    { ratio: 1.0, label: '1:1' },
+                    { ratio: 4 / 3, label: '4:3' },
+                    { ratio: 3 / 4, label: '3:4' },
+                    { ratio: 16 / 9, label: '16:9' },
+                    { ratio: 9 / 16, label: '9:16' },
+                    { ratio: 3 / 2, label: '3:2' },
+                    { ratio: 2 / 3, label: '2:3' },
+                    { ratio: 21 / 9, label: '21:9' },
+                    { ratio: 9 / 21, label: '9:21' },
+                    { ratio: 16 / 10, label: '16:10' },
+                    { ratio: 10 / 16, label: '10:16' },
+                    { ratio: 5 / 4, label: '5:4' },
+                    { ratio: 4 / 5, label: '4:5' },
+                  ];
+                  for (const common of commonRatios) {
+                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
+                      aspectRatio = common.label;
+                      break;
+                    }
+                  }
+                  if (!aspectRatio) {
+                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+                    const divisor = gcd(width, height);
+                    const w = width / divisor;
+                    const h = height / divisor;
+                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
+                  }
+                }
+                newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'music-generator') {
-                newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
+                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
+                let aspectRatio = element.meta?.aspectRatio;
+                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
+                  const width = element.meta.frameWidth;
+                  const height = element.meta.frameHeight;
+                  const ratio = width / height;
+                  const tolerance = 0.01;
+                  const commonRatios: Array<{ ratio: number; label: string }> = [
+                    { ratio: 1.0, label: '1:1' },
+                    { ratio: 4 / 3, label: '4:3' },
+                    { ratio: 3 / 4, label: '3:4' },
+                    { ratio: 16 / 9, label: '16:9' },
+                    { ratio: 9 / 16, label: '9:16' },
+                    { ratio: 3 / 2, label: '3:2' },
+                    { ratio: 2 / 3, label: '2:3' },
+                    { ratio: 21 / 9, label: '21:9' },
+                    { ratio: 9 / 21, label: '9:21' },
+                    { ratio: 16 / 10, label: '16:10' },
+                    { ratio: 10 / 16, label: '10:16' },
+                    { ratio: 5 / 4, label: '5:4' },
+                    { ratio: 4 / 5, label: '4:5' },
+                  ];
+                  for (const common of commonRatios) {
+                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
+                      aspectRatio = common.label;
+                      break;
+                    }
+                  }
+                  if (!aspectRatio) {
+                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+                    const divisor = gcd(width, height);
+                    const w = width / divisor;
+                    const h = height / divisor;
+                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
+                  }
+                }
+                newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: aspectRatio, prompt: element.meta?.prompt });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.

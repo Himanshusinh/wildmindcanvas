@@ -164,21 +164,41 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
     if (!id || !connections) return [];
     const matchingConnections = connections.filter(c => c.to === id && c.toAnchor === anchor);
 
+    console.log(`[StoryboardPluginModal] getConnectedImages for anchor "${anchor}":`, {
+      storyboardId: id,
+      totalConnections: connections.length,
+      matchingConnections: matchingConnections.length,
+      connections: matchingConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor }))
+    });
+
     const imageUrls: string[] = [];
 
     matchingConnections.forEach(connection => {
       const imageNode = imageModalStates.find(img => img.id === connection.from);
       if (imageNode) {
-        if (imageNode.generatedImageUrl) imageUrls.push(imageNode.generatedImageUrl);
-        else if (imageNode.sourceImageUrl) imageUrls.push(imageNode.sourceImageUrl);
+        if (imageNode.generatedImageUrl) {
+          imageUrls.push(imageNode.generatedImageUrl);
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates (generatedImageUrl):`, imageNode.generatedImageUrl.substring(0, 50) + '...');
+        } else if (imageNode.sourceImageUrl) {
+          imageUrls.push(imageNode.sourceImageUrl);
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates (sourceImageUrl):`, imageNode.sourceImageUrl.substring(0, 50) + '...');
+        }
       } else {
         const mediaImage = images.find(img => img.elementId === connection.from);
         if (mediaImage && mediaImage.url) {
           imageUrls.push(mediaImage.url);
+          console.log(`[StoryboardPluginModal] Found image from media images:`, mediaImage.url.substring(0, 50) + '...');
+        } else {
+          console.warn(`[StoryboardPluginModal] Connection found but no image URL available:`, {
+            connectionFrom: connection.from,
+            hasImageNode: !!imageNode,
+            hasMediaImage: !!mediaImage
+          });
         }
       }
     });
 
+    console.log(`[StoryboardPluginModal] Returning ${imageUrls.length} images for anchor "${anchor}"`);
     return imageUrls;
   };
 

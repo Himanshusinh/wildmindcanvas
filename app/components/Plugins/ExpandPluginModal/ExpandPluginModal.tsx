@@ -242,17 +242,33 @@ export const ExpandPluginModal: React.FC<ExpandPluginModalProps> = ({
   }, [initialSourceImageUrl, initialLocalExpandedImageUrl]);
 
   useEffect(() => {
-    if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
-      setSourceImageUrl(connectedImageSource);
-      // Clear dimming when image is connected
-      setIsDimmed(false);
-      // Reset expanded image when source changes (only if not persisted)
-      if (!initialLocalExpandedImageUrl) {
-        setLocalExpandedImageUrl(null);
+    // Handle connection changes: update or clear source image
+    if (connectedImageSource) {
+      // Connection exists: update source image if different
+      if (connectedImageSource !== sourceImageUrl) {
+        setSourceImageUrl(connectedImageSource);
+        // Clear dimming when image is connected
+        setIsDimmed(false);
+        // Reset expanded image when source changes (only if not persisted)
+        if (!initialLocalExpandedImageUrl) {
+          setLocalExpandedImageUrl(null);
+        }
+        // Persist the source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+        }
       }
-      // Persist the source image URL (only if it actually changed from initial)
-      if (onOptionsChangeRef.current && connectedImageSource !== initialSourceImageUrl) {
-        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+    } else {
+      // Connection deleted: clear source image if it was from a connection
+      // Only clear if current sourceImageUrl matches what was connected (or if no initialSourceImageUrl was set)
+      if (sourceImageUrl && (!initialSourceImageUrl || sourceImageUrl === initialSourceImageUrl)) {
+        setSourceImageUrl(null);
+        // Clear dimming
+        setIsDimmed(false);
+        // Clear persisted source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: null });
+        }
       }
     }
   }, [connectedImageSource, initialLocalExpandedImageUrl, initialSourceImageUrl, sourceImageUrl]);

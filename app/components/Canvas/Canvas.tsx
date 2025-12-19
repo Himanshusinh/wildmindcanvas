@@ -891,35 +891,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleScriptGenerationStart = (textModalId: string) => {
-    const storyboardTargets = (connections ?? [])
-      .filter(conn => conn.from === textModalId)
-      .map(conn => conn.to)
-      .filter(Boolean);
-    if (!storyboardTargets.length) return;
-
-    // Find target plugin IDs either directly or via script frame ID
-    const targetPluginIds = new Set<string>();
-
-    storyboardTargets.forEach(targetId => {
-      // Check if target is a storyboard plugin
-      if (storyboardModalStates.some(modal => modal.id === targetId)) {
-        targetPluginIds.add(targetId);
-      }
-      // Check if target is a script frame (format: script-{pluginId})
-      else if (targetId.startsWith('script-')) {
-        const potentialPluginId = targetId.replace('script-', '');
-        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
-          targetPluginIds.add(potentialPluginId);
-        }
-      }
-    });
-
-    if (targetPluginIds.size === 0) return;
-
-    for (const id of targetPluginIds) {
-      // Ensure script frame exists and set loading state
-      ensureScriptFrameForPlugin(id, '', true);
-    }
+    // Script generation starts - no need to create script frames anymore
+    // The generated story will be shown in the text input itself
+    console.log('[Canvas] Script generation started for text input:', textModalId);
   };
 
   const handleTextScriptGenerated = async (textModalId: string, script: string) => {
@@ -927,13 +901,25 @@ export const Canvas: React.FC<CanvasProps> = ({
     const sanitizedScript = sanitizeScriptOutput(script);
     if (!sanitizedScript) return;
 
+    // Update the text input's value to show the generated story
+    setTextInputStates(prev => prev.map(t => 
+      t.id === textModalId ? { ...t, value: sanitizedScript } : t
+    ));
+    
+    // Persist the text input update
+    if (onPersistTextModalMove) {
+      Promise.resolve(onPersistTextModalMove(textModalId, { value: sanitizedScript })).catch(console.error);
+    }
+
+    // Find connected storyboard plugins
     const storyboardTargets = (connections ?? [])
       .filter(conn => conn.from === textModalId)
       .map(conn => conn.to)
       .filter(Boolean);
+    
     if (!storyboardTargets.length) return;
 
-    // Find target plugin IDs either directly or via script frame ID
+    // Find target plugin IDs (only direct storyboard plugin connections, no script frames)
     const targetPluginIds = new Set<string>();
 
     storyboardTargets.forEach(targetId => {
@@ -941,20 +927,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (storyboardModalStates.some(modal => modal.id === targetId)) {
         targetPluginIds.add(targetId);
       }
-      // Check if target is a script frame (format: script-{pluginId})
-      else if (targetId.startsWith('script-')) {
-        const potentialPluginId = targetId.replace('script-', '');
-        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
-          targetPluginIds.add(potentialPluginId);
-        }
-      }
     });
 
     if (targetPluginIds.size === 0) return;
 
     const storyboardIds = Array.from(targetPluginIds);
 
-    // Update storyboard modals with the new script text
+    // Update storyboard modals with the new script text (for reference)
     setStoryboardModalStates(prev => {
       let changed = false;
       const updated = prev.map(modal => {
@@ -969,21 +948,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       return changed ? updated : prev;
     });
 
+    // Persist storyboard script text
     for (const id of storyboardIds) {
-      // Clear loading state and set text
-      const scriptFrameDetails = ensureScriptFrameForPlugin(id, sanitizedScript, false);
-
       if (onPersistStoryboardModalMove) {
         Promise.resolve(onPersistStoryboardModalMove(id, { scriptText: sanitizedScript })).catch(console.error);
       }
-
-      // Automatically generate scenes from the story
-      if (scriptFrameDetails) {
-        console.log('[Canvas] Automatically triggering scene generation for script frame:', scriptFrameDetails.id);
-        // Pass details directly to avoid stale state issues
-        handleGenerateScenes(scriptFrameDetails.id, scriptFrameDetails.text, scriptFrameDetails);
-      }
     }
+
+    // Note: We don't automatically generate scenes here anymore
+    // User must click "Generate Storyboard" button to generate scenes
   };
 
   const handleDeleteScriptFrame = (frameId: string) => {
@@ -1301,7 +1274,39 @@ export const Canvas: React.FC<CanvasProps> = ({
       specialRequest?: string;
     }
   ) => {
-    console.log('[Canvas] Creating stitched image for storyboard:', storyboardId);
+    console.log('[Canvas] Generate Storyboard clicked for:', storyboardId);
+
+    // Get the storyboard modal
+    const storyboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+    if (!storyboard) {
+      console.warn('[Canvas] Storyboard not found:', storyboardId);
+      return;
+    }
+
+    // Get script text from connected text input or from storyboard's scriptText
+    let scriptText: string | null = null;
+    
+    // Find connected text input
+    const textInputConnection = (connections ?? []).find(conn => conn.to === storyboardId);
+    if (textInputConnection) {
+      const connectedTextInput = textInputStates.find(t => t.id === textInputConnection.from);
+      if (connectedTextInput?.value) {
+        scriptText = connectedTextInput.value;
+        console.log('[Canvas] ✅ Found script from connected text input:', scriptText.substring(0, 100) + '...');
+      }
+    }
+    
+    // Fallback to storyboard's stored scriptText
+    if (!scriptText && storyboard.scriptText) {
+      scriptText = storyboard.scriptText;
+      console.log('[Canvas] ✅ Using script from storyboard scriptText:', scriptText.substring(0, 100) + '...');
+    }
+
+    if (!scriptText || !scriptText.trim()) {
+      console.warn('[Canvas] ⚠️ No script text found. Please connect a text input with a generated story.');
+      alert('Please connect a text input with a generated story first.');
+      return;
+    }
 
     // Create stitched reference image from all connected images
     let stitchedImageUrl: string | undefined = undefined;
@@ -1333,29 +1338,46 @@ export const Canvas: React.FC<CanvasProps> = ({
     } catch (error) {
       console.error('[Canvas] ❌ Error creating stitched image:', error);
     }
+
+    // Generate scenes directly from the script text
+    await handleGenerateScenesFromStoryboard(storyboardId, scriptText);
   };
 
-  // Scene frame handlers
-  const handleGenerateScenes = async (
-    scriptFrameId: string,
-    overrideText?: string,
-    overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
+  // Scene frame handlers - NEW: Generate scenes directly from storyboard (no script frames)
+  const handleGenerateScenesFromStoryboard = async (
+    storyboardId: string,
+    scriptText: string
   ) => {
-    const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
-    const textToUse = overrideText || scriptFrame?.text;
-    const frameToUse = overrideFrame || scriptFrame;
-
-    if (!frameToUse || !textToUse) {
-      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+    if (!storyboardId || !scriptText || !scriptText.trim()) {
+      console.warn('[Canvas] Missing storyboardId or scriptText');
       return;
     }
 
-    // Get the storyboard ID (parent of script frame)
-    const storyboardId = scriptFrame?.pluginId;
-    if (!storyboardId) {
-      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+    // Get the storyboard modal for positioning
+    const storyboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+    if (!storyboard) {
+      console.warn('[Canvas] Storyboard not found:', storyboardId);
       return;
     }
+
+    const textToUse = scriptText;
+    const frameToUse = {
+      x: storyboard.x,
+      y: storyboard.y,
+      frameWidth: storyboard.frameWidth || 400,
+      frameHeight: storyboard.frameHeight || 500,
+    };
+
+    // Continue with scene generation logic (same as before, but without script frame dependency)
+    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+  };
+
+  // Internal function to generate scenes (extracted from old handleGenerateScenes)
+  const generateScenesFromStoryboardInternal = async (
+    storyboardId: string,
+    textToUse: string,
+    frameToUse: { x: number; y: number; frameWidth: number; frameHeight: number }
+  ) => {
 
     try {
       // Log the story text and detect @mentions before sending to backend
@@ -1368,7 +1390,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         storyLength: textToUse.length,
         detectedMentions: detectedMentions,
         mentionCount: detectedMentions.length,
-        scriptFrameId,
         storyboardId,
       });
 
@@ -1406,7 +1427,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Import scene utilities dynamically for positioning
       const { calculateSceneFramePositions } = await import('@/app/components/Plugins/StoryboardPluginModal/sceneUtils');
 
-      // Calculate positions for scene frames (grid layout to the right of script frame)
+      // Calculate positions for scene frames (grid layout to the right of storyboard plugin)
       const positions = calculateSceneFramePositions(
         frameToUse.x,
         frameToUse.y,
@@ -1450,8 +1471,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         });
 
         return {
-          id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
-          scriptFrameId: scriptFrameId,
+          id: `scene-${storyboardId}-${scene.scene_number}-${Date.now()}`,
+          scriptFrameId: storyboardId, // Use storyboardId as scriptFrameId for compatibility (no script frames anymore)
           sceneNumber: scene.scene_number,
           x: positions[index].x,
           y: positions[index].y,
@@ -1482,11 +1503,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       });
 
-      // Create connections from script frame to scene frames
+      // Create connections from storyboard to scene frames (no script frame anymore)
       const newConnections = newSceneFrames.map(sceneFrame => ({
-        from: scriptFrameId,
+        from: storyboardId,
         to: sceneFrame.id,
-        color: '#437eb5', // Blue connection for script → scene
+        color: '#437eb5', // Blue connection for storyboard → scene
       }));
 
       // Update connections state and persist
@@ -1909,6 +1930,33 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.error('[Canvas] Error generating scenes:', error);
       alert('Failed to generate scenes. Please try again.');
     }
+  };
+
+  // Backward compatibility: Keep old handleGenerateScenes for script frames (if any exist)
+  // This allows old projects with script frames to still work
+  const handleGenerateScenes = async (
+    scriptFrameId: string,
+    overrideText?: string,
+    overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
+  ) => {
+    const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
+    const textToUse = overrideText || scriptFrame?.text;
+    const frameToUse = overrideFrame || scriptFrame;
+
+    if (!frameToUse || !textToUse) {
+      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+      return;
+    }
+
+    // Get the storyboard ID (parent of script frame)
+    const storyboardId = scriptFrame?.pluginId;
+    if (!storyboardId) {
+      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+      return;
+    }
+
+    // Use the new function with storyboardId
+    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
   };
 
   const handleDeleteSceneFrame = (frameId: string) => {
@@ -2870,44 +2918,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   }, [storyboardModalStates]);
 
-  // Automatically generate scenes when new script frames are created
-  useEffect(() => {
-    scriptFrameModalStates.forEach(frame => {
-      // Check if this frame has already been processed for scene generation
-      const hasScenes = sceneFrameModalStates.some(scene => scene.scriptFrameId === frame.id);
-      const alreadyProcessed = processedScriptFramesRef.current.has(frame.id);
-
-      // Validate that the script text is complete and meaningful
-      const hasValidScript = frame.text &&
-        frame.text.trim().length > 50 && // At least 50 characters
-        !frame.text.includes('...') && // Not a loading indicator
-        !frame.text.toLowerCase().includes('generating'); // Not still generating
-
-      // Check if the parent storyboard exists and has completed script generation
-      const parentStoryboard = storyboardModalStates.find(s => s.id === frame.pluginId);
-      const storyboardHasScript = parentStoryboard && parentStoryboard.scriptText && parentStoryboard.scriptText.trim().length > 0;
-
-      // Only generate scenes for new frames that:
-      // 1. Don't have scenes yet
-      // 2. Have valid, complete script text
-      // 3. Haven't been processed before
-      // 4. Have a parent storyboard with a complete script
-      if (!hasScenes && hasValidScript && !alreadyProcessed && storyboardHasScript) {
-        processedScriptFramesRef.current.add(frame.id);
-
-        console.log('[Canvas] Auto-generating scenes for script frame:', frame.id, 'Script length:', frame.text.length);
-
-        // Add a small delay to ensure the script frame is fully rendered and stable
-        setTimeout(() => {
-          handleGenerateScenes(frame.id).catch(err => {
-            console.error('[Canvas] Auto scene generation failed:', err);
-            // Remove from processed set on failure so it can be retried
-            processedScriptFramesRef.current.delete(frame.id);
-          });
-        }, 1000); // 1 second delay to ensure stability
-      }
-    });
-  }, [scriptFrameModalStates.length, scriptFrameModalStates.map(f => f.id).join(','), scriptFrameModalStates.map(f => f.text).join('|'), sceneFrameModalStates.length, storyboardModalStates.length]);
+  // NOTE: Removed automatic scene generation from script frames
+  // Script frames are no longer used - stories are shown in text input directly
+  // Scenes are generated when user clicks "Generate Storyboard" button
 
   useEffect(() => {
     if (!onPersistConnectorCreate) return;

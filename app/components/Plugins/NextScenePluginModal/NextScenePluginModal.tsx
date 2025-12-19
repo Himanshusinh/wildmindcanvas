@@ -177,9 +177,9 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   }, [initialMode, initialSourceImageUrl, initialLocalNextSceneImageUrl]);
 
   useEffect(() => {
-    // If we have connected images, update local state
+    // Handle connection changes: update or clear source image
     if (connectedImageSources.length > 0) {
-      // Always use the first one as primary source for single scene mode
+      // Connection exists: update source image if different
       const firstSource = connectedImageSources[0];
       if (firstSource !== sourceImageUrl) {
         setSourceImageUrl(firstSource);
@@ -188,8 +188,21 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         if (!initialLocalNextSceneImageUrl) {
           setLocalNextSceneImageUrl(null);
         }
-        if (onOptionsChangeRef.current && firstSource !== initialSourceImageUrl) {
+        // Persist the source image URL
+        if (onOptionsChangeRef.current) {
           onOptionsChangeRef.current({ sourceImageUrl: firstSource });
+        }
+      }
+    } else {
+      // Connection deleted: clear source image if it was from a connection
+      // Only clear if current sourceImageUrl matches what was connected (or if no initialSourceImageUrl was set)
+      if (sourceImageUrl && (!initialSourceImageUrl || sourceImageUrl === initialSourceImageUrl)) {
+        setSourceImageUrl(null);
+        // Clear dimming
+        setIsDimmed(false);
+        // Clear persisted source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: null });
         }
       }
     }
