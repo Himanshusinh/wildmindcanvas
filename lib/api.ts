@@ -3,6 +3,63 @@ import { getCachedRequest, setCachedRequest } from './apiCache';
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 const API_GATEWAY_URL = `${API_BASE_URL}/api`;
 
+/**
+ * Get Bearer token for authentication (fallback when cookies don't work)
+ * Shared helper function for all canvas API calls
+ */
+async function getBearerTokenForCanvas(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+
+    // Check URL hash first (token passed from parent window)
+    try {
+      const hash = window.location.hash;
+      const authTokenMatch = hash.match(/authToken=([^&]+)/);
+      if (authTokenMatch) {
+        const passedToken = decodeURIComponent(authTokenMatch[1]);
+        if (passedToken && passedToken.startsWith('eyJ')) {
+          // Store it for future use
+          try {
+            localStorage.setItem('authToken', passedToken);
+          } catch {}
+          return passedToken;
+        }
+      }
+    } catch {}
+
+    // Try localStorage
+    const storedToken = localStorage.getItem('authToken');
+    if (storedToken && storedToken.startsWith('eyJ')) {
+      return storedToken;
+    }
+
+    // Try user object
+    const userString = localStorage.getItem('user');
+    if (userString) {
+      try {
+        const userObj = JSON.parse(userString);
+        const token = userObj?.idToken || userObj?.token || null;
+        if (token && token.startsWith('eyJ')) {
+          return token;
+        }
+      } catch {}
+    }
+
+    // Try idToken directly
+    const idToken = localStorage.getItem('idToken');
+    if (idToken && idToken.startsWith('eyJ')) {
+      return idToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[getBearerTokenForCanvas] Error getting token:', error);
+    return null;
+  }
+}
+
 export interface ImageGenerationRequest {
   prompt: string;
   model: string;
@@ -217,6 +274,13 @@ export async function generateImageForCanvas(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  const bearerToken = await getBearerTokenForCanvas();
+  
+  if (!bearerToken) {
+    console.warn('[generateImageForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
+  }
+
   try {
     const requestBody = {
       prompt,
@@ -235,8 +299,19 @@ export async function generateImageForCanvas(
       },
     };
 
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+      console.log('[generateImageForCanvas] Using Bearer token authentication');
+    }
+
     console.log('[generateImageForCanvas] 📤 STEP 6: Sending request to backend:', {
       url: `${API_GATEWAY_URL}/canvas/generate`,
+      hasBearerToken: !!bearerToken,
       requestBody: {
         ...requestBody,
         sourceImageUrl: sourceImageUrl || 'NONE',
@@ -249,10 +324,8 @@ export async function generateImageForCanvas(
 
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate`, {
       method: 'POST',
-      credentials: 'include', // Include cookies (app_session)
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      credentials: 'include', // Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
+      headers,
       signal: controller.signal,
       body: JSON.stringify(requestBody),
     });
@@ -337,13 +410,28 @@ export async function generateVideoForCanvas(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  const bearerToken = await getBearerTokenForCanvas();
+  
+  if (!bearerToken) {
+    console.warn('[generateVideoForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
+  }
+
   try {
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+      console.log('[generateVideoForCanvas] Using Bearer token authentication');
+    }
+
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-video`, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         prompt,
