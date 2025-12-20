@@ -143,7 +143,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
     }
   }, [isModelDropdownOpen, isAspectRatioDropdownOpen, isDurationDropdownOpen, isResolutionDropdownOpen, onSetIsModelDropdownOpen, onSetIsAspectRatioDropdownOpen, onSetIsDurationDropdownOpen, onSetIsResolutionDropdownOpen]);
 
-  if (isUploadedVideo) return null;
+
 
   return (
     <div
@@ -172,8 +172,6 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
-      onMouseEnter={() => onSetIsHovered(true)}
-      onMouseLeave={() => onSetIsHovered(false)}
     >
       {/* Prompt Input */}
       <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>

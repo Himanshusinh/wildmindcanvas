@@ -1,6 +1,6 @@
 import { getCachedRequest, setCachedRequest } from './apiCache';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.wildmindai.com';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 const API_GATEWAY_URL = `${API_BASE_URL}/api`;
 
 export interface ImageGenerationRequest {

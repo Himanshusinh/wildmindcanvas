@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ExpandModalState, VectorizeModalState, StoryboardModalState, ScriptFrameModalState } from './types';
+import { TextModalState, ImageModalState, VideoModalState, MusicModalState, UpscaleModalState, RemoveBgModalState, EraseModalState, ExpandModalState, VectorizeModalState, NextSceneModalState, StoryboardModalState, ScriptFrameModalState } from './types';
 
 export const getComponentType = (id?: string | null): string | null => {
   if (!id) return null;
@@ -52,6 +52,7 @@ export const computeNodeCenter = (
   eraseModalStates?: EraseModalState[],
   expandModalStates?: ExpandModalState[],
   vectorizeModalStates?: VectorizeModalState[],
+  nextSceneModalStates?: NextSceneModalState[],
   storyboardModalStates?: StoryboardModalState[],
   scriptFrameModalStates?: ScriptFrameModalState[],
   sceneFrameModalStates?: any[]
@@ -111,6 +112,8 @@ export const computeNodeCenter = (
         if (ep) return { x: ep.x, y: ep.y, width: ep.frameWidth || 400, height: ep.frameHeight || 500 };
         const vzm = vectorizeModalStates?.find(m => m.id === id);
         if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
+        const nsm = nextSceneModalStates?.find(m => m.id === id);
+        if (nsm) return { x: nsm.x, y: nsm.y, width: nsm.frameWidth || 400, height: nsm.frameHeight || 500 };
         const sb = storyboardModalStates?.find(m => m.id === id);
         if (sb) return { x: sb.x, y: sb.y, width: sb.frameWidth || 400, height: sb.frameHeight || 500 };
         const sfModal = scriptFrameModalStates?.find(m => m.id === id);
@@ -139,9 +142,13 @@ export const computeStrokeForScale = (base: number, scale: number): number => {
   return Math.max(0.5, Math.min(8, Math.round(raw * 10) / 10));
 };
 
-export const computeCircleRadiusForScale = (base: number, scale: number): number => {
-  const effectiveScale = typeof scale === 'number' && !isNaN(scale) ? scale : 1;
-  const raw = base * effectiveScale;
-  return Math.max(1, Math.min(8, Math.round(raw * 10) / 10));
+export const computeCircleRadiusForScale = (_base: number, _scale: number): number => {
+  // Background dots are 4px diameter (2px radius) and maintain constant visual size
+  // Since connection line circles are in fixed-position SVG (screen space), not canvas space,
+  // they MUST use a fixed pixel size to maintain constant visual size like background dots
+  // Scale parameter is intentionally ignored - circles should never scale with zoom
+  // Match background dot size exactly: 2px radius (4px diameter)
+  // This ensures circles appear the same size regardless of zoom level (in or out)
+  // The circles will maintain constant visual size just like the background dots do
+  return 2;
 };
-

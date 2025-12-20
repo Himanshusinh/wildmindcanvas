@@ -18,12 +18,12 @@ interface CanvasImageProps {
   scale?: number;
 }
 
-export const CanvasImage: React.FC<CanvasImageProps> = ({ 
-  imageData, 
-  index, 
-  onUpdate, 
-  onSelect, 
-  isSelected: externalIsSelected, 
+export const CanvasImage: React.FC<CanvasImageProps> = ({
+  imageData,
+  index,
+  onUpdate,
+  onSelect,
+  isSelected: externalIsSelected,
   onDelete,
   stageRef,
   position = { x: 0, y: 0 },
@@ -68,7 +68,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     if (!isDraggingImage && !justFinishedDragRef.current) {
       const incomingX = imageData.x || 50;
       const incomingY = imageData.y || 50;
-      
+
       // Check if this is a new position from parent (different from what we last received)
       const lastReceived = lastReceivedPositionRef.current;
       if (!lastReceived || lastReceived.x !== incomingX || lastReceived.y !== incomingY) {
@@ -104,7 +104,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const url = getImageUrl(imageData.url); // Type narrowing
 
   useEffect(() => {
-    
+
     if (isVideo) {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
@@ -113,7 +113,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       video.loop = false;
       video.playsInline = true;
       video.preload = 'metadata';
-      
+
       video.onloadedmetadata = () => {
         // Ensure video is paused and at first frame
         video.pause();
@@ -122,7 +122,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         originalAspectRatio.current = video.videoWidth / video.videoHeight;
         setDuration(video.duration || 0);
         videoRef.current = video;
-        
+
         // Force initial frame display after a small delay to ensure video is ready
         setTimeout(() => {
           if (videoRef.current && imageRef.current) {
@@ -131,7 +131,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           }
         }, 100);
       };
-      
+
       // Ensure first frame is loaded and displayed
       video.onloadeddata = () => {
         if (video.readyState >= 2) { // HAVE_CURRENT_DATA
@@ -142,7 +142,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           }
         }
       };
-      
+
       // When video seeks to first frame, update the display
       video.onseeked = () => {
         if (video.currentTime === 0 && imageRef.current) {
@@ -150,7 +150,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           imageRef.current.getLayer()?.batchDraw();
         }
       };
-      
+
       video.onplay = () => setIsPlaying(true);
       video.onpause = () => setIsPlaying(false);
       video.onended = () => {
@@ -170,7 +170,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           });
         }
       };
-      
+
       return () => {
         if (videoRef.current) {
           videoRef.current.pause();
@@ -206,11 +206,11 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           animRef.current = requestAnimationFrame(anim);
         }
       };
-      
+
       if (isPlaying) {
         anim();
       }
-      
+
       return () => {
         if (animRef.current) {
           cancelAnimationFrame(animRef.current);
@@ -218,19 +218,19 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       };
     }
   }, [isVideo, isPlaying]);
-  
+
   // Generate unique ID for connection nodes
   const nodeId = imageData.elementId || `canvas-image-${index}`;
 
   // Check if this is an uploaded image (from local storage or library)
-  const isUploadedMedia = 
+  const isUploadedMedia =
     imageData.file || // Direct file upload
     (imageData.url && (
-      imageData.url.toLowerCase().startsWith('blob:') || 
+      imageData.url.toLowerCase().startsWith('blob:') ||
       imageData.url.toLowerCase().includes('/input/') ||
       (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
     ));
-  
+
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -240,10 +240,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     // Dispatch event for connection nodes to detect hover
     if (isUploadedMedia && nodeId) {
       try {
-        window.dispatchEvent(new CustomEvent('canvas-image-hover', { 
-          detail: { index, nodeId, hovered: true } 
+        window.dispatchEvent(new CustomEvent('canvas-image-hover', {
+          detail: { index, nodeId, hovered: true }
         }));
-      } catch (err) {}
+      } catch (err) { }
     }
   };
 
@@ -255,10 +255,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       // Dispatch event for connection nodes to detect hover end
       if (isUploadedMedia && nodeId) {
         try {
-          window.dispatchEvent(new CustomEvent('canvas-image-hover', { 
-            detail: { index, nodeId, hovered: false } 
+          window.dispatchEvent(new CustomEvent('canvas-image-hover', {
+            detail: { index, nodeId, hovered: false }
           }));
-        } catch (err) {}
+        } catch (err) { }
       }
     }, 100);
   };
@@ -323,23 +323,23 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const handleProgressClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isVideo || !videoRef.current || !duration) return;
     e.cancelBubble = true;
-    
+
     const stage = e.target.getStage();
     if (!stage) return;
-    
+
     const pointerPos = stage.getPointerPosition();
     if (!pointerPos) return;
-    
+
     // Get the absolute position of the progress bar
     const progressBarStartX = x + 40; // Left edge of progress bar (accounting for play button)
     const progressBarWidth = width - 100; // Width of progress bar
     const progressBarEndX = progressBarStartX + progressBarWidth;
-    
+
     // Calculate progress based on click position
     const clickX = pointerPos.x;
     const relativeX = clickX - progressBarStartX;
     const progress = Math.max(0, Math.min(1, relativeX / progressBarWidth));
-    
+
     if (videoRef.current) {
       videoRef.current.currentTime = progress * duration;
       setCurrentTime(progress * duration);
@@ -348,16 +348,16 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
   const handleProgressDrag = (e: Konva.KonvaEventObject<DragEvent>) => {
     if (!isVideo || !videoRef.current || !duration) return;
-    
+
     const node = e.target;
     const progressBarWidth = width - 100;
-    
+
     // Get the handle's x position relative to the progress bar group
     // Since the handle is now a Group, get its x position
     const handleX = node.x();
     const progress = Math.max(0, Math.min(1, handleX / progressBarWidth));
     const newTime = progress * duration;
-    
+
     if (videoRef.current) {
       // Update video position smoothly during drag
       videoRef.current.currentTime = newTime;
@@ -483,10 +483,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         }}
         onTransform={(e) => {
           // Disable transform for uploaded images - frame size should be static like generation frames
-          const isUploaded = 
+          const isUploaded =
             imageData.file || // Direct file upload
             (imageData.url && (
-              imageData.url.toLowerCase().startsWith('blob:') || 
+              imageData.url.toLowerCase().startsWith('blob:') ||
               imageData.url.toLowerCase().includes('/input/') ||
               (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
             ));
@@ -506,10 +506,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         }}
         onTransformEnd={(e) => {
           // Disable transform for uploaded images - frame size should be static like generation frames
-          const isUploaded = 
+          const isUploaded =
             imageData.file || // Direct file upload
             (imageData.url && (
-              imageData.url.toLowerCase().startsWith('blob:') || 
+              imageData.url.toLowerCase().startsWith('blob:') ||
               imageData.url.toLowerCase().includes('/input/') ||
               (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
             ));
@@ -567,7 +567,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           shadowColor="rgba(0, 0, 0, 1)"
           shadowOffsetY={8}
         />
-        
+
         {/* Image/Video clipped to frame with rounded corners - fills entire frame */}
         <Group
           clipFunc={(ctx) => {
@@ -602,8 +602,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       </Group>
       {/* Video controls overlay - appears on hover */}
       {isVideo && isHovered && (
-        <Group 
-          x={x} 
+        <Group
+          x={x}
           y={y + height - 50}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -620,7 +620,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             strokeWidth={isSelectedState ? 4 : 0}
             listening={false}
           />
-          
+
           {/* Play/Pause button */}
           <Group
             x={15}
@@ -658,7 +658,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               fill="transparent"
               onClick={handleProgressClick}
             />
-            
+
             {/* Progress bar background track - larger and more visible */}
             <Rect
               x={0}
@@ -669,7 +669,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               cornerRadius={4}
               listening={false}
             />
-            
+
             {/* Progress bar filled - shows progress */}
             <Rect
               x={0}
@@ -680,7 +680,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               cornerRadius={4}
               listening={false}
             />
-            
+
             {/* Progress bar handle - larger and more visible */}
             <Group
               x={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
@@ -731,7 +731,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           />
         </Group>
       )}
-      
+
       {/* Center play/pause button - only show on hover */}
       {isVideo && isHovered && (
         <Group
@@ -764,7 +764,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         </Group>
       )}
       {/* Resize handles removed - user requested to remove 4 corner dots */}
-      
+
       {/* Connection nodes are now rendered outside Konva Layer via CanvasImageConnectionNodes component */}
     </>
   );

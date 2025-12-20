@@ -128,6 +128,31 @@ export interface VectorizeGenerator {
   isVectorizing?: boolean;
 }
 
+export interface NextSceneGenerator {
+  id: string;
+  x: number;
+  y: number;
+  nextSceneImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localNextSceneImageUrl?: string | null;
+  mode?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  isProcessing?: boolean;
+}
+
+export interface MultiangleGenerator {
+  id: string;
+  x: number;
+  y: number;
+  multiangleImageUrl?: string | null;
+  sourceImageUrl?: string | null;
+  localMultiangleImageUrl?: string | null;
+  frameWidth?: number;
+  frameHeight?: number;
+  isProcessing?: boolean;
+}
+
 export interface StoryboardGenerator {
   id: string;
   x: number;
@@ -205,10 +230,13 @@ export interface CanvasAppState {
   eraseGenerators: EraseGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
+  nextSceneGenerators: NextSceneGenerator[];
+  multiangleGenerators: MultiangleGenerator[];
   storyboardGenerators: StoryboardGenerator[];
   scriptFrameGenerators: ScriptFrameGenerator[];
   sceneFrameGenerators: SceneFrameGenerator[];
   textGenerators: TextGenerator[];
+  canvasTextStates?: import('@/app/components/ModalOverlays/types').CanvasTextState[];
   connectors: Connector[];
   generationQueue: GenerationQueueItem[];
 }
@@ -224,6 +252,8 @@ export interface CanvasAppSetters {
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
+  setNextSceneGenerators: React.Dispatch<React.SetStateAction<NextSceneGenerator[]>>;
+  setMultiangleGenerators: React.Dispatch<React.SetStateAction<MultiangleGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;
   setScriptFrameGenerators: React.Dispatch<React.SetStateAction<ScriptFrameGenerator[]>>;
   setSceneFrameGenerators: React.Dispatch<React.SetStateAction<SceneFrameGenerator[]>>;

@@ -17,6 +17,7 @@ import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
 import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY } from '@/lib/canvasHelpers';
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/lib/api';
 import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
+import { CanvasTextState } from '@/app/components/ModalOverlays/types';
 
 // ... (rest of imports)
 
@@ -33,7 +34,8 @@ interface CanvasProps {
   onImageDuplicate?: (index: number) => void;
   onImagesDrop?: (files: File[]) => void;
   onLibraryMediaDrop?: (media: { id: string; url: string; type: 'image' | 'video' | 'music' | 'uploaded'; thumbnail?: string; prompt?: string; model?: string; createdAt?: string; storagePath?: string; mediaId?: string }, x: number, y: number) => void;
-  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin';
+  selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text';
+  onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text') => void;
   onTextCreate?: (text: string, x: number, y: number) => void;
   toolClickCounter?: number;
   isImageModalOpen?: boolean;
@@ -75,6 +77,8 @@ interface CanvasProps {
   externalEraseModals?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>;
   externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
   externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
+  externalNextSceneModals?: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
+  externalMultiangleModals?: Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
   externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
   externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
@@ -113,8 +117,16 @@ interface CanvasProps {
   onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   // Vectorize plugin persistence callbacks
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
-  onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
+  onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
   onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
+  // NextScene plugin persistence callbacks
+  onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
+  onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
+  // Multiangle plugin persistence callbacks
+  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
+  onPersistMultiangleModalDelete?: (id: string) => void | Promise<void>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
@@ -129,7 +141,15 @@ interface CanvasProps {
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
-  // Connector props
+  canvasTextStates?: import('@/app/components/ModalOverlays/types').CanvasTextState[];
+  setCanvasTextStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CanvasTextState[]>>;
+  selectedCanvasTextId?: string | null;
+  selectedCanvasTextIds?: string[];
+  setSelectedCanvasTextId?: (id: string | null) => void;
+  setSelectedCanvasTextIds?: (ids: string[]) => void;
+  onPersistCanvasTextCreate?: (modal: import('@/app/components/ModalOverlays/types').CanvasTextState) => void | Promise<void>;
+  onPersistCanvasTextMove?: (id: string, updates: Partial<import('@/app/components/ModalOverlays/types').CanvasTextState>) => void | Promise<void>;
+  onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
   onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
@@ -150,6 +170,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onImagesDrop,
   onLibraryMediaDrop,
   selectedTool,
+  onToolSelect = () => { },
   onTextCreate,
   toolClickCounter = 0,
   isImageModalOpen = false,
@@ -178,6 +199,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalEraseModals,
   externalExpandModals,
   externalVectorizeModals,
+  externalNextSceneModals,
+  externalMultiangleModals,
   externalStoryboardModals,
   externalScriptFrameModals,
   externalSceneFrameModals,
@@ -215,6 +238,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistVectorizeModalMove,
   onPersistVectorizeModalDelete,
   onVectorize,
+  onPersistNextSceneModalCreate,
+  onPersistNextSceneModalMove,
+  onPersistNextSceneModalDelete,
+  onPersistMultiangleModalCreate,
+  onPersistMultiangleModalMove,
+  onPersistMultiangleModalDelete,
   onPersistStoryboardModalCreate,
   onPersistStoryboardModalMove,
   onPersistStoryboardModalDelete,
@@ -227,6 +256,15 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
+  onPersistCanvasTextCreate,
+  onPersistCanvasTextMove,
+  onPersistCanvasTextDelete,
+  canvasTextStates,
+  setCanvasTextStates,
+  selectedCanvasTextId,
+  selectedCanvasTextIds,
+  setSelectedCanvasTextId,
+  setSelectedCanvasTextIds,
   connections = [],
   onConnectionsChange,
   onPersistConnectorCreate,
@@ -327,6 +365,17 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [eraseModalStates, setEraseModalStates] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
   const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
   const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
+  const [nextSceneModalStates, setNextSceneModalStates] = useState<Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>>([]);
+  const [multiangleModalStates, setMultiangleModalStates] = useState<Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>>([]);
+  // Local state for canvas text (fallback if props not provided)
+  const [localCanvasTextStates, setLocalCanvasTextStates] = useState<Array<import('@/app/components/ModalOverlays/types').CanvasTextState>>([]);
+  const [localSelectedCanvasTextId, setLocalSelectedCanvasTextId] = useState<string | null>(null);
+  
+  // Use props if provided, otherwise use local state
+  const effectiveCanvasTextStates = canvasTextStates ?? localCanvasTextStates;
+  const effectiveSetCanvasTextStates = setCanvasTextStates ?? setLocalCanvasTextStates;
+  const effectiveSelectedCanvasTextId = selectedCanvasTextId ?? localSelectedCanvasTextId;
+  const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId ?? setLocalSelectedCanvasTextId;
   const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; namedImages?: { characters?: Record<string, string>; backgrounds?: Record<string, string>; props?: Record<string, string> }; stitchedImageUrl?: string }>>([]);
   const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<import('@/app/components/ModalOverlays/types').ScriptFrameModalState>>([]);
   const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string; characterIds?: string[]; locationId?: string; mood?: string }>>([]);
@@ -347,6 +396,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedExpandModalIds, setSelectedExpandModalIds] = useState<string[]>([]);
   const [selectedVectorizeModalId, setSelectedVectorizeModalId] = useState<string | null>(null);
   const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
+  const [selectedNextSceneModalId, setSelectedNextSceneModalId] = useState<string | null>(null);
+  const [selectedNextSceneModalIds, setSelectedNextSceneModalIds] = useState<string[]>([]);
+  const [selectedMultiangleModalId, setSelectedMultiangleModalId] = useState<string | null>(null);
+  const [selectedMultiangleModalIds, setSelectedMultiangleModalIds] = useState<string[]>([]);
   const [selectedStoryboardModalId, setSelectedStoryboardModalId] = useState<string | null>(null);
   const [selectedStoryboardModalIds, setSelectedStoryboardModalIds] = useState<string[]>([]);
   const [selectedScriptFrameModalId, setSelectedScriptFrameModalId] = useState<string | null>(null);
@@ -377,10 +430,19 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
+    if (externalVectorizeModals) {
+      setVectorizeModalStates(externalVectorizeModals);
+    }
+    if (externalNextSceneModals) {
+      setNextSceneModalStates(externalNextSceneModals);
+    }
+    if (externalMultiangleModals) {
+      setMultiangleModalStates(externalMultiangleModals);
+    }
     if (externalVideoEditorModals) {
       setVideoEditorModalStates(externalVideoEditorModals);
     }
-  }, [externalVideoEditorModals]);
+  }, [externalVectorizeModals, externalNextSceneModals, externalMultiangleModals, externalVideoEditorModals]);
 
   const sanitizeScriptOutput = (value?: string | null) => {
     if (!value) return '';
@@ -639,6 +701,43 @@ export const Canvas: React.FC<CanvasProps> = ({
     );
     if (onPersistScriptFrameModalMove) {
       Promise.resolve(onPersistScriptFrameModalMove(frameId, { text })).catch(console.error);
+    }
+  };
+
+  const handleCanvasTextCreate = (x: number, y: number) => {
+    const id = `canvas-text-${Date.now()}`;
+    const newText: import('@/app/components/ModalOverlays/types').CanvasTextState = {
+      id,
+      x,
+      y,
+      text: 'add text here',
+      fontSize: 24,
+      fontWeight: 'normal',
+      styleType: 'paragraph',
+      textAlign: 'left',
+      color: '#ffffff',
+      width: 200,
+      height: 100,
+    };
+    setCanvasTextStates?.(prev => [...prev, newText]);
+    setSelectedCanvasTextId?.(id);
+    if (onPersistCanvasTextCreate) {
+      Promise.resolve(onPersistCanvasTextCreate(newText)).catch(console.error);
+    }
+  };
+
+  const handleCanvasTextUpdate = (id: string, updates: Partial<import('@/app/components/ModalOverlays/types').CanvasTextState>) => {
+    effectiveSetCanvasTextStates(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    if (onPersistCanvasTextMove) {
+      Promise.resolve(onPersistCanvasTextMove(id, updates)).catch(console.error);
+    }
+  };
+
+  const handleCanvasTextDelete = (id: string) => {
+    effectiveSetCanvasTextStates(prev => prev.filter(item => item.id !== id));
+    if (effectiveSelectedCanvasTextId === id) effectiveSetSelectedCanvasTextId(null);
+    if (onPersistCanvasTextDelete) {
+      Promise.resolve(onPersistCanvasTextDelete(id)).catch(console.error);
     }
   };
 
@@ -1535,9 +1634,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     return storyWorldStates.find(sw => sw.storyboardId === storyboardId)?.storyWorld;
   };
 
-  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | undefined>(undefined);
+  const prevSelectedToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | undefined>(undefined);
   // Guard against rapid duplicate creations (e.g., accidental double events)
-  const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number }>({});
+  const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number }>({});
 
   // Wrapper for applyStageCursor to use stageRef
   const applyStageCursorWrapper = (style: string, force = false) => {
@@ -1578,9 +1677,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     setContextMenuModalId(null);
     setContextMenuModalType(null);
     setSelectedScriptFrameModalId(null);
+    // Clear canvas text selection
+    effectiveSetSelectedCanvasTextId(null);
+    setSelectedCanvasTextIds?.([]);
     setSelectedScriptFrameModalIds([]);
     setSelectedSceneFrameModalId(null);
     setSelectedSceneFrameModalIds([]);
+    // Clear canvas text selection
+    effectiveSetSelectedCanvasTextId(null);
     if (clearSelectionBoxes) {
       setSelectionBox(null);
       setSelectionTightRect(null);
@@ -1878,6 +1982,59 @@ export const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTool, isImageModalOpen, toolClickCounter]);
 
+  // Automatically create canvas text element when canvas-text tool is selected
+  useEffect(() => {
+    if (selectedTool === 'canvas-text') {
+      const now = Date.now();
+      const last = lastCreateTimesRef.current.canvasText || 0;
+      if (now - last < 400) return;
+      lastCreateTimesRef.current.canvasText = now;
+
+      // Find a blank space for the text element (300px width, 100px height)
+      const blankPos = findBlankSpaceWrapper(300, 100);
+      
+      const newId = `text-${Date.now()}`;
+      const newTextState: CanvasTextState = {
+        id: newId,
+        x: blankPos.x,
+        y: blankPos.y,
+        text: 'add text here',
+        styleType: 'paragraph',
+        fontSize: 24,
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        fontFamily: 'Inter, sans-serif',
+        textAlign: 'left',
+        color: '#ffffff',
+        width: 300,
+        height: 100, // Initial height
+      };
+
+      console.log('[Canvas] Auto-creating canvas text at:', blankPos, newTextState);
+      effectiveSetCanvasTextStates(prev => {
+        // Check if text already exists nearby using current state
+        if (prev.some(text => 
+          Math.abs(text.x - blankPos.x) < 350 && Math.abs(text.y - blankPos.y) < 150
+        )) {
+          console.log('[Canvas] Text already exists nearby, skipping creation');
+          return prev;
+        }
+        const updated = [...(prev || []), newTextState];
+        console.log('[Canvas] Updated canvasTextStates:', updated);
+        return updated;
+      });
+      effectiveSetSelectedCanvasTextId(newId);
+
+      if (onPersistCanvasTextCreate) {
+        onPersistCanvasTextCreate(newTextState);
+      }
+
+      // Auto-focus on new text component
+      setTimeout(() => focusOnComponentWrapper(blankPos.x, blankPos.y, 300, 100), 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTool, toolClickCounter]);
+
   // Automatically create video modal at center when video tool is selected
   useEffect(() => {
     if (selectedTool === 'video' && isVideoModalOpen) {
@@ -2132,6 +2289,30 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalVectorizeModals || [])]);
+
+  // Hydrate multiangle modals from external or localStorage
+  useEffect(() => {
+    // If externalMultiangleModals is provided (even if empty), sync to it immediately
+    if (externalMultiangleModals !== undefined) {
+      console.log('[Canvas] Syncing multiangleModalStates with externalMultiangleModals', externalMultiangleModals.length);
+      setMultiangleModalStates(externalMultiangleModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:multiangleModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
+        if (Array.isArray(parsed)) {
+          setMultiangleModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted multiangle modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalMultiangleModals || [])]);
 
   // Hydrate storyboard modals from external or localStorage
   useEffect(() => {
@@ -3049,10 +3230,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
 
       // Quick-create shortcuts (keyboard): t = text, i = image, v = video, m = music
-      // Only trigger when keyboard focus is not inside an input/textarea/select
+      // Only trigger when keyboard focus is not inside an input/textarea/select/contentEditable
       try {
         const target = e.target as Element | null;
-        const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+        const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
+        // Check if target is contentEditable or inside a contentEditable element
+        const isContentEditable = target?.hasAttribute('contenteditable') || 
+          (target?.getAttribute('contenteditable') === 'true') ||
+          (target?.closest && target.closest('[contenteditable="true"]') !== null);
+        const isTyping = isInputElement || isContentEditable;
         if (!e.repeat && !isTyping) {
           // Text input shortcut
           if (e.key === 't') {
@@ -3141,8 +3327,14 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Handle Delete/Backspace key for deletion (works on both Windows and Mac)
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.repeat) {
         // Prevent default browser behavior (like going back in history)
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          // Don't delete if user is typing in an input field
+        const target = e.target as Element | null;
+        const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+        // Check if target is contentEditable or inside a contentEditable element
+        const isContentEditable = target?.hasAttribute('contenteditable') || 
+          (target?.getAttribute('contenteditable') === 'true') ||
+          (target?.closest && target.closest('[contenteditable="true"]') !== null);
+        if (isInputElement || isContentEditable) {
+          // Don't delete if user is typing in an input field or contentEditable element
           return;
         }
 
@@ -3783,6 +3975,10 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
 
       // Check if click is inside any modal component
+      // Also check for contentEditable elements (canvas text components)
+      const isContentEditable = target.hasAttribute('contenteditable') || 
+        target.getAttribute('contenteditable') === 'true' ||
+        target.closest('[contenteditable="true"]') !== null;
       const isInsideModal =
         target.closest('[data-modal-component]') !== null ||
         target.closest('.controls-overlay') !== null ||
@@ -3791,7 +3987,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         target.tagName === 'TEXTAREA' ||
         target.tagName === 'SELECT' ||
         target.tagName === 'BUTTON' ||
-        target.closest('button') !== null;
+        target.closest('button') !== null ||
+        isContentEditable ||
+        // Check if click is on canvas text component container (the div wrapper) or its controls
+        (target.closest && target.closest('[data-canvas-text]') !== null) ||
+        // Check if click is on canvas text controls panel
+        (target.closest && target.closest('[data-canvas-text-controls]') !== null);
 
       // Check if click is on Konva canvas (canvas element) - let Konva handle it completely
       const isOnKonvaCanvas = target.tagName === 'CANVAS' || target.closest('canvas') !== null;
@@ -3968,32 +4169,21 @@ export const Canvas: React.FC<CanvasProps> = ({
           const modal = vectorizeModalStates.find(m => m.id === id);
           if (!modal) return { width: 400, height: 500 };
 
-          // Vectorize plugin: similar to upscale
+          // Vectorize plugin: 400px wide, 500px high
           return {
             width: modal.frameWidth ?? 400,
             height: modal.frameHeight ?? 500
           };
         }
 
-        case 'storyboardModal': {
-          const modal = storyboardModalStates.find(m => m.id === id);
+        case 'nextSceneModal': {
+          const modal = nextSceneModalStates.find(m => m.id === id);
           if (!modal) return { width: 400, height: 500 };
 
-          // Storyboard plugin: 400px wide, 500px high
+          // NextScene plugin: 400px wide, 500px high
           return {
             width: modal.frameWidth ?? 400,
             height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'scriptFrameModal': {
-          const modal = scriptFrameModalStates.find(m => m.id === id);
-          if (!modal) return { width: 360, height: 260 };
-
-          // Script frame: 360px wide, 260px high
-          return {
-            width: modal.frameWidth ?? 360,
-            height: modal.frameHeight ?? 260
           };
         }
 
@@ -4068,6 +4258,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const selectedEraseModalIdsList: string[] = [];
         const selectedExpandModalIdsList: string[] = [];
         const selectedVectorizeModalIdsList: string[] = [];
+        const selectedNextSceneModalIdsList: string[] = [];
         const selectedStoryboardModalIdsList: string[] = [];
         const selectedScriptFrameModalIdsList: string[] = [];
         const selectedSceneFrameModalIdsList: string[] = [];
@@ -4174,6 +4365,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         });
 
+        // Check next scene modals
+        nextSceneModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('nextSceneModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedNextSceneModalIdsList.push(modal.id);
+          }
+        });
+
         // Check storyboard modals
         storyboardModalStates.forEach((modal) => {
           const dims = getComponentDimensions('storyboardModal', modal.id);
@@ -4209,6 +4408,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedEraseModalIds(selectedEraseModalIdsList);
         setSelectedExpandModalIds(selectedExpandModalIdsList);
         setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
+        setSelectedNextSceneModalIds(selectedNextSceneModalIdsList);
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -4408,6 +4608,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
+          selectedNextSceneModalIds.forEach(id => {
+            const modal = nextSceneModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('nextSceneModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
           selectedStoryboardModalIds.forEach(id => {
             const modal = storyboardModalStates.find(m => m.id === id);
             if (modal) {
@@ -4494,7 +4707,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         rafId = null;
       }
     };
-  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
+  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
 
   // Attach Transformer to selected nodes
   useEffect(() => {
@@ -4572,6 +4785,14 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [selectedImageIndices, images, position.x, position.y, scale, transformerUpdateKey]);
 
+  const handleUpdateImageModalState = (modalId: string, updates: any) => {
+    setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+    // Persist changes if handler is available
+    if (onPersistImageModalMove) {
+      Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+    }
+  };
+
   // Handle drag to pan - enhanced for better navigation
   const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const target = e.target;
@@ -4589,6 +4810,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Shift + Left Click is for selection, not panning
     const isShiftSelection = e.evt.shiftKey && e.evt.button === 0;
     const clickedOnElement = !clickedOnEmpty;
+
+    // Canvas text creation is now handled automatically via useEffect when tool is selected
+    // No need to handle clicks here anymore
 
     // Check if clicking on a resize handle - if so, don't clear selection
     // Resize handles have a name attribute "resize-handle"
@@ -4671,26 +4895,41 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
 
     // If text tool is selected and clicking on empty space, create text input
+    // If text tool is selected and clicking on empty space, create text input
     if (selectedTool === 'text' && clickedOnEmpty && !isPanKey) {
       const stage = e.target.getStage();
-      if (stage) {
-        if (pointerPos) {
-          // Debounce guard: avoid creating multiple quickly
-          const now = Date.now();
-          const last = lastCreateTimesRef.current.text || 0;
-          if (now - last >= 400) {
-            lastCreateTimesRef.current.text = now;
-            // Convert screen coordinates to canvas coordinates
-            const canvasX = (pointerPos.x - position.x) / scale;
-            const canvasY = (pointerPos.y - position.y) / scale;
-            const newId = `text-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: canvasX, y: canvasY, autoFocusInput: true };
-            setTextInputStates(prev => [...prev, newModal]);
-            if (onPersistTextModalCreate) {
-              Promise.resolve(onPersistTextModalCreate(newModal)).catch(console.error);
-            }
-          }
+      if (stage && pointerPos) {
+        // Clear existing selections first
+        clearAllSelections(true);
+
+        const x = (pointerPos.x - position.x) / scale;
+        const y = (pointerPos.y - position.y) / scale;
+
+        const newId = `text-${Date.now()}`;
+        const newTextState: CanvasTextState = {
+          id: newId,
+          x: x,
+          y: y,
+          text: 'add text here',
+          styleType: 'paragraph',
+          fontSize: 24,
+          fontWeight: 'normal',
+          textAlign: 'left',
+          color: '#ffffff',
+          width: 300,
+        };
+
+        if (setCanvasTextStates) {
+          setCanvasTextStates(prev => [...prev, newTextState]);
+          setSelectedCanvasTextId?.(newId);
         }
+
+        if (onPersistCanvasTextCreate) {
+          onPersistCanvasTextCreate(newTextState);
+        }
+
+        // Reset tool to cursor after creation (standard behavior)
+        onToolSelect('cursor');
       }
       return;
     }
@@ -5192,6 +5431,32 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // NextScene persistence handlers
+  const handlePersistNextSceneModalCreate = (modal: any) => {
+    setNextSceneModalStates(prev => [...prev, modal]);
+    if (onPersistNextSceneModalCreate) {
+      Promise.resolve(onPersistNextSceneModalCreate(modal)).catch(console.error);
+    }
+  };
+
+  const handlePersistNextSceneModalMove = (id: string, updates: any) => {
+    setNextSceneModalStates(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    if (onPersistNextSceneModalMove) {
+      Promise.resolve(onPersistNextSceneModalMove(id, updates)).catch(console.error);
+    }
+  };
+
+  const handlePersistNextSceneModalDelete = (id: string) => {
+    setNextSceneModalStates(prev => prev.filter(m => m.id !== id));
+    if (onPersistNextSceneModalDelete) {
+      Promise.resolve(onPersistNextSceneModalDelete(id)).catch(console.error);
+    }
+    if (selectedNextSceneModalId === id) {
+      setSelectedNextSceneModalId(null);
+    }
+    setSelectedNextSceneModalIds(prev => prev.filter(mid => mid !== id));
+  };
+
   return (
     <div
       ref={containerRef}
@@ -5212,7 +5477,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         scaleY={scale}
         x={position.x}
         y={position.y}
-        draggable={false}
+        draggable={isPanning}
         onMouseDown={handleStageMouseDown}
         onMouseUp={handleStageMouseUp}
         onDragMove={handleStageDragMove}
@@ -5346,6 +5611,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedEraseModalIds={selectedEraseModalIds}
             selectedExpandModalIds={selectedExpandModalIds}
             selectedVectorizeModalIds={selectedVectorizeModalIds}
+            selectedMultiangleModalIds={selectedMultiangleModalIds}
             selectedStoryboardModalIds={selectedStoryboardModalIds}
             selectedScriptFrameModalIds={selectedScriptFrameModalIds}
             selectedSceneFrameModalIds={selectedSceneFrameModalIds}
@@ -5354,6 +5620,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             eraseModalStates={eraseModalStates}
             expandModalStates={expandModalStates}
             vectorizeModalStates={vectorizeModalStates}
+            multiangleModalStates={multiangleModalStates}
             storyboardModalStates={storyboardModalStates}
             scriptFrameModalStates={scriptFrameModalStates}
             sceneFrameModalStates={sceneFrameModalStates}
@@ -5362,6 +5629,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setEraseModalStates={setEraseModalStates}
             setExpandModalStates={setExpandModalStates}
             setVectorizeModalStates={setVectorizeModalStates}
+            setMultiangleModalStates={setMultiangleModalStates}
             setStoryboardModalStates={setStoryboardModalStates}
             setScriptFrameModalStates={setScriptFrameModalStates as any}
             setSceneFrameModalStates={setSceneFrameModalStates as any}
@@ -5370,6 +5638,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedEraseModalIds={setSelectedEraseModalIds}
             setSelectedExpandModalIds={setSelectedExpandModalIds}
             setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+            setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
             setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
             setSelectedScriptFrameModalIds={setSelectedScriptFrameModalIds}
             setSelectedSceneFrameModalIds={setSelectedSceneFrameModalIds}
@@ -5378,6 +5647,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistEraseModalMove={onPersistEraseModalMove}
             onPersistExpandModalMove={onPersistExpandModalMove}
             onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+            onPersistMultiangleModalMove={onPersistMultiangleModalMove}
             onPersistStoryboardModalMove={onPersistStoryboardModalMove}
             onPersistScriptFrameModalMove={onPersistScriptFrameModalMove}
             onPersistSceneFrameModalMove={onPersistSceneFrameModalMove}
@@ -5430,6 +5700,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         stageRef={stageRef}
         onImageUpdate={onImageUpdate}
       />
+
       {/* Connection Nodes for uploaded images - rendered outside Konva as overlay */}
       <CanvasImageConnectionNodes
         images={images}
@@ -5450,6 +5721,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         eraseModalStates={eraseModalStates}
         expandModalStates={expandModalStates}
         vectorizeModalStates={vectorizeModalStates}
+        nextSceneModalStates={nextSceneModalStates}
+        multiangleModalStates={multiangleModalStates}
         storyboardModalStates={storyboardModalStates}
         scriptFrameModalStates={scriptFrameModalStates}
         sceneFrameModalStates={sceneFrameModalStates}
@@ -5473,6 +5746,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedExpandModalIds={selectedExpandModalIds}
         selectedVectorizeModalId={selectedVectorizeModalId}
         selectedVectorizeModalIds={selectedVectorizeModalIds}
+        selectedNextSceneModalId={selectedNextSceneModalId}
+        selectedNextSceneModalIds={selectedNextSceneModalIds}
+        selectedMultiangleModalId={selectedMultiangleModalId}
+        selectedMultiangleModalIds={selectedMultiangleModalIds}
         selectedStoryboardModalId={selectedStoryboardModalId}
         selectedStoryboardModalIds={selectedStoryboardModalIds}
         clearAllSelections={clearAllSelections}
@@ -5507,6 +5784,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         setVectorizeModalStates={setVectorizeModalStates}
         setSelectedVectorizeModalId={setSelectedVectorizeModalId}
         setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
+        setNextSceneModalStates={setNextSceneModalStates}
+        setSelectedNextSceneModalId={setSelectedNextSceneModalId}
+        setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
+        setMultiangleModalStates={setMultiangleModalStates}
+        setSelectedMultiangleModalId={setSelectedMultiangleModalId}
+        setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
         setStoryboardModalStates={setStoryboardModalStates}
         setScriptFrameModalStates={setScriptFrameModalStates}
         onScriptFramePositionChange={handleScriptFramePositionChange}
@@ -5539,6 +5822,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistImageModalCreate={onPersistImageModalCreate}
         onPersistImageModalMove={onPersistImageModalMove}
         onPersistImageModalDelete={onPersistImageModalDelete}
+        onUpdateImageModalState={handleUpdateImageModalState}
         onPersistVideoModalCreate={onPersistVideoModalCreate}
         onPersistVideoModalMove={onPersistVideoModalMove}
         onPersistVideoModalDelete={onPersistVideoModalDelete}
@@ -5552,6 +5836,17 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistTextModalCreate={onPersistTextModalCreate}
         onPersistTextModalMove={onPersistTextModalMove}
         onPersistTextModalDelete={onPersistTextModalDelete}
+        // Canvas Text
+        canvasTextStates={effectiveCanvasTextStates}
+        setCanvasTextStates={effectiveSetCanvasTextStates}
+        selectedCanvasTextId={effectiveSelectedCanvasTextId}
+        selectedCanvasTextIds={selectedCanvasTextIds}
+        setSelectedCanvasTextId={effectiveSetSelectedCanvasTextId}
+        setSelectedCanvasTextIds={setSelectedCanvasTextIds}
+        onPersistCanvasTextCreate={onPersistCanvasTextCreate}
+        onPersistCanvasTextMove={onPersistCanvasTextMove}
+        onPersistCanvasTextDelete={onPersistCanvasTextDelete}
+        // Connection & Menu props
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
         onPersistUpscaleModalMove={onPersistUpscaleModalMove}
         onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
@@ -5572,6 +5867,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistVectorizeModalMove={onPersistVectorizeModalMove}
         onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
         onVectorize={onVectorize}
+        onPersistNextSceneModalCreate={handlePersistNextSceneModalCreate}
+        onPersistNextSceneModalMove={handlePersistNextSceneModalMove}
+        onPersistNextSceneModalDelete={handlePersistNextSceneModalDelete}
+        onPersistMultiangleModalCreate={onPersistMultiangleModalCreate}
+        onPersistMultiangleModalMove={onPersistMultiangleModalMove}
+        onPersistMultiangleModalDelete={onPersistMultiangleModalDelete}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
         onPersistStoryboardModalMove={onPersistStoryboardModalMove}
         onPersistStoryboardModalDelete={onPersistStoryboardModalDelete}

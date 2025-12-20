@@ -1,0 +1,121 @@
+'use client';
+
+import React from 'react';
+import { ConnectionNodes } from './ConnectionNodes';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+
+interface MultiangleImageFrameProps {
+    id: string | undefined;
+    scale: number;
+    frameBorderColor: string;
+    frameBorderWidth: number;
+    isDraggingContainer: boolean;
+    isHovered: boolean;
+    isSelected: boolean;
+    sourceImageUrl: string | null;
+    onMouseDown: (e: React.MouseEvent) => void;
+    onSelect?: () => void;
+}
+
+export const MultiangleImageFrame: React.FC<MultiangleImageFrameProps> = ({
+    id,
+    scale,
+    frameBorderColor,
+    frameBorderWidth,
+    isDraggingContainer,
+    isHovered,
+    isSelected,
+    sourceImageUrl,
+    onMouseDown,
+    onSelect,
+}) => {
+    const isDark = useIsDarkTheme();
+
+    return (
+        <div
+            data-frame-id={id ? `${id}-frame` : undefined}
+            onMouseDown={(e) => {
+                // Allow dragging from the frame
+                if (e.button === 0 && !e.defaultPrevented) {
+                    const target = e.target as HTMLElement;
+                    const isImage = target.tagName === 'IMG';
+                    const isNode = target.closest('[data-node-id]');
+                    const isButton = target.closest('button');
+                    if (!isImage && !isNode && !isButton) {
+                        onMouseDown(e as any);
+                    }
+                }
+            }}
+            onClick={(e) => {
+                if (onSelect && !e.defaultPrevented) {
+                    onSelect();
+                }
+            }}
+            style={{
+                width: `${400 * scale}px`,
+                maxWidth: '90vw',
+                minHeight: `${150 * scale}px`,
+                maxHeight: `${400 * scale}px`,
+                height: sourceImageUrl ? `${220 * scale}px` : 'auto',
+                backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
+                border: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+                boxShadow: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: isDraggingContainer ? 'grabbing' : 'grab',
+                overflow: 'visible',
+                position: 'relative',
+                zIndex: 1,
+                transition: 'border 0.18s ease, background-color 0.3s ease',
+                padding: `${16 * scale}px`,
+                marginTop: `${-frameBorderWidth * scale}px`,
+            }}
+        >
+            {sourceImageUrl ? (
+                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                    <img
+                        src={sourceImageUrl}
+                        alt="Source"
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            pointerEvents: 'none',
+                        }}
+                        draggable={false}
+                    />
+                </div>
+            ) : (
+                <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `${20 * scale}px`, transition: 'color 0.3s ease' }}>
+                    <svg
+                        width={48 * scale}
+                        height={48 * scale}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ margin: '0 auto 8px', opacity: 0.3 }}
+                    >
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <path d="M12 8v8" />
+                        <path d="M8 12h8" />
+                    </svg>
+                    <p style={{ fontSize: `${12 * scale}px`, margin: 0, opacity: 0.6 }}>Connect an image</p>
+                </div>
+            )}
+
+            <ConnectionNodes
+                id={id}
+                scale={scale}
+                isHovered={isHovered}
+                isSelected={isSelected}
+            />
+        </div>
+    );
+};

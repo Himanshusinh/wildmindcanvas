@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { ComponentMenu } from './types';
+import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ComponentCreationMenuProps {
   componentMenu: ComponentMenu | null;
@@ -9,6 +10,7 @@ interface ComponentCreationMenuProps {
   setComponentMenu: (menu: ComponentMenu | null) => void;
   setComponentMenuSearch: (search: string) => void;
   scale: number;
+  position: { x: number; y: number };
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
@@ -21,6 +23,12 @@ interface ComponentCreationMenuProps {
   setEraseModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
   setExpandModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
+  setVectorizeModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  setNextSceneModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
+  setMultiangleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setStoryboardModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
@@ -32,6 +40,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setComponentMenu,
   setComponentMenuSearch,
   scale,
+  position,
   onPersistTextModalCreate,
   onPersistImageModalCreate,
   onPersistVideoModalCreate,
@@ -44,10 +53,30 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setEraseModalStates,
   onPersistExpandModalCreate,
   setExpandModalStates,
+  onPersistVectorizeModalCreate,
+  setVectorizeModalStates,
+  onPersistNextSceneModalCreate,
+  setNextSceneModalStates,
+  onPersistMultiangleModalCreate,
+  setMultiangleModalStates,
   onPersistStoryboardModalCreate,
   setStoryboardModalStates,
   onPersistConnectorCreate,
 }) => {
+  const isDark = useIsDarkTheme();
+
+  // Color Palette based on theme
+  const colors = {
+    bg: isDark ? '#121212' : '#ffffff',
+    text: isDark ? '#ffffff' : '#1f2937',
+    border: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+    shadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.5)' : '0 8px 32px rgba(0, 0, 0, 0.2)',
+    hoverBg: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+    inputBg: isDark ? '#1a1a1a' : '#ffffff',
+    inputText: isDark ? '#ffffff' : '#1f2937',
+    itemBorder: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+  };
+
   // Close component menu when clicking outside
   React.useEffect(() => {
     if (!componentMenu) return;
@@ -80,6 +109,9 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'removebg-plugin', label: 'Remove BG Plugin', type: 'plugin' },
     { id: 'erase-plugin', label: 'Erase Plugin', type: 'plugin' },
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
+    { id: 'vectorize-plugin', label: 'Vectorize Plugin', type: 'plugin' },
+    { id: 'next-scene-plugin', label: 'Next Scene Plugin', type: 'plugin' },
+    { id: 'multiangle-plugin', label: 'Multiangle Plugin', type: 'plugin' },
     { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
 
@@ -99,7 +131,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
         return ['image', 'video', 'music', 'storyboard-plugin'];
 
       case 'image':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'storyboard-plugin'];
+        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin', 'storyboard-plugin'];
 
       case 'video':
       case 'music':
@@ -110,7 +142,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
       case 'erase':
       case 'expand':
       case 'vectorize':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin'];
+      case 'nextscene':
+        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin'];
 
       default:
         return null;
@@ -148,29 +181,36 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     }
   };
 
+  // Calculate position relative to canvas container (which ModalOverlays likely is)
+  // Instead of static screen x/y, we transform canvas x/y to the screen space within the container
+  const containerX = componentMenu.canvasX * scale + position.x;
+  const containerY = componentMenu.canvasY * scale + position.y;
+
   return (
     <div
       data-component-menu
       style={{
-        position: 'fixed',
-        left: `${componentMenu.x}px`,
-        top: `${componentMenu.y}px`,
+        position: 'absolute', // Changed from fixed to absolute to move with canvas pan
+        left: `${containerX}px`,
+        top: `${containerY}px`,
         width: `${280 * scale}px`,
         maxHeight: `${400 * scale}px`,
-        backgroundColor: '#ffffff',
+        backgroundColor: colors.bg,
         borderRadius: `${12 * scale}px`,
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+        boxShadow: colors.shadow,
         zIndex: 10000,
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid rgba(0, 0, 0, 0.1)',
+        border: `1px solid ${colors.border}`,
+        pointerEvents: 'auto',
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
     >
       {/* Search Input - Top */}
-      <div style={{ padding: `${12 * scale}px`, borderBottom: '1px solid rgba(0, 0, 0, 0.1)' }}>
+      <div style={{ padding: `${12 * scale}px`, borderBottom: `1px solid ${colors.border}` }}>
         <input
           type="text"
           placeholder="Search features..."
@@ -181,9 +221,11 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
             width: '100%',
             padding: `${8 * scale}px ${12 * scale}px`,
             fontSize: `${14 * scale}px`,
-            border: '1px solid rgba(0, 0, 0, 0.1)',
+            border: `1px solid ${colors.border}`,
             borderRadius: `${8 * scale}px`,
             outline: 'none',
+            backgroundColor: colors.inputBg,
+            color: colors.inputText,
           }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -197,11 +239,11 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
       {/* Component List */}
       <div
         style={{
+          flex: 1, // Use flex: 1 like LibrarySidebar
           overflowY: 'auto',
-          maxHeight: `${320 * scale}px`,
-          overscrollBehavior: 'contain', // Prevent scroll chaining
+          overflowX: 'hidden', // Match LibrarySidebar
+          minHeight: 0, // Allow flex item to shrink below content size
         }}
-        onWheel={(e) => e.stopPropagation()}
       >
         {filtered.map((comp) => (
           <div
@@ -337,6 +379,53 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setExpandModalStates(prev => [...prev, newExpand]);
                 Promise.resolve(onPersistExpandModalCreate(newExpand)).catch(console.error);
+              } else if (comp.id === 'vectorize-plugin' && comp.type === 'plugin' && onPersistVectorizeModalCreate && setVectorizeModalStates) {
+                newComponentId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const newVectorize = {
+                  id: newComponentId,
+                  x: canvasX,
+                  y: canvasY,
+                  vectorizedImageUrl: null,
+                  sourceImageUrl: null,
+                  localVectorizedImageUrl: null,
+                  mode: 'simple',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isVectorizing: false,
+                };
+                setVectorizeModalStates(prev => [...prev, newVectorize]);
+                Promise.resolve(onPersistVectorizeModalCreate(newVectorize)).catch(console.error);
+              } else if (comp.id === 'next-scene-plugin' && comp.type === 'plugin' && onPersistNextSceneModalCreate && setNextSceneModalStates) {
+                newComponentId = `nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const newNextScene = {
+                  id: newComponentId,
+                  x: canvasX,
+                  y: canvasY,
+                  nextSceneImageUrl: null,
+                  sourceImageUrl: null,
+                  localNextSceneImageUrl: null,
+                  mode: 'scene',
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isProcessing: false,
+                };
+                setNextSceneModalStates(prev => [...prev, newNextScene]);
+                Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
+              } else if (comp.id === 'multiangle-plugin' && comp.type === 'plugin' && onPersistMultiangleModalCreate && setMultiangleModalStates) {
+                newComponentId = `multiangle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const newMultiangle = {
+                  id: newComponentId,
+                  x: canvasX,
+                  y: canvasY,
+                  multiangleImageUrl: null,
+                  sourceImageUrl: null,
+                  localMultiangleImageUrl: null,
+                  frameWidth: 400,
+                  frameHeight: 500,
+                  isProcessing: false,
+                };
+                setMultiangleModalStates(prev => [...prev, newMultiangle]);
+                Promise.resolve(onPersistMultiangleModalCreate(newMultiangle)).catch(console.error);
               } else if (comp.id === 'storyboard-plugin' && comp.type === 'plugin' && onPersistStoryboardModalCreate && setStoryboardModalStates) {
                 newComponentId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 const newStoryboard = {
@@ -361,12 +450,12 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
               padding: `${12 * scale}px ${16 * scale}px`,
               cursor: 'pointer',
               fontSize: `${14 * scale}px`,
-              color: '#1f2937',
-              borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+              color: colors.text,
+              borderBottom: `1px solid ${colors.itemBorder}`,
               transition: 'background-color 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+              e.currentTarget.style.backgroundColor = colors.hoverBg;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
