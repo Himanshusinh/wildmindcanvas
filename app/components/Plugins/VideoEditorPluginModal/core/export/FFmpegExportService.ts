@@ -31,10 +31,14 @@ interface RenderItem {
 interface TransitionStyle {
     opacity?: number;
     scale?: number;
+    scaleX?: number;  // For horizontal-only scaling (stretch, cube-rotate)
+    scaleY?: number;  // For vertical-only scaling (flip-3d)
     rotate?: number;
     translateX?: number;
     translateY?: number;
     blur?: number;
+    skewX?: number;   // For datamosh/glitch effects
+    skewY?: number;
     // Filter effects
     brightness?: number;
     contrast?: number;
@@ -840,14 +844,23 @@ class FFmpegExportService {
                 return role === 'outgoing' ? { scale: 1 + p * 0.5, opacity: outP } : { opacity: p };
 
             // === SPINS ===
-            case 'spin':
-                return role === 'outgoing'
-                    ? { rotate: p * 360, scale: outP, opacity: outP }
-                    : { rotate: (1 - p) * -360, scale: p, opacity: p };
+            case 'spin': {
+                // Match Canvas.tsx: rotation + scale that shrinks at midpoint
+                const rotation = role === 'outgoing' ? -p * 180 : (1 - p) * 180;
+                const scaleSpin = 1 - Math.sin(p * Math.PI) * 0.5;
+                return {
+                    rotate: rotation,
+                    scale: scaleSpin,
+                    opacity: role === 'outgoing' ? outP : p
+                };
+            }
 
             // === FLASH ===
             case 'flash':
-                return role === 'outgoing' ? { opacity: p < 0.5 ? 1 : 0 } : { opacity: p >= 0.5 ? 1 : 0 };
+                // Match Canvas.tsx: bright flash with brightness filter
+                return role === 'main'
+                    ? { brightness: 1 + (1 - p) * 5, opacity: p }
+                    : { brightness: 1 + p * 5, opacity: outP };
 
             // === BLUR ===
             case 'blur':
@@ -880,15 +893,29 @@ class FFmpegExportService {
                 return role === 'main' ? { rotate: (1 - p) * -5, opacity: p } : { opacity: outP };
 
             // === FILM & LIGHT EFFECTS ===
-            case 'film-burn':
-                return { scale: 1 + Math.sin(p * Math.PI) * 0.1, brightness: 1 + Math.sin(p * Math.PI) * 0.3, opacity: role === 'main' ? p : outP };
+            case 'film-burn': {
+                // Match Canvas.tsx: brightness + sepia + saturate + contrast
+                const burnIntensity = Math.sin(p * Math.PI);
+                return {
+                    scale: 1 + burnIntensity * 0.1,
+                    brightness: 1 + burnIntensity * 3,
+                    sepia: burnIntensity * 0.5,
+                    saturate: 1 + burnIntensity,
+                    contrast: 1 - burnIntensity * 0.2,
+                    opacity: role === 'main' ? p : outP
+                };
+            }
             case 'light-leak':
+                // Match Canvas.tsx: sepia + brightness
                 return role === 'main'
-                    ? { opacity: p, brightness: 1 + Math.sin(p * Math.PI) * 0.5 }
-                    : { opacity: outP, brightness: 1 + Math.sin(p * Math.PI) * 0.3 };
+                    ? { sepia: 1 - p, brightness: 1 + (1 - p), opacity: p }
+                    : { sepia: p, brightness: 1 + p, opacity: outP };
             case 'luma-dissolve': {
+                // Match Canvas.tsx: contrast + brightness
                 const lumaP = 1 - Math.pow(1 - p, 2);
-                return role === 'main' ? { opacity: lumaP } : { opacity: 1 - lumaP };
+                return role === 'main'
+                    ? { contrast: 1 + lumaP * 2, brightness: lumaP, opacity: lumaP }
+                    : { contrast: 1 + (1 - lumaP) * 2, brightness: 1 - lumaP, opacity: 1 - lumaP };
             }
 
             // === DIGITAL EFFECTS ===
@@ -904,18 +931,34 @@ class FFmpegExportService {
             case 'pixelate':
             case 'chromatic-aberration':
                 return role === 'main' ? { opacity: p, contrast: 1.1 } : { opacity: outP };
-            case 'datamosh':
-                return { scale: 1 + Math.sin(p * 8) * 0.08, opacity: role === 'main' ? p : outP };
+            case 'datamosh': {
+                // Match Canvas.tsx: scale + skew distortion
+                const skewAmount = Math.sin(p * 20) * 10;
+                return {
+                    scale: 1 + Math.sin(p * 10) * 0.1,
+                    skewX: skewAmount,
+                    opacity: role === 'main' ? p : outP
+                };
+            }
 
             // === DISTORTION ===
             case 'ripple':
-                return role === 'main' ? { scale: 1 + Math.sin(p * 10) * 0.05, opacity: p } : { opacity: outP };
+                // Match Canvas.tsx: scale + blur
+                return role === 'main'
+                    ? { scale: 1 + Math.sin(p * 10) * 0.05, blur: Math.abs(Math.sin(p * 10)) * 5 }
+                    : { opacity: outP };
             case 'ripple-dissolve':
                 return { scale: 1 + Math.sin(p * Math.PI * 4) * 0.05, blur: Math.sin(p * Math.PI) * 2, opacity: role === 'main' ? p : outP };
             case 'stretch':
-                return role === 'main' ? { scale: 0.1 + 0.9 * p, opacity: p } : { scale: 1 + p, opacity: outP };
+                // Match Canvas.tsx: scaleX horizontal stretch
+                return role === 'main'
+                    ? { scaleX: 0.1 + 0.9 * p, opacity: p }
+                    : { scaleX: 1 + p, opacity: outP };
             case 'liquid':
-                return { opacity: role === 'main' ? p : outP };
+                // Match Canvas.tsx: contrast + blur
+                return role === 'main'
+                    ? { contrast: 1.5, blur: (1 - p) * 10, opacity: p }
+                    : { contrast: 1.5, blur: p * 10, opacity: outP };
 
             // === MOVEMENT ===
             case 'flow':
@@ -1064,9 +1107,19 @@ class FFmpegExportService {
 
         ctx.translate(tx, ty);
 
-        // Transition + animation scale
-        const totalScale = (style.scale ?? 1) * (animStyle.scale ?? 1);
-        if (totalScale !== 1) ctx.scale(totalScale, totalScale);
+        // Transition + animation scale (including scaleX/scaleY for stretch, cube-rotate, flip-3d effects)
+        const totalScaleX = (style.scale ?? 1) * (style.scaleX ?? 1) * (animStyle.scale ?? 1);
+        const totalScaleY = (style.scale ?? 1) * (style.scaleY ?? 1) * (animStyle.scale ?? 1);
+        if (totalScaleX !== 1 || totalScaleY !== 1) {
+            ctx.scale(totalScaleX, totalScaleY);
+        }
+
+        // Apply skew transforms (for datamosh/glitch effects)
+        if (style.skewX || style.skewY) {
+            const skewXRad = ((style.skewX ?? 0) * Math.PI) / 180;
+            const skewYRad = ((style.skewY ?? 0) * Math.PI) / 180;
+            ctx.transform(1, Math.tan(skewYRad), Math.tan(skewXRad), 1, 0, 0);
+        }
 
         // Transition + animation rotate
         const totalRotate = (style.rotate ?? 0) + (animStyle.rotate ?? 0);
