@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import '../../common/canvasCaptureGuard';
 import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
+import { PluginNodeShell } from '../PluginComponents';
 import { ImageModalState } from '../../ModalOverlays/types';
 import { ImageUpload } from '@/types/canvas';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
@@ -80,16 +82,8 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   images = [],
   onGenerate,
 }) => {
-  const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const hasDraggedRef = useRef(false);
-  const dragOriginRef = useRef<{ x: number; y: number }>({ x, y });
-  const activePointerIdRef = useRef<number | null>(null);
-  const pointerTypeRef = useRef<string | null>(null);
   const isDark = useIsDarkTheme();
 
   // New state for controls
@@ -128,113 +122,19 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
     return isInput || isButton || isImage || isControls || isActionIcons || isConnectionNode;
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    const target = e.target as Element;
-    const isBlocked = isDragBlockedTarget(target);
-
-    if (onSelect && !isBlocked) {
-      onSelect();
-    }
-
-    if (!isBlocked) {
-      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-      dragOriginRef.current = { x, y };
-      hasDraggedRef.current = false;
-      lastCanvasPosRef.current = null;
-      pointerTypeRef.current = e.pointerType;
-      activePointerIdRef.current = e.pointerId;
-      setIsDraggingContainer(true);
-
-      try {
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      } catch (err) {
-        // ignore
-      }
-
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setDragOffset({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        });
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  };
-
-  // Handle drag
-  useEffect(() => {
-    if (!isDraggingContainer) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
-      const activeId = activePointerIdRef.current;
-      if (activeId !== null && e.pointerId !== activeId) return;
-
-      if (dragStartPosRef.current) {
-        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-        if (dx > 5 || dy > 5) {
-          hasDraggedRef.current = true;
-        }
-      }
-
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
-
-      onPositionChange(newCanvasX, newCanvasY);
-      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-      e.preventDefault();
-    };
-
-    const finishDrag = () => {
-      const wasDragging = hasDraggedRef.current;
-      setIsDraggingContainer(false);
-      dragStartPosRef.current = null;
-      pointerTypeRef.current = null;
-
-      if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
-      }
-
-      if (wasDragging && onPositionCommit) {
-        const fallback = dragOriginRef.current;
-        const finalX = lastCanvasPosRef.current?.x ?? fallback.x;
-        const finalY = lastCanvasPosRef.current?.y ?? fallback.y;
-        onPositionCommit(finalX, finalY);
-      }
-
-      hasDraggedRef.current = false;
-      lastCanvasPosRef.current = null;
-      activePointerIdRef.current = null;
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      const activeId = activePointerIdRef.current;
-      if (activeId !== null && e.pointerId !== activeId) return;
-      try {
-        containerRef.current?.releasePointerCapture?.(e.pointerId);
-      } catch (err) {
-        // ignore
-      }
-      finishDrag();
-    };
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: false });
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-    };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  const { isDragging: isDraggingContainer, onPointerDown: handlePointerDown } = useCanvasModalDrag({
+    enabled: isOpen,
+    x,
+    y,
+    scale,
+    position,
+    containerRef,
+    onPositionChange,
+    onPositionCommit,
+    onSelect,
+    onTap: () => setIsPopupOpen(prev => !prev),
+    shouldIgnoreTarget: isDragBlockedTarget,
+  });
 
   const handleGenerate = () => {
     console.log('Generate Storyboard', {
@@ -264,21 +164,41 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
     if (!id || !connections) return [];
     const matchingConnections = connections.filter(c => c.to === id && c.toAnchor === anchor);
 
+    console.log(`[StoryboardPluginModal] getConnectedImages for anchor "${anchor}":`, {
+      storyboardId: id,
+      totalConnections: connections.length,
+      matchingConnections: matchingConnections.length,
+      connections: matchingConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor }))
+    });
+
     const imageUrls: string[] = [];
 
     matchingConnections.forEach(connection => {
       const imageNode = imageModalStates.find(img => img.id === connection.from);
       if (imageNode) {
-        if (imageNode.generatedImageUrl) imageUrls.push(imageNode.generatedImageUrl);
-        else if (imageNode.sourceImageUrl) imageUrls.push(imageNode.sourceImageUrl);
+        if (imageNode.generatedImageUrl) {
+          imageUrls.push(imageNode.generatedImageUrl);
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates (generatedImageUrl):`, imageNode.generatedImageUrl.substring(0, 50) + '...');
+        } else if (imageNode.sourceImageUrl) {
+          imageUrls.push(imageNode.sourceImageUrl);
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates (sourceImageUrl):`, imageNode.sourceImageUrl.substring(0, 50) + '...');
+        }
       } else {
         const mediaImage = images.find(img => img.elementId === connection.from);
         if (mediaImage && mediaImage.url) {
           imageUrls.push(mediaImage.url);
+          console.log(`[StoryboardPluginModal] Found image from media images:`, mediaImage.url.substring(0, 50) + '...');
+        } else {
+          console.warn(`[StoryboardPluginModal] Connection found but no image URL available:`, {
+            connectionFrom: connection.from,
+            hasImageNode: !!imageNode,
+            hasMediaImage: !!mediaImage
+          });
         }
       }
     });
 
+    console.log(`[StoryboardPluginModal] Returning ${imageUrls.length} images for anchor "${anchor}"`);
     return imageUrls;
   };
 
@@ -289,21 +209,18 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-modal-component="storyboard"
-      data-overlay-id={id}
+    <PluginNodeShell
+      modalKey="storyboard"
+      id={id}
+      containerRef={containerRef}
+      screenX={screenX}
+      screenY={screenY}
+      isHovered={isHovered}
+      isSelected={Boolean(isSelected)}
       onPointerDown={handlePointerDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        position: 'absolute',
-        left: `${screenX}px`,
-        top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
-        userSelect: 'none',
-        touchAction: 'none',
-      }}
+      style={{ touchAction: 'none' }}
     >
       {/* Plugin node design with icon and label */}
       <div
@@ -470,7 +387,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </PluginNodeShell>
   );
 };
 

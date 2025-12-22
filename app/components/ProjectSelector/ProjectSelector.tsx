@@ -43,6 +43,22 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
       }
     } catch (error) {
       console.error('Failed to load projects:', error);
+      
+      // Handle authentication errors specifically
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        // Check if we're on a different subdomain and might need to log in
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+        const isStudioSubdomain = hostname.includes('studio.wildmindai.com') || hostname.includes('studio');
+        
+        if (isStudioSubdomain) {
+          console.warn('[ProjectSelector] Authentication failed - user may need to log in on main site first', {
+            hostname,
+            error: error.message,
+          });
+          // Don't show error to user - they might be able to continue with a new project
+          // The error is logged for debugging
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -62,10 +78,29 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
     try {
       creatingRef.current = true;
       setIsCreating(true);
+      
+      // Clear localStorage and URL BEFORE creating project to ensure clean state
+      if (typeof window !== 'undefined') {
+        // Clear old project data from localStorage
+        localStorage.removeItem('canvas-project-id');
+        localStorage.removeItem('canvas-project-name');
+        
+        // Clear URL parameters
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('projectId');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+      
+      console.log('[ProjectSelector] Creating new project:', newProjectName.trim());
       const project = await createProject(newProjectName.trim());
+      console.log('[ProjectSelector] New project created:', { id: project.id, name: project.name });
+      
       setProjects(prev => [project, ...prev]);
       setShowCreateModal(false);
       setNewProjectName('Untitled');
+      
+      // Select the newly created project immediately (no delay needed since we already cleared localStorage)
+      console.log('[ProjectSelector] Selecting newly created project:', project.id);
       onProjectSelect(project);
     } catch (error: any) {
       console.error('Failed to create project:', error);

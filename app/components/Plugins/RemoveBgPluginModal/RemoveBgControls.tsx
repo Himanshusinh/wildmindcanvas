@@ -64,7 +64,7 @@ export const RemoveBgControls: React.FC<RemoveBgControlsProps> = ({
         flexDirection: 'column',
         gap: `${10 * scale}px`,
         overflow: 'visible',
-        zIndex: 10,
+        zIndex: 2002,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,

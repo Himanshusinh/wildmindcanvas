@@ -48,6 +48,7 @@ interface ConnectionLinesProps {
   videoModalStates: any[];
   musicModalStates: any[];
   upscaleModalStates?: any[];
+  multiangleCameraModalStates?: any[];
   removeBgModalStates?: any[];
   eraseModalStates?: any[];
   expandModalStates?: any[];
@@ -73,6 +74,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   videoModalStates,
   musicModalStates,
   upscaleModalStates,
+  multiangleCameraModalStates,
   removeBgModalStates,
   eraseModalStates,
   expandModalStates,
@@ -153,8 +155,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         }
         seen.add(uniqueKey);
 
-        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
+        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
         if (!fromCenter || !toCenter) {
           // Debug: log when nodes can't be found
           if (process.env.NODE_ENV === 'development') {
@@ -172,7 +174,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, recalcKey, stageRef]);
+  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, recalcKey, stageRef]);
 
   return (
     <svg

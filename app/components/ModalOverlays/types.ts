@@ -6,6 +6,7 @@ export interface TextModalState {
   x: number;
   y: number;
   value?: string;
+  sentValue?: string; // Value sent to connected components (only updated when arrow is clicked)
   autoFocusInput?: boolean;
 }
 
@@ -43,6 +44,7 @@ export interface VideoModalState {
   generationId?: string;
   status?: string;
   provider?: string;
+  isExpanded?: boolean;
 }
 
 export interface VideoEditorModalState {
@@ -66,6 +68,7 @@ export interface MusicModalState {
   aspectRatio?: string;
   prompt?: string;
   isGenerating?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface UpscaleModalState {
@@ -80,6 +83,15 @@ export interface UpscaleModalState {
   frameWidth?: number;
   frameHeight?: number;
   isUpscaling?: boolean;
+  isExpanded?: boolean;
+}
+
+export interface MultiangleCameraModalState {
+  id: string;
+  x: number;
+  y: number;
+  sourceImageUrl?: string | null;
+  isExpanded?: boolean;
 }
 
 export interface RemoveBgModalState {
@@ -95,6 +107,20 @@ export interface RemoveBgModalState {
   frameWidth?: number;
   frameHeight?: number;
   isRemovingBg?: boolean;
+  isExpanded?: boolean;
+}
+
+export interface CompareModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  isOpen?: boolean;
+  prompt?: string;
+  model?: string;
+  isExpanded?: boolean;
 }
 
 export interface EraseModalState {
@@ -108,6 +134,7 @@ export interface EraseModalState {
   frameWidth?: number;
   frameHeight?: number;
   isErasing?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface ExpandModalState {
@@ -121,6 +148,7 @@ export interface ExpandModalState {
   frameWidth?: number;
   frameHeight?: number;
   isExpanding?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface VectorizeModalState {
@@ -134,6 +162,7 @@ export interface VectorizeModalState {
   frameWidth?: number;
   frameHeight?: number;
   isVectorizing?: boolean;
+  isExpanded?: boolean;
 }
 
 export interface NextSceneModalState {
@@ -147,19 +176,9 @@ export interface NextSceneModalState {
   frameWidth?: number;
   frameHeight?: number;
   isProcessing?: boolean;
+  isExpanded?: boolean;
 }
 
-export interface MultiangleModalState {
-  id: string;
-  x: number;
-  y: number;
-  multiangleImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localMultiangleImageUrl?: string | null;
-  frameWidth?: number;
-  frameHeight?: number;
-  isProcessing?: boolean;
-}
 
 
 export interface StoryboardModalState {
@@ -188,6 +207,9 @@ export interface CanvasTextState {
   fontFamily?: string; // Font family name
   textAlign: 'left' | 'center' | 'right';
   color: string; // Kept for backward compatibility, but text color is now theme-aware
+  rotation?: number;
+  textDecoration?: string; // 'none' | 'underline' | 'line-through'
+  htmlContent?: string;
 }
 
 export interface ScriptFrameModalState {
@@ -260,10 +282,33 @@ export interface ModalOverlaysProps {
   expandModalStates?: ExpandModalState[];
   vectorizeModalStates?: VectorizeModalState[];
   nextSceneModalStates?: NextSceneModalState[];
-  multiangleModalStates?: MultiangleModalState[];
   storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
+
+  // Compare Plugin
+  compareModalStates?: CompareModalState[];
+  selectedCompareModalId?: string | null;
+  selectedCompareModalIds?: string[];
+  setCompareModalStates?: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
+  setSelectedCompareModalId?: (id: string | null) => void;
+  setSelectedCompareModalIds?: (ids: string[]) => void;
+  onPersistCompareModalCreate?: (modal: CompareModalState) => void | Promise<void>;
+  onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
+  onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
+
+  // Multiangle Camera Plugin
+  multiangleCameraModalStates?: MultiangleCameraModalState[];
+  selectedMultiangleCameraModalId?: string | null;
+  selectedMultiangleCameraModalIds?: string[];
+  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
+  setSelectedMultiangleCameraModalId?: (id: string | null) => void;
+  setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
+  onPersistMultiangleCameraModalCreate?: (modal: MultiangleCameraModalState) => void | Promise<void>;
+  onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
+  onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
+  onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
   selectedImageModalId: string | null;
@@ -286,8 +331,6 @@ export interface ModalOverlaysProps {
   selectedVectorizeModalIds?: string[];
   selectedNextSceneModalId?: string | null;
   selectedNextSceneModalIds?: string[];
-  selectedMultiangleModalId?: string | null;
-  selectedMultiangleModalIds?: string[];
   selectedStoryboardModalId?: string | null;
   selectedStoryboardModalIds?: string[];
   clearAllSelections: () => void;
@@ -325,9 +368,6 @@ export interface ModalOverlaysProps {
   setNextSceneModalStates?: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
   setSelectedNextSceneModalId?: (id: string | null) => void;
   setSelectedNextSceneModalIds?: (ids: string[]) => void;
-  setMultiangleModalStates?: React.Dispatch<React.SetStateAction<MultiangleModalState[]>>;
-  setSelectedMultiangleModalId?: (id: string | null) => void;
-  setSelectedMultiangleModalIds?: (ids: string[]) => void;
   setStoryboardModalStates?: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
   setScriptFrameModalStates?: React.Dispatch<React.SetStateAction<ScriptFrameModalState[]>>;
   setSelectedStoryboardModalId?: (id: string | null) => void;
@@ -397,9 +437,6 @@ export interface ModalOverlaysProps {
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
   onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
-  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
-  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
-  onPersistMultiangleModalDelete?: (id: string) => void | Promise<void>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
@@ -420,7 +457,7 @@ export interface ModalOverlaysProps {
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   connections?: Connection[];
   onConnectionsChange?: (connections: Connection[]) => void;
@@ -438,4 +475,15 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
   onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
+  projectId?: string | null;
+}
+
+export interface CompareModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  scale?: number;
+  isOpen?: boolean;
 }

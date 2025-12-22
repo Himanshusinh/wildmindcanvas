@@ -7,6 +7,7 @@ import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 import { ImageModalFrame } from './ImageModalFrame';
 import { ImageModalNodes } from './ImageModalNodes';
 import { ImageModalControls } from './ImageModalControls';
+import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ interface ImageUploadModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
-  textInputStates?: Array<{ id: string; value?: string }>;
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
   sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
@@ -109,6 +110,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+  // Track if resolution change was user-initiated to prevent useEffect from overriding it
+  const userInitiatedResolutionChangeRef = useRef(false);
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Google Nano Banana');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
@@ -118,7 +121,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageCount, setImageCount] = useState<number>(initialCount ?? 1);
-  const [selectedResolution, setSelectedResolution] = useState<string>('2K'); // Default to 2K
+  const [selectedResolution, setSelectedResolution] = useState<string>('1024'); // Default to 1024px
 
   // Check if this is a scene image and detect auto-reference
   const relatedScene = useMemo(() => {
@@ -182,7 +185,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     : selectedAspectRatio;
 
   // Detect connected text input
-  const connectedTextInput = useMemo(() => {
+  const connectedTextInput = useMemo<{ id: string; value?: string; sentValue?: string } | null>(() => {
     if (!id || !connections || connections.length === 0) return null;
 
     // Find connection where this modal is the target (to === id)
@@ -191,20 +194,31 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     // First try to find a matching text input state
     const textInput = (textInputStates || []).find(t => t.id === connection.from);
-    if (textInput) return textInput;
+    if (textInput) {
+      return {
+        id: textInput.id,
+        value: textInput.value,
+        sentValue: 'sentValue' in textInput ? (textInput as any).sentValue : undefined
+      };
+    }
 
     // Next, try to find a matching scene frame and expose its content as a text input-like object
     const scene = (sceneFrameModalStates || []).find(s => s.id === connection.from);
-    if (scene) return { id: scene.id, value: scene.content };
+    if (scene) {
+      const sceneContent = scene.content || '';
+      return { 
+        id: scene.id, 
+        value: sceneContent, 
+        sentValue: sceneContent 
+      };
+    }
 
     return null;
   }, [id, connections, textInputStates, sceneFrameModalStates]);
 
-  // Use connected text as prompt if connected, otherwise use local prompt state
-  const effectivePrompt = connectedTextInput?.value || prompt;
-
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
   const onOptionsChangeRef = useRef(onOptionsChange);
 
   // Update ref when onOptionsChange changes
@@ -212,23 +226,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when connected text changes (only when value actually changes)
+  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
   useEffect(() => {
-    const currentValue = connectedTextInput?.value;
-    // Only update if the value actually changed
-    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentValue;
-      setPrompt(currentValue);
-      // Only call onOptionsChange if the prompt value actually changed
-      if (onOptionsChangeRef.current && currentValue !== prompt) {
-        const opts: any = { prompt: currentValue };
+    const currentSentValue = connectedTextInput?.sentValue;
+    // Only update if the sentValue actually changed
+    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentSentValue;
+      lastReceivedSentValueRef.current = currentSentValue;
+      // Always update the prompt, replacing any existing value
+      setPrompt(currentSentValue);
+      // Always call onOptionsChange to persist the change
+      if (onOptionsChangeRef.current) {
+        const opts: any = { prompt: currentSentValue };
         onOptionsChangeRef.current(opts);
       }
-    } else if (currentValue === undefined) {
-      // Reset ref when disconnected
+    } else if (currentSentValue === undefined && connectedTextInput === null) {
+      // Reset refs when disconnected
       prevConnectedTextValueRef.current = undefined;
+      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
+  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+
+  // Use local prompt for display - user can edit independently after receiving sentValue
+  // sentValue is only used to initially populate the prompt when arrow is clicked
+  const effectivePrompt = prompt;
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -246,6 +267,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Google nano banana pro',
     'Flux 2 pro',
     'Seedream v4',
+    'Seedream 4.5',
     'Imagen 4 Ultra',
     'Imagen 4',
     'Imagen 4 Fast',
@@ -263,7 +285,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // 1. Model is explicitly 'Library Image' or 'Uploaded Image' (highest priority - check both initialModel and selectedModel), OR
   // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
   // Priority: Explicit model check first, then fallback detection
+  // Priority: Explicit model check first, then fallback detection
   const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
+  const isCompareResult = initialFrame === 'Compare' || selectedFrame === 'Compare';
   const isUploadedImage =
     initialModel === 'Library Image' ||
     initialModel === 'Uploaded Image' ||
@@ -271,6 +295,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     selectedModel === 'Library Image' ||
     selectedModel === 'Uploaded Image' ||
     PLUGIN_MODELS.includes(selectedModel || '') ||
+    isCompareResult ||
     (!isGenerationModel && !isSelectedModelGeneration && !initialPrompt && !prompt && generatedImageUrl && !isGenerating && !externalIsGenerating);
 
   // Detect connected image nodes (for image-to-image generation)
@@ -313,6 +338,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Max',
     'Flux Kontext Pro',
     'Seedream v4 4K',
+    'Seedream 4.5',
     'Runway Gen4 Image',
     'Runway Gen4 Image Turbo'
   ];
@@ -321,6 +347,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Google nano banana pro',
     'Flux 2 pro',
     'Seedream v4',
+    'Seedream 4.5',
     'Imagen 4 Ultra',
     'Imagen 4',
     'Imagen 4 Fast',
@@ -330,7 +357,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1',
     'Seedream v4 4K',
     'Runway Gen4 Image',
-    'Runway Gen4 Image Turbo'
+    'Runway Gen4 Image Turbo',
+    'Z Image Turbo',
+    'P-Image'
   ];
   const availableModels = (hasConnectedImage || hasExistingImage) ? IMAGE_TO_IMAGE_MODELS : ALL_MODELS;
 
@@ -396,41 +425,88 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         setGeneratingState(true);
         didSetCurrentFrameGenerating = true;
       }
-      
+
       console.log('[ImageUploadModal] 🎯 Generation state management:', {
         hasExistingImage,
         generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
         willCreateNewFrame,
         didSetCurrentFrameGenerating,
       });
-      
+
       try {
         // Calculate width and height based on resolution and aspect ratio
         let width: number | undefined;
         let height: number | undefined;
+
+        const modelLower = selectedModel.toLowerCase();
+        const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
+        const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
 
         if (selectedResolution) {
           const [wRatio, hRatio] = selectedAspectRatio.split(':').map(Number);
           const ratio = wRatio / hRatio;
           let baseSize = 1024; // Default 1K
 
-          if (selectedResolution === '2K') baseSize = 2048;
-          if (selectedResolution === '4K') baseSize = 4096;
-
-          if (ratio >= 1) {
-            // Landscape or square
-            width = Math.round(baseSize * ratio);
-            height = baseSize;
-          } else {
-            // Portrait
-            width = baseSize;
-            height = Math.round(baseSize / ratio);
+          // Z Image Turbo: width/height 64-1440, divisible by 16
+          if (isZTurbo) {
+            // For Z Image Turbo, resolution value is the base size (512, 768, 1024, 1280, 1440)
+            baseSize = Number(selectedResolution) || 1024;
+            
+            // Round to nearest multiple of 16
+            const roundTo16 = (val: number) => Math.round(val / 16) * 16;
+            
+            if (ratio >= 1) {
+              width = roundTo16(Math.round(baseSize * ratio));
+              height = roundTo16(baseSize);
+            } else {
+              width = roundTo16(baseSize);
+              height = roundTo16(Math.round(baseSize / ratio));
+            }
+            
+            // Clamp to 64-1440 (per backend implementation)
+            width = Math.max(64, Math.min(1440, width));
+            height = Math.max(64, Math.min(1440, height));
           }
+          // P-Image: width/height 256-1440, divisible by 16
+          else if (isPImage) {
+            // For P-Image, resolution value is the base size (512, 768, 1024, 1280, 1440)
+            baseSize = Number(selectedResolution) || 1024;
+            
+            // Round to nearest multiple of 16
+            const roundTo16 = (val: number) => Math.round(val / 16) * 16;
+            
+            if (ratio >= 1) {
+              width = roundTo16(Math.round(baseSize * ratio));
+              height = roundTo16(baseSize);
+            } else {
+              width = roundTo16(baseSize);
+              height = roundTo16(Math.round(baseSize / ratio));
+            }
+            
+            // Clamp to 256-1440
+            width = Math.max(256, Math.min(1440, width));
+            height = Math.max(256, Math.min(1440, height));
+          }
+          // Other models
+          else {
+            if (selectedResolution === '2K') baseSize = 2048;
+            if (selectedResolution === '4K') baseSize = 4096;
 
-          // Special case for Flux 2 Pro 1024x2048
-          if (selectedResolution === '1024x2048') {
-            width = 1024;
-            height = 2048;
+            if (ratio >= 1) {
+              // Landscape or square
+              width = Math.round(baseSize * ratio);
+              height = baseSize;
+            } else {
+              // Portrait
+              width = baseSize;
+              height = Math.round(baseSize / ratio);
+            }
+
+            // Special case for Flux 2 Pro 1024x2048
+            if (selectedResolution === '1024x2048') {
+              width = 1024;
+              height = 2048;
+            }
           }
         }
 
@@ -814,21 +890,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
         // Determine final reference: prefer stitched reference exclusively when present
         let allReferenceImageUrls: string[] = [];
-        
+
         console.log('[Image Generation] 🔍 STEP 1: Before building allReferenceImageUrls:', {
           stitchedOnly,
           finalSourceImageUrl: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NULL/UNDEFINED',
           referenceImageUrls: referenceImageUrls.map(url => url.substring(0, 100) + '...'),
           referenceImageUrlsLength: referenceImageUrls.length,
         });
-        
+
         if (stitchedOnly && finalSourceImageUrl) {
           allReferenceImageUrls = [finalSourceImageUrl];
           console.log('[Image Generation] 🔍 STEP 2a: Using stitched-only path');
         } else {
           allReferenceImageUrls = [...referenceImageUrls];
           console.log('[Image Generation] 🔍 STEP 2b: Copied referenceImageUrls, length:', allReferenceImageUrls.length);
-          
+
           if (finalSourceImageUrl && !allReferenceImageUrls.includes(finalSourceImageUrl)) {
             console.log('[Image Generation] 🔍 STEP 3: Adding finalSourceImageUrl to allReferenceImageUrls');
             allReferenceImageUrls.push(finalSourceImageUrl);
@@ -839,7 +915,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             });
           }
         }
-        
+
         console.log('[Image Generation] 🔍 STEP 4: After building allReferenceImageUrls:', {
           allReferenceImageUrls: allReferenceImageUrls.map(url => url.substring(0, 100) + '...'),
           allReferenceImageUrlsLength: allReferenceImageUrls.length,
@@ -848,10 +924,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // CRITICAL: When creating a new frame for image-to-image (hasExistingImage is true),
         // we MUST pass the source image URL explicitly because the new frame doesn't have it yet
         // The finalSourceImageUrl contains the current frame's generatedImageUrl which should be used as the source
-        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl 
-          ? finalSourceImageUrl 
+        const finalSourceImageUrlParam = stitchedOnly && finalSourceImageUrl
+          ? finalSourceImageUrl
           : (allReferenceImageUrls.length > 0 ? allReferenceImageUrls.join(',') : undefined);
-        
+
         console.log('[Image Generation] 🎯 Source image determination:', {
           hasExistingImage,
           generatedImageUrl: generatedImageUrl ? generatedImageUrl.substring(0, 100) + '...' : 'NONE',
@@ -876,7 +952,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           width,
           height,
         });
-        
+
         console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
           'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
           'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
@@ -884,7 +960,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
         });
-        
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
@@ -931,15 +1007,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // Only show images when all are ready
         for (let i = 0; i < modalIds.length && i < imageUrls.length; i++) {
           if (onUpdateModalState) {
+            // Recalculate frame dimensions based on selected aspect ratio to ensure correct frame size
+            // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
+            const [w, h] = selectedAspectRatio.split(':').map(Number);
+            const calculatedFrameWidth = 600;
+            const ar = w && h ? (w / h) : 1;
+            const rawHeight = ar ? Math.round(calculatedFrameWidth / ar) : 600;
+            const calculatedFrameHeight = Math.max(400, rawHeight);
+            
             onUpdateModalState(modalIds[i], {
               generatedImageUrl: imageUrls[i],
               isGenerating: false, // Mark as completed
               model: selectedModel,
               frame: selectedFrame,
-              aspectRatio: selectedAspectRatio,
+              aspectRatio: selectedAspectRatio, // Preserve the selected aspect ratio
               prompt,
-              frameWidth,
-              frameHeight,
+              frameWidth: calculatedFrameWidth, // Use calculated dimensions based on aspect ratio
+              frameHeight: calculatedFrameHeight, // Use calculated dimensions based on aspect ratio
             } as any);
           }
         }
@@ -975,11 +1059,33 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     window.addEventListener('canvas-frame-dim', handleDim as any);
     return () => window.removeEventListener('canvas-frame-dim', handleDim as any);
   }, [id]);
+
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedImageModalIds } = ce.detail || {};
+      // Check if this modal is selected
+      if (selectedImageModalIds && Array.isArray(selectedImageModalIds) && selectedImageModalIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
   // Helper to parse model string into base model and resolution
   const parseModelAndResolution = (modelString: string) => {
     if (!modelString) return { model: 'Google Nano Banana', resolution: '2K' };
 
     const lower = modelString.toLowerCase();
+
+    // Check for Z Image Turbo and P-Image first (they don't have resolution in model name)
+    if (lower.includes('z image turbo') || lower.includes('z-image-turbo')) {
+      return { model: 'Z Image Turbo', resolution: '1024' }; // Default to 1024 for Z Image Turbo
+    }
+    if (lower.includes('p-image') && !lower.includes('p-image-edit')) {
+      return { model: 'P-Image', resolution: '1024' }; // Default to 1024 for P-Image
+    }
 
     // Check for known resolutions at the end of the string
     const resolutions = ['1K', '2K', '4K', '1024x2048'];
@@ -996,11 +1102,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }
     }
 
-    // Special handling for "Google nano banana pro" which might be lowercased in some contexts
+    // Special handling for model names which might be lowercased in some contexts
     if (baseModel.toLowerCase() === 'google nano banana pro') {
       baseModel = 'Google nano banana pro';
     } else if (baseModel.toLowerCase() === 'flux 2 pro') {
       baseModel = 'Flux 2 pro';
+    } else if (baseModel.toLowerCase().includes('seedream') && (baseModel.toLowerCase().includes('4.5') || baseModel.toLowerCase().includes('v4.5') || baseModel.toLowerCase().includes('v45'))) {
+      baseModel = 'Seedream 4.5';
     }
 
     return { model: baseModel, resolution: foundResolution };
@@ -1009,10 +1117,54 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   useEffect(() => {
     if (initialModel) {
       const { model, resolution } = parseModelAndResolution(initialModel);
-      if (model !== selectedModel) setSelectedModel(model);
-      if (resolution !== selectedResolution) setSelectedResolution(resolution);
+      if (model !== selectedModel) {
+        setSelectedModel(model);
+        // When model changes, also update resolution if needed
+        const modelLower = model.toLowerCase();
+        const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
+        const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+        
+        // For Z Image Turbo and P-Image, only accept valid resolutions
+        if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
+          if (resolution !== selectedResolution) {
+            userInitiatedResolutionChangeRef.current = false;
+            setSelectedResolution(resolution);
+          }
+        } else if (isPImage && ['512', '768', '1024', '1280', '1440'].includes(resolution)) {
+          if (resolution !== selectedResolution) {
+            userInitiatedResolutionChangeRef.current = false;
+            setSelectedResolution(resolution);
+          }
+        } else if (!isZTurbo && !isPImage) {
+          // For other models, use the parsed resolution
+          if (resolution !== selectedResolution) {
+            userInitiatedResolutionChangeRef.current = false;
+            setSelectedResolution(resolution);
+          }
+        }
+      } else {
+        // Model hasn't changed - only update resolution if it's from initialModel prop change
+        // and not from a user-initiated change
+        if (resolution !== selectedResolution && !userInitiatedResolutionChangeRef.current) {
+          const modelLower = model.toLowerCase();
+          const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
+          const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+          
+          // For Z Image Turbo and P-Image, only accept valid resolutions
+          if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
+            setSelectedResolution(resolution);
+          } else if (isPImage && ['512', '768', '1024', '1280', '1440'].includes(resolution)) {
+            setSelectedResolution(resolution);
+          } else if (!isZTurbo && !isPImage) {
+            // For other models, use the parsed resolution
+            setSelectedResolution(resolution);
+          }
+        }
+        // Reset the flag after processing
+        userInitiatedResolutionChangeRef.current = false;
+      }
     }
-  }, [initialModel]);
+  }, [initialModel, selectedModel]);
   useEffect(() => {
     if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame);
   }, [initialFrame]);
@@ -1020,17 +1172,24 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio);
   }, [initialAspectRatio]);
 
-  // Load image and get its resolution
+  // Load image and get its resolution (works for both generated and uploaded images)
   useEffect(() => {
     if (generatedImageUrl) {
       const img = new Image();
+      // Use the same URL handling as ImageModalFrame
+      const imageUrl = generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')
+        ? buildProxyResourceUrl(generatedImageUrl)
+        : generatedImageUrl;
+      img.crossOrigin = 'anonymous'; // Allow CORS for external images
       img.onload = () => {
-        setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          setImageResolution({ width: img.naturalWidth, height: img.naturalHeight });
+        }
       };
       img.onerror = () => {
         setImageResolution(null);
       };
-      img.src = generatedImageUrl;
+      img.src = imageUrl;
     } else {
       setImageResolution(null);
     }
@@ -1091,6 +1250,32 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // Z Image Turbo supports: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3 (width/height must be divisible by 16, 64-2048)
+    if (modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo')) {
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '16:9', label: '16:9' },
+        { value: '9:16', label: '9:16' },
+        { value: '4:3', label: '4:3' },
+        { value: '3:4', label: '3:4' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+      ];
+    }
+
+    // P-Image supports: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3 (width/height 256-1440, divisible by 16)
+    if (modelLower.includes('p-image') && !modelLower.includes('p-image-edit')) {
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '16:9', label: '16:9' },
+        { value: '9:16', label: '9:16' },
+        { value: '4:3', label: '4:3' },
+        { value: '3:4', label: '3:4' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+      ];
+    }
+
     // FAL models (Google Nano Banana, Seedream v4, Imagen) support: 1:1, 16:9, 9:16, 3:4, 4:3
     return [
       { value: '1:1', label: '1:1' },
@@ -1123,7 +1308,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
-    // Seedream, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
+    // Seedream 4.5 supports 1K, 2K, 4K (check before general seedream)
+    if (
+      modelLower.includes('seedream-4.5') ||
+      modelLower.includes('seedream_v45') ||
+      modelLower.includes('seedreamv45') ||
+      (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+    ) {
+      return [
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+        { value: '4K', label: '4K' },
+      ];
+    }
+
+    // Seedream v4, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
     if (
       modelLower.includes('seedream') ||
       modelLower.includes('imagen') ||
@@ -1136,11 +1335,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
-    // Z Image Turbo supports 1K and 2K only
-    if (modelLower.includes('z image turbo')) {
+    // Z Image Turbo supports only 1024px and 1440px (width/height 64-1440, divisible by 16)
+    if (modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo')) {
       return [
-        { value: '1K', label: '1K' },
-        { value: '2K', label: '2K' },
+        { value: '1024', label: '1024px' },
+        { value: '1440', label: '1440px' },
+      ];
+    }
+
+    // P-Image supports 1024 and 1440 resolution options only
+    if (modelLower.includes('p-image') && !modelLower.includes('p-image-edit')) {
+      return [
+        { value: '1024', label: '1024px' },
+        { value: '1440', label: '1440px' },
       ];
     }
 
@@ -1152,6 +1359,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const getFinalModelName = (modelOverride?: string) => {
     const targetModel = modelOverride || selectedModel;
     const modelLower = targetModel.toLowerCase();
+    
+    // Map frontend model names to backend model names for Replicate models
+    if (modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo')) {
+      return 'Z Image Turbo';
+    }
+    if (modelLower.includes('p-image') && !modelLower.includes('p-image-edit')) {
+      return 'P-Image';
+    }
 
     // For Google Nano Banana Pro, append resolution
     if (modelLower.includes('nano banana pro')) {
@@ -1163,7 +1378,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       return `Flux 2 Pro ${selectedResolution}`;
     }
 
-    // For Seedream, Imagen, and Flux Pro 1.1, append resolution
+    // For Seedream 4.5, append resolution (check before general seedream)
+    if (
+      modelLower.includes('seedream-4.5') ||
+      modelLower.includes('seedream_v45') ||
+      modelLower.includes('seedreamv45') ||
+      (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+    ) {
+      return `Seedream 4.5 ${selectedResolution}`;
+    }
+
+    // For Seedream v4, Imagen, and Flux Pro 1.1, append resolution
     if (
       modelLower.includes('seedream') ||
       modelLower.includes('imagen') ||
@@ -1233,11 +1458,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation (e.g. connection nodes) can't block drag end
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isDraggingContainer, dragOffset, scale, position, onPositionChange]);
 
@@ -1345,6 +1571,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         isUploadedImage={Boolean(isUploadedImage)}
         imageResolution={imageResolution}
         scale={scale}
+        title={isCompareResult ? selectedModel : (PLUGIN_MODELS.includes(selectedModel || '') || PLUGIN_MODELS.includes(initialModel || '') ? (selectedModel || initialModel) : undefined)}
       />
 
       <ModalActionIcons
@@ -1354,6 +1581,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onTogglePin={!isUploadedImage ? () => setIsPinned(!isPinned) : undefined}
       />
 
       <div style={{ position: 'relative' }}>
@@ -1371,8 +1600,26 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          width={frameWidth}
-          height={frameHeight}
+          // If an image already exists, use existing frame dimensions to prevent visual frame size change
+          // If no image exists, calculate from selected aspect ratio
+          width={(() => {
+            // If image exists, keep existing frame width; otherwise calculate from aspect ratio
+            if (generatedImageUrl && frameWidth) {
+              return frameWidth; // Keep existing frame width when image is present
+            }
+            return 600; // Fixed width for new frames
+          })()}
+          height={(() => {
+            // If image exists, keep existing frame height; otherwise calculate from aspect ratio
+            if (generatedImageUrl && frameHeight) {
+              return frameHeight; // Keep existing frame height when image is present
+            }
+            // Calculate from selected aspect ratio for new frames
+            const [w, h] = selectedAspectRatio.split(':').map(Number);
+            const ar = w && h ? (w / h) : 1;
+            const rawHeight = ar ? Math.round(600 / ar) : 600;
+            return Math.max(400, rawHeight); // Min 400px height
+          })()}
         />
         <ImageModalNodes
           id={id}
@@ -1391,7 +1638,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             isUploadedImage={Boolean(isUploadedImage)}
             isSelected={Boolean(isSelected)}
             prompt={effectivePrompt}
-            isPromptDisabled={!!connectedTextInput}
+            isPromptDisabled={false}
             selectedModel={selectedModel}
             selectedAspectRatio={selectedAspectRatio}
             selectedFrame={selectedFrame}
@@ -1455,6 +1702,68 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               if (newAspectRatio !== selectedAspectRatio) {
                 setSelectedAspectRatio(newAspectRatio);
               }
+              
+              // Update resolution when switching models
+              // Calculate available resolutions for the new model
+              const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
+              const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+              let availableResolutionsForModel: Array<{ value: string; label: string }> = [];
+              
+              if (isZTurbo) {
+                availableResolutionsForModel = [
+                  { value: '1024', label: '1024px' },
+                  { value: '1440', label: '1440px' },
+                ];
+              } else if (isPImage) {
+                availableResolutionsForModel = [
+                  { value: '512', label: '512px' },
+                  { value: '768', label: '768px' },
+                  { value: '1024', label: '1024px' },
+                  { value: '1280', label: '1280px' },
+                  { value: '1440', label: '1440px' },
+                ];
+              } else if (modelLower.includes('nano banana pro')) {
+                availableResolutionsForModel = [
+                  { value: '1K', label: '1K' },
+                  { value: '2K', label: '2K' },
+                  { value: '4K', label: '4K' },
+                ];
+              } else if (modelLower.includes('flux 2 pro')) {
+                availableResolutionsForModel = [
+                  { value: '1K', label: '1K' },
+                  { value: '2K', label: '2K' },
+                  { value: '1024x2048', label: '1024x2048' },
+                ];
+              } else if (
+                modelLower.includes('seedream-4.5') ||
+                modelLower.includes('seedream_v45') ||
+                modelLower.includes('seedreamv45') ||
+                (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+              ) {
+                // Seedream 4.5 supports 1K, 2K, 4K
+                availableResolutionsForModel = [
+                  { value: '1K', label: '1K' },
+                  { value: '2K', label: '2K' },
+                  { value: '4K', label: '4K' },
+                ];
+              } else if (modelLower.includes('seedream') || modelLower.includes('imagen') || modelLower.includes('flux pro 1.1')) {
+                availableResolutionsForModel = [
+                  { value: '1K', label: '1K' },
+                  { value: '2K', label: '2K' },
+                  { value: '4K', label: '4K' },
+                ];
+              }
+              
+              // Update resolution if current is not valid for the new model
+              if (availableResolutionsForModel.length > 0) {
+                const isValidResolution = availableResolutionsForModel.some(r => r.value === selectedResolution);
+                if (!isValidResolution) {
+                  // Set to first available resolution (default to 1024 for Z Image Turbo)
+                  const newResolution = isZTurbo ? '1024' : availableResolutionsForModel[0].value;
+                  setSelectedResolution(newResolution);
+                }
+              }
+              
               if (onOptionsChange) {
                 const [w, h] = newAspectRatio.split(':').map(Number);
                 const frameWidth = 600;
@@ -1473,16 +1782,38 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               setSelectedAspectRatio(ratio);
               setIsAspectRatioDropdownOpen(false);
               if (onOptionsChange) {
-                const [w, h] = ratio.split(':').map(Number);
-                const frameWidth = 600;
-                const ar = w && h ? (w / h) : 1;
-                const rawHeight = Math.round(frameWidth / ar);
-                const frameHeight = Math.max(400, rawHeight);
-                const opts: any = { model: selectedModel, frame: selectedFrame, prompt, frameWidth, frameHeight, imageCount };
-                if (!generatedImageUrl) {
-                  opts.aspectRatio = ratio;
+                // If an image already exists, don't change frame dimensions
+                // The aspect ratio change should only affect the next generation (image-to-image)
+                if (generatedImageUrl) {
+                  // Keep existing frame dimensions, only update aspect ratio for next generation
+                  const opts: any = { 
+                    model: selectedModel, 
+                    frame: selectedFrame, 
+                    prompt, 
+                    aspectRatio: ratio, // Update aspect ratio for next generation
+                    frameWidth: frameWidth, // Keep existing frame width
+                    frameHeight: frameHeight, // Keep existing frame height
+                    imageCount 
+                  };
+                  onOptionsChange(opts);
+                } else {
+                  // No image exists yet - calculate new frame dimensions based on aspect ratio
+                  const [w, h] = ratio.split(':').map(Number);
+                  const calculatedFrameWidth = 600;
+                  const ar = w && h ? (w / h) : 1;
+                  const rawHeight = Math.round(calculatedFrameWidth / ar);
+                  const calculatedFrameHeight = Math.max(400, rawHeight);
+                  const opts: any = { 
+                    model: selectedModel, 
+                    frame: selectedFrame, 
+                    prompt, 
+                    aspectRatio: ratio,
+                    frameWidth: calculatedFrameWidth, 
+                    frameHeight: calculatedFrameHeight, 
+                    imageCount 
+                  };
+                  onOptionsChange(opts);
                 }
-                onOptionsChange(opts);
               }
             }}
             onImageCountChange={(count) => {
@@ -1493,13 +1824,26 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             }}
             onResolutionChange={(resolution) => {
               console.log('[ImageUploadModal] Resolution changed:', { resolution, prev: selectedResolution });
+              // Mark as user-initiated to prevent useEffect from overriding
+              userInitiatedResolutionChangeRef.current = true;
+              // Update resolution state immediately
               setSelectedResolution(resolution);
+              
               if (onOptionsChange) {
                 // Helper to get model name with NEW resolution
                 const getModelNameWithResolution = (res: string) => {
                   const modelLower = selectedModel.toLowerCase();
                   if (modelLower.includes('nano banana pro')) return `Google nano banana pro ${res}`;
                   if (modelLower.includes('flux 2 pro')) return `Flux 2 Pro ${res}`;
+                  // Seedream 4.5 (check before general seedream)
+                  if (
+                    modelLower.includes('seedream-4.5') ||
+                    modelLower.includes('seedream_v45') ||
+                    modelLower.includes('seedreamv45') ||
+                    (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+                  ) {
+                    return `Seedream 4.5 ${res}`;
+                  }
                   if (
                     modelLower.includes('seedream') ||
                     modelLower.includes('imagen') ||
@@ -1510,14 +1854,22 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   }
                   return selectedModel;
                 };
+                
+                // Calculate frame dimensions based on CURRENT aspect ratio (not resolution)
+                // Frame size should only change when aspect ratio changes, not resolution
+                const [w, h] = selectedAspectRatio.split(':').map(Number);
+                const ar = w && h ? (w / h) : 1;
+                const frameWidth = 600;
+                const rawHeight = Math.round(frameWidth / ar);
+                const frameHeight = Math.max(400, rawHeight);
 
                 onOptionsChange({
                   model: getModelNameWithResolution(resolution),
-                  aspectRatio: selectedAspectRatio,
+                  aspectRatio: selectedAspectRatio, // Preserve aspect ratio
                   frame: selectedFrame,
                   prompt,
-                  frameWidth: 600,
-                  frameHeight: 400,
+                  frameWidth, // Keep frame size based on aspect ratio only
+                  frameHeight, // Keep frame size based on aspect ratio only
                   imageCount
                 } as any);
               }

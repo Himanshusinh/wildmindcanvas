@@ -28,6 +28,30 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
       // Prevent multiple simultaneous checks
       if (checkedRef.current) return;
       checkedRef.current = true;
+      
+      // Check if auth token was passed via URL hash (from parent window)
+      let passedToken: string | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          const hash = window.location.hash;
+          const authTokenMatch = hash.match(/authToken=([^&]+)/);
+          if (authTokenMatch) {
+            passedToken = decodeURIComponent(authTokenMatch[1]);
+            // Store it temporarily for authentication
+            if (passedToken) {
+              try {
+                localStorage.setItem('authToken', passedToken);
+                // Clear the hash to avoid exposing token in URL
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+              } catch (e) {
+                console.warn('[AuthGuard] Failed to store passed auth token', e);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[AuthGuard] Failed to parse auth token from URL hash', e);
+        }
+      }
 
       // Helper to log to console, state (visible on page), and localStorage
       const logDebug = (message: string, data?: unknown) => {
@@ -139,25 +163,81 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         } else {
           // Production: Try API check first (even without cookie, in case cookie is on different subdomain)
           // The API will return 401 if no valid session, but we should still try
-          logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain)');
+          // NEW: Also check for Bearer token in case cookies aren't working
+          logDebug('[AuthGuard] Prod mode: Attempting API check (cookie may be on different subdomain, will also try Bearer token)');
 
           try {
-            logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API)');
+            logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API, with Bearer token fallback)');
+            
+            // Give a small delay to allow cookies to be sent (sometimes there's a race condition)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             const isValid = await checkAuthStatus();
             logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
 
             if (isValid) {
               // Fetch user info
-              const user = await getCurrentUser();
-              logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username });
-              if (user && onUserLoaded) {
-                onUserLoaded(user);
+              try {
+                const user = await getCurrentUser();
+                logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
+                
+                if (user && user.uid) {
+                  if (onUserLoaded) {
+                    onUserLoaded(user);
+                  }
+                  setIsAuth(true);
+                  setIsChecking(false);
+                  return;
+                } else {
+                  logDebug('[AuthGuard] Prod mode: getCurrentUser returned empty/invalid user object - authentication may have failed');
+                  // Continue to redirect
+                }
+              } catch (userError) {
+                logDebug('[AuthGuard] Prod mode: Error fetching user info', { error: String(userError) });
+                // Continue to redirect
               }
-              setIsAuth(true);
-              setIsChecking(false);
-              return;
             } else {
-              logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session');
+              logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session (cookie or Bearer token)');
+              
+              // Check if we have a token in localStorage that we can try
+              const hasToken = typeof window !== 'undefined' && (
+                localStorage.getItem('authToken') ||
+                localStorage.getItem('idToken') ||
+                localStorage.getItem('user')
+              );
+              
+              if (hasToken) {
+                logDebug('[AuthGuard] Prod mode: Token found in localStorage but API check failed - retrying once more...');
+                
+                // Retry once more after a short delay (cookie might need time to be sent)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const retryIsValid = await checkAuthStatus();
+                logDebug('[AuthGuard] Prod mode: Retry checkAuthStatus result', { retryIsValid });
+                
+                if (retryIsValid) {
+                  try {
+                    const user = await getCurrentUser();
+                    logDebug('[AuthGuard] Prod mode: Retry succeeded, fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
+                    
+                    if (user && user.uid) {
+                      if (onUserLoaded) {
+                        onUserLoaded(user);
+                      }
+                      setIsAuth(true);
+                      setIsChecking(false);
+                      return;
+                    } else {
+                      logDebug('[AuthGuard] Prod mode: Retry getCurrentUser returned empty/invalid user object');
+                    }
+                  } catch (userError) {
+                    logDebug('[AuthGuard] Prod mode: Error fetching user info on retry', { error: String(userError) });
+                  }
+                } else {
+                  logDebug('[AuthGuard] Prod mode: Retry also failed - token may be expired or invalid');
+                }
+              } else {
+                logDebug('[AuthGuard] Prod mode: No token in localStorage - user needs to authenticate on www.wildmindai.com first');
+              }
             }
           } catch (apiError) {
             logDebug('[AuthGuard] Prod mode: API auth check threw error', {
@@ -227,9 +307,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           debugInfo
         });
 
-        // Add longer delay to allow logs to be read (10 seconds)
-        logDebug('[AuthGuard] Waiting 10 seconds before redirect - check debug panel below');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Shorter delay for better UX (was 10 seconds, now 2 seconds)
+        logDebug('[AuthGuard] Waiting 2 seconds before redirect - check debug panel below');
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         logDebug('[AuthGuard] Executing redirect now');
         // Encode debug info in URL so it can be read on redirect page

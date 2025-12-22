@@ -9,6 +9,8 @@ interface ModalActionIconsProps {
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
   onCopy?: () => void;
   onEdit?: () => void;
   editActive?: boolean;
@@ -22,6 +24,8 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   onDelete,
   onDownload,
   onDuplicate,
+  isPinned = false,
+  onTogglePin,
   onCopy,
   onEdit,
   editActive = false,
@@ -63,7 +67,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     borderRadius: `${8 * scale}px`,
     color: textColor,
     cursor: 'pointer',
-    transition: isTextVariant ? 'box-shadow 0.12s, background-color 0.12s, color 0.12s' : 'all 0.3s ease',
+    transition: 'none',
     boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
     flexShrink: 0,
   };
@@ -149,6 +153,28 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     }
   };
 
+  const handlePinMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.backgroundColor = 'rgba(67, 126, 181, 0.2)';
+    e.currentTarget.style.color = '#437eb5';
+    if (!isTextVariant) {
+      e.currentTarget.style.transform = 'scale(1.1)';
+    }
+  };
+
+  const handlePinMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const defaultBg = isPinned
+      ? 'rgba(67, 126, 181, 0.2)'
+      : (isDark
+        ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+        : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)'));
+    const defaultColor = isPinned ? '#437eb5' : (isDark ? '#cccccc' : '#4b5563');
+    e.currentTarget.style.backgroundColor = defaultBg;
+    e.currentTarget.style.color = defaultColor;
+    if (!isTextVariant) {
+      e.currentTarget.style.transform = 'scale(1)';
+    }
+  };
+
   // Delete icon SVG - different for text variant
   const DeleteIcon = isTextVariant ? (
     <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -188,6 +214,21 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="8" y="8" width="13" height="13" rx="2" ry="2" />
       <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+
+  const PinIcon = (
+    <svg
+      width={16 * scale}
+      height={16 * scale}
+      viewBox="0 0 24 24"
+      fill={isPinned ? '#437eb5' : 'none'}
+      stroke={isPinned ? '#437eb5' : 'currentColor'}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
     </svg>
   );
 
@@ -325,6 +366,39 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
           {DuplicateIcon}
         </button>
       )}
+
+      {/* Pin Icon */}
+      {onTogglePin && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            onTogglePin();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          title={isPinned ? 'Unpin controls' : 'Pin controls'}
+          style={{
+            ...baseButtonStyle,
+            backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : baseButtonStyle.backgroundColor,
+            border: `1px solid ${isPinned ? '#437eb5' : borderColor}`,
+            color: isPinned ? '#437eb5' : textColor,
+          }}
+          onMouseEnter={handlePinMouseEnter}
+          onMouseLeave={handlePinMouseLeave}
+        >
+          {PinIcon}
+        </button>
+      )}
+
       {/* Copy Icon */}
       {onCopy && (
         <button

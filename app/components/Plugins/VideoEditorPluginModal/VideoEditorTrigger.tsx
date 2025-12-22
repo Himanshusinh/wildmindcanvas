@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
-
-import { ConnectionNodes } from './ConnectionNodes';
+import { PluginConnectionNodes, PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
 
 interface VideoEditorTriggerProps {
     id: string;
@@ -33,10 +32,7 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
     onDelete,
 }) => {
     const [isHovered, setIsHovered] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-    const dragOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const hasDraggedRef = useRef(false);
+    const containerRef = useRef<HTMLDivElement>(null);
     const isDark = useIsDarkTheme();
 
     const screenX = x * scale + position.x;
@@ -46,76 +42,31 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
     const screenWidth = width * scale;
     const screenHeight = height * scale;
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (onSelect) onSelect();
-
-        dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-        hasDraggedRef.current = false;
-        setIsDragging(true);
-        dragOffset.current = {
-            x: e.clientX - screenX,
-            y: e.clientY - screenY
-        };
-    };
-
-    useEffect(() => {
-        if (!isDragging) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            if (isDragging) {
-                if (dragStartPosRef.current) {
-                    const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-                    const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-                    if (dx > 5 || dy > 5) hasDraggedRef.current = true;
-                }
-
-                if (onPositionChange) {
-                    const newScreenX = e.clientX - dragOffset.current.x;
-                    const newScreenY = e.clientY - dragOffset.current.y;
-                    const newCanvasX = (newScreenX - position.x) / scale;
-                    const newCanvasY = (newScreenY - position.y) / scale;
-                    onPositionChange(newCanvasX, newCanvasY);
-                }
-            }
-        };
-
-        const handleMouseUp = (e: MouseEvent) => {
-            if (isDragging) {
-                setIsDragging(false);
-                if (!hasDraggedRef.current) {
-                    onOpenEditor();
-                } else if (onPositionCommit) {
-                    const newScreenX = e.clientX - dragOffset.current.x;
-                    const newScreenY = e.clientY - dragOffset.current.y;
-                    const newCanvasX = (newScreenX - position.x) / scale;
-                    const newCanvasY = (newScreenY - position.y) / scale;
-                    onPositionCommit(newCanvasX, newCanvasY);
-                }
-                hasDraggedRef.current = false;
-            }
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging, onOpenEditor, onPositionChange, onPositionCommit, position, scale, screenX, screenY]);
+    const { onMouseDown: handleMouseDown } = useCanvasModalDrag({
+        enabled: true,
+        x,
+        y,
+        scale,
+        position,
+        containerRef,
+        onPositionChange,
+        onPositionCommit,
+        onSelect,
+        onTap: () => onOpenEditor(),
+    });
 
     return (
-        <div
-            style={{
-                position: 'absolute',
-                left: `${screenX}px`,
-                top: `${screenY}px`,
-                zIndex: isHovered || isSelected ? 2001 : 2000,
-                userSelect: 'none',
-            }}
+        <PluginNodeShell
+            modalKey="videoeditor"
+            id={id}
+            containerRef={containerRef}
+            screenX={screenX}
+            screenY={screenY}
+            isHovered={isHovered}
+            isSelected={Boolean(isSelected)}
+            onMouseDown={handleMouseDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onMouseDown={handleMouseDown}
         >
             <div
                 style={{
@@ -195,7 +146,7 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
                         }}
                     />
 
-                    <ConnectionNodes
+                    <PluginConnectionNodes
                         id={id}
                         scale={scale}
                         isHovered={isHovered}
@@ -203,6 +154,6 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
                     />
                 </div>
             </div>
-        </div>
+        </PluginNodeShell>
     );
 };

@@ -14,10 +14,14 @@ import { MediaActionIcons } from './MediaActionIcons';
 import AvatarButton from './AvatarButton';
 import { SettingsPopup } from '@/app/components/Settings';
 import { CanvasImageConnectionNodes } from './CanvasImageConnectionNodes';
-import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY } from '@/lib/canvasHelpers';
+import { existsNearby, findAvailablePositionNear, applyStageCursor, checkOverlap, findBlankSpace, focusOnComponent, INFINITE_CANVAS_SIZE, DOT_SPACING, DOT_SIZE, DOT_OPACITY, getClientRect } from '@/lib/canvasHelpers';
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/lib/api';
 import { generateSingleScenePrompt, ReferenceDetails } from '@/utils/generateStoryboardPrompt';
-import { CanvasTextState } from '@/app/components/ModalOverlays/types';
+import { CanvasTextState, CompareModalState } from '@/app/components/ModalOverlays/types';
+import { CanvasTextNode } from './CanvasTextNode';
+import { useCanvasHistory, CanvasHistoryState } from '@/app/hooks/useCanvasHistory';
+import { TextFormattingToolbar } from './TextFormattingToolbar';
+import { useKeyboardShortcuts } from '@/app/components/CanvasApp/hooks/useKeyboardShortcuts';
 
 // ... (rest of imports)
 
@@ -73,12 +77,13 @@ interface CanvasProps {
   externalVideoEditorModals?: Array<{ id: string; x: number; y: number }>;
   externalMusicModals?: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
+  externalMultiangleCameraModals?: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }>;
+  externalCompareModals?: Array<{ id: string; x: number; y: number; width?: number; height?: number; scale?: number }>;
   externalRemoveBgModals?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>;
   externalEraseModals?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>;
   externalExpandModals?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>;
   externalVectorizeModals?: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>;
   externalNextSceneModals?: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
-  externalMultiangleModals?: Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
   externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
   externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
@@ -101,6 +106,11 @@ interface CanvasProps {
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>) => void | Promise<void>;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  // Multiangle Camera plugin persistence callbacks
+  onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null }) => void | Promise<void>;
+  onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number; sourceImageUrl?: string | null }>) => void | Promise<void>;
+  onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
+  onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>) => void | Promise<void>;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
@@ -123,10 +133,10 @@ interface CanvasProps {
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
   onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
-  // Multiangle plugin persistence callbacks
-  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
-  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
-  onPersistMultiangleModalDelete?: (id: string) => void | Promise<void>;
+  // Compare plugin persistence callbacks
+  onPersistCompareModalCreate?: (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => void | Promise<void>;
+  onPersistCompareModalMove?: (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => void | Promise<void>;
+  onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
@@ -141,6 +151,14 @@ interface CanvasProps {
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
+  // Compare plugin persistence callbacks
+  compareModalStates?: import('@/app/components/ModalOverlays/types').CompareModalState[];
+  setCompareModalStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CompareModalState[]>>;
+  selectedCompareModalId?: string | null;
+  selectedCompareModalIds?: string[];
+  setSelectedCompareModalId?: (id: string | null) => void;
+  setSelectedCompareModalIds?: (ids: string[]) => void;
+
   canvasTextStates?: import('@/app/components/ModalOverlays/types').CanvasTextState[];
   setCanvasTextStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CanvasTextState[]>>;
   selectedCanvasTextId?: string | null;
@@ -195,12 +213,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   externalVideoEditorModals,
   externalMusicModals,
   externalUpscaleModals,
+  externalMultiangleCameraModals,
+  externalCompareModals,
   externalRemoveBgModals,
   externalEraseModals,
   externalExpandModals,
   externalVectorizeModals,
   externalNextSceneModals,
-  externalMultiangleModals,
   externalStoryboardModals,
   externalScriptFrameModals,
   externalSceneFrameModals,
@@ -222,6 +241,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistUpscaleModalMove,
   onPersistUpscaleModalDelete,
   onUpscale,
+  onPersistMultiangleCameraModalCreate,
+  onPersistMultiangleCameraModalMove,
+  onPersistMultiangleCameraModalDelete,
+  onMultiangleCamera,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
   onPersistRemoveBgModalDelete,
@@ -241,9 +264,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistNextSceneModalCreate,
   onPersistNextSceneModalMove,
   onPersistNextSceneModalDelete,
-  onPersistMultiangleModalCreate,
-  onPersistMultiangleModalMove,
-  onPersistMultiangleModalDelete,
   onPersistStoryboardModalCreate,
   onPersistStoryboardModalMove,
   onPersistStoryboardModalDelete,
@@ -256,6 +276,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistTextModalCreate,
   onPersistTextModalMove,
   onPersistTextModalDelete,
+  onPersistCompareModalCreate,
+  onPersistCompareModalMove,
+  onPersistCompareModalDelete,
   onPersistCanvasTextCreate,
   onPersistCanvasTextMove,
   onPersistCanvasTextDelete,
@@ -360,17 +383,17 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
   const [videoEditorModalStates, setVideoEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
   const [musicModalStates, setMusicModalStates] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>>([]);
-  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
-  const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>>([]);
-  const [eraseModalStates, setEraseModalStates] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean }>>([]);
-  const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }>>([]);
-  const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>>([]);
-  const [nextSceneModalStates, setNextSceneModalStates] = useState<Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>>([]);
-  const [multiangleModalStates, setMultiangleModalStates] = useState<Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>>([]);
+  const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>>([]);
+  const [multiangleCameraModalStates, setMultiangleCameraModalStates] = useState<Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>>([]);
+  const [removeBgModalStates, setRemoveBgModalStates] = useState<Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean; isExpanded?: boolean }>>([]);
+  const [eraseModalStates, setEraseModalStates] = useState<Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean; isExpanded?: boolean }>>([]);
+  const [expandModalStates, setExpandModalStates] = useState<Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean; isExpanded?: boolean }>>([]);
+  const [vectorizeModalStates, setVectorizeModalStates] = useState<Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean; isExpanded?: boolean }>>([]);
+  const [nextSceneModalStates, setNextSceneModalStates] = useState<Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean; isExpanded?: boolean }>>([]);
   // Local state for canvas text (fallback if props not provided)
   const [localCanvasTextStates, setLocalCanvasTextStates] = useState<Array<import('@/app/components/ModalOverlays/types').CanvasTextState>>([]);
   const [localSelectedCanvasTextId, setLocalSelectedCanvasTextId] = useState<string | null>(null);
-  
+
   // Use props if provided, otherwise use local state
   const effectiveCanvasTextStates = canvasTextStates ?? localCanvasTextStates;
   const effectiveSetCanvasTextStates = setCanvasTextStates ?? setLocalCanvasTextStates;
@@ -388,6 +411,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedImageModalId, setSelectedImageModalId] = useState<string | null>(null);
   const [selectedUpscaleModalId, setSelectedUpscaleModalId] = useState<string | null>(null);
   const [selectedUpscaleModalIds, setSelectedUpscaleModalIds] = useState<string[]>([]);
+  const [selectedMultiangleCameraModalId, setSelectedMultiangleCameraModalId] = useState<string | null>(null);
+  const [selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds] = useState<string[]>([]);
   const [selectedRemoveBgModalId, setSelectedRemoveBgModalId] = useState<string | null>(null);
   const [selectedRemoveBgModalIds, setSelectedRemoveBgModalIds] = useState<string[]>([]);
   const [selectedEraseModalId, setSelectedEraseModalId] = useState<string | null>(null);
@@ -398,8 +423,14 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [selectedVectorizeModalIds, setSelectedVectorizeModalIds] = useState<string[]>([]);
   const [selectedNextSceneModalId, setSelectedNextSceneModalId] = useState<string | null>(null);
   const [selectedNextSceneModalIds, setSelectedNextSceneModalIds] = useState<string[]>([]);
-  const [selectedMultiangleModalId, setSelectedMultiangleModalId] = useState<string | null>(null);
-  const [selectedMultiangleModalIds, setSelectedMultiangleModalIds] = useState<string[]>([]);
+
+  // Persistence using callback function references to avoid re-renders
+
+  // Compare Plugin
+  const [compareModalStates, setCompareModalStates] = useState<CompareModalState[]>([]);
+  const [selectedCompareModalId, setSelectedCompareModalId] = useState<string | null>(null);
+  const [selectedCompareModalIds, setSelectedCompareModalIds] = useState<string[]>([]);
+
   const [selectedStoryboardModalId, setSelectedStoryboardModalId] = useState<string | null>(null);
   const [selectedStoryboardModalIds, setSelectedStoryboardModalIds] = useState<string[]>([]);
   const [selectedScriptFrameModalId, setSelectedScriptFrameModalId] = useState<string | null>(null);
@@ -429,33 +460,331 @@ export const Canvas: React.FC<CanvasProps> = ({
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  useEffect(() => {
-    if (externalVectorizeModals) {
-      setVectorizeModalStates(externalVectorizeModals);
-    }
-    if (externalNextSceneModals) {
-      setNextSceneModalStates(externalNextSceneModals);
-    }
-    if (externalMultiangleModals) {
-      setMultiangleModalStates(externalMultiangleModals);
-    }
-    if (externalVideoEditorModals) {
-      setVideoEditorModalStates(externalVideoEditorModals);
-    }
-  }, [externalVectorizeModals, externalNextSceneModals, externalMultiangleModals, externalVideoEditorModals]);
+  // --- HISTORY MANAGEMENT ---
 
-  const sanitizeScriptOutput = (value?: string | null) => {
-    if (!value) return '';
-    let cleaned = value;
-    cleaned = cleaned.replace(/###\s*B[\s\S]*$/i, '').trim();
-    cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
-    cleaned = cleaned.replace(/\*\*/g, '');
-    cleaned = cleaned.replace(/^#+\s*/gm, '');
-    cleaned = cleaned.replace(/^\s*[-*]\s+/gm, '- ');
-    cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
-    cleaned = cleaned.replace(/\{\s*|\s*\}/g, '');
-    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-    return cleaned.trim();
+  const getCurrentState = useCallback((): CanvasHistoryState => ({
+    images,
+    canvasTextStates: effectiveCanvasTextStates,
+    textInputStates,
+    imageModalStates,
+    videoModalStates,
+    musicModalStates,
+    storyboardModalStates,
+    scriptFrameModalStates,
+    sceneFrameModalStates,
+    connections,
+    upscaleModalStates,
+    multiangleCameraModalStates,
+    removeBgModalStates,
+    eraseModalStates,
+    expandModalStates,
+    vectorizeModalStates,
+    nextSceneModalStates,
+    videoEditorModalStates,
+  }), [
+    images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, connections,
+    upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, videoEditorModalStates
+  ]);
+
+  const isRestoring = useRef(false);
+
+  const handleRestore = useCallback((state: CanvasHistoryState) => {
+    isRestoring.current = true;
+
+    // Restore local states
+    effectiveSetCanvasTextStates(state.canvasTextStates || []);
+    setImageModalStates(state.imageModalStates || []);
+    setVideoModalStates(state.videoModalStates || []);
+    setMusicModalStates(state.musicModalStates || []);
+    setTextInputStates(state.textInputStates || []);
+    setStoryboardModalStates(state.storyboardModalStates || []);
+    setScriptFrameModalStates(state.scriptFrameModalStates || []);
+    setSceneFrameModalStates(state.sceneFrameModalStates || []);
+    setUpscaleModalStates(state.upscaleModalStates || []);
+    setRemoveBgModalStates(state.removeBgModalStates || []);
+    setEraseModalStates(state.eraseModalStates || []);
+    setExpandModalStates(state.expandModalStates || []);
+    setVectorizeModalStates(state.vectorizeModalStates || []);
+    setNextSceneModalStates(state.nextSceneModalStates || []);
+    setVideoEditorModalStates(state.videoEditorModalStates || []);
+
+    if (onConnectionsChange && state.connections) {
+      onConnectionsChange(state.connections);
+    }
+
+    // Reconcile 'images' prop - skipped for now due to type mismatch
+    // if (state.images && images && onImageUpdate) {
+    //   state.images.forEach(savedImg => {
+    //     const currentImgIndex = images.findIndex(img => img.id === savedImg.id);
+    //     if (currentImgIndex !== -1) {
+    //       const currentImg = images[currentImgIndex];
+    //       // Check for significant differences to avoid spamming updates
+    //       if (currentImg.x !== savedImg.x || currentImg.y !== savedImg.y ||
+    //         currentImg.scaleX !== savedImg.scaleX || currentImg.scaleY !== savedImg.scaleY ||
+    //         currentImg.rotation !== savedImg.rotation) {
+    //         onImageUpdate(currentImgIndex, {
+    //           x: savedImg.x,
+    //           y: savedImg.y,
+    //           scaleX: savedImg.scaleX,
+    //           scaleY: savedImg.scaleY,
+    //           rotation: savedImg.rotation
+    //         });
+    //       }
+    //     }
+    //   });
+    // }
+
+    // Reset restoring flag after a tick to allow state updates to settle without triggering record()
+    setTimeout(() => {
+      isRestoring.current = false;
+    }, 100);
+  }, [effectiveSetCanvasTextStates, onConnectionsChange, images, onImageUpdate]);
+
+  const { record, undo, redo, canUndo, canRedo } = useCanvasHistory(
+    {
+      images,
+      canvasTextStates: effectiveCanvasTextStates,
+      textInputStates,
+      imageModalStates,
+      videoModalStates,
+      musicModalStates,
+      storyboardModalStates,
+      scriptFrameModalStates,
+      sceneFrameModalStates,
+      connections,
+      upscaleModalStates,
+      multiangleCameraModalStates,
+      removeBgModalStates,
+      eraseModalStates,
+      expandModalStates,
+      vectorizeModalStates,
+      nextSceneModalStates,
+      videoEditorModalStates
+    },
+    handleRestore
+  );
+
+  // Auto-record history on state changes
+  useEffect(() => {
+    if (!isRestoring.current) {
+      // Debounce slightly or just record? 
+      // Use a timeout to coalesce rapid updates if necessary, 
+      // but for now direct record is safer for "dragEnd" type updates.
+      // Konva usually updates state on dragEnd, so simple record is fine.
+      const timer = setTimeout(() => {
+        if (!isRestoring.current) {
+          record(getCurrentState());
+        }
+      }, 300); // 300ms debounce to catch the "end" of an operation
+      return () => clearTimeout(timer);
+    }
+  }, [
+    images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, connections,
+    upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, videoEditorModalStates,
+    record, getCurrentState
+  ]);
+
+
+
+  // Helper function to get accurate dimensions for each component type
+  // Accounts for hover states, open/closed states, and actual frame sizes
+  const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
+    switch (type) {
+      case 'image': {
+        const img = images[id as number];
+        if (!img) return { width: 0, height: 0 };
+
+        // Generation frames: 600px wide, height based on aspect ratio (min 400px)
+        // Add extra height for hover controls and UI elements
+        const baseWidth = img.width || 600;
+        const baseHeight = img.height || 400;
+
+        // For selection, use exact dimensions
+        return { width: baseWidth, height: baseHeight };
+      }
+
+      case 'imageModal': {
+        const modal = imageModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 600 };
+
+        // Image modals: 600px wide, height based on aspect ratio (min 400px)
+        // Add 100px for hover controls
+        return {
+          width: modal.frameWidth ?? 600,
+          height: (modal.frameHeight ?? 400) + 100
+        };
+      }
+
+      case 'videoModal': {
+        const modal = videoModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 500 };
+
+        // Video modals: 600px wide, 400px min height
+        return {
+          width: modal.frameWidth ?? 600,
+          height: modal.frameHeight ?? 400
+        };
+      }
+
+      case 'musicModal': {
+        const modal = musicModalStates.find(m => m.id === id);
+        if (!modal) return { width: 600, height: 400 };
+
+        // Music modals: 600px wide, 300px high (fixed)
+        return {
+          width: modal.frameWidth ?? 600,
+          height: modal.frameHeight ?? 300
+        };
+      }
+
+      case 'textInput': {
+        // Text inputs: 400px min width, ~110-140px height
+        // Use conservative estimate for selection
+        return { width: 400, height: 110 };
+      }
+
+      case 'upscaleModal': {
+        const modal = upscaleModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'multiangleCameraModal': {
+        const modal = multiangleCameraModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: 400,
+          height: 500
+        };
+      }
+
+      case 'removeBgModal': {
+        const modal = removeBgModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'eraseModal': {
+        const modal = eraseModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'compareModal': {
+        const modal = compareModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 }; // Just the circle node
+        }
+
+        // Expanded state: Includes the 500px wide popover below
+        return {
+          width: 500,
+          height: 600
+        };
+      }
+
+      case 'expandModal': {
+        const modal = expandModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'vectorizeModal': {
+        const modal = vectorizeModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+      case 'nextSceneModal': {
+        const modal = nextSceneModalStates.find(m => m.id === id);
+        if (!modal) return { width: 100, height: 100 };
+
+        if (!modal.isExpanded) {
+          return { width: 100, height: 100 };
+        }
+
+        return {
+          width: modal.frameWidth ?? 400,
+          height: modal.frameHeight ?? 500
+        };
+      }
+
+
+      case 'sceneFrameModal': {
+        const modal = sceneFrameModalStates.find(m => m.id === id);
+        if (!modal) return { width: 350, height: 300 };
+
+        // Scene frame: 350px wide, 300px high
+        return {
+          width: modal.frameWidth ?? 350,
+          height: modal.frameHeight ?? 300
+        };
+      }
+
+      case 'canvasText': {
+        const textState = effectiveCanvasTextStates.find(t => t.id === id);
+        if (!textState) return { width: 0, height: 0 };
+
+        const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
+        const height = textState.height || (textState.fontSize || 16) * 1.2;
+
+        return { width: estimatedWidth, height };
+      }
+
+      default:
+        return { width: 0, height: 0 };
+    }
   };
 
   const ensureScriptFrameForPlugin = (pluginId: string, script: string, isLoading: boolean = false) => {
@@ -547,36 +876,24 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   };
 
+  const sanitizeScriptOutput = (value?: string | null) => {
+    if (!value) return '';
+    let cleaned = value;
+    cleaned = cleaned.replace(/###\s*B[\s\S]*$/i, '').trim();
+    cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
+    cleaned = cleaned.replace(/\*\*/g, '');
+    cleaned = cleaned.replace(/^#+\s*/gm, '');
+    cleaned = cleaned.replace(/^\s*[-*]\s+/gm, '- ');
+    cleaned = cleaned.replace(/^\s*\d+\.\s+/gm, '');
+    cleaned = cleaned.replace(/\{\s*|\s*\}/g, '');
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    return cleaned.trim();
+  };
+
   const handleScriptGenerationStart = (textModalId: string) => {
-    const storyboardTargets = (connections ?? [])
-      .filter(conn => conn.from === textModalId)
-      .map(conn => conn.to)
-      .filter(Boolean);
-    if (!storyboardTargets.length) return;
-
-    // Find target plugin IDs either directly or via script frame ID
-    const targetPluginIds = new Set<string>();
-
-    storyboardTargets.forEach(targetId => {
-      // Check if target is a storyboard plugin
-      if (storyboardModalStates.some(modal => modal.id === targetId)) {
-        targetPluginIds.add(targetId);
-      }
-      // Check if target is a script frame (format: script-{pluginId})
-      else if (targetId.startsWith('script-')) {
-        const potentialPluginId = targetId.replace('script-', '');
-        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
-          targetPluginIds.add(potentialPluginId);
-        }
-      }
-    });
-
-    if (targetPluginIds.size === 0) return;
-
-    for (const id of targetPluginIds) {
-      // Ensure script frame exists and set loading state
-      ensureScriptFrameForPlugin(id, '', true);
-    }
+    // Script generation starts - no need to create script frames anymore
+    // The generated story will be shown in the text input itself
+    console.log('[Canvas] Script generation started for text input:', textModalId);
   };
 
   const handleTextScriptGenerated = async (textModalId: string, script: string) => {
@@ -584,13 +901,25 @@ export const Canvas: React.FC<CanvasProps> = ({
     const sanitizedScript = sanitizeScriptOutput(script);
     if (!sanitizedScript) return;
 
+    // Update the text input's value to show the generated story
+    setTextInputStates(prev => prev.map(t => 
+      t.id === textModalId ? { ...t, value: sanitizedScript } : t
+    ));
+    
+    // Persist the text input update
+    if (onPersistTextModalMove) {
+      Promise.resolve(onPersistTextModalMove(textModalId, { value: sanitizedScript })).catch(console.error);
+    }
+
+    // Find connected storyboard plugins
     const storyboardTargets = (connections ?? [])
       .filter(conn => conn.from === textModalId)
       .map(conn => conn.to)
       .filter(Boolean);
+    
     if (!storyboardTargets.length) return;
 
-    // Find target plugin IDs either directly or via script frame ID
+    // Find target plugin IDs (only direct storyboard plugin connections, no script frames)
     const targetPluginIds = new Set<string>();
 
     storyboardTargets.forEach(targetId => {
@@ -598,20 +927,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (storyboardModalStates.some(modal => modal.id === targetId)) {
         targetPluginIds.add(targetId);
       }
-      // Check if target is a script frame (format: script-{pluginId})
-      else if (targetId.startsWith('script-')) {
-        const potentialPluginId = targetId.replace('script-', '');
-        if (storyboardModalStates.some(modal => modal.id === potentialPluginId)) {
-          targetPluginIds.add(potentialPluginId);
-        }
-      }
     });
 
     if (targetPluginIds.size === 0) return;
 
     const storyboardIds = Array.from(targetPluginIds);
 
-    // Update storyboard modals with the new script text
+    // Update storyboard modals with the new script text (for reference)
     setStoryboardModalStates(prev => {
       let changed = false;
       const updated = prev.map(modal => {
@@ -626,21 +948,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       return changed ? updated : prev;
     });
 
+    // Persist storyboard script text
     for (const id of storyboardIds) {
-      // Clear loading state and set text
-      const scriptFrameDetails = ensureScriptFrameForPlugin(id, sanitizedScript, false);
-
       if (onPersistStoryboardModalMove) {
         Promise.resolve(onPersistStoryboardModalMove(id, { scriptText: sanitizedScript })).catch(console.error);
       }
-
-      // Automatically generate scenes from the story
-      if (scriptFrameDetails) {
-        console.log('[Canvas] Automatically triggering scene generation for script frame:', scriptFrameDetails.id);
-        // Pass details directly to avoid stale state issues
-        handleGenerateScenes(scriptFrameDetails.id, scriptFrameDetails.text, scriptFrameDetails);
-      }
     }
+
+    // Note: We don't automatically generate scenes here anymore
+    // User must click "Generate Storyboard" button to generate scenes
   };
 
   const handleDeleteScriptFrame = (frameId: string) => {
@@ -727,6 +1043,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleCanvasTextUpdate = (id: string, updates: Partial<import('@/app/components/ModalOverlays/types').CanvasTextState>) => {
+    // Check for movement and group update
+    const isMoving = updates.x !== undefined || updates.y !== undefined;
+    const isSelected = (selectedCanvasTextIds || []).includes(id);
+
+    if (isMoving && isSelected) {
+      const current = effectiveCanvasTextStates.find(t => t.id === id);
+      if (current) {
+        const newX = updates.x !== undefined ? updates.x : current.x;
+        const newY = updates.y !== undefined ? updates.y : current.y;
+        const dx = newX - current.x;
+        const dy = newY - current.y;
+
+        if (dx !== 0 || dy !== 0) {
+          moveSelectedItems(dx, dy, 'canvas-text', id);
+        }
+      }
+    }
+
     effectiveSetCanvasTextStates(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     if (onPersistCanvasTextMove) {
       Promise.resolve(onPersistCanvasTextMove(id, updates)).catch(console.error);
@@ -940,7 +1274,39 @@ export const Canvas: React.FC<CanvasProps> = ({
       specialRequest?: string;
     }
   ) => {
-    console.log('[Canvas] Creating stitched image for storyboard:', storyboardId);
+    console.log('[Canvas] Generate Storyboard clicked for:', storyboardId);
+
+    // Get the storyboard modal
+    const storyboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+    if (!storyboard) {
+      console.warn('[Canvas] Storyboard not found:', storyboardId);
+      return;
+    }
+
+    // Get script text from connected text input or from storyboard's scriptText
+    let scriptText: string | null = null;
+    
+    // Find connected text input
+    const textInputConnection = (connections ?? []).find(conn => conn.to === storyboardId);
+    if (textInputConnection) {
+      const connectedTextInput = textInputStates.find(t => t.id === textInputConnection.from);
+      if (connectedTextInput?.value) {
+        scriptText = connectedTextInput.value;
+        console.log('[Canvas] ✅ Found script from connected text input:', scriptText.substring(0, 100) + '...');
+      }
+    }
+    
+    // Fallback to storyboard's stored scriptText
+    if (!scriptText && storyboard.scriptText) {
+      scriptText = storyboard.scriptText;
+      console.log('[Canvas] ✅ Using script from storyboard scriptText:', scriptText.substring(0, 100) + '...');
+    }
+
+    if (!scriptText || !scriptText.trim()) {
+      console.warn('[Canvas] ⚠️ No script text found. Please connect a text input with a generated story.');
+      alert('Please connect a text input with a generated story first.');
+      return;
+    }
 
     // Create stitched reference image from all connected images
     let stitchedImageUrl: string | undefined = undefined;
@@ -972,29 +1338,46 @@ export const Canvas: React.FC<CanvasProps> = ({
     } catch (error) {
       console.error('[Canvas] ❌ Error creating stitched image:', error);
     }
+
+    // Generate scenes directly from the script text
+    await handleGenerateScenesFromStoryboard(storyboardId, scriptText);
   };
 
-  // Scene frame handlers
-  const handleGenerateScenes = async (
-    scriptFrameId: string,
-    overrideText?: string,
-    overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
+  // Scene frame handlers - NEW: Generate scenes directly from storyboard (no script frames)
+  const handleGenerateScenesFromStoryboard = async (
+    storyboardId: string,
+    scriptText: string
   ) => {
-    const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
-    const textToUse = overrideText || scriptFrame?.text;
-    const frameToUse = overrideFrame || scriptFrame;
-
-    if (!frameToUse || !textToUse) {
-      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+    if (!storyboardId || !scriptText || !scriptText.trim()) {
+      console.warn('[Canvas] Missing storyboardId or scriptText');
       return;
     }
 
-    // Get the storyboard ID (parent of script frame)
-    const storyboardId = scriptFrame?.pluginId;
-    if (!storyboardId) {
-      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+    // Get the storyboard modal for positioning
+    const storyboard = storyboardModalStates.find(sb => sb.id === storyboardId);
+    if (!storyboard) {
+      console.warn('[Canvas] Storyboard not found:', storyboardId);
       return;
     }
+
+    const textToUse = scriptText;
+    const frameToUse = {
+      x: storyboard.x,
+      y: storyboard.y,
+      frameWidth: storyboard.frameWidth || 400,
+      frameHeight: storyboard.frameHeight || 500,
+    };
+
+    // Continue with scene generation logic (same as before, but without script frame dependency)
+    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+  };
+
+  // Internal function to generate scenes (extracted from old handleGenerateScenes)
+  const generateScenesFromStoryboardInternal = async (
+    storyboardId: string,
+    textToUse: string,
+    frameToUse: { x: number; y: number; frameWidth: number; frameHeight: number }
+  ) => {
 
     try {
       // Log the story text and detect @mentions before sending to backend
@@ -1007,7 +1390,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         storyLength: textToUse.length,
         detectedMentions: detectedMentions,
         mentionCount: detectedMentions.length,
-        scriptFrameId,
         storyboardId,
       });
 
@@ -1045,7 +1427,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Import scene utilities dynamically for positioning
       const { calculateSceneFramePositions } = await import('@/app/components/Plugins/StoryboardPluginModal/sceneUtils');
 
-      // Calculate positions for scene frames (grid layout to the right of script frame)
+      // Calculate positions for scene frames (grid layout to the right of storyboard plugin)
       const positions = calculateSceneFramePositions(
         frameToUse.x,
         frameToUse.y,
@@ -1089,8 +1471,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         });
 
         return {
-          id: `scene-${scriptFrameId}-${scene.scene_number}-${Date.now()}`,
-          scriptFrameId: scriptFrameId,
+          id: `scene-${storyboardId}-${scene.scene_number}-${Date.now()}`,
+          scriptFrameId: storyboardId, // Use storyboardId as scriptFrameId for compatibility (no script frames anymore)
           sceneNumber: scene.scene_number,
           x: positions[index].x,
           y: positions[index].y,
@@ -1121,11 +1503,11 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
       });
 
-      // Create connections from script frame to scene frames
+      // Create connections from storyboard to scene frames (no script frame anymore)
       const newConnections = newSceneFrames.map(sceneFrame => ({
-        from: scriptFrameId,
+        from: storyboardId,
         to: sceneFrame.id,
-        color: '#437eb5', // Blue connection for script → scene
+        color: '#437eb5', // Blue connection for storyboard → scene
       }));
 
       // Update connections state and persist
@@ -1550,6 +1932,33 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // Backward compatibility: Keep old handleGenerateScenes for script frames (if any exist)
+  // This allows old projects with script frames to still work
+  const handleGenerateScenes = async (
+    scriptFrameId: string,
+    overrideText?: string,
+    overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
+  ) => {
+    const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
+    const textToUse = overrideText || scriptFrame?.text;
+    const frameToUse = overrideFrame || scriptFrame;
+
+    if (!frameToUse || !textToUse) {
+      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+      return;
+    }
+
+    // Get the storyboard ID (parent of script frame)
+    const storyboardId = scriptFrame?.pluginId;
+    if (!storyboardId) {
+      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+      return;
+    }
+
+    // Use the new function with storyboardId
+    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+  };
+
   const handleDeleteSceneFrame = (frameId: string) => {
     setSceneFrameModalStates(prev => prev.filter(frame => frame.id !== frameId));
     if (onPersistSceneFrameModalDelete) {
@@ -1660,6 +2069,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedMusicModalIds([]);
     setSelectedUpscaleModalId(null);
     setSelectedUpscaleModalIds([]);
+    setSelectedMultiangleCameraModalId(null);
+    setSelectedMultiangleCameraModalIds([]);
     setSelectedRemoveBgModalId(null);
     setSelectedRemoveBgModalIds([]);
     setSelectedEraseModalId(null);
@@ -1668,6 +2079,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedExpandModalIds([]);
     setSelectedVectorizeModalId(null);
     setSelectedVectorizeModalIds([]);
+    setSelectedNextSceneModalId(null);
+    setSelectedNextSceneModalIds([]);
+    setSelectedCompareModalId(null);
+    setSelectedCompareModalIds([]);
     setSelectedStoryboardModalId(null);
     setSelectedStoryboardModalIds([]);
     setSelectedVideoEditorModalId(null);
@@ -1992,7 +2407,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // Find a blank space for the text element (300px width, 100px height)
       const blankPos = findBlankSpaceWrapper(300, 100);
-      
+
       const newId = `text-${Date.now()}`;
       const newTextState: CanvasTextState = {
         id: newId,
@@ -2013,7 +2428,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.log('[Canvas] Auto-creating canvas text at:', blankPos, newTextState);
       effectiveSetCanvasTextStates(prev => {
         // Check if text already exists nearby using current state
-        if (prev.some(text => 
+        if (prev.some(text =>
           Math.abs(text.x - blankPos.x) < 350 && Math.abs(text.y - blankPos.y) < 150
         )) {
           console.log('[Canvas] Text already exists nearby, skipping creation');
@@ -2266,6 +2681,29 @@ export const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalUpscaleModals || [])]);
 
+  // Hydrate compare modals from external or localStorage
+  useEffect(() => {
+    // If externalCompareModals is provided (even if empty), sync to it immediately
+    if (externalCompareModals !== undefined) {
+      setCompareModalStates(externalCompareModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:compareModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as CompareModalState[];
+        if (Array.isArray(parsed)) {
+          setCompareModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted compare modals');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalCompareModals || [])]);
+
   // Hydrate vectorize modals from external or localStorage
   useEffect(() => {
     // If externalVectorizeModals is provided (even if empty), sync to it immediately
@@ -2290,29 +2728,6 @@ export const Canvas: React.FC<CanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalVectorizeModals || [])]);
 
-  // Hydrate multiangle modals from external or localStorage
-  useEffect(() => {
-    // If externalMultiangleModals is provided (even if empty), sync to it immediately
-    if (externalMultiangleModals !== undefined) {
-      console.log('[Canvas] Syncing multiangleModalStates with externalMultiangleModals', externalMultiangleModals.length);
-      setMultiangleModalStates(externalMultiangleModals);
-      return;
-    }
-    if (!projectId) return;
-    try {
-      const key = `canvas:${projectId}:multiangleModals`;
-      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; multiangleImageUrl?: string | null; sourceImageUrl?: string | null; localMultiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
-        if (Array.isArray(parsed)) {
-          setMultiangleModalStates(parsed);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load persisted multiangle modals');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, JSON.stringify(externalMultiangleModals || [])]);
 
   // Hydrate storyboard modals from external or localStorage
   useEffect(() => {
@@ -2337,6 +2752,30 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, JSON.stringify(externalStoryboardModals || [])]);
+
+  // Hydrate next scene modals from external or localStorage
+  useEffect(() => {
+    // If externalNextSceneModals is provided (even if empty), sync to it immediately
+    if (externalNextSceneModals !== undefined) {
+      console.log('[Canvas] Syncing nextSceneModalStates with externalNextSceneModals', externalNextSceneModals.length);
+      setNextSceneModalStates(externalNextSceneModals);
+      return;
+    }
+    if (!projectId) return;
+    try {
+      const key = `canvas:${projectId}:nextSceneModals`;
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>;
+        if (Array.isArray(parsed)) {
+          setNextSceneModalStates(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('[Canvas] Failed to load persisted next scene modals', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, JSON.stringify(externalNextSceneModals || [])]);
 
   // Also sync externalStoryboardModals changes to internal state (for real-time updates)
   useEffect(() => {
@@ -2479,44 +2918,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   }, [storyboardModalStates]);
 
-  // Automatically generate scenes when new script frames are created
-  useEffect(() => {
-    scriptFrameModalStates.forEach(frame => {
-      // Check if this frame has already been processed for scene generation
-      const hasScenes = sceneFrameModalStates.some(scene => scene.scriptFrameId === frame.id);
-      const alreadyProcessed = processedScriptFramesRef.current.has(frame.id);
-
-      // Validate that the script text is complete and meaningful
-      const hasValidScript = frame.text &&
-        frame.text.trim().length > 50 && // At least 50 characters
-        !frame.text.includes('...') && // Not a loading indicator
-        !frame.text.toLowerCase().includes('generating'); // Not still generating
-
-      // Check if the parent storyboard exists and has completed script generation
-      const parentStoryboard = storyboardModalStates.find(s => s.id === frame.pluginId);
-      const storyboardHasScript = parentStoryboard && parentStoryboard.scriptText && parentStoryboard.scriptText.trim().length > 0;
-
-      // Only generate scenes for new frames that:
-      // 1. Don't have scenes yet
-      // 2. Have valid, complete script text
-      // 3. Haven't been processed before
-      // 4. Have a parent storyboard with a complete script
-      if (!hasScenes && hasValidScript && !alreadyProcessed && storyboardHasScript) {
-        processedScriptFramesRef.current.add(frame.id);
-
-        console.log('[Canvas] Auto-generating scenes for script frame:', frame.id, 'Script length:', frame.text.length);
-
-        // Add a small delay to ensure the script frame is fully rendered and stable
-        setTimeout(() => {
-          handleGenerateScenes(frame.id).catch(err => {
-            console.error('[Canvas] Auto scene generation failed:', err);
-            // Remove from processed set on failure so it can be retried
-            processedScriptFramesRef.current.delete(frame.id);
-          });
-        }, 1000); // 1 second delay to ensure stability
-      }
-    });
-  }, [scriptFrameModalStates.length, scriptFrameModalStates.map(f => f.id).join(','), scriptFrameModalStates.map(f => f.text).join('|'), sceneFrameModalStates.length, storyboardModalStates.length]);
+  // NOTE: Removed automatic scene generation from script frames
+  // Script frames are no longer used - stories are shown in text input directly
+  // Scenes are generated when user clicks "Generate Storyboard" button
 
   useEffect(() => {
     if (!onPersistConnectorCreate) return;
@@ -2718,6 +3122,37 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [JSON.stringify(externalExpandModals || [])]);
 
+  // Sync externalMultiangleCameraModals changes to internal state
+  useEffect(() => {
+    if (externalMultiangleCameraModals !== undefined && externalMultiangleCameraModals.length === 0) {
+      console.log('[Canvas] Clearing multiangleCameraModalStates (external is empty)');
+      setMultiangleCameraModalStates([]);
+      return;
+    }
+    if (externalMultiangleCameraModals && externalMultiangleCameraModals.length > 0) {
+      setMultiangleCameraModalStates(prev => {
+        const externalIds = new Set(externalMultiangleCameraModals.map(m => m.id));
+        const prevIds = new Set(prev.map(m => m.id));
+        const idsMatch = externalIds.size === prevIds.size && [...externalIds].every(id => prevIds.has(id));
+        if (idsMatch) {
+          return prev.map(prevModal => {
+            const externalModal = externalMultiangleCameraModals.find(m => m.id === prevModal.id);
+            if (externalModal) {
+              return {
+                ...prevModal,
+                ...externalModal,
+                x: Math.abs(prevModal.x - externalModal.x) < 1 ? externalModal.x : prevModal.x,
+                y: Math.abs(prevModal.y - externalModal.y) < 1 ? externalModal.y : prevModal.y,
+              };
+            }
+            return prevModal;
+          });
+        }
+        return externalMultiangleCameraModals.map(m => ({ ...m, isExpanded: false }));
+      });
+    }
+  }, [JSON.stringify(externalMultiangleCameraModals || [])]);
+
   // Also sync externalUpscaleModals changes to internal state (for real-time updates)
   // Only sync if externalUpscaleModals is actually different to avoid overwriting local drag updates
   useEffect(() => {
@@ -2759,6 +3194,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       });
     }
   }, [JSON.stringify(externalUpscaleModals || [])]);
+
 
   // Also sync externalVectorizeModals changes to internal state (for real-time updates)
   // Only sync if externalVectorizeModals is actually different to avoid overwriting local drag updates
@@ -2814,6 +3250,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       console.warn('Failed to persist upscale modals');
     }
   }, [upscaleModalStates, projectId]);
+
 
   // Persist music modals
   useEffect(() => {
@@ -3135,6 +3572,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (!stage) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Disabled: Middle button wheel scrolling to prevent glitches
+      // If middle button is pressed, ignore wheel events (don't pan or zoom)
+      if (isMiddleButtonPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Just prevent default behavior, don't pan the canvas
+        return;
+      }
+
       e.preventDefault();
 
       const stage = stageRef.current;
@@ -3148,13 +3594,22 @@ export const Canvas: React.FC<CanvasProps> = ({
 
       // If on Mac, no modifier keys, and we have horizontal/vertical deltas from touchpad, treat as pan
       if (isMac && !isModifier && (absDeltaX > 0 || absDeltaY > 0) && Math.max(absDeltaX, absDeltaY) < 400) {
+        // Disable stage dragging during trackpad pan to prevent conflicts
+        if (stage) {
+          stage.draggable(false);
+          setIsPanning(false);
+        }
+        
         // Adjust position by wheel deltas (invert sign if needed based on UX)
+        // Use requestAnimationFrame for smooth updates
+        requestAnimationFrame(() => {
         setPosition(prev => {
           // Invert deltas so two-finger drag direction matches canvas movement
           // (drag up → canvas moves up, drag left → canvas moves left)
           const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
           setTimeout(() => updateViewportCenter(newPos, scale), 0);
           return newPos;
+          });
         });
         return;
       }
@@ -3196,7 +3651,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track if space key is pressed for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const [isTextInteracting, setIsTextInteracting] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [isMiddleButtonPressed, setIsMiddleButtonPressed] = useState(false);
   const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingFromElement, setIsDraggingFromElement] = useState(false);
   // Selection box state (marquee)
@@ -3215,731 +3672,224 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Track real-time position of selected image during drag
   const [selectedImageRealTimePosition, setSelectedImageRealTimePosition] = useState<{ x: number; y: number } | null>(null);
 
-  // Listen for space key for panning, Shift key for panning, and Delete/Backspace for deletion
+  // Region selection rectangle (Konva pattern)
+  const selectionRectangleRef = useRef<Konva.Rect>(null);
+  const [selectionRectCoords, setSelectionRectCoords] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
+  // Track middle button state globally - always reset to prevent stuck state
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
-        setIsSpacePressed(true);
-        applyStageCursorWrapper('grab', true);
-      }
-
-      if (e.shiftKey) {
-        setIsShiftPressed(true);
-        // Force crosshair while Shift is pressed
-        applyStageCursorWrapper('crosshair', true);
-      }
-
-      // Quick-create shortcuts (keyboard): t = text, i = image, v = video, m = music
-      // Only trigger when keyboard focus is not inside an input/textarea/select/contentEditable
-      try {
-        const target = e.target as Element | null;
-        const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
-        // Check if target is contentEditable or inside a contentEditable element
-        const isContentEditable = target?.hasAttribute('contenteditable') || 
-          (target?.getAttribute('contenteditable') === 'true') ||
-          (target?.closest && target.closest('[contenteditable="true"]') !== null);
-        const isTyping = isInputElement || isContentEditable;
-        if (!e.repeat && !isTyping) {
-          // Text input shortcut
-          if (e.key === 't') {
-            e.preventDefault();
-            const now = Date.now();
-            const last = lastCreateTimesRef.current.text || 0;
-            if (now - last >= 200) {
-              lastCreateTimesRef.current.text = now;
-              const canvasX = (viewportSize.width / 2 - position.x) / scale;
-              const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
-              const newId = `text-${Date.now()}-${Math.random()}`;
-              const newModal = { id: newId, x: pos.x, y: pos.y, autoFocusInput: true };
-              setTextInputStates(prev => [...prev, newModal]);
-              if (onPersistTextModalCreate) {
-                Promise.resolve(onPersistTextModalCreate(newModal)).catch(console.error);
-              }
-            }
-            return;
-          }
-
-          // Image modal shortcut
-          if (e.key === 'i') {
-            e.preventDefault();
-            const now = Date.now();
-            const last = lastCreateTimesRef.current.image || 0;
-            if (now - last >= 200) {
-              lastCreateTimesRef.current.image = now;
-              const canvasX = (viewportSize.width / 2 - position.x) / scale;
-              const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
-              const newId = `img-${Date.now()}-${Math.random()}`;
-              const newModal = { id: newId, x: pos.x, y: pos.y };
-              setImageModalStates(prev => [...prev, newModal]);
-              if (onPersistImageModalCreate) {
-                Promise.resolve(onPersistImageModalCreate(newModal)).catch(console.error);
-              }
-            }
-            return;
-          }
-
-          // Video modal shortcut
-          if (e.key === 'v') {
-            e.preventDefault();
-            const now = Date.now();
-            const last = lastCreateTimesRef.current.video || 0;
-            if (now - last >= 200) {
-              lastCreateTimesRef.current.video = now;
-              const canvasX = (viewportSize.width / 2 - position.x) / scale;
-              const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
-              const newId = `video-${Date.now()}-${Math.random()}`;
-              const newModal = { id: newId, x: pos.x, y: pos.y };
-              setVideoModalStates(prev => [...prev, newModal]);
-              if (onPersistVideoModalCreate) {
-                Promise.resolve(onPersistVideoModalCreate(newModal)).catch(console.error);
-              }
-            }
-            return;
-          }
-
-          // Music modal shortcut
-          if (e.key === 'm') {
-            e.preventDefault();
-            const now = Date.now();
-            const last = lastCreateTimesRef.current.music || 0;
-            if (now - last >= 200) {
-              lastCreateTimesRef.current.music = now;
-              const canvasX = (viewportSize.width / 2 - position.x) / scale;
-              const canvasY = (viewportSize.height / 2 - position.y) / scale;
-              const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
-              const newId = `music-${Date.now()}-${Math.random()}`;
-              const newModal = { id: newId, x: pos.x, y: pos.y };
-              setMusicModalStates(prev => [...prev, newModal]);
-              if (onPersistMusicModalCreate) {
-                Promise.resolve(onPersistMusicModalCreate(newModal)).catch(console.error);
-              }
-            }
-            return;
-          }
-        }
-      } catch (err) {
-        // ignore any errors from DOM target checks
-      }
-
-      // Handle Delete/Backspace key for deletion (works on both Windows and Mac)
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.repeat) {
-        // Prevent default browser behavior (like going back in history)
-        const target = e.target as Element | null;
-        const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-        // Check if target is contentEditable or inside a contentEditable element
-        const isContentEditable = target?.hasAttribute('contenteditable') || 
-          (target?.getAttribute('contenteditable') === 'true') ||
-          (target?.closest && target.closest('[contenteditable="true"]') !== null);
-        if (isInputElement || isContentEditable) {
-          // Don't delete if user is typing in an input field or contentEditable element
-          return;
-        }
-
-        // Prevent deletion if editing a group name
-        if (document.querySelector('input[data-editing-group="true"]') !== null) {
-          return;
-        }
-
-        e.preventDefault();
-
-        // Check if there's a selected region (multiple components)
-        const hasMultipleSelections = selectedImageIndices.length > 0 ||
-          selectedTextInputIds.length > 0 ||
-          selectedImageModalIds.length > 0 ||
-          selectedVideoModalIds.length > 0 ||
-          selectedMusicModalIds.length > 0 ||
-          (selectedUpscaleModalIds?.length ?? 0) > 0 ||
-          (selectedRemoveBgModalIds?.length ?? 0) > 0 ||
-          (selectedEraseModalIds?.length ?? 0) > 0 ||
-          (selectedVectorizeModalIds?.length ?? 0) > 0 ||
-          selectedExpandModalIds.length > 0 ||
-          selectedStoryboardModalIds.length > 0 ||
-          selectedScriptFrameModalIds.length > 0 ||
-          selectedSceneFrameModalIds.length > 0;
-
-        if (hasMultipleSelections) {
-          // Delete all selected components in the region
-
-
-          // Delete all selected images
-          if (selectedImageIndices.length > 0 && onImageDelete) {
-            // Delete in reverse order to maintain correct indices
-            const sortedIndices = [...selectedImageIndices].sort((a, b) => b - a);
-            sortedIndices.forEach(index => {
-              onImageDelete(index);
-            });
-          }
-
-          // Delete all selected text inputs
-          if (selectedTextInputIds.length > 0) {
-            // Call persist delete for each text modal and remove locally
-            selectedTextInputIds.forEach(id => {
-              if (onPersistTextModalDelete) {
-                Promise.resolve(onPersistTextModalDelete(id)).catch(console.error);
-              }
-            });
-            setTextInputStates(prev => prev.filter(t => !selectedTextInputIds.includes(t.id)));
-          }
-
-          // Delete all selected image modals
-          if (selectedImageModalIds.length > 0) {
-            selectedImageModalIds.forEach(id => {
-              if (onPersistImageModalDelete) {
-                Promise.resolve(onPersistImageModalDelete(id)).catch(console.error);
-              }
-            });
-            setImageModalStates(prev => prev.filter(m => !selectedImageModalIds.includes(m.id)));
-          }
-
-          // Delete all selected video modals
-          if (selectedVideoModalIds.length > 0) {
-            selectedVideoModalIds.forEach(id => {
-              if (onPersistVideoModalDelete) {
-                Promise.resolve(onPersistVideoModalDelete(id)).catch(console.error);
-              }
-            });
-            setVideoModalStates(prev => prev.filter(m => !selectedVideoModalIds.includes(m.id)));
-          }
-
-          // Delete all selected music modals
-          if (selectedMusicModalIds.length > 0) {
-            selectedMusicModalIds.forEach(id => {
-              if (onPersistMusicModalDelete) {
-                Promise.resolve(onPersistMusicModalDelete(id)).catch(console.error);
-              }
-            });
-            setMusicModalStates(prev => prev.filter(m => !selectedMusicModalIds.includes(m.id)));
-          }
-
-          // Delete all selected erase modals
-          if (selectedEraseModalIds.length > 0) {
-            selectedEraseModalIds.forEach(id => {
-              if (onPersistEraseModalDelete) {
-                Promise.resolve(onPersistEraseModalDelete(id)).catch(console.error);
-              }
-            });
-            setEraseModalStates(prev => prev.filter(m => !selectedEraseModalIds.includes(m.id)));
-          }
-
-          if (selectedExpandModalIds.length > 0) {
-            selectedExpandModalIds.forEach(id => {
-              if (onPersistExpandModalDelete) {
-                Promise.resolve(onPersistExpandModalDelete(id)).catch(console.error);
-              }
-            });
-            setExpandModalStates(prev => prev.filter(m => !selectedExpandModalIds.includes(m.id)));
-          }
-
-          if (selectedUpscaleModalIds.length > 0) {
-            selectedUpscaleModalIds.forEach(id => onPersistUpscaleModalDelete && Promise.resolve(onPersistUpscaleModalDelete(id)).catch(console.error));
-            setUpscaleModalStates(prev => prev.filter(m => !selectedUpscaleModalIds.includes(m.id)));
-          }
-          if (selectedRemoveBgModalIds.length > 0) {
-            selectedRemoveBgModalIds.forEach(id => onPersistRemoveBgModalDelete && Promise.resolve(onPersistRemoveBgModalDelete(id)).catch(console.error));
-            setRemoveBgModalStates(prev => prev.filter(m => !selectedRemoveBgModalIds.includes(m.id)));
-          }
-          if (selectedVectorizeModalIds.length > 0) {
-            selectedVectorizeModalIds.forEach(id => onPersistVectorizeModalDelete && Promise.resolve(onPersistVectorizeModalDelete(id)).catch(console.error));
-            setVectorizeModalStates(prev => prev.filter(m => !selectedVectorizeModalIds.includes(m.id)));
-          }
-          if (selectedStoryboardModalIds.length > 0) {
-            selectedStoryboardModalIds.forEach(id => onPersistStoryboardModalDelete && Promise.resolve(onPersistStoryboardModalDelete(id)).catch(console.error));
-            setStoryboardModalStates(prev => prev.filter(m => !selectedStoryboardModalIds.includes(m.id)));
-          }
-          if (selectedScriptFrameModalIds.length > 0) {
-            selectedScriptFrameModalIds.forEach(id => handleDeleteScriptFrame(id));
-          }
-          if (selectedSceneFrameModalIds.length > 0) {
-            selectedSceneFrameModalIds.forEach(id => handleDeleteSceneFrame(id));
-          }
-
-          // Clear all selections
-          setSelectedImageIndices([]);
-          setSelectedImageIndex(null);
-          setSelectedTextInputIds([]);
-          setSelectedTextInputId(null);
-          setSelectedImageModalIds([]);
-          setSelectedImageModalId(null);
-          setSelectedVideoModalIds([]);
-          setSelectedVideoModalId(null);
-          setSelectedMusicModalIds([]);
-          setSelectedMusicModalId(null);
-          setSelectedEraseModalIds([]);
-          setSelectedEraseModalId(null);
-          setSelectedExpandModalIds([]);
-          setSelectedExpandModalIds([]);
-          setSelectedExpandModalId(null);
-          setSelectedUpscaleModalIds([]);
-          setSelectedUpscaleModalId(null);
-          setSelectedRemoveBgModalIds([]);
-          setSelectedRemoveBgModalId(null);
-          setSelectedVectorizeModalIds([]);
-          setSelectedVectorizeModalId(null);
-          setSelectedStoryboardModalIds([]);
-          setSelectedStoryboardModalId(null);
-          setSelectedScriptFrameModalIds([]);
-          setSelectedScriptFrameModalId(null);
-          setSelectedSceneFrameModalIds([]);
-          setSelectedSceneFrameModalId(null);
-        } else {
-          // Single selection deletion (backward compatibility)
-
-          // Delete selected image/video/text element
-          if (selectedImageIndex !== null && onImageDelete) {
-            onImageDelete(selectedImageIndex);
-            setSelectedImageIndex(null);
-          }
-
-          // Delete selected text input overlay
-          if (selectedTextInputId !== null) {
-            if (onPersistTextModalDelete) {
-              Promise.resolve(onPersistTextModalDelete(selectedTextInputId)).catch(console.error);
-            }
-            setTextInputStates(prev => prev.filter(t => t.id !== selectedTextInputId));
-            setSelectedTextInputId(null);
-          }
-
-          // Delete selected image modal
-          if (selectedImageModalId !== null) {
-            if (onPersistImageModalDelete) {
-              Promise.resolve(onPersistImageModalDelete(selectedImageModalId)).catch(console.error);
-            }
-            setImageModalStates(prev => prev.filter(m => m.id !== selectedImageModalId));
-            setSelectedImageModalId(null);
-          }
-
-          // Delete selected video modal
-          if (selectedVideoModalId !== null) {
-            if (onPersistVideoModalDelete) {
-              Promise.resolve(onPersistVideoModalDelete(selectedVideoModalId)).catch(console.error);
-            }
-            setVideoModalStates(prev => prev.filter(m => m.id !== selectedVideoModalId));
-            setSelectedVideoModalId(null);
-          }
-
-          // Delete selected music modal
-          if (selectedMusicModalId !== null) {
-            if (onPersistMusicModalDelete) {
-              Promise.resolve(onPersistMusicModalDelete(selectedMusicModalId)).catch(console.error);
-            }
-            setMusicModalStates(prev => prev.filter(m => m.id !== selectedMusicModalId));
-            setSelectedMusicModalId(null);
-          }
-
-          // Delete selected erase modal
-          if (selectedEraseModalId !== null) {
-            if (onPersistEraseModalDelete) {
-              Promise.resolve(onPersistEraseModalDelete(selectedEraseModalId)).catch(console.error);
-            }
-            setEraseModalStates(prev => prev.filter(m => m.id !== selectedEraseModalId));
-            setSelectedEraseModalId(null);
-          }
-
-          if (selectedExpandModalId !== null) {
-            if (onPersistExpandModalDelete) {
-              Promise.resolve(onPersistExpandModalDelete(selectedExpandModalId)).catch(console.error);
-            }
-            setExpandModalStates(prev => prev.filter(m => m.id !== selectedExpandModalId));
-            setExpandModalStates(prev => prev.filter(m => m.id !== selectedExpandModalId));
-            setSelectedExpandModalId(null);
-          }
-
-          if (selectedUpscaleModalId !== null) {
-            if (onPersistUpscaleModalDelete) Promise.resolve(onPersistUpscaleModalDelete(selectedUpscaleModalId)).catch(console.error);
-            setUpscaleModalStates(prev => prev.filter(m => m.id !== selectedUpscaleModalId));
-            setSelectedUpscaleModalId(null);
-          }
-          if (selectedRemoveBgModalId !== null) {
-            if (onPersistRemoveBgModalDelete) Promise.resolve(onPersistRemoveBgModalDelete(selectedRemoveBgModalId)).catch(console.error);
-            setRemoveBgModalStates(prev => prev.filter(m => m.id !== selectedRemoveBgModalId));
-            setSelectedRemoveBgModalId(null);
-          }
-          if (selectedVectorizeModalId !== null) {
-            if (onPersistVectorizeModalDelete) Promise.resolve(onPersistVectorizeModalDelete(selectedVectorizeModalId)).catch(console.error);
-            setVectorizeModalStates(prev => prev.filter(m => m.id !== selectedVectorizeModalId));
-            setSelectedVectorizeModalId(null);
-          }
-          if (selectedStoryboardModalId !== null) {
-            if (onPersistStoryboardModalDelete) Promise.resolve(onPersistStoryboardModalDelete(selectedStoryboardModalId)).catch(console.error);
-            setStoryboardModalStates(prev => prev.filter(m => m.id !== selectedStoryboardModalId));
-            setSelectedStoryboardModalId(null);
-          }
-          if (selectedScriptFrameModalId !== null) {
-            handleDeleteScriptFrame(selectedScriptFrameModalId);
-            setSelectedScriptFrameModalId(null);
-          }
-          if (selectedSceneFrameModalId !== null) {
-            handleDeleteSceneFrame(selectedSceneFrameModalId);
-            setSelectedSceneFrameModalId(null);
-          }
-        }
-
-        // Clear selection box and tight rect when Delete is pressed
-        setSelectionBox(null);
-        setSelectionTightRect(null);
-        setIsDragSelection(false);
-      }
-
-      // Handle Ctrl/Cmd + A = Select All components on canvas
-      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.repeat) {
-        // Avoid when typing in inputs
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-        e.preventDefault();
-
-        // Select all canvas images (exclude 3D models if present)
-        const allImageIndices: number[] = [];
-        images.forEach((img, idx) => {
-          if (!img) return;
-          if (img.type === 'model3d') return;
-          allImageIndices.push(idx);
-        });
-
-        // Select all text ids
-        const allTextIds = textInputStates.map(t => t.id);
-
-        // Select all modals
-        const allImageModalIds = imageModalStates.map(m => m.id);
-        const allVideoModalIds = videoModalStates.map(m => m.id);
-        const allMusicModalIds = musicModalStates.map(m => m.id);
-
-        setSelectedImageIndices(allImageIndices);
-        setSelectedImageIndex(allImageIndices.length > 0 ? allImageIndices[0] : null);
-        setSelectedTextInputIds(allTextIds);
-        setSelectedTextInputId(allTextIds.length > 0 ? allTextIds[0] : null);
-        setSelectedImageModalIds(allImageModalIds);
-        setSelectedImageModalId(allImageModalIds.length > 0 ? allImageModalIds[0] : null);
-        setSelectedVideoModalIds(allVideoModalIds);
-        setSelectedVideoModalId(allVideoModalIds.length > 0 ? allVideoModalIds[0] : null);
-        setSelectedMusicModalIds(allMusicModalIds);
-        setSelectedMusicModalId(allMusicModalIds.length > 0 ? allMusicModalIds[0] : null);
-
-        // Compute tight bounding rect around all selected components so selection visuals show
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        let any = false;
-
-        allImageIndices.forEach(idx => {
-          const img = images[idx];
-          if (!img) return;
-          const ix = img.x || 0;
-          const iy = img.y || 0;
-          const iw = img.width || 0;
-          const ih = img.height || 0;
-          minX = Math.min(minX, ix);
-          minY = Math.min(minY, iy);
-          maxX = Math.max(maxX, ix + iw);
-          maxY = Math.max(maxY, iy + ih);
-          any = true;
-        });
-
-        allTextIds.forEach(id => {
-          const t = textInputStates.find(tt => tt.id === id);
-          if (!t) return;
-          minX = Math.min(minX, t.x);
-          minY = Math.min(minY, t.y);
-          maxX = Math.max(maxX, t.x + 300);
-          maxY = Math.max(maxY, t.y + 100);
-          any = true;
-        });
-
-        allImageModalIds.forEach(id => {
-          const m = imageModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 400;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
-
-        allVideoModalIds.forEach(id => {
-          const m = videoModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 400;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
-
-        allMusicModalIds.forEach(id => {
-          const m = musicModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 300;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
-
-        if (any) {
-          const width = maxX - minX;
-          const height = maxY - minY;
-          setSelectionTightRect({
-            x: minX,
-            y: minY,
-            width: Math.max(1, width),
-            height: Math.max(1, height)
-          });
-          setIsDragSelection(true);
-        } else {
-          setSelectionTightRect(null);
-          setIsDragSelection(false);
-        }
-        return;
-      }
-      // Handle 'z' to zoom to selection or to all components
-      // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
-      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
-        // Avoid when typing in inputs
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-        e.preventDefault();
-
-        // Helper: compute bounding rect from selection or all components
-        const computeSelectionBounds = (): { x: number; y: number; width: number; height: number } | null => {
-          // If there's a tight selection rect (computed from marquee), use it
-          if (selectionTightRect) return selectionTightRect;
-
-          // If explicit selected ids exist, compute bounds across selected items
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          let found = false;
-
-          // Selected canvas images
-          if (selectedImageIndices.length > 0) {
-            selectedImageIndices.forEach(idx => {
-              const img = images[idx];
-              if (!img) return;
-              const ix = img.x || 0;
-              const iy = img.y || 0;
-              const iw = img.width || 0;
-              const ih = img.height || 0;
-              minX = Math.min(minX, ix);
-              minY = Math.min(minY, iy);
-              maxX = Math.max(maxX, ix + iw);
-              maxY = Math.max(maxY, iy + ih);
-              found = true;
-            });
-          }
-
-          // Selected text inputs
-          if (selectedTextInputIds.length > 0) {
-            selectedTextInputIds.forEach(id => {
-              const t = textInputStates.find(tt => tt.id === id);
-              if (!t) return;
-              minX = Math.min(minX, t.x);
-              minY = Math.min(minY, t.y);
-              maxX = Math.max(maxX, t.x + 300);
-              maxY = Math.max(maxY, t.y + 100);
-              found = true;
-            });
-          }
-
-          // Selected image modals
-          if (selectedImageModalIds.length > 0) {
-            selectedImageModalIds.forEach(id => {
-              const m = imageModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 400;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          // Selected video modals
-          if (selectedVideoModalIds.length > 0) {
-            selectedVideoModalIds.forEach(id => {
-              const m = videoModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 400;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          // Selected music modals
-          if (selectedMusicModalIds.length > 0) {
-            selectedMusicModalIds.forEach(id => {
-              const m = musicModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 300;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          if (found) {
-            const width = maxX - minX;
-            const height = maxY - minY;
-            return {
-              x: minX,
-              y: minY,
-              width: Math.max(1, width),
-              height: Math.max(1, height)
-            };
-          }
-
-          // Nothing selected
-          return null;
-        };
-
-        const zoomToRect = (rect: { x: number; y: number; width: number; height: number } | null) => {
-          if (!rect) return;
-          // Add small padding around rect (in canvas space) so components are not flush to edges
-          const padding = Math.max(20, Math.min(rect.width, rect.height) * 0.04);
-          const targetWidth = rect.width + padding * 2;
-          const targetHeight = rect.height + padding * 2;
-
-          // Compute scale to fit target into viewport
-          const scaleX = viewportSize.width / targetWidth;
-          const scaleY = viewportSize.height / targetHeight;
-          // Use a tiny margin multiplier to ensure fit but keep components large on screen
-          const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY) * 0.995));
-
-          // Center rect in viewport
-          const rectCenterX = rect.x + rect.width / 2;
-          const rectCenterY = rect.y + rect.height / 2;
-          const newPos = {
-            x: viewportSize.width / 2 - rectCenterX * newScale,
-            y: viewportSize.height / 2 - rectCenterY * newScale,
-          };
-
-          setScale(newScale);
-          setPosition(newPos);
-          // Update callback after state settles
-          setTimeout(() => updateViewportCenter(newPos, newScale), 0);
-        };
-
-        // First try selection bounds
-        const selBounds = computeSelectionBounds();
-        if (selBounds) {
-          zoomToRect(selBounds);
-          return;
-        }
-
-        // No selection: compute bounding box for all components present
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        let any = false;
-
-        // Canvas images
-        images.forEach(img => {
-          if (!img) return;
-          const ix = img.x || 0;
-          const iy = img.y || 0;
-          const iw = img.width || 0;
-          const ih = img.height || 0;
-          minX = Math.min(minX, ix);
-          minY = Math.min(minY, iy);
-          maxX = Math.max(maxX, ix + iw);
-          maxY = Math.max(maxY, iy + ih);
-          any = true;
-        });
-
-        // Text inputs
-        textInputStates.forEach(t => {
-          minX = Math.min(minX, t.x);
-          minY = Math.min(minY, t.y);
-          maxX = Math.max(maxX, t.x + 300);
-          maxY = Math.max(maxY, t.y + 100);
-          any = true;
-        });
-
-        // Image modals
-        imageModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 400);
-          any = true;
-        });
-
-        // Video modals
-        videoModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 400);
-          any = true;
-        });
-
-        // Music modals
-        musicModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 300);
-          any = true;
-        });
-
-        if (any) {
-          const allRect = { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
-          zoomToRect(allRect);
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        // Always reset middle button state to prevent stuck selection
+        setIsMiddleButtonPressed(false);
+        setIsPanning(false);
+        
+        // Disable stage dragging to ensure clean state
+        const stage = stageRef.current;
+        if (stage) {
+          stage.draggable(false);
         }
       }
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        setIsSpacePressed(false);
-        const stage = stageRef.current;
-        if (stage && !isPanning) {
-          if (selectedTool === 'text') {
-            applyStageCursorWrapper('text');
-          } else if (selectedTool === 'cursor') {
-            applyStageCursorWrapper('default');
-          } else if (selectedTool === 'move') {
-            applyStageCursorWrapper('grab');
-          } else {
-            // Non-persistent tools should show pointer by default
-            applyStageCursorWrapper('pointer');
-          }
-        }
-      }
-
-      if (!e.shiftKey) {
-        setIsShiftPressed(false);
-        const stage = stageRef.current;
-        if (stage && !isPanning) {
-          if (selectedTool === 'cursor') {
-            applyStageCursorWrapper('default');
-          } else if (selectedTool === 'move') {
-            applyStageCursorWrapper('grab');
-          } else if (selectedTool === 'text') {
-            applyStageCursorWrapper('text');
-          } else {
-            applyStageCursorWrapper('pointer');
-          }
-        }
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        // Prevent default middle button behavior (browser back/forward, auto-scroll)
+        e.preventDefault();
+        e.stopPropagation();
+        // Set state but don't enable panning
+        setIsMiddleButtonPressed(true);
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
+    window.addEventListener('mouseup', handleGlobalMouseUp, true);
+    window.addEventListener('mousedown', handleGlobalMouseDown, true);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mouseup', handleGlobalMouseUp, true);
+      window.removeEventListener('mousedown', handleGlobalMouseDown, true);
     };
-  }, [selectedTool, isPanning, selectedImageIndex, selectedImageIndices, selectedTextInputId, selectedImageModalId, selectedVideoModalId, selectedMusicModalId, onImageDelete, onImageUpdate]);
+  }, []);
+
+  // Helper function to update viewport center
+  const updateViewportCenter = useCallback((pos: { x: number; y: number }, currentScale: number) => {
+    if (onViewportChange && stageRef.current) {
+      // Calculate the center of the viewport in canvas coordinates
+      // Formula: canvasX = (screenX - stageX) / scale
+      const centerX = (viewportSize.width / 2 - pos.x) / currentScale;
+      const centerY = (viewportSize.height / 2 - pos.y) / currentScale;
+      onViewportChange({ x: centerX, y: centerY }, currentScale);
+    }
+  }, [onViewportChange, viewportSize.width, viewportSize.height]);
+
+  // Use keyboard shortcuts hook
+  useKeyboardShortcuts({
+    // Undo/Redo
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    // Space key (panning)
+    setIsSpacePressed,
+    applyStageCursorWrapper,
+    // Shift key (crosshair)
+    setIsShiftPressed,
+    // Pin toggle
+    selectedImageIndices,
+    selectedImageModalIds,
+    selectedVideoModalIds,
+    selectedMusicModalIds,
+    selectedTextInputIds,
+    selectedCanvasTextIds,
+    // Component creation
+    lastCreateTimesRef,
+    viewportSize,
+    position,
+    scale,
+    findAvailablePositionNearWrapper,
+    setTextInputStates,
+    setImageModalStates,
+    setVideoModalStates,
+    setMusicModalStates,
+    onPersistTextModalCreate,
+    onPersistImageModalCreate,
+    onPersistVideoModalCreate,
+    onPersistMusicModalCreate,
+    // Delete handlers
+    selectionRectCoords,
+    setSelectionRectCoords,
+    selectionBox,
+    setSelectionBox,
+    setIsSelecting,
+    selectionTightRect,
+    setSelectionTightRect,
+    setIsDragSelection,
+    // Canvas Text deletion
+    selectedCanvasTextId: effectiveSelectedCanvasTextId,
+    effectiveSetCanvasTextStates,
+    effectiveSetSelectedCanvasTextId,
+    setSelectedCanvasTextIds,
+    onPersistCanvasTextDelete,
+    // Image deletion
+    selectedImageIndex,
+    onImageDelete,
+    setSelectedImageIndex,
+    setSelectedImageIndices,
+    selectedImageModalId,
+    setSelectedImageModalId,
+    setSelectedImageModalIds,
+    onPersistImageModalDelete,
+    // Video deletion
+    selectedVideoModalId,
+    setSelectedVideoModalId,
+    setSelectedVideoModalIds,
+    onPersistVideoModalDelete,
+    // Video Editor deletion
+    selectedVideoEditorModalIds,
+    selectedVideoEditorModalId,
+    videoEditorModalStates,
+    setVideoEditorModalStates,
+    setSelectedVideoEditorModalId,
+    setSelectedVideoEditorModalIds,
+    onPersistVideoEditorModalDelete,
+    // Music deletion
+    selectedMusicModalId,
+    setSelectedMusicModalId,
+    setSelectedMusicModalIds,
+    onPersistMusicModalDelete,
+    // Text input deletion
+    selectedTextInputId,
+    setSelectedTextInputId,
+    setSelectedTextInputIds,
+    onPersistTextModalDelete,
+    // Other modal deletions
+    selectedUpscaleModalIds,
+    selectedUpscaleModalId,
+    upscaleModalStates,
+    setUpscaleModalStates,
+    setSelectedUpscaleModalId,
+    setSelectedUpscaleModalIds,
+    onPersistUpscaleModalDelete,
+    selectedMultiangleCameraModalIds,
+    selectedMultiangleCameraModalId,
+    multiangleCameraModalStates,
+    setMultiangleCameraModalStates,
+    setSelectedMultiangleCameraModalId,
+    setSelectedMultiangleCameraModalIds,
+    onPersistMultiangleCameraModalDelete,
+    selectedRemoveBgModalIds,
+    selectedRemoveBgModalId,
+    removeBgModalStates,
+    setRemoveBgModalStates,
+    setSelectedRemoveBgModalId,
+    setSelectedRemoveBgModalIds,
+    onPersistRemoveBgModalDelete,
+    selectedEraseModalIds,
+    selectedEraseModalId,
+    eraseModalStates,
+    setEraseModalStates,
+    setSelectedEraseModalId,
+    setSelectedEraseModalIds,
+    onPersistEraseModalDelete,
+    selectedVectorizeModalIds,
+    selectedVectorizeModalId,
+    vectorizeModalStates,
+    setVectorizeModalStates,
+    setSelectedVectorizeModalId,
+    setSelectedVectorizeModalIds,
+    onPersistVectorizeModalDelete,
+    selectedExpandModalIds,
+    selectedExpandModalId,
+    expandModalStates,
+    setExpandModalStates,
+    setSelectedExpandModalId,
+    setSelectedExpandModalIds,
+    onPersistExpandModalDelete,
+    selectedStoryboardModalIds,
+    selectedStoryboardModalId,
+    storyboardModalStates,
+    setStoryboardModalStates,
+    setSelectedStoryboardModalId,
+    setSelectedStoryboardModalIds,
+    onPersistStoryboardModalDelete,
+    selectedScriptFrameModalIds,
+    selectedScriptFrameModalId,
+    handleDeleteScriptFrame,
+    setSelectedScriptFrameModalId,
+    setSelectedScriptFrameModalIds,
+    selectedSceneFrameModalIds,
+    selectedSceneFrameModalId,
+    handleDeleteSceneFrame,
+    setSelectedSceneFrameModalId,
+    setSelectedSceneFrameModalIds,
+    selectedNextSceneModalIds,
+    selectedNextSceneModalId,
+    nextSceneModalStates,
+    setNextSceneModalStates,
+    setSelectedNextSceneModalId,
+    setSelectedNextSceneModalIds,
+    onPersistNextSceneModalDelete,
+    selectedCompareModalIds,
+    selectedCompareModalId,
+    compareModalStates,
+    setCompareModalStates,
+    setSelectedCompareModalId,
+    setSelectedCompareModalIds,
+    onPersistCompareModalDelete,
+    // Select All
+    images: images || [],
+    textInputStates,
+    imageModalStates,
+    videoModalStates,
+    musicModalStates,
+    // Zoom to selection
+    setScale,
+    setPosition,
+    updateViewportCenter,
+    // Key up handler
+    isPanning,
+    stageRef,
+    selectedTool: selectedTool || 'cursor',
+  });
 
   // Handle clicks outside modal components to clear selections
   useEffect(() => {
@@ -3971,12 +3921,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (isSelecting || wasDrag) {
         mouseDownTarget = null;
         mouseDownPos = null;
-        return;
-      }
+            return;
+          }
 
       // Check if click is inside any modal component
       // Also check for contentEditable elements (canvas text components)
-      const isContentEditable = target.hasAttribute('contenteditable') || 
+      const isContentEditable = target.hasAttribute('contenteditable') ||
         target.getAttribute('contenteditable') === 'true' ||
         target.closest('[contenteditable="true"]') !== null;
       const isInsideModal =
@@ -4026,22 +3976,39 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    document.addEventListener('mouseup', handleMouseUp, true);
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isSelecting, clearAllSelections]);
 
   // Handle selection box mouse move - Freepik Spaces style
   useEffect(() => {
-    if (!isSelecting || !selectionBox) return;
+    if (!isSelecting || !selectionBox) {
+      // Clear selection rectangle if not selecting
+      if (selectionRectCoords) {
+        setSelectionRectCoords(null);
+      }
+      return;
+    }
 
     // Use requestAnimationFrame to throttle updates for smooth performance
     let rafId: number | null = null;
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
+    
+    // Store initial selection rectangle coordinates if not set
+    if (!selectionRectCoords) {
+      setSelectionRectCoords({
+        x1: selectionBox.startX,
+        y1: selectionBox.startY,
+        x2: selectionBox.currentX,
+        y2: selectionBox.currentY,
+      });
+    }
 
     const updateSelectionBox = () => {
       // Store pending update in a local variable to avoid race conditions
@@ -4059,149 +4026,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       rafId = null;
     };
 
-    // Helper function to get accurate dimensions for each component type
-    // Accounts for hover states, open/closed states, and actual frame sizes
-    const getComponentDimensions = (type: string, id: string | number): { width: number; height: number } => {
-      switch (type) {
-        case 'image': {
-          const img = images[id as number];
-          if (!img) return { width: 0, height: 0 };
 
-          // Generation frames: 600px wide, height based on aspect ratio (min 400px)
-          // Add extra height for hover controls and UI elements
-          const baseWidth = img.width || 600;
-          const baseHeight = img.height || 400;
-
-          // For selection, add 100px to account for hover controls at bottom
-          // This ensures the selection area covers the entire component including controls
-          return { width: baseWidth, height: baseHeight + 100 };
-        }
-
-        case 'imageModal': {
-          const modal = imageModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 600 };
-
-          // Image modals: 600px wide, height based on aspect ratio (min 400px)
-          // Add 100px for hover controls
-          return {
-            width: modal.frameWidth ?? 600,
-            height: (modal.frameHeight ?? 400) + 100
-          };
-        }
-
-        case 'videoModal': {
-          const modal = videoModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 500 };
-
-          // Video modals: 600px wide, height based on aspect ratio (min 400px)
-          // Add 100px for hover controls
-          return {
-            width: modal.frameWidth ?? 600,
-            height: (modal.frameHeight ?? 400) + 100
-          };
-        }
-
-        case 'musicModal': {
-          const modal = musicModalStates.find(m => m.id === id);
-          if (!modal) return { width: 600, height: 400 };
-
-          // Music modals: 600px wide, 300px high (fixed)
-          // Add 100px for hover controls
-          return {
-            width: modal.frameWidth ?? 600,
-            height: (modal.frameHeight ?? 300) + 100
-          };
-        }
-
-        case 'textInput': {
-          // Text inputs: 400px min width, ~110-140px height
-          // Use conservative estimate for selection
-          return { width: 400, height: 110 };
-        }
-
-        case 'upscaleModal': {
-          const modal = upscaleModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // Upscale plugin: 400px wide when closed, 600px when open
-          // Height: 500px when closed, 600px when open (with expanded controls)
-          // Use frameWidth/frameHeight from state which reflects current open/closed state
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'removeBgModal': {
-          const modal = removeBgModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // RemoveBg plugin: similar to upscale
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'eraseModal': {
-          const modal = eraseModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // Erase plugin: similar to upscale
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'expandModal': {
-          const modal = expandModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // Expand plugin: similar to upscale
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'vectorizeModal': {
-          const modal = vectorizeModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // Vectorize plugin: 400px wide, 500px high
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'nextSceneModal': {
-          const modal = nextSceneModalStates.find(m => m.id === id);
-          if (!modal) return { width: 400, height: 500 };
-
-          // NextScene plugin: 400px wide, 500px high
-          return {
-            width: modal.frameWidth ?? 400,
-            height: modal.frameHeight ?? 500
-          };
-        }
-
-        case 'sceneFrameModal': {
-          const modal = sceneFrameModalStates.find(m => m.id === id);
-          if (!modal) return { width: 350, height: 300 };
-
-          // Scene frame: 350px wide, 300px high
-          return {
-            width: modal.frameWidth ?? 350,
-            height: modal.frameHeight ?? 300
-          };
-        }
-
-        default:
-          return { width: 0, height: 0 };
-      }
-    };
 
     const handleMouseMove = (e: MouseEvent) => {
       const stage = stageRef.current;
@@ -4225,6 +4050,26 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
+        
+        // Also update selection rectangle coordinates (Konva pattern) - update immediately
+        setSelectionRectCoords(prev => {
+          if (!prev) {
+            // Initialize if not set
+            return {
+              x1: selectionBox.startX,
+              y1: selectionBox.startY,
+              x2: canvasX,
+              y2: canvasY,
+            };
+          }
+          // Update x2, y2 with current mouse position
+          return {
+            x1: prev.x1,
+            y1: prev.y1,
+            x2: canvasX,
+            y2: canvasY,
+          };
+        });
 
         // Schedule update using requestAnimationFrame for smooth performance
         if (rafId === null) {
@@ -4251,14 +4096,17 @@ export const Canvas: React.FC<CanvasProps> = ({
         const selectedIndices: number[] = [];
         const selectedImageModalIdsList: string[] = [];
         const selectedVideoModalIdsList: string[] = [];
+        const selectedVideoEditorModalIdsList: string[] = [];
         const selectedMusicModalIdsList: string[] = [];
         const selectedTextInputIdsList: string[] = [];
         const selectedUpscaleModalIdsList: string[] = [];
+        const selectedMultiangleCameraModalIdsList: string[] = [];
         const selectedRemoveBgModalIdsList: string[] = [];
         const selectedEraseModalIdsList: string[] = [];
         const selectedExpandModalIdsList: string[] = [];
         const selectedVectorizeModalIdsList: string[] = [];
         const selectedNextSceneModalIdsList: string[] = [];
+        const selectedCompareModalIdsList: string[] = [];
         const selectedStoryboardModalIdsList: string[] = [];
         const selectedScriptFrameModalIdsList: string[] = [];
         const selectedSceneFrameModalIdsList: string[] = [];
@@ -4333,6 +4181,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         });
 
+        // Check multiangle camera modals
+        multiangleCameraModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('multiangleCameraModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedMultiangleCameraModalIdsList.push(modal.id);
+          }
+        });
+
         // Check removeBg modals
         removeBgModalStates.forEach((modal) => {
           const dims = getComponentDimensions('removeBgModal', modal.id);
@@ -4369,7 +4225,25 @@ export const Canvas: React.FC<CanvasProps> = ({
         nextSceneModalStates.forEach((modal) => {
           const dims = getComponentDimensions('nextSceneModal', modal.id);
           if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
-            selectedNextSceneModalIdsList.push(modal.id);
+            if (!selectedNextSceneModalIdsList.includes(modal.id)) {
+              selectedNextSceneModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        });
+
+        // Check compare modals
+        compareModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('compareModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            if (!selectedCompareModalIdsList.includes(modal.id)) {
+              selectedCompareModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
           }
         });
 
@@ -4397,18 +4271,38 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         });
 
+        // Check video editor modals
+        videoEditorModalStates.forEach((modal) => {
+          // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+          // Total bounding box: 100px width, 120px height (100px circle + label space)
+          const modalWidth = 100;
+          const modalHeight = 120; // 100px circle + ~20px for label
+          if (hasOverlap(modal.x, modal.y, modalWidth, modalHeight)) {
+            selectedVideoEditorModalIdsList.push(modal.id);
+          }
+        });
+
         // Update selections in real-time (Freepik Spaces behavior)
         setSelectedImageIndices(selectedIndices);
         setSelectedImageModalIds(selectedImageModalIdsList);
         setSelectedVideoModalIds(selectedVideoModalIdsList);
+        setSelectedVideoEditorModalIds(selectedVideoEditorModalIdsList);
         setSelectedMusicModalIds(selectedMusicModalIdsList);
         setSelectedTextInputIds(selectedTextInputIdsList);
         setSelectedUpscaleModalIds(selectedUpscaleModalIdsList);
+        setSelectedMultiangleCameraModalIds(selectedMultiangleCameraModalIdsList);
         setSelectedRemoveBgModalIds(selectedRemoveBgModalIdsList);
         setSelectedEraseModalIds(selectedEraseModalIdsList);
         setSelectedExpandModalIds(selectedExpandModalIdsList);
         setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
-        setSelectedNextSceneModalIds(selectedNextSceneModalIdsList);
+        // Merge with existing selections for NextScene and Compare to accumulate across handler runs
+        const mergedNextSceneIds = [...new Set([...selectedNextSceneModalIds, ...selectedNextSceneModalIdsList])];
+        const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
+        setSelectedNextSceneModalIds(mergedNextSceneIds);
+        setSelectedCompareModalIds?.(mergedCompareIds);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -4476,6 +4370,657 @@ export const Canvas: React.FC<CanvasProps> = ({
           // Calculate tight bounding box from selected elements
           // This will be used for the selection box visualization
           const allSelectedComponents: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+          // Canvas Text Nodes
+          (selectedCanvasTextIds || []).forEach(id => {
+            const textState = effectiveCanvasTextStates.find(t => t.id === id);
+            if (textState) {
+              const dims = getComponentDimensions('canvasText', id);
+              allSelectedComponents.push({
+                x: textState.x,
+                y: textState.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          // Collect all selected component positions and dimensions
+          selectedImageIndices.forEach(idx => {
+          const img = images[idx];
+            if (img && img.type !== 'model3d') {
+              const dims = getComponentDimensions('image', idx);
+              allSelectedComponents.push({
+                x: img.x || 0,
+                y: img.y || 0,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedImageModalIds.forEach(id => {
+          const m = imageModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('imageModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedVideoModalIds.forEach(id => {
+          const m = videoModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('videoModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedMusicModalIds.forEach(id => {
+          const m = musicModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('musicModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+            selectedTextInputIds.forEach(id => {
+              const t = textInputStates.find(tt => tt.id === id);
+            if (t) {
+              const dims = getComponentDimensions('textInput', id);
+              allSelectedComponents.push({
+                x: t.x,
+                y: t.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedUpscaleModalIds.forEach(id => {
+            const m = upscaleModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('upscaleModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedMultiangleCameraModalIds.forEach(id => {
+            const m = multiangleCameraModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('multiangleCameraModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedRemoveBgModalIds.forEach(id => {
+            const m = removeBgModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('removeBgModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedEraseModalIds.forEach(id => {
+            const m = eraseModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('eraseModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedExpandModalIds.forEach(id => {
+            const m = expandModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('expandModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedVectorizeModalIds.forEach(id => {
+            const m = vectorizeModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('vectorizeModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedNextSceneModalIds.forEach(id => {
+            const m = nextSceneModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('nextSceneModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedStoryboardModalIds.forEach(id => {
+            const m = storyboardModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('storyboardModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedScriptFrameModalIds.forEach(id => {
+            const m = scriptFrameModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('scriptFrameModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedSceneFrameModalIds.forEach(id => {
+            const m = sceneFrameModalStates.find(mm => mm.id === id);
+            if (m) {
+              const dims = getComponentDimensions('sceneFrameModal', id);
+              allSelectedComponents.push({
+                x: m.x,
+                y: m.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          // Calculate tight bounding box
+          if (allSelectedComponents.length > 0) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            allSelectedComponents.forEach(comp => {
+              minX = Math.min(minX, comp.x);
+              minY = Math.min(minY, comp.y);
+              maxX = Math.max(maxX, comp.x + comp.width);
+              maxY = Math.max(maxY, comp.y + comp.height);
+            });
+
+            setSelectionTightRect({
+              x: minX,
+              y: minY,
+              width: Math.max(1, maxX - minX),
+              height: Math.max(1, maxY - minY),
+            });
+            setIsDragSelection(true);
+          } else {
+            setSelectionTightRect(null);
+            setIsDragSelection(false);
+          }
+        }
+
+        // Hide the selection rectangle
+        setSelectionRectCoords(null);
+        setSelectionBox(null);
+        setIsSelecting(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isSelecting, selectionBox, selectionRectCoords, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedMultiangleCameraModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedMultiangleCameraModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
+
+
+  // Handle selection box mouse move - Freepik Spaces style
+  useEffect(() => {
+    if (!isSelecting || !selectionBox) {
+      // Clear selection rectangle if not selecting
+      if (selectionRectCoords) {
+        setSelectionRectCoords(null);
+      }
+        return;
+      }
+
+    // Use requestAnimationFrame to throttle updates for smooth performance
+    let rafId: number | null = null;
+    let pendingUpdate: { currentX: number; currentY: number } | null = null;
+    // Use a ref to store the latest coordinates for immediate access on mouse up
+    const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
+    
+    // Store initial selection rectangle coordinates if not set
+    if (!selectionRectCoords) {
+      setSelectionRectCoords({
+        x1: selectionBox.startX,
+        y1: selectionBox.startY,
+        x2: selectionBox.currentX,
+        y2: selectionBox.currentY,
+      });
+    }
+
+    const updateSelectionBox = () => {
+      // Store pending update in a local variable to avoid race conditions
+      const update = pendingUpdate;
+      if (update) {
+        latestCoordsRef.currentX = update.currentX;
+        latestCoordsRef.currentY = update.currentY;
+        setSelectionBox(prev => prev ? {
+          ...prev,
+          currentX: update.currentX,
+          currentY: update.currentY,
+        } : null);
+        pendingUpdate = null;
+      }
+      rafId = null;
+    };
+
+
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      // Prevent text selection during drag
+      e.preventDefault();
+
+      // Ensure stage is not draggable during selection
+      stage.draggable(false);
+
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos) {
+        // Store selection box in canvas coordinates so it stays consistent across zoom/pan
+        const canvasX = (pointerPos.x - position.x) / scale;
+        const canvasY = (pointerPos.y - position.y) / scale;
+
+        // Update ref immediately for mouse up handler
+        latestCoordsRef.currentX = canvasX;
+        latestCoordsRef.currentY = canvasY;
+
+        // Store pending update
+        pendingUpdate = { currentX: canvasX, currentY: canvasY };
+        
+        // Also update selection rectangle coordinates (Konva pattern) - update immediately
+        setSelectionRectCoords(prev => {
+          if (!prev) {
+            // Initialize if not set
+            return {
+              x1: selectionBox.startX,
+              y1: selectionBox.startY,
+              x2: canvasX,
+              y2: canvasY,
+            };
+          }
+          // Update x2, y2 with current mouse position
+          return {
+            x1: prev.x1,
+            y1: prev.y1,
+            x2: canvasX,
+            y2: canvasY,
+          };
+        });
+
+        // Schedule update using requestAnimationFrame for smooth performance
+        if (rafId === null) {
+          rafId = requestAnimationFrame(updateSelectionBox);
+        }
+
+        // FREEPIK SPACES FEATURE: Real-time hit detection during drag
+        // Calculate current selection rectangle
+        const currentBox = {
+          startX: selectionBox.startX,
+          startY: selectionBox.startY,
+          currentX: canvasX,
+          currentY: canvasY,
+        };
+
+        const marqueeRect = {
+          x: Math.min(currentBox.startX, currentBox.currentX),
+          y: Math.min(currentBox.startY, currentBox.currentY),
+          width: Math.abs(currentBox.currentX - currentBox.startX),
+          height: Math.abs(currentBox.currentY - currentBox.startY),
+        };
+
+        // Perform real-time hit detection - check which elements are inside
+        const selectedIndices: number[] = [];
+        const selectedImageModalIdsList: string[] = [];
+        const selectedVideoModalIdsList: string[] = [];
+        const selectedVideoEditorModalIdsList: string[] = [];
+        const selectedMusicModalIdsList: string[] = [];
+        const selectedTextInputIdsList: string[] = [];
+        const selectedUpscaleModalIdsList: string[] = [];
+        const selectedMultiangleCameraModalIdsList: string[] = [];
+        const selectedRemoveBgModalIdsList: string[] = [];
+        const selectedEraseModalIdsList: string[] = [];
+        const selectedExpandModalIdsList: string[] = [];
+        const selectedVectorizeModalIdsList: string[] = [];
+        const selectedNextSceneModalIdsList: string[] = [];
+        const selectedCompareModalIdsList: string[] = [];
+        const selectedStoryboardModalIdsList: string[] = [];
+        const selectedScriptFrameModalIdsList: string[] = [];
+        const selectedSceneFrameModalIdsList: string[] = [];
+
+        // Helper function to check if element overlaps with selection (even 1%)
+        // Changed from "fully inside" to "any overlap" for better UX
+        const hasOverlap = (x: number, y: number, width: number, height: number) => {
+          const componentRight = x + width;
+          const componentBottom = y + height;
+          const marqueeRight = marqueeRect.x + marqueeRect.width;
+          const marqueeBottom = marqueeRect.y + marqueeRect.height;
+
+          // Check if rectangles overlap (any intersection)
+          // Returns true if there's ANY overlap, even 1%
+          return !(
+            componentRight <= marqueeRect.x ||  // Component is completely to the left
+            x >= marqueeRight ||                 // Component is completely to the right
+            componentBottom <= marqueeRect.y ||  // Component is completely above
+            y >= marqueeBottom                   // Component is completely below
+          );
+        };
+
+        // Check images
+        images.forEach((img, index) => {
+          if (img.type === 'model3d') return;
+          const imgX = img.x || 0;
+          const imgY = img.y || 0;
+          const dims = getComponentDimensions('image', index);
+
+          if (hasOverlap(imgX, imgY, dims.width, dims.height)) {
+            selectedIndices.push(index);
+          }
+        });
+
+        // Check image modals
+        imageModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('imageModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedImageModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check video modals
+        videoModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('videoModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedVideoModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check music modals
+        musicModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('musicModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedMusicModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check text inputs
+        textInputStates.forEach((textState) => {
+          const dims = getComponentDimensions('textInput', textState.id);
+          if (hasOverlap(textState.x, textState.y, dims.width, dims.height)) {
+            selectedTextInputIdsList.push(textState.id);
+          }
+        });
+
+        // Check upscale modals
+        upscaleModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('upscaleModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedUpscaleModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check multiangle camera modals
+        multiangleCameraModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('multiangleCameraModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedMultiangleCameraModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check removeBg modals
+        removeBgModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('removeBgModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedRemoveBgModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check erase modals
+        eraseModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('eraseModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedEraseModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check expand modals
+        expandModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('expandModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedExpandModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check vectorize modals
+        vectorizeModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('vectorizeModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedVectorizeModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check next scene modals
+        nextSceneModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('nextSceneModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            if (!selectedNextSceneModalIdsList.includes(modal.id)) {
+              selectedNextSceneModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        });
+
+        // Check compare modals
+        compareModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('compareModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            if (!selectedCompareModalIdsList.includes(modal.id)) {
+              selectedCompareModalIdsList.push(modal.id);
+            }
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        });
+
+        // Check storyboard modals
+        storyboardModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('storyboardModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedStoryboardModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check script frame modals
+        scriptFrameModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('scriptFrameModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedScriptFrameModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check scene frame modals
+        sceneFrameModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('sceneFrameModal', modal.id);
+          if (hasOverlap(modal.x, modal.y, dims.width, dims.height)) {
+            selectedSceneFrameModalIdsList.push(modal.id);
+          }
+        });
+
+        // Check video editor modals
+        videoEditorModalStates.forEach((modal) => {
+          // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+          // Total bounding box: 100px width, 120px height (100px circle + label space)
+          const modalWidth = 100;
+          const modalHeight = 120; // 100px circle + ~20px for label
+          if (hasOverlap(modal.x, modal.y, modalWidth, modalHeight)) {
+            selectedVideoEditorModalIdsList.push(modal.id);
+          }
+        });
+
+        // Update selections in real-time (Freepik Spaces behavior)
+        setSelectedImageIndices(selectedIndices);
+        setSelectedImageModalIds(selectedImageModalIdsList);
+        setSelectedVideoModalIds(selectedVideoModalIdsList);
+        setSelectedVideoEditorModalIds(selectedVideoEditorModalIdsList);
+        setSelectedMusicModalIds(selectedMusicModalIdsList);
+        setSelectedTextInputIds(selectedTextInputIdsList);
+        setSelectedUpscaleModalIds(selectedUpscaleModalIdsList);
+        setSelectedMultiangleCameraModalIds(selectedMultiangleCameraModalIdsList);
+        setSelectedRemoveBgModalIds(selectedRemoveBgModalIdsList);
+        setSelectedEraseModalIds(selectedEraseModalIdsList);
+        setSelectedExpandModalIds(selectedExpandModalIdsList);
+        setSelectedVectorizeModalIds(selectedVectorizeModalIdsList);
+        // Merge with existing selections for NextScene and Compare to accumulate across handler runs
+        const mergedNextSceneIds = [...new Set([...selectedNextSceneModalIds, ...selectedNextSceneModalIdsList])];
+        const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
+        setSelectedNextSceneModalIds(mergedNextSceneIds);
+        setSelectedCompareModalIds?.(mergedCompareIds);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
+        setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
+        setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
+      }
+    };
+
+    const handleMouseUp = () => {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      // Cancel any pending animation frame
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+
+      // Apply final pending update if any (use latest from ref)
+      if (pendingUpdate) {
+        setSelectionBox(prev => prev ? {
+          ...prev,
+          currentX: latestCoordsRef.currentX,
+          currentY: latestCoordsRef.currentY,
+        } : null);
+        pendingUpdate = null;
+      }
+
+      // Ensure stage is not draggable
+      stage.draggable(false);
+
+      // Reset cursor to default for cursor tool or after Shift selection
+      if (selectedTool === 'cursor') {
+        applyStageCursorWrapper('default');
+      } else if (!isShiftPressed) {
+        // Reset cursor when Shift is released
+        if (selectedTool === 'move') {
+          applyStageCursorWrapper('grab');
+        } else if (selectedTool === 'text') {
+          applyStageCursorWrapper('text');
+        } else {
+          applyStageCursorWrapper('pointer');
+        }
+      }
+
+      // FREEPIK SPACES: Finalize selection on mouse up
+      // Selection is already determined by real-time hit detection during drag
+      // Just need to hide the selection rectangle and show the tight rect
+      const currentBox = selectionBox ? {
+        ...selectionBox,
+        currentX: latestCoordsRef.currentX,
+        currentY: latestCoordsRef.currentY,
+      } : null;
+
+      if (currentBox) {
+        const marqueeRect = {
+          x: Math.min(currentBox.startX, currentBox.currentX),
+          y: Math.min(currentBox.startY, currentBox.currentY),
+          width: Math.abs(currentBox.currentX - currentBox.startX),
+          height: Math.abs(currentBox.currentY - currentBox.startY),
+        };
+
+        // Check if selection box was actually dragged (not just clicked)
+        const wasDragged = marqueeRect.width > 5 || marqueeRect.height > 5;
+
+        if (wasDragged) {
+          // Calculate tight bounding box from selected elements
+          // This will be used for the selection box visualization
+          const allSelectedComponents: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+          // Canvas Text Nodes
+          (selectedCanvasTextIds || []).forEach(id => {
+            const textState = effectiveCanvasTextStates.find(t => t.id === id);
+            if (textState) {
+              const dims = getComponentDimensions('canvasText', id);
+              allSelectedComponents.push({
+                x: textState.x,
+                y: textState.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
 
           // Collect all selected component positions and dimensions
           selectedImageIndices.forEach(idx => {
@@ -4556,6 +5101,19 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
+          selectedMultiangleCameraModalIds.forEach(id => {
+            const modal = multiangleCameraModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('multiangleCameraModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
           selectedRemoveBgModalIds.forEach(id => {
             const modal = removeBgModalStates.find(m => m.id === id);
             if (modal) {
@@ -4621,6 +5179,34 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
+          selectedCompareModalIds.forEach(id => {
+            const modal = compareModalStates.find(m => m.id === id);
+            if (modal) {
+              const dims = getComponentDimensions('compareModal', id);
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: dims.width,
+                height: dims.height,
+              });
+            }
+          });
+
+          selectedVideoEditorModalIds.forEach(id => {
+            const modal = videoEditorModalStates.find(m => m.id === id);
+            if (modal) {
+              // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+              const modalWidth = 100;
+              const modalHeight = 120; // 100px circle + ~20px for label
+              allSelectedComponents.push({
+                x: modal.x,
+                y: modal.y,
+                width: modalWidth,
+                height: modalHeight,
+              });
+            }
+          });
+
           selectedStoryboardModalIds.forEach(id => {
             const modal = storyboardModalStates.find(m => m.id === id);
             if (modal) {
@@ -4682,12 +5268,22 @@ export const Canvas: React.FC<CanvasProps> = ({
                 height: Math.max(1, maxY - minY),
               });
               selectionDragOriginRef.current = { x: minX, y: minY };
+              // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+              setSelectionBox(null);
+              setIsDragSelection(true);
+            } else {
+              // If no valid tight rect could be computed, keep the selection box visible
+              // This ensures the user can see what they selected even if tight rect calculation fails
             }
+          } else {
+            // If no components were selected, clear the selection box
+            setSelectionBox(null);
+            setIsSelecting(false);
           }
-
-          // Clear selectionBox once tight rect is calculated - this makes the selection shrink to fit
+        } else {
+          // If selection box was too small (just a click), clear it
           setSelectionBox(null);
-          setIsDragSelection(true);
+          setIsSelecting(false);
         }
       }
 
@@ -4696,18 +5292,19 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
       // Clean up any pending animation frame
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;
       }
     };
-  }, [isSelecting, selectionBox, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
+  }, [isSelecting, selectionBox, selectionRectCoords, position, scale, images, selectedTool, imageModalStates, videoModalStates, musicModalStates, textInputStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds, selectedMusicModalIds, selectedTextInputIds, selectedUpscaleModalIds, selectedMultiangleCameraModalIds, selectedRemoveBgModalIds, selectedEraseModalIds, selectedExpandModalIds, selectedVectorizeModalIds, selectedNextSceneModalIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds, applyStageCursorWrapper, isShiftPressed, setSelectedImageIndices, setSelectedImageModalIds, setSelectedVideoModalIds, setSelectedMusicModalIds, setSelectedTextInputIds, setSelectedUpscaleModalIds, setSelectedMultiangleCameraModalIds, setSelectedRemoveBgModalIds, setSelectedEraseModalIds, setSelectedExpandModalIds, setSelectedVectorizeModalIds, setSelectedNextSceneModalIds, setSelectedStoryboardModalIds, setSelectedScriptFrameModalIds, setSelectedSceneFrameModalIds, setSelectionTightRect, setIsDragSelection, selectionDragOriginRef]);
 
   // Attach Transformer to selected nodes
   useEffect(() => {
@@ -4801,12 +5398,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     const clickedOnEmpty = target === stage ||
       target.getClassName() === 'Stage' ||
       target.getClassName() === 'Layer' ||
+      target.name() === 'background-rect' ||
       (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
-    // Panning: only with move tool, or with middle mouse, Ctrl/Cmd, or Space key (NOT with cursor tool or Shift)
+    // Panning: only with move tool, Ctrl/Cmd, or Space key (NOT with cursor tool, Shift, or middle mouse)
+    // Middle mouse button (button === 1) is DISABLED to prevent glitches
     const isMoveTool = selectedTool === 'move';
     const isCursorTool = selectedTool === 'cursor';
     // Cursor tool and Shift + Left Click should NEVER pan - only selection
-    const isPanKey = isMoveTool || e.evt.button === 1 || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
+    // Middle mouse button is disabled - removed: || e.evt.button === 1
+    const isPanKey = isMoveTool || e.evt.ctrlKey || e.evt.metaKey || isSpacePressed;
     // Shift + Left Click is for selection, not panning
     const isShiftSelection = e.evt.shiftKey && e.evt.button === 0;
     const clickedOnElement = !clickedOnEmpty;
@@ -4871,11 +5471,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     // Clear selections when clicking on empty canvas space
     // Only skip clearing if:
     // 1. We're clicking on a resize handle
-    // 2. We're starting a selection box (cursor tool drag)
-    // 3. We're clicking inside an existing selection area
-    // 4. Current selection is a group (groups persist their border)
-    // 5. We're editing a group name (prevent deletion during editing)
-    if (clickedOnEmpty && !isResizeHandle && !isStartingSelection && !isInsideSelection && !isEditingGroup) {
+    // 2. We're clicking inside an existing selection area
+    // 3. Current selection is a group (groups persist their border)
+    // 4. We're editing a group name (prevent deletion during editing)
+    // 5. We are Panning (don't lose selection while moving canvas)
+    // 6. We are Shift-Selecting (adding to selection)
+    // 7. We are starting a selection (cursor tool or Shift + Left Click)
+    if (clickedOnEmpty && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
       // Click is on empty canvas - clear everything including selection boxes
       // But don't clear if it's a group - groups should persist
       clearAllSelections(true);
@@ -4967,10 +5569,24 @@ export const Canvas: React.FC<CanvasProps> = ({
     // If cursor tool is selected, prepare marquee selection but defer creating
     // the visible selection box until the pointer moves beyond a small threshold.
     if (isCursorTool && e.evt.button === 0) {
-      if (clickedOnEmpty) {
+      // Do nothing if we mousedown on any shape (like in Konva example)
+      if (!clickedOnEmpty) {
+        return;
+      }
+      
         if (pointerPos) {
+        // Initialize region selection rectangle (Konva pattern)
+        const canvasX = (pointerPos.x - position.x) / scale;
+        const canvasY = (pointerPos.y - position.y) / scale;
+        setSelectionRectCoords({
+          x1: canvasX,
+          y1: canvasY,
+          x2: canvasX,
+          y2: canvasY,
+        });
+        
           setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
-          setPendingSelectionStartCanvas({ x: (pointerPos.x - position.x) / scale, y: (pointerPos.y - position.y) / scale });
+        setPendingSelectionStartCanvas({ x: canvasX, y: canvasY });
           setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
           setSelectionBox(null);
           // Don't clear selection box if it's a group - groups persist
@@ -4980,7 +5596,6 @@ export const Canvas: React.FC<CanvasProps> = ({
           }
         }
         return;
-      }
     }
 
     // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
@@ -5002,6 +5617,16 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (shouldPan) {
       const stage = e.target.getStage();
       if (stage) {
+        // Disabled: Middle button panning to prevent glitches
+        // Don't enable panning if middle button is pressed
+        if (e.evt.button === 1) {
+          // Prevent default middle button behavior but don't enable panning
+          e.evt.preventDefault();
+          e.evt.stopPropagation();
+          setIsMiddleButtonPressed(true);
+          // Don't enable panning - just prevent default behavior
+          return;
+        }
         setIsPanning(true);
         stage.draggable(true);
         applyStageCursorWrapper('grabbing', true);
@@ -5057,11 +5682,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isDraggingFromElement, mouseDownPos, selectedTool]);
 
@@ -5094,6 +5720,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           currentY: pendingSelectionStartCanvas.y,
         });
         setIsSelecting(true);
+        
+        // Update selection rectangle coordinates
+        setSelectionRectCoords({
+          x1: pendingSelectionStartCanvas.x,
+          y1: pendingSelectionStartCanvas.y,
+          x2: pendingSelectionStartCanvas.x,
+          y2: pendingSelectionStartCanvas.y,
+        });
 
         // Clear pending markers
         setPendingSelectionStartScreen(null);
@@ -5108,17 +5742,596 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
 
     window.addEventListener('mousemove', handleMove, { passive: true });
-    window.addEventListener('mouseup', handleUp);
+    // Capture so child stopPropagation can't block cleanup
+    window.addEventListener('mouseup', handleUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMove as any);
-      window.removeEventListener('mouseup', handleUp as any);
+      window.removeEventListener('mouseup', handleUp as any, true);
     };
   }, [pendingSelectionStartScreen, pendingSelectionStartCanvas, position.x, position.y, scale]);
 
+  // Update selection rectangle coordinates when selectionBox updates (sync with existing selection logic)
+  useEffect(() => {
+    if (selectionBox && selectionRectCoords) {
+      // Keep selectionRectCoords in sync with selectionBox
+      setSelectionRectCoords({
+        x1: selectionRectCoords.x1,
+        y1: selectionRectCoords.y1,
+        x2: selectionBox.currentX,
+        y2: selectionBox.currentY,
+      });
+    }
+  }, [selectionBox?.currentX, selectionBox?.currentY]);
+
+  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Selection rectangle is now updated via the useEffect that syncs with selectionBox
+    // This handler is kept for any other mousemove logic if needed
+  };
+
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // If we are selecting with rect, do nothing (like in Konva example)
+    if (selectionRectCoords) {
+      const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
+      const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+      if (rectWidth > 0 && rectHeight > 0) {
+        return; // Don't process click if selection rectangle was visible
+      }
+    }
+
+    const target = e.target;
+    const stage = target.getStage();
+    const clickedOnEmpty = target === stage ||
+      target.getClassName() === 'Stage' ||
+      target.getClassName() === 'Layer' ||
+      target.name() === 'background-rect' ||
+      (target.getClassName() === 'Rect' && (target as Konva.Rect).width() > 100000);
+
+    // If click on empty area - remove all selections
+    if (clickedOnEmpty) {
+      clearAllSelections();
+      return;
+    }
+
+    // The rest of click handling is done at component level (CanvasImage, etc.)
+    // This handler mainly prevents clicks when selection rectangle is visible
+  };
+
   const handleStageMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Reset middle button state when mouse button is released
+    if (e.evt.button === 1) {
+      // Always reset middle button state and panning state
+      setIsMiddleButtonPressed(false);
+      setIsPanning(false);
+      
+      // Disable stage dragging to ensure clean state
+      const stage = e.target.getStage();
+      if (stage) {
+        stage.draggable(false);
+      }
+      
+      // Prevent default browser behavior (navigation)
+      e.evt.preventDefault();
+      e.evt.stopPropagation();
+      
+      // Return early to prevent any other mouse up handling
+      return;
+    }
+    
     const stage = e.target.getStage();
     const target = e.target;
+
+    // Handle region selection rectangle (Konva pattern)
+    // Process this BEFORE the existing selectionBox logic to ensure it works
+    if (selectionRectCoords) {
+      const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
+      const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+      
+      // Only process selection if rectangle has meaningful size (at least 5px to avoid accidental clicks)
+      if (rectWidth >= 5 && rectHeight >= 5) {
+        const selectionRect = {
+          x: Math.min(selectionRectCoords.x1, selectionRectCoords.x2),
+          y: Math.min(selectionRectCoords.y1, selectionRectCoords.y2),
+          width: rectWidth,
+          height: rectHeight,
+        };
+
+        const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+
+        // Initialize selection containers
+        const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
+        const newSelectedImageModalIds: string[] = isMultiSelect ? [...selectedImageModalIds] : [];
+        const newSelectedVideoModalIds: string[] = isMultiSelect ? [...selectedVideoModalIds] : [];
+        const newSelectedVideoEditorModalIds: string[] = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
+        const newSelectedMusicModalIds: string[] = isMultiSelect ? [...selectedMusicModalIds] : [];
+        const newSelectedTextInputIds: string[] = isMultiSelect ? [...selectedTextInputIds] : [];
+        const newSelectedUpscaleModalIds: string[] = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+        const newSelectedMultiangleCameraModalIds: string[] = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
+        const newSelectedRemoveBgModalIds: string[] = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
+        const newSelectedEraseModalIds: string[] = isMultiSelect ? [...selectedEraseModalIds] : [];
+        const newSelectedExpandModalIds: string[] = isMultiSelect ? [...selectedExpandModalIds] : [];
+        const newSelectedVectorizeModalIds: string[] = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+        const newSelectedNextSceneModalIds: string[] = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+        const newSelectedCompareModalIds: string[] = isMultiSelect ? [...(selectedCompareModalIds || [])] : [];
+        const newSelectedStoryboardModalIds: string[] = isMultiSelect ? [...selectedStoryboardModalIds] : [];
+        const newSelectedScriptFrameModalIds: string[] = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
+        const newSelectedSceneFrameModalIds: string[] = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
+        const newSelectedCanvasTextIds: string[] = isMultiSelect ? [...(selectedCanvasTextIds || [])] : [];
+
+        // Helper to check intersection using Konva.Util.haveIntersection
+        // This checks if the selection rectangle intersects with the component's bounding box
+        const checkIntersection = (itemRect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
+          // Use getClientRect to handle rotation properly
+          const componentRect = getClientRect(itemRect);
+          // Check if selection rectangle intersects with component's bounding box
+          return Konva.Util.haveIntersection(selectionRect, componentRect);
+        };
+
+        // Find all selectable components and check intersection
+        // Images
+        images.forEach((img, idx) => {
+          if (img.type === 'image' || img.type === 'video') {
+            const dims = getComponentDimensions('image', idx);
+            if (checkIntersection({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height, rotation: img.rotation || 0 })) {
+              if (!newSelectedIndices.includes(idx)) newSelectedIndices.push(idx);
+            }
+          }
+        });
+
+        // Canvas Text Nodes
+        effectiveCanvasTextStates.forEach((textState) => {
+          const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
+          const height = textState.height || (textState.fontSize || 16) * 1.2;
+          if (checkIntersection({ x: textState.x, y: textState.y, width: estimatedWidth, height: height, rotation: textState.rotation || 0 })) {
+            if (!newSelectedCanvasTextIds.includes(textState.id)) newSelectedCanvasTextIds.push(textState.id);
+          }
+        });
+
+        // Text Input Overlays
+        textInputStates.forEach((text) => {
+          if (checkIntersection({ x: text.x, y: text.y, width: 600, height: 400 })) {
+            if (!newSelectedTextInputIds.includes(text.id)) newSelectedTextInputIds.push(text.id);
+          }
+        });
+
+        // Image Modals
+        imageModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('imageModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedImageModalIds.includes(modal.id)) newSelectedImageModalIds.push(modal.id);
+          }
+        });
+
+        // Video Modals
+        videoModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('videoModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedVideoModalIds.includes(modal.id)) newSelectedVideoModalIds.push(modal.id);
+          }
+        });
+
+        // Music Modals
+        musicModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('musicModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
+          }
+        });
+
+        // Upscale Modals
+        upscaleModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('upscaleModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
+          }
+        });
+
+        // Multiangle Camera Modals
+        multiangleCameraModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('multiangleCameraModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedMultiangleCameraModalIds.includes(modal.id)) newSelectedMultiangleCameraModalIds.push(modal.id);
+          }
+        });
+
+        // Remove BG Modals
+        removeBgModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('removeBgModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
+          }
+        });
+
+        // Erase Modals
+        eraseModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('eraseModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
+          }
+        });
+
+        // Expand Modals
+        expandModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('expandModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
+          }
+        });
+
+        // Vectorize Modals
+        vectorizeModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('vectorizeModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
+          }
+        });
+
+        // Storyboard Modals
+        storyboardModalStates.forEach((modal) => {
+          const dims = getComponentDimensions('storyboardModal', modal.id);
+          if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+            if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
+          }
+        });
+
+        // Script Frame Modals
+        scriptFrameModalStates.forEach((modal) => {
+          if (checkIntersection({ x: modal.x, y: modal.y, width: modal.frameWidth, height: modal.frameHeight })) {
+            if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
+          }
+        });
+
+        // Scene Frame Modals
+        sceneFrameModalStates.forEach((modal) => {
+          if (checkIntersection({ x: modal.x, y: modal.y, width: modal.frameWidth, height: modal.frameHeight })) {
+            if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
+          }
+        });
+
+        // Video Editor Modals
+        videoEditorModalStates.forEach((modal) => {
+          // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+          // Total bounding box: 100px width, 120px height (100px circle + label space)
+          const modalWidth = 100;
+          const modalHeight = 120; // 100px circle + ~20px for label
+          if (checkIntersection({ x: modal.x, y: modal.y, width: modalWidth, height: modalHeight })) {
+            if (!newSelectedVideoEditorModalIds.includes(modal.id)) newSelectedVideoEditorModalIds.push(modal.id);
+          }
+        });
+
+        // Apply selections
+        setSelectedImageIndices(newSelectedIndices);
+        if (newSelectedIndices.length > 0) {
+          setSelectedImageIndex(newSelectedIndices[0]);
+        }
+        setSelectedTextInputIds(newSelectedTextInputIds);
+        setSelectedImageModalIds(newSelectedImageModalIds);
+        setSelectedVideoModalIds(newSelectedVideoModalIds);
+        setSelectedVideoEditorModalIds(newSelectedVideoEditorModalIds);
+        if (newSelectedVideoEditorModalIds.length > 0) {
+          setSelectedVideoEditorModalId(newSelectedVideoEditorModalIds[0]);
+        }
+        setSelectedMusicModalIds(newSelectedMusicModalIds);
+        setSelectedUpscaleModalIds(newSelectedUpscaleModalIds);
+        setSelectedMultiangleCameraModalIds(newSelectedMultiangleCameraModalIds);
+        setSelectedRemoveBgModalIds(newSelectedRemoveBgModalIds);
+        setSelectedEraseModalIds(newSelectedEraseModalIds);
+        setSelectedExpandModalIds(newSelectedExpandModalIds);
+        setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
+        setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
+        setSelectedCompareModalIds?.(newSelectedCompareModalIds);
+        setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
+        setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
+        setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
+        setSelectedCanvasTextIds?.(newSelectedCanvasTextIds);
+        if (newSelectedCanvasTextIds.length > 0) {
+          setSelectedCanvasTextId?.(newSelectedCanvasTextIds[0]);
+        }
+        
+        // Hide selection rectangle after processing (with timeout like in example)
+        setTimeout(() => {
+          setSelectionRectCoords(null);
+        }, 0);
+        
+        // Clear selectionBox to prevent double processing
+        setSelectionBox(null);
+        setIsSelecting(false);
+        
+        // Return early to skip the existing selectionBox logic below
+        return;
+      } else {
+        // If rectangle was too small, just clear it
+        setSelectionRectCoords(null);
+      }
+    }
+
+    // Check for intersection with generated selection box (only if selectionRectCoords wasn't processed)
+    if (selectionBox) {
+      const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
+      const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
+      const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
+      const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
+      const selectionRect = {
+        x: boxX,
+        y: boxY,
+        width: boxWidth,
+        height: boxHeight,
+      };
+
+      const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+
+      // Initialize selection containers
+      const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
+      const newSelectedImageModalIds: string[] = isMultiSelect ? [...selectedImageModalIds] : [];
+      const newSelectedVideoModalIds: string[] = isMultiSelect ? [...selectedVideoModalIds] : [];
+      const newSelectedVideoEditorModalIds: string[] = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
+      const newSelectedMusicModalIds: string[] = isMultiSelect ? [...selectedMusicModalIds] : [];
+      const newSelectedTextInputIds: string[] = isMultiSelect ? [...selectedTextInputIds] : [];
+      const newSelectedUpscaleModalIds: string[] = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+      const newSelectedMultiangleCameraModalIds: string[] = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
+      const newSelectedRemoveBgModalIds: string[] = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
+      const newSelectedEraseModalIds: string[] = isMultiSelect ? [...selectedEraseModalIds] : [];
+      const newSelectedExpandModalIds: string[] = isMultiSelect ? [...selectedExpandModalIds] : [];
+      const newSelectedVectorizeModalIds: string[] = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+      const newSelectedNextSceneModalIds: string[] = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+      const newSelectedCompareModalIds: string[] = isMultiSelect ? [...(selectedCompareModalIds || [])] : [];
+      const newSelectedStoryboardModalIds: string[] = isMultiSelect ? [...selectedStoryboardModalIds] : [];
+      const newSelectedScriptFrameModalIds: string[] = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
+      const newSelectedSceneFrameModalIds: string[] = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
+      const newSelectedCanvasTextIds: string[] = isMultiSelect ? [...(selectedCanvasTextIds || [])] : [];
+
+      // Helper to check intersection
+      const checkIntersection = (itemRect: any) => {
+        return Konva.Util.haveIntersection(selectionRect, getClientRect(itemRect));
+      };
+
+
+      // Images
+      images.forEach((img, idx) => {
+        if (img.type === 'image' || img.type === 'video') {
+          const dims = getComponentDimensions('image', idx);
+          if (checkIntersection({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height, rotation: img.rotation || 0 })) {
+            if (!newSelectedIndices.includes(idx)) newSelectedIndices.push(idx);
+          }
+        }
+      });
+
+      // Canvas Text Nodes
+      effectiveCanvasTextStates.forEach((textState) => {
+        // Use logic similar to Group Selection Box for text width
+        const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
+        const height = textState.height || (textState.fontSize || 16) * 1.2;
+
+        if (checkIntersection({ x: textState.x, y: textState.y, width: estimatedWidth, height: height, rotation: textState.rotation || 0 })) {
+          if (!newSelectedCanvasTextIds.includes(textState.id)) newSelectedCanvasTextIds.push(textState.id);
+        }
+      });
+
+      // Text Input Overlays
+      textInputStates.forEach((text) => {
+        if (checkIntersection({ x: text.x, y: text.y, width: 600, height: 400 })) {
+          if (!newSelectedTextInputIds.includes(text.id)) newSelectedTextInputIds.push(text.id);
+        }
+      });
+
+      // Image Modals
+      imageModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('imageModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedImageModalIds.includes(modal.id)) newSelectedImageModalIds.push(modal.id);
+        }
+      });
+
+      // Video Modals
+      videoModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('videoModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedVideoModalIds.includes(modal.id)) newSelectedVideoModalIds.push(modal.id);
+        }
+      });
+
+      // Music Modals
+      musicModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('musicModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
+        }
+      });
+
+      // Upscale Modals
+      upscaleModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('upscaleModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
+        }
+      });
+
+      // Multiangle Camera Modals
+      multiangleCameraModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('multiangleCameraModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedMultiangleCameraModalIds.includes(modal.id)) newSelectedMultiangleCameraModalIds.push(modal.id);
+        }
+      });
+
+      // RemoveBg Modals
+      removeBgModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('removeBgModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
+        }
+      });
+
+      // Erase Modals
+      eraseModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('eraseModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
+        }
+      });
+
+      // Expand Modals
+      expandModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('expandModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
+        }
+      });
+
+      // Vectorize Modals
+      vectorizeModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('vectorizeModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
+        }
+      });
+
+      // NextScene Modals
+      nextSceneModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('nextSceneModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedNextSceneModalIds.includes(modal.id)) newSelectedNextSceneModalIds.push(modal.id);
+        }
+      });
+
+      // Compare Modals
+      compareModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('compareModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedCompareModalIds.includes(modal.id)) newSelectedCompareModalIds.push(modal.id);
+        }
+      });
+
+      // Storyboard Modals
+      storyboardModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('storyboardModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
+        }
+      });
+
+      // Script Frame Modals
+      scriptFrameModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('scriptFrameModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
+        }
+      });
+
+      // Scene Frame Modals
+      sceneFrameModalStates.forEach((modal) => {
+        const dims = getComponentDimensions('sceneFrameModal', modal.id);
+        if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+          if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
+        }
+      });
+
+      // Video Editor Modals
+      videoEditorModalStates.forEach((modal) => {
+        // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+        // Total bounding box: 100px width, 120px height (100px circle + label space)
+        const modalWidth = 100;
+        const modalHeight = 120; // 100px circle + ~20px for label
+        if (checkIntersection({ x: modal.x, y: modal.y, width: modalWidth, height: modalHeight })) {
+          if (!newSelectedVideoEditorModalIds.includes(modal.id)) newSelectedVideoEditorModalIds.push(modal.id);
+        }
+      });
+
+      // Update selection states
+      if (newSelectedIndices.length > 0 || !isMultiSelect) {
+        setSelectedImageIndices(newSelectedIndices);
+        setSelectedImageIndex(newSelectedIndices.length > 0 ? newSelectedIndices[0] : null);
+      }
+
+      if (newSelectedImageModalIds.length > 0 || !isMultiSelect) {
+        setSelectedImageModalIds(newSelectedImageModalIds);
+        setSelectedImageModalId(newSelectedImageModalIds.length > 0 ? newSelectedImageModalIds[0] : null);
+      }
+
+      if (newSelectedVideoModalIds.length > 0 || !isMultiSelect) {
+        setSelectedVideoModalIds(newSelectedVideoModalIds);
+        setSelectedVideoModalId(newSelectedVideoModalIds.length > 0 ? newSelectedVideoModalIds[0] : null);
+      }
+
+      if (newSelectedVideoEditorModalIds.length > 0 || !isMultiSelect) {
+        setSelectedVideoEditorModalIds(newSelectedVideoEditorModalIds);
+        setSelectedVideoEditorModalId(newSelectedVideoEditorModalIds.length > 0 ? newSelectedVideoEditorModalIds[0] : null);
+      }
+
+      if (newSelectedMusicModalIds.length > 0 || !isMultiSelect) {
+        setSelectedMusicModalIds(newSelectedMusicModalIds);
+        setSelectedMusicModalId(newSelectedMusicModalIds.length > 0 ? newSelectedMusicModalIds[0] : null);
+      }
+
+      if (newSelectedTextInputIds.length > 0 || !isMultiSelect) {
+        setSelectedTextInputIds(newSelectedTextInputIds);
+        setSelectedTextInputId(newSelectedTextInputIds.length > 0 ? newSelectedTextInputIds[0] : null);
+      }
+
+      if (newSelectedUpscaleModalIds.length > 0 || !isMultiSelect) {
+        setSelectedUpscaleModalIds(newSelectedUpscaleModalIds);
+        setSelectedUpscaleModalId(newSelectedUpscaleModalIds.length > 0 ? newSelectedUpscaleModalIds[0] : null);
+      }
+
+      if (newSelectedMultiangleCameraModalIds.length > 0 || !isMultiSelect) {
+        setSelectedMultiangleCameraModalIds(newSelectedMultiangleCameraModalIds);
+        setSelectedMultiangleCameraModalId(newSelectedMultiangleCameraModalIds.length > 0 ? newSelectedMultiangleCameraModalIds[0] : null);
+      }
+
+      if (newSelectedRemoveBgModalIds.length > 0 || !isMultiSelect) {
+        setSelectedRemoveBgModalIds(newSelectedRemoveBgModalIds);
+        setSelectedRemoveBgModalId(newSelectedRemoveBgModalIds.length > 0 ? newSelectedRemoveBgModalIds[0] : null);
+      }
+
+      if (newSelectedEraseModalIds.length > 0 || !isMultiSelect) {
+        setSelectedEraseModalIds(newSelectedEraseModalIds);
+        setSelectedEraseModalId(newSelectedEraseModalIds.length > 0 ? newSelectedEraseModalIds[0] : null);
+      }
+
+      if (newSelectedExpandModalIds.length > 0 || !isMultiSelect) {
+        setSelectedExpandModalIds(newSelectedExpandModalIds);
+        setSelectedExpandModalId(newSelectedExpandModalIds.length > 0 ? newSelectedExpandModalIds[0] : null);
+      }
+
+      if (newSelectedVectorizeModalIds.length > 0 || !isMultiSelect) {
+        setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
+        setSelectedVectorizeModalId(newSelectedVectorizeModalIds.length > 0 ? newSelectedVectorizeModalIds[0] : null);
+      }
+
+      if (newSelectedNextSceneModalIds.length > 0 || !isMultiSelect) {
+        setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
+        setSelectedNextSceneModalId(newSelectedNextSceneModalIds.length > 0 ? newSelectedNextSceneModalIds[0] : null);
+      }
+
+      if (newSelectedCompareModalIds.length > 0 || !isMultiSelect) {
+        setSelectedCompareModalIds?.(newSelectedCompareModalIds);
+        setSelectedCompareModalId?.(newSelectedCompareModalIds.length > 0 ? newSelectedCompareModalIds[0] : null);
+      }
+
+      if (newSelectedStoryboardModalIds.length > 0 || !isMultiSelect) {
+        setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
+        setSelectedStoryboardModalId(newSelectedStoryboardModalIds.length > 0 ? newSelectedStoryboardModalIds[0] : null);
+      }
+
+      if (newSelectedScriptFrameModalIds.length > 0 || !isMultiSelect) {
+        setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
+        setSelectedScriptFrameModalId(newSelectedScriptFrameModalIds.length > 0 ? newSelectedScriptFrameModalIds[0] : null);
+      }
+
+      if (newSelectedSceneFrameModalIds.length > 0 || !isMultiSelect) {
+        setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
+        setSelectedSceneFrameModalId(newSelectedSceneFrameModalIds.length > 0 ? newSelectedSceneFrameModalIds[0] : null);
+      }
+
+      if (newSelectedCanvasTextIds.length > 0 || !isMultiSelect) {
+        setSelectedCanvasTextIds?.(newSelectedCanvasTextIds);
+        effectiveSetSelectedCanvasTextId(newSelectedCanvasTextIds.length > 0 ? newSelectedCanvasTextIds[0] : null);
+      }
+
+      // Don't clear selection box here - let the selection box mouse move handler compute tight rect first
+      // The selection box will be cleared after tight rect is computed in handleMouseUp of the selection box effect
+      setIsSelecting(false);
+    }
 
     // Check if this was a click on empty canvas (not a drag)
     const clickedOnEmpty = target === stage ||
@@ -5142,6 +6355,8 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedTextInputIds.length > 0 ||
         selectedUpscaleModalId !== null ||
         selectedUpscaleModalIds.length > 0 ||
+        selectedMultiangleCameraModalId !== null ||
+        selectedMultiangleCameraModalIds.length > 0 ||
         selectedExpandModalId !== null ||
         selectedExpandModalIds.length > 0 ||
         selectedEraseModalId !== null ||
@@ -5202,17 +6417,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       setPosition(newPos);
       updateViewportCenter(newPos, scale);
     }
-  };
-
-  // Calculate and expose viewport center
-  const updateViewportCenter = (pos: { x: number; y: number }, currentScale: number) => {
-    if (onViewportChange && stageRef.current) {
-      // Calculate the center of the viewport in canvas coordinates
-      // Formula: canvasX = (screenX - stageX) / scale
-      const centerX = (viewportSize.width / 2 - pos.x) / currentScale;
-      const centerY = (viewportSize.height / 2 - pos.y) / currentScale;
-      onViewportChange({ x: centerX, y: centerY }, currentScale);
-    }
+    
+    // Reset panning state
+    setIsPanning(false);
   };
 
   // Update viewport center when scale or position changes
@@ -5226,9 +6433,133 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Canvas is truly infinite - no need to expand, it's already massive
   // Fixed at 1,000,000 x 1,000,000 pixels - can handle 100+ 8K images easily
+  // --- Multi-select Move Logic ---
 
+  const moveSelectedItems = (dx: number, dy: number, excludeType?: string, excludeId?: string | number) => {
+    // 1. Move Images
+    selectedImageIndices.forEach(idx => {
+      // Check exclusion
+      if (excludeType === 'image' && excludeId === idx) return;
+
+      const img = images[idx];
+      if (img && onImageUpdate) {
+        onImageUpdate(idx, {
+          x: (img.x || 0) + dx,
+          y: (img.y || 0) + dy
+        });
+      }
+    });
+
+    // 2. Move Canvas Text
+    if (selectedCanvasTextIds && selectedCanvasTextIds.length > 0) {
+      selectedCanvasTextIds.forEach(id => {
+        if (excludeType === 'canvas-text' && excludeId === id) return;
+        const m = effectiveCanvasTextStates.find(m => m.id === id);
+        if (m && onPersistCanvasTextMove) onPersistCanvasTextMove(id, { x: m.x + dx, y: m.y + dy });
+      });
+    }
+
+    // Helper for modals
+    const moveModalGroup = (
+      selectedIds: string[],
+      states: any[],
+      moveFn: ((id: string, updates: any) => void) | undefined,
+      type: string
+    ) => {
+      selectedIds.forEach(id => {
+        if (excludeType === type && excludeId === id) return;
+        const m = states.find(s => s.id === id);
+        if (m && moveFn) {
+          moveFn(id, { x: m.x + dx, y: m.y + dy });
+        }
+      });
+    };
+
+    moveModalGroup(selectedImageModalIds, imageModalStates, onPersistImageModalMove, 'image-modal');
+    moveModalGroup(selectedVideoModalIds, videoModalStates, onPersistVideoModalMove, 'video-modal');
+    moveModalGroup(selectedMusicModalIds, musicModalStates, onPersistMusicModalMove, 'music-modal');
+    moveModalGroup(selectedTextInputIds, textInputStates, onPersistTextModalMove, 'text-input');
+    moveModalGroup(selectedUpscaleModalIds, upscaleModalStates, onPersistUpscaleModalMove, 'upscale');
+    moveModalGroup(selectedMultiangleCameraModalIds, multiangleCameraModalStates, onPersistMultiangleCameraModalMove, 'multiangle-camera');
+    moveModalGroup(selectedRemoveBgModalIds, removeBgModalStates, onPersistRemoveBgModalMove, 'removebg');
+    moveModalGroup(selectedEraseModalIds, eraseModalStates, onPersistEraseModalMove, 'erase');
+    moveModalGroup(selectedExpandModalIds, expandModalStates, onPersistExpandModalMove, 'expand');
+    moveModalGroup(selectedVectorizeModalIds, vectorizeModalStates, onPersistVectorizeModalMove, 'vectorize');
+    moveModalGroup(selectedStoryboardModalIds, storyboardModalStates, onPersistStoryboardModalMove, 'storyboard');
+    moveModalGroup(selectedScriptFrameModalIds, scriptFrameModalStates, onPersistScriptFrameModalMove, 'script-frame');
+    moveModalGroup(selectedSceneFrameModalIds, sceneFrameModalStates, onPersistSceneFrameModalMove, 'scene-frame');
+    moveModalGroup(selectedCompareModalIds, compareModalStates, onPersistCompareModalMove, 'compare');
+    moveModalGroup(selectedNextSceneModalIds, nextSceneModalStates, onPersistNextSceneModalMove, 'next-scene');
+    moveModalGroup(selectedVideoEditorModalIds, videoEditorModalStates, onPersistVideoEditorModalMove, 'video-editor');
+  };
+
+  const createMoveWrapper = (
+    type: string,
+    selectionIds: string[],
+    states: any[],
+    originalHandler?: (id: string, updates: any) => void | Promise<void>
+  ) => {
+    return (id: string, updates: any) => {
+      // Call original first (or after? doesn't matter much, but let's do original first)
+      if (originalHandler) originalHandler(id, updates);
+
+      // Check if this move should trigger group move
+      if ((updates.x !== undefined || updates.y !== undefined) && selectionIds.includes(id)) {
+        const current = states.find(s => s.id === id);
+        if (current) {
+          // Calculate delta using NEW updates and OLD state
+          // Note: 'updates' only contains the CHANGED properties.
+          // If only x changed, dy is 0.
+          const newX = updates.x !== undefined ? updates.x : current.x;
+          const newY = updates.y !== undefined ? updates.y : current.y;
+          const dx = newX - current.x;
+          const dy = newY - current.y;
+
+          if (dx !== 0 || dy !== 0) {
+            moveSelectedItems(dx, dy, type, id);
+          }
+        }
+      }
+    };
+  };
+
+  // Create wrappers
+  const handleImageModalMove = createMoveWrapper('image-modal', selectedImageModalIds, imageModalStates, onPersistImageModalMove);
+  const handleVideoModalMove = createMoveWrapper('video-modal', selectedVideoModalIds, videoModalStates, onPersistVideoModalMove);
+  const handleMusicModalMove = createMoveWrapper('music-modal', selectedMusicModalIds, musicModalStates, onPersistMusicModalMove);
+  const handleTextModalMove = createMoveWrapper('text-input', selectedTextInputIds, textInputStates, onPersistTextModalMove);
+  const handleUpscaleModalMove = createMoveWrapper('upscale', selectedUpscaleModalIds, upscaleModalStates, onPersistUpscaleModalMove);
+  const handleMultiangleCameraModalMove = createMoveWrapper('multiangle-camera', selectedMultiangleCameraModalIds, multiangleCameraModalStates, onPersistMultiangleCameraModalMove);
+  const handleRemoveBgModalMove = createMoveWrapper('removebg', selectedRemoveBgModalIds, removeBgModalStates, onPersistRemoveBgModalMove);
+  const handleEraseModalMove = createMoveWrapper('erase', selectedEraseModalIds, eraseModalStates, onPersistEraseModalMove);
+  const handleExpandModalMove = createMoveWrapper('expand', selectedExpandModalIds, expandModalStates, onPersistExpandModalMove);
+  const handleVectorizeModalMove = createMoveWrapper('vectorize', selectedVectorizeModalIds, vectorizeModalStates, onPersistVectorizeModalMove);
+  const handleStoryboardModalMove = createMoveWrapper('storyboard', selectedStoryboardModalIds, storyboardModalStates, onPersistStoryboardModalMove);
+  const handleScriptFrameModalMove = createMoveWrapper('script-frame', selectedScriptFrameModalIds, scriptFrameModalStates, onPersistScriptFrameModalMove);
+  const handleSceneFrameModalMove = createMoveWrapper('scene-frame', selectedSceneFrameModalIds, sceneFrameModalStates, onPersistSceneFrameModalMove);
+  const handleCompareModalMove = createMoveWrapper('compare', selectedCompareModalIds, compareModalStates, onPersistCompareModalMove);
+  const handleNextSceneModalMove = createMoveWrapper('next-scene', selectedNextSceneModalIds, nextSceneModalStates, onPersistNextSceneModalMove);
+  const handleVideoEditorModalMove = createMoveWrapper('video-editor', selectedVideoEditorModalIds, videoEditorModalStates, onPersistVideoEditorModalMove);
   // Wrapper for onImageUpdate
   const handleImageUpdateWithGroup = (index: number, updates: Partial<ImageUpload>) => {
+    // Check if we are moving the image (x or y update) and if it is part of the selection
+    const isMoving = updates.x !== undefined || updates.y !== undefined;
+    const isSelected = selectedImageIndices.includes(index);
+
+    if (isMoving && isSelected && images[index]) {
+      // Calculate delta
+      const currentImage = images[index];
+      const newX = updates.x !== undefined ? updates.x : currentImage.x || 0;
+      const newY = updates.y !== undefined ? updates.y : currentImage.y || 0;
+      const dx = newX - (currentImage.x || 0);
+      const dy = newY - (currentImage.y || 0);
+
+      // Use helper to move everything else
+      if (dx !== 0 || dy !== 0) {
+        moveSelectedItems(dx, dy, 'image', index);
+      }
+    }
+
     if (onImageUpdate) {
       onImageUpdate(index, updates);
     }
@@ -5249,6 +6580,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       }, 50);
     }
   };
+
+
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -5313,6 +6646,16 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setUpscaleModalStates(prev => [...prev, newUpscale]);
               Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+            } else if (data.plugin.id === 'multiangle-camera' && onPersistMultiangleCameraModalCreate) {
+              const modalId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newMultiangleCamera = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                sourceImageUrl: null,
+              };
+              setMultiangleCameraModalStates(prev => [...prev, newMultiangleCamera]);
+              Promise.resolve(onPersistMultiangleCameraModalCreate(newMultiangleCamera)).catch(console.error);
             } else if (data.plugin.id === 'removebg' && onPersistRemoveBgModalCreate) {
               const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
               const newRemoveBg = {
@@ -5378,6 +6721,54 @@ export const Canvas: React.FC<CanvasProps> = ({
               };
               setVectorizeModalStates(prev => [...prev, newVectorize]);
               Promise.resolve(onPersistVectorizeModalCreate(newVectorize)).catch(console.error);
+            } else if (data.plugin.id === 'compare' && onPersistCompareModalCreate) {
+              const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newCompare = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                width: 600,
+                height: 400,
+              };
+              setCompareModalStates(prev => [...prev, newCompare]);
+              Promise.resolve(onPersistCompareModalCreate(newCompare)).catch(console.error);
+            } else if (data.plugin.id === 'next-scene' && onPersistNextSceneModalCreate) {
+              const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newNextScene = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                nextSceneImageUrl: null,
+                sourceImageUrl: null,
+                localNextSceneImageUrl: null,
+                mode: 'scene',
+                frameWidth: 400,
+                frameHeight: 500,
+                isProcessing: false,
+              };
+              setNextSceneModalStates(prev => [...prev, newNextScene]);
+              Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
+            } else if (data.plugin.id === 'storyboard' && onPersistStoryboardModalCreate) {
+              const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newStoryboard = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+                frameWidth: 400,
+                frameHeight: 500,
+                scriptText: null,
+              };
+              setStoryboardModalStates(prev => [...prev, newStoryboard]);
+              Promise.resolve(onPersistStoryboardModalCreate(newStoryboard)).catch(console.error);
+            } else if (data.plugin.id === 'video-editor' && onPersistVideoEditorModalCreate) {
+              const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const newVideoEditor = {
+                id: modalId,
+                x: canvasX,
+                y: canvasY,
+              };
+              setVideoEditorModalStates(prev => [...prev, newVideoEditor]);
+              Promise.resolve(onPersistVideoEditorModalCreate(newVideoEditor)).catch(console.error);
             }
             return;
           }
@@ -5479,7 +6870,10 @@ export const Canvas: React.FC<CanvasProps> = ({
         y={position.y}
         draggable={isPanning}
         onMouseDown={handleStageMouseDown}
+        onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
+        onClick={handleStageClick}
+        onTap={handleStageClick}
         onDragMove={handleStageDragMove}
         onDragEnd={handleStageDragEnd}
         style={{
@@ -5502,6 +6896,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               height={canvasSize.height}
               fillPatternImage={patternImage}
               fillPatternRepeat="repeat"
+              name="background-rect"
             />
           )}
           {/* Images and Videos */}
@@ -5562,6 +6957,19 @@ export const Canvas: React.FC<CanvasProps> = ({
                 />
               );
             })}
+          {/* Canvas Text Nodes (Konva-based) */}
+          {effectiveCanvasTextStates.map((textState) => (
+            <CanvasTextNode
+              key={textState.id}
+              data={textState}
+              isSelected={effectiveSelectedCanvasTextId === textState.id}
+              onSelect={(id) => effectiveSetSelectedCanvasTextId(id)}
+              onChange={(id, updates) => handleCanvasTextUpdate(id, updates)}
+              stageScale={scale}
+              onInteractionStart={() => setIsTextInteracting(true)}
+              onInteractionEnd={() => setIsTextInteracting(false)}
+            />
+          ))}
           {/* Text Elements */}
           <TextElements
             images={images}
@@ -5573,6 +6981,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             setContextMenuOpen={setContextMenuOpen}
             handleImageUpdateWithGroup={handleImageUpdateWithGroup}
           />
+
+
           {/* Selection Rect & Toolbar */}
           <SelectionBox
             selectionBox={selectionBox}
@@ -5582,6 +6992,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             selectedImageIndices={selectedImageIndices}
             selectedImageModalIds={selectedImageModalIds}
             selectedVideoModalIds={selectedVideoModalIds}
+            selectedVideoEditorModalIds={selectedVideoEditorModalIds}
             selectedMusicModalIds={selectedMusicModalIds}
             selectedTextInputIds={selectedTextInputIds}
             images={images}
@@ -5592,6 +7003,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             setTextInputStates={setTextInputStates}
             setImageModalStates={setImageModalStates}
             setVideoModalStates={setVideoModalStates}
+            videoEditorModalStates={videoEditorModalStates}
+            setVideoEditorModalStates={setVideoEditorModalStates}
             setMusicModalStates={setMusicModalStates}
             textInputStates={textInputStates}
             imageModalStates={imageModalStates}
@@ -5601,57 +7014,83 @@ export const Canvas: React.FC<CanvasProps> = ({
             setSelectedTextInputIds={setSelectedTextInputIds}
             setSelectedImageModalIds={setSelectedImageModalIds}
             setSelectedVideoModalIds={setSelectedVideoModalIds}
+            setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
             setSelectedMusicModalIds={setSelectedMusicModalIds}
             onPersistImageModalMove={onPersistImageModalMove}
+            onPersistVideoModalMove={onPersistVideoModalMove}
+            onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
             onPersistTextModalMove={onPersistTextModalMove}
             onImageUpdate={onImageUpdate}
             // Pass all other modal states and setters for full selection support
             selectedUpscaleModalIds={selectedUpscaleModalIds}
+            selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
             selectedRemoveBgModalIds={selectedRemoveBgModalIds}
             selectedEraseModalIds={selectedEraseModalIds}
             selectedExpandModalIds={selectedExpandModalIds}
             selectedVectorizeModalIds={selectedVectorizeModalIds}
-            selectedMultiangleModalIds={selectedMultiangleModalIds}
+            selectedNextSceneModalIds={selectedNextSceneModalIds || []}
+            selectedCompareModalIds={selectedCompareModalIds || []}
             selectedStoryboardModalIds={selectedStoryboardModalIds}
             selectedScriptFrameModalIds={selectedScriptFrameModalIds}
             selectedSceneFrameModalIds={selectedSceneFrameModalIds}
             upscaleModalStates={upscaleModalStates}
+            multiangleCameraModalStates={multiangleCameraModalStates}
             removeBgModalStates={removeBgModalStates}
             eraseModalStates={eraseModalStates}
             expandModalStates={expandModalStates}
             vectorizeModalStates={vectorizeModalStates}
-            multiangleModalStates={multiangleModalStates}
+            nextSceneModalStates={nextSceneModalStates || []}
+            compareModalStates={compareModalStates || []}
             storyboardModalStates={storyboardModalStates}
             scriptFrameModalStates={scriptFrameModalStates}
             sceneFrameModalStates={sceneFrameModalStates}
             setUpscaleModalStates={setUpscaleModalStates}
+            setMultiangleCameraModalStates={setMultiangleCameraModalStates}
             setRemoveBgModalStates={setRemoveBgModalStates}
             setEraseModalStates={setEraseModalStates}
             setExpandModalStates={setExpandModalStates}
             setVectorizeModalStates={setVectorizeModalStates}
-            setMultiangleModalStates={setMultiangleModalStates}
+            setNextSceneModalStates={setNextSceneModalStates}
+            setCompareModalStates={setCompareModalStates}
             setStoryboardModalStates={setStoryboardModalStates}
             setScriptFrameModalStates={setScriptFrameModalStates as any}
             setSceneFrameModalStates={setSceneFrameModalStates as any}
             setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+            setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
             setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
             setSelectedEraseModalIds={setSelectedEraseModalIds}
             setSelectedExpandModalIds={setSelectedExpandModalIds}
             setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
-            setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
+            setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
+            setSelectedCompareModalIds={setSelectedCompareModalIds}
             setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
             setSelectedScriptFrameModalIds={setSelectedScriptFrameModalIds}
             setSelectedSceneFrameModalIds={setSelectedSceneFrameModalIds}
-            onPersistUpscaleModalMove={onPersistUpscaleModalMove}
-            onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
-            onPersistEraseModalMove={onPersistEraseModalMove}
-            onPersistExpandModalMove={onPersistExpandModalMove}
-            onPersistVectorizeModalMove={onPersistVectorizeModalMove}
-            onPersistMultiangleModalMove={onPersistMultiangleModalMove}
-            onPersistStoryboardModalMove={onPersistStoryboardModalMove}
-            onPersistScriptFrameModalMove={onPersistScriptFrameModalMove}
-            onPersistSceneFrameModalMove={onPersistSceneFrameModalMove}
+            onPersistUpscaleModalMove={handleUpscaleModalMove}
+            onPersistMultiangleCameraModalMove={handleMultiangleCameraModalMove}
+            onPersistRemoveBgModalMove={handleRemoveBgModalMove}
+            onPersistEraseModalMove={handleEraseModalMove}
+            onPersistExpandModalMove={handleExpandModalMove}
+            onPersistVectorizeModalMove={handleVectorizeModalMove}
+            onPersistNextSceneModalMove={handleNextSceneModalMove}
+            onPersistCompareModalMove={handleCompareModalMove}
+            onPersistStoryboardModalMove={handleStoryboardModalMove}
+            onPersistScriptFrameModalMove={handleScriptFrameModalMove}
+            onPersistSceneFrameModalMove={handleSceneFrameModalMove}
           />
+          {/* Region selection rectangle (Konva pattern) */}
+          {selectionRectCoords && (
+            <Rect
+              ref={selectionRectangleRef}
+              x={Math.min(selectionRectCoords.x1, selectionRectCoords.x2)}
+              y={Math.min(selectionRectCoords.y1, selectionRectCoords.y2)}
+              width={Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1)}
+              height={Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1)}
+              fill="rgba(59,130,246,0.15)"
+              visible={true}
+              listening={false}
+            />
+          )}
           {/* Transformer for selected nodes - only for non-uploaded images */}
           {selectedImageIndices.length > 0 && (() => {
             // Check if any selected image is NOT uploaded (has resize enabled)
@@ -5717,15 +7156,37 @@ export const Canvas: React.FC<CanvasProps> = ({
         videoEditorModalStates={videoEditorModalStates}
         musicModalStates={musicModalStates}
         upscaleModalStates={upscaleModalStates}
+        multiangleCameraModalStates={multiangleCameraModalStates}
         removeBgModalStates={removeBgModalStates}
         eraseModalStates={eraseModalStates}
         expandModalStates={expandModalStates}
         vectorizeModalStates={vectorizeModalStates}
         nextSceneModalStates={nextSceneModalStates}
-        multiangleModalStates={multiangleModalStates}
         storyboardModalStates={storyboardModalStates}
         scriptFrameModalStates={scriptFrameModalStates}
         sceneFrameModalStates={sceneFrameModalStates}
+
+        // Compare Plugin
+        compareModalStates={compareModalStates}
+        selectedCompareModalId={selectedCompareModalId}
+        selectedCompareModalIds={selectedCompareModalIds}
+        setCompareModalStates={setCompareModalStates}
+        setSelectedCompareModalId={setSelectedCompareModalId}
+        setSelectedCompareModalIds={setSelectedCompareModalIds}
+        onPersistCompareModalCreate={onPersistCompareModalCreate}
+        onPersistCompareModalMove={handleCompareModalMove}
+        onPersistCompareModalDelete={onPersistCompareModalDelete}
+        // Multiangle Camera Plugin
+        selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
+        selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
+        setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+        setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
+        setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
+        onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
+        onPersistMultiangleCameraModalMove={handleMultiangleCameraModalMove}
+        onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
+        onMultiangleCamera={onMultiangleCamera}
+
         selectedTextInputId={selectedTextInputId}
         selectedTextInputIds={selectedTextInputIds}
         selectedImageModalId={selectedImageModalId}
@@ -5748,8 +7209,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         selectedVectorizeModalIds={selectedVectorizeModalIds}
         selectedNextSceneModalId={selectedNextSceneModalId}
         selectedNextSceneModalIds={selectedNextSceneModalIds}
-        selectedMultiangleModalId={selectedMultiangleModalId}
-        selectedMultiangleModalIds={selectedMultiangleModalIds}
         selectedStoryboardModalId={selectedStoryboardModalId}
         selectedStoryboardModalIds={selectedStoryboardModalIds}
         clearAllSelections={clearAllSelections}
@@ -5787,9 +7246,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         setNextSceneModalStates={setNextSceneModalStates}
         setSelectedNextSceneModalId={setSelectedNextSceneModalId}
         setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
-        setMultiangleModalStates={setMultiangleModalStates}
-        setSelectedMultiangleModalId={setSelectedMultiangleModalId}
-        setSelectedMultiangleModalIds={setSelectedMultiangleModalIds}
+
+
+
         setStoryboardModalStates={setStoryboardModalStates}
         setScriptFrameModalStates={setScriptFrameModalStates}
         onScriptFramePositionChange={handleScriptFramePositionChange}
@@ -5820,21 +7279,21 @@ export const Canvas: React.FC<CanvasProps> = ({
         position={position}
         onAddImageToCanvas={onAddImageToCanvas}
         onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
+        onPersistImageModalMove={handleImageModalMove}
         onPersistImageModalDelete={onPersistImageModalDelete}
         onUpdateImageModalState={handleUpdateImageModalState}
         onPersistVideoModalCreate={onPersistVideoModalCreate}
-        onPersistVideoModalMove={onPersistVideoModalMove}
+        onPersistVideoModalMove={handleVideoModalMove}
         onPersistVideoModalDelete={onPersistVideoModalDelete}
         onPersistVideoEditorModalCreate={onPersistVideoEditorModalCreate}
-        onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
+        onPersistVideoEditorModalMove={handleVideoEditorModalMove}
         onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
         onOpenVideoEditor={onOpenVideoEditor}
         onPersistMusicModalCreate={onPersistMusicModalCreate}
-        onPersistMusicModalMove={onPersistMusicModalMove}
+        onPersistMusicModalMove={handleMusicModalMove}
         onPersistMusicModalDelete={onPersistMusicModalDelete}
         onPersistTextModalCreate={onPersistTextModalCreate}
-        onPersistTextModalMove={onPersistTextModalMove}
+        onPersistTextModalMove={handleTextModalMove}
         onPersistTextModalDelete={onPersistTextModalDelete}
         // Canvas Text
         canvasTextStates={effectiveCanvasTextStates}
@@ -5848,33 +7307,30 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistCanvasTextDelete={onPersistCanvasTextDelete}
         // Connection & Menu props
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
-        onPersistUpscaleModalMove={onPersistUpscaleModalMove}
+        onPersistUpscaleModalMove={handleUpscaleModalMove}
         onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
         onUpscale={onUpscale}
         onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
-        onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
+        onPersistRemoveBgModalMove={handleRemoveBgModalMove}
         onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
         onRemoveBg={onRemoveBg}
         onPersistEraseModalCreate={onPersistEraseModalCreate}
-        onPersistEraseModalMove={onPersistEraseModalMove}
+        onPersistEraseModalMove={handleEraseModalMove}
         onPersistEraseModalDelete={onPersistEraseModalDelete}
         onErase={onErase}
         onPersistExpandModalCreate={onPersistExpandModalCreate}
-        onPersistExpandModalMove={onPersistExpandModalMove}
+        onPersistExpandModalMove={handleExpandModalMove}
         onPersistExpandModalDelete={onPersistExpandModalDelete}
         onExpand={onExpand}
         onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
-        onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+        onPersistVectorizeModalMove={handleVectorizeModalMove}
         onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
         onVectorize={onVectorize}
         onPersistNextSceneModalCreate={handlePersistNextSceneModalCreate}
-        onPersistNextSceneModalMove={handlePersistNextSceneModalMove}
+        onPersistNextSceneModalMove={handleNextSceneModalMove}
         onPersistNextSceneModalDelete={handlePersistNextSceneModalDelete}
-        onPersistMultiangleModalCreate={onPersistMultiangleModalCreate}
-        onPersistMultiangleModalMove={onPersistMultiangleModalMove}
-        onPersistMultiangleModalDelete={onPersistMultiangleModalDelete}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
-        onPersistStoryboardModalMove={onPersistStoryboardModalMove}
+        onPersistStoryboardModalMove={handleStoryboardModalMove}
         onPersistStoryboardModalDelete={onPersistStoryboardModalDelete}
         onDeleteScriptFrame={handleDeleteScriptFrame}
         connections={connections}
@@ -5882,6 +7338,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
         onPluginSidebarOpen={onPluginSidebarOpen}
+        projectId={projectId}
         onGenerateStoryboard={handleGenerateStoryboard}
       />
       {/* Action Icons for Uploaded Media */}
@@ -5945,7 +7402,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             setContextMenuModalType(null);
           }
         }}
-        onDownload={() => {
+        onDownload={async () => {
           // Handle download for actual images/videos
           if (contextMenuImageIndex !== null && onImageDownload) {
             onImageDownload(contextMenuImageIndex);
@@ -5965,17 +7422,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
 
             if (urlToDownload) {
-              // Download the file
-              const link = document.createElement('a');
-              link.href = urlToDownload;
-              link.download = contextMenuModalType === 'image'
-                ? `image-${Date.now()}.png`
-                : contextMenuModalType === 'video'
-                  ? `video-${Date.now()}.mp4`
-                  : `music-${Date.now()}.mp3`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              try {
+                // Download the file using proper download utilities
+                const { downloadFile, generateDownloadFilename } = await import('@/lib/downloadUtils');
+                const extension = contextMenuModalType === 'image' ? 'png' : contextMenuModalType === 'video' ? 'mp4' : 'mp3';
+                const prefix = contextMenuModalType === 'image' ? 'image' : contextMenuModalType === 'video' ? 'video' : 'music';
+                const filename = generateDownloadFilename(prefix, contextMenuModalId || 'unknown', extension);
+                await downloadFile(urlToDownload, filename);
+              } catch (error) {
+                console.error('Failed to download:', error);
+                alert('Failed to download. Please try again.');
+              }
             }
           }
         }}
@@ -6051,6 +7508,53 @@ export const Canvas: React.FC<CanvasProps> = ({
         scale={scale}
       />
 
+      {/* Floating Text Formatting Toolbar */}
+      {effectiveSelectedCanvasTextId && !isTextInteracting && (
+        (() => {
+          const selectedText = effectiveCanvasTextStates.find(t => t.id === effectiveSelectedCanvasTextId);
+          if (!selectedText) return null;
+
+          // Calculate screen position
+          // Canvas coordinates -> Screen coordinates
+          const screenX = (selectedText.x + position.x) * scale;
+          const screenY = (selectedText.y + position.y) * scale;
+
+          // Adjust for width/height to center or place above
+          // We passed position to toolbar, which expects screen coords relative to container
+          // But container is relative. Let's assume container is top-left 0,0 for now or use absolute positioning
+          // The toolbar uses absolute position inside the container.
+
+          // Actually, we need to consider the containerRef offset if necessary, 
+          // but since it's absolute inside the relative container, straightforward calculation should work.
+          // Wait, the containerRef has the stage.
+          // Let's place it inside the Main Container Div which is the parent of Stage.
+
+          return (
+            <TextFormattingToolbar
+              selectedTextState={selectedText}
+              onChange={(id, updates) => {
+                effectiveSetCanvasTextStates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+                // Update persisted state on move is handled by onDragEnd inside the node, 
+                // BUT we also need to trigger persistence on transform end.
+                // CanvasTextNode calls onChange for both transform and drag end.
+                // We should debounce or check if we need to persist here?
+                // The node calls onChange with final values.
+                // We should probably call the persistence callback here if it's a move/transform end?
+                // Actually, CanvasTextNode calls onChange frequently? 
+                // No, it calls onChange on dragEnd and transformEnd.
+
+                if (onPersistCanvasTextMove) {
+                  onPersistCanvasTextMove(id, updates);
+                }
+              }}
+              position={{
+                x: selectedText.x * scale + position.x + (selectedText.width || 0) * scale / 2, // Center horizontal
+                y: selectedText.y * scale + position.y // Top of the text
+              }}
+            />
+          );
+        })()
+      )}
     </div>
   );
 };

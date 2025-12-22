@@ -20,6 +20,8 @@ interface TextModalControlsProps {
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsModelHovered: (hovered: boolean) => void;
   onEnhance: () => void;
+  onSendPrompt?: () => void;
+  hasConnectedComponents?: boolean;
 }
 
 export const TextModalControls: React.FC<TextModalControlsProps> = ({
@@ -40,6 +42,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   onSetIsModelDropdownOpen,
   onSetIsModelHovered,
   onEnhance,
+  onSendPrompt,
+  hasConnectedComponents = false,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -75,6 +79,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         left: `${-2 * scale}px`,
         width: `${400 * scale}px`,
         padding: `${12 * scale}px`,
+        paddingTop: `${16 * scale}px`,
+        paddingBottom: `${16 * scale}px`,
         backgroundColor: controlsBg,
         
         border: 'none',
@@ -264,6 +270,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
             </svg>
           )}
         </button>
+
+
         {enhanceStatus && (
           <span
             style={{

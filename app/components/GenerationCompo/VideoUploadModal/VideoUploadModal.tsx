@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/app/components/common/canvasCaptureGuard';
 import { VideoModalTooltip } from './VideoModalTooltip';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
@@ -58,7 +58,7 @@ interface VideoUploadModalProps {
   onAddToCanvas?: (url: string) => void;
   isSelected?: boolean;
   initialModel?: string;
-  initialFrame?: string;
+  initialFrame?: string; 
   initialAspectRatio?: string;
   initialPrompt?: string;
   initialDuration?: number;
@@ -67,7 +67,7 @@ interface VideoUploadModalProps {
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: ImageUpload[];
-  textInputStates?: Array<{ id: string; value?: string }>;
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -143,11 +143,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     return textInput || null;
   }, [id, connections, textInputStates]);
 
-  // Use connected text as prompt if connected, otherwise use local prompt state
-  const effectivePrompt = connectedTextInput?.value || prompt;
-
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
+  const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
   const onOptionsChangeRef = useRef(onOptionsChange);
   
   // Update ref when onOptionsChange changes
@@ -155,28 +153,37 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when connected text changes (only when value actually changes)
+  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
   useEffect(() => {
-    const currentValue = connectedTextInput?.value;
-    // Only update if the value actually changed
-    if (currentValue !== undefined && currentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentValue;
-      setPrompt(currentValue);
-      // Only call onOptionsChange if the prompt value actually changed
-      if (onOptionsChangeRef.current && currentValue !== prompt) {
-        onOptionsChangeRef.current({ prompt: currentValue });
+    const currentSentValue = connectedTextInput?.sentValue;
+    // Only update if the sentValue actually changed
+    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
+      prevConnectedTextValueRef.current = currentSentValue;
+      lastReceivedSentValueRef.current = currentSentValue;
+      // Always update the prompt, replacing any existing value
+      setPrompt(currentSentValue);
+      // Always call onOptionsChange to persist the change
+      if (onOptionsChangeRef.current) {
+        onOptionsChangeRef.current({ prompt: currentSentValue });
       }
-    } else if (currentValue === undefined) {
-      // Reset ref when disconnected
+    } else if (currentSentValue === undefined && connectedTextInput === null) {
+      // Reset refs when disconnected
       prevConnectedTextValueRef.current = undefined;
+      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.value, prompt]); // Only depend on the actual value, not all the other options
+  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+
+  // Use local prompt for display - user can edit independently after receiving sentValue
+  // sentValue is only used to initially populate the prompt when arrow is clicked
+  const effectivePrompt = prompt;
 
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
     const [width, height] = ratio.split(':').map(Number);
     return `${width} / ${height}`;
   };
+
+
 
   const isDark = useIsDarkTheme();
 
@@ -348,17 +355,35 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedVideoModalIds } = ce.detail || {};
+      // Check if this modal is selected
+      if (selectedVideoModalIds && Array.isArray(selectedVideoModalIds) && selectedVideoModalIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
   useEffect(() => { if (initialModel && initialModel !== selectedModel) setSelectedModel(initialModel); }, [initialModel]);
   useEffect(() => { if (initialFrame && initialFrame !== selectedFrame) setSelectedFrame(initialFrame); }, [initialFrame]);
   useEffect(() => { if (initialAspectRatio && initialAspectRatio !== selectedAspectRatio) setSelectedAspectRatio(initialAspectRatio); }, [initialAspectRatio]);
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
 
-  // Load video and get its resolution
+  // Load video and get its resolution (works for both generated and uploaded videos)
   useEffect(() => {
     if (generatedVideoUrl) {
       const video = document.createElement('video');
+      video.crossOrigin = 'anonymous'; // Allow CORS for external videos
+      video.preload = 'metadata'; // Only load metadata, not the full video
       video.onloadedmetadata = () => {
-        setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+        }
       };
       video.onerror = () => {
         setVideoResolution(null);
@@ -466,10 +491,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       }
     };
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation (e.g. connection nodes) can't block drag end
+    window.addEventListener('mouseup', handleMouseUp, true);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
       if (rafId != null) cancelAnimationFrame(rafId);
     };
   }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
@@ -508,6 +534,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         onDelete={onDelete}
         onDownload={onDownload}
         onDuplicate={onDuplicate}
+        isPinned={isPinned}
+        onTogglePin={!isUploadedVideo ? () => setIsPinned(!isPinned) : undefined}
       />
 
       <div style={{ position: 'relative' }}>
@@ -526,7 +554,6 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           frameBorderWidth={frameBorderWidth}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          onSetIsPinned={setIsPinned}
         />
 
         <VideoModalNodes
@@ -545,7 +572,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isUploadedVideo={!!isUploadedVideo}
         isSelected={Boolean(isSelected)}
         prompt={effectivePrompt}
-        isPromptDisabled={!!connectedTextInput}
+        isPromptDisabled={false}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}

@@ -59,7 +59,7 @@ export const BackgroundTypeDropdown: React.FC<BackgroundTypeDropdownProps> = ({
         width: '100%',
         minWidth: 0,
         maxWidth: '100%',
-        zIndex: 10002,
+        zIndex: 3000,
         overflow: 'visible',
       }}
     >
@@ -99,7 +99,7 @@ export const BackgroundTypeDropdown: React.FC<BackgroundTypeDropdownProps> = ({
             border: `1px solid ${dropdownBorderColor}`,
             borderRadius: `${8 * scale}px`,
             boxShadow: isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.15)`,
-            zIndex: 10001,
+            zIndex: 3001,
             maxHeight: `${300 * scale}px`,
             overflowY: 'auto',
             display: 'flex',

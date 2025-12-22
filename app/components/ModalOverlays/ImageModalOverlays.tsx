@@ -8,6 +8,46 @@ import { downloadImage, generateDownloadFilename } from '@/lib/downloadUtils';
 import { ImageUpload } from '@/types/canvas';
 import { getReferenceImagesForText } from '@/app/components/Plugins/StoryboardPluginModal/mentionUtils';
 
+/**
+ * Calculate aspect ratio string (e.g., "9:16") from width and height
+ */
+function calculateAspectRatioFromDimensions(width?: number, height?: number): string {
+  if (!width || !height || width <= 0 || height <= 0) return '1:1';
+  
+  const ratio = width / height;
+  const tolerance = 0.01;
+  
+  const commonRatios: Array<{ ratio: number; label: string }> = [
+    { ratio: 1.0, label: '1:1' },
+    { ratio: 4 / 3, label: '4:3' },
+    { ratio: 3 / 4, label: '3:4' },
+    { ratio: 16 / 9, label: '16:9' },
+    { ratio: 9 / 16, label: '9:16' },
+    { ratio: 3 / 2, label: '3:2' },
+    { ratio: 2 / 3, label: '2:3' },
+    { ratio: 21 / 9, label: '21:9' },
+    { ratio: 9 / 21, label: '9:21' },
+    { ratio: 16 / 10, label: '16:10' },
+    { ratio: 10 / 16, label: '10:16' },
+    { ratio: 5 / 4, label: '5:4' },
+    { ratio: 4 / 5, label: '4:5' },
+  ];
+  
+  for (const common of commonRatios) {
+    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
+      return common.label;
+    }
+  }
+  
+  // Calculate GCD for custom ratios
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const divisor = gcd(width, height);
+  const w = width / divisor;
+  const h = height / divisor;
+  if (w <= 100 && h <= 100) return `${w}:${h}`;
+  return `${Math.round(ratio * 100) / 100}:1`;
+}
+
 interface ImageModalOverlaysProps {
   imageModalStates: ImageModalState[];
   selectedImageModalId: string | null;
@@ -457,27 +497,32 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                       : [];
 
                   // CRITICAL: Update the TARGET frame (which may be a new frame), not the current frame
+                  // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
+                  // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
+                  const [w, h] = aspectRatio.split(':').map(Number);
+                  const frameWidth = 600;
+                  const ar = w && h ? (w / h) : 1;
+                  const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
+                  const frameHeight = Math.max(400, rawHeight);
+                  
                   setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
                     ...m,
                     generatedImageUrl: imageUrls[0] || null,
                     generatedImageUrls: imageUrls,
                     isGenerating: false,
+                    aspectRatio, // Preserve aspect ratio
+                    frameWidth, // Update frame dimensions based on aspect ratio
+                    frameHeight, // Update frame dimensions based on aspect ratio
                   } : m));
                   if (onPersistImageModalMove) {
-                    // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
-                    const [w, h] = aspectRatio.split(':').map(Number);
-                    const frameWidth = 600;
-                    const ar = w && h ? (w / h) : 1;
-                    const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
-                    const frameHeight = Math.max(400, rawHeight);
                     Promise.resolve(onPersistImageModalMove(targetFrameId, {
                       generatedImageUrl: imageUrls[0] || null,
                       generatedImageUrls: imageUrls,
                       model,
                       frame,
-                      aspectRatio,
-                      frameWidth,
-                      frameHeight,
+                      aspectRatio, // Preserve aspect ratio
+                      frameWidth, // Use calculated dimensions based on aspect ratio
+                      frameHeight, // Use calculated dimensions based on aspect ratio
                       prompt,
                       isGenerating: false,
                     } as any)).catch(console.error);
@@ -498,7 +543,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           isGenerating={modalState.isGenerating}
           initialModel={modalState.model}
           initialFrame={modalState.frame}
-          initialAspectRatio={modalState.aspectRatio}
+          initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}
           initialPrompt={modalState.prompt}
           frameWidth={modalState.frameWidth}
           frameHeight={modalState.frameHeight}

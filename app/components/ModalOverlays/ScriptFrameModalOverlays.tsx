@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { ScriptFrame } from '@/app/components/Plugins/StoryboardPluginModal/ScriptFrame';
-import { ConnectionNodes } from '@/app/components/Plugins/UpscalePluginModal/ConnectionNodes';
+import { PluginConnectionNodes } from '@/app/components/Plugins/PluginComponents';
 import { ModalActionIcons } from '@/app/components/common/ModalActionIcons';
 
 interface ScriptFrameModalState {
@@ -198,11 +198,12 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so stopPropagation can't block drag end
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit, frame.id, frame.x, frame.y]);
 
@@ -269,7 +270,7 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
           transition: 'box-shadow 0.2s ease, border 0.2s ease',
         }}
       >
-        <ConnectionNodes
+        <PluginConnectionNodes
           id={frame.id}
           scale={scale}
           isHovered={isHovered}

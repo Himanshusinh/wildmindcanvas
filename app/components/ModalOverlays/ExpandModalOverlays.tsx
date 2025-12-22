@@ -56,6 +56,7 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
         <ExpandPluginModal
           key={modalState.id}
           isOpen={true}
+          isExpanded={modalState.isExpanded}
           id={modalState.id}
           onClose={() => {
             setExpandModalStates(prev => prev.filter(m => m.id !== modalState.id));
@@ -83,13 +84,27 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
             setSelectedExpandModalIds([modalState.id]);
           }}
           onDelete={() => {
+            console.log('[ExpandModalOverlays] onDelete called', {
+              timestamp: Date.now(),
+              modalId: modalState.id,
+            });
+            // Clear selection immediately
             setSelectedExpandModalId(null);
+            setSelectedExpandModalIds([]);
+            // Call persist delete - it updates parent state (expandGenerators) which flows down as externalExpandModals
+            // Canvas will sync expandModalStates with externalExpandModals via useEffect
             if (onPersistExpandModalDelete) {
+              console.log('[ExpandModalOverlays] Calling onPersistExpandModalDelete', modalState.id);
+              // Call synchronously - the handler updates parent state immediately
               const result = onPersistExpandModalDelete(modalState.id);
-              if (result && typeof (result as any).then === 'function') {
-                Promise.resolve(result).catch((err) => console.error('[ExpandModalOverlays] delete failed', err));
+              // If it returns a promise, handle it
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch((err) => {
+                  console.error('[ModalOverlays] Error in onPersistExpandModalDelete', err);
+                });
               }
             }
+            // DO NOT update local state here - let parent state flow down through props
           }}
           onDuplicate={() => {
             const duplicated = {
@@ -109,6 +124,12 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
           images={images}
           onPersistConnectorCreate={onPersistConnectorCreate}
           onExpand={onExpand}
+          onUpdateModalState={(modalId, updates) => {
+            setExpandModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+            if (onPersistExpandModalMove) {
+              Promise.resolve(onPersistExpandModalMove(modalId, updates)).catch(console.error);
+            }
+          }}
           onPersistImageModalCreate={onPersistImageModalCreate}
           onUpdateImageModalState={(modalId, updates) => {
             console.log('[ExpandModalOverlays] onUpdateImageModalState called:', {

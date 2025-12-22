@@ -6,11 +6,15 @@ import { UpscaleLabel } from './UpscaleLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { UpscaleControls } from './UpscaleControls';
 import { UpscaleImageFrame } from './UpscaleImageFrame';
-import { ConnectionNodes } from './ConnectionNodes';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
+import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscalePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
@@ -34,16 +38,18 @@ interface UpscalePluginModalProps {
   initialLocalUpscaledImageUrl?: string | null;
   onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean }) => void;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
+  images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
 }
 
 export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onUpscale,
@@ -72,29 +78,21 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   onUpdateImageModalState,
   connections = [],
   imageModalStates = [],
+  images = [],
   onPersistConnectorCreate,
 }) => {
-  const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Crystal Upscaler');
   const [scaleValue, setScaleValue] = useState<number>(initialScale ?? 2);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
-  const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const { isDimmed, setIsDimmed } = useCanvasFrameDim(id);
+  const { isPopupOpen, setIsPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
-  const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
-  const onOptionsChangeRef = useRef(onOptionsChange);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const hasDraggedRef = useRef(false);
 
-  // Update ref when callback changes
-  useEffect(() => {
-    onOptionsChangeRef.current = onOptionsChange;
-  }, [onOptionsChange]);
+  const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
+  const onOptionsChangeRef = useLatestRef(onOptionsChange);
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -113,14 +111,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   // Only result frames (with model 'Upscale') should be media-like
   const isUpscaledImage = selectedModel === 'Upscale' || initialModel === 'Upscale';
 
-  // Detect connected image nodes
-  const connectedImageSource = useMemo(() => {
-    if (!id || !imageModalStates) return null;
-    const conn = connections.find(c => c.to === id && c.from);
-    if (!conn) return null;
-    const sourceModal = imageModalStates.find(m => m.id === conn.from);
-    return sourceModal?.generatedImageUrl || null;
-  }, [id, connections, imageModalStates]);
+  const connectedImageSource = useConnectedSourceImage({ id, connections, imageModalStates, images });
 
   // Restore images from props on mount or when props change
   useEffect(() => {
@@ -133,17 +124,33 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   }, [initialSourceImageUrl, initialLocalUpscaledImageUrl]);
 
   useEffect(() => {
-    if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
-      setSourceImageUrl(connectedImageSource);
-      // Clear dimming when image is connected
-      setIsDimmed(false);
-      // Reset upscaled image when source changes (only if not persisted)
-      if (!initialLocalUpscaledImageUrl) {
-        setLocalUpscaledImageUrl(null);
+    // Handle connection changes: update or clear source image
+    if (connectedImageSource) {
+      // Connection exists: update source image if different
+      if (connectedImageSource !== sourceImageUrl) {
+        setSourceImageUrl(connectedImageSource);
+        // Clear dimming when image is connected
+        setIsDimmed(false);
+        // Reset upscaled image when source changes (only if not persisted)
+        if (!initialLocalUpscaledImageUrl) {
+          setLocalUpscaledImageUrl(null);
+        }
+        // Persist the source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+        }
       }
-      // Persist the source image URL (only if it actually changed from initial)
-      if (onOptionsChangeRef.current && connectedImageSource !== initialSourceImageUrl) {
-        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+    } else {
+      // Connection deleted: clear source image if it was from a connection
+      // Only clear if current sourceImageUrl matches what was connected (or if no initialSourceImageUrl was set)
+      if (sourceImageUrl && (!initialSourceImageUrl || sourceImageUrl === initialSourceImageUrl)) {
+        setSourceImageUrl(null);
+        // Clear dimming
+        setIsDimmed(false);
+        // Clear persisted source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: null });
+        }
       }
     }
   }, [connectedImageSource, initialLocalUpscaledImageUrl, initialSourceImageUrl, sourceImageUrl]);
@@ -166,126 +173,18 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
     }
   }, [localUpscaledImageUrl, upscaledImageUrl]);
 
-  // Listen for dimming events
-  useEffect(() => {
-    const handleDim = (e: CustomEvent) => {
-      if (e.detail?.frameId === id) {
-        // Only dim if explicitly set to true, otherwise clear dimming
-        setIsDimmed(e.detail?.dimmed === true);
-      }
-    };
-    window.addEventListener('canvas-frame-dim' as any, handleDim);
-    return () => {
-      window.removeEventListener('canvas-frame-dim' as any, handleDim);
-    };
-  }, [id]);
-
-  // Handle mouse down to start dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-    const isButton = target.tagName === 'BUTTON' || target.closest('button');
-    const isImage = target.tagName === 'IMG';
-    const isControls = target.closest('.controls-overlay');
-    // Check if clicking on action icons (ModalActionIcons container or its children)
-    const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-
-    console.log('[UpscalePluginModal] handleMouseDown', {
-      timestamp: Date.now(),
-      target: target.tagName,
-      isInput,
-      isButton,
-      isImage,
-      isControls: !!isControls,
-      isActionIcons: !!isActionIcons,
-      buttonTitle: target.closest('button')?.getAttribute('title'),
-    });
-
-    // Call onSelect when clicking on the modal (this will trigger context menu)
-    // Don't select if clicking on buttons, controls, inputs, or action icons
-    if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
-      console.log('[UpscalePluginModal] Calling onSelect');
-      onSelect();
-    }
-
-    // Only allow dragging from the frame, not from controls
-    if (!isInput && !isButton && !isImage && !isControls) {
-      // Track initial mouse position to detect drag vs click
-      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-      hasDraggedRef.current = false;
-
-      setIsDraggingContainer(true);
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setDragOffset({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        });
-      }
-      // Initialize lastCanvasPosRef with current position
-      lastCanvasPosRef.current = { x, y };
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  };
-
-  // Handle drag
-  useEffect(() => {
-    if (!isDraggingContainer) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
-
-      // Check if mouse moved significantly (more than 5px) to detect drag
-      if (dragStartPosRef.current) {
-        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-        if (dx > 5 || dy > 5) {
-          hasDraggedRef.current = true;
-        }
-      }
-
-      // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
-
-      // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
-
-      onPositionChange(newCanvasX, newCanvasY);
-      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-    };
-
-    const handleMouseUp = () => {
-      const wasDragging = hasDraggedRef.current;
-      setIsDraggingContainer(false);
-      dragStartPosRef.current = null;
-
-      // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
-      }
-
-      if (onPositionCommit) {
-        // Use lastCanvasPosRef if available, otherwise use current x, y props
-        const finalX = lastCanvasPosRef.current?.x ?? x;
-        const finalY = lastCanvasPosRef.current?.y ?? y;
-        onPositionCommit(finalX, finalY);
-      }
-
-      // Reset drag flag
-      hasDraggedRef.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  const { isDragging: isDraggingContainer, onMouseDown: handleMouseDown } = useCanvasModalDrag({
+    enabled: isOpen,
+    x,
+    y,
+    scale,
+    position,
+    containerRef,
+    onPositionChange,
+    onPositionCommit,
+    onSelect,
+    onTap: () => togglePopup(),
+  });
 
 
   const handleUpscale = async () => {
@@ -448,22 +347,18 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-modal-component="upscale"
-      data-overlay-id={id}
+    <PluginNodeShell
+      modalKey="upscale"
+      id={id}
+      containerRef={containerRef}
+      screenX={screenX}
+      screenY={screenY}
+      isHovered={isHovered}
+      isSelected={Boolean(isSelected)}
+      isDimmed={isDimmed}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        position: 'absolute',
-        left: `${screenX}px`,
-        top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
-        userSelect: 'none',
-        opacity: isDimmed ? 0.4 : 1,
-        transition: 'opacity 0.2s ease',
-      }}
     >
       {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
       {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
@@ -541,7 +436,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}
@@ -614,7 +509,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         )}
       </div>
 
-    </div>
+    </PluginNodeShell>
   );
 };
 

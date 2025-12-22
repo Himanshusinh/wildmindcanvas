@@ -12,7 +12,7 @@ const ARRANGE_ANIMATION_DURATION = 420;
 const BUTTON_OVERFLOW_PADDING = 72;
 
 interface SelectedComponent {
-  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'musicModal' | 'upscaleModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'multiangleModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'videoEditorModal' | 'musicModal' | 'upscaleModal' | 'multiangleCameraModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'nextSceneModal' | 'compareModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
   id: number | string;
   key: string;
   width: number;
@@ -34,6 +34,7 @@ interface SelectionBoxProps {
   selectedImageIndices: number[];
   selectedImageModalIds: string[];
   selectedVideoModalIds: string[];
+  selectedVideoEditorModalIds: string[];
   selectedMusicModalIds: string[];
   selectedTextInputIds: string[];
   images: ImageUpload[];
@@ -44,6 +45,8 @@ interface SelectionBoxProps {
   setTextInputStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>>>;
   setImageModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
   setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
+  videoEditorModalStates: Array<{ id: string; x: number; y: number }>;
+  setVideoEditorModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number }>>>;
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
   textInputStates: Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>;
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
@@ -53,54 +56,66 @@ interface SelectionBoxProps {
   setSelectedTextInputIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedVideoEditorModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMusicModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
   selectedUpscaleModalIds: string[];
+  selectedMultiangleCameraModalIds: string[];
   selectedRemoveBgModalIds: string[];
   selectedEraseModalIds: string[];
   selectedExpandModalIds: string[];
   selectedVectorizeModalIds: string[];
-  selectedMultiangleModalIds: string[];
+  selectedNextSceneModalIds: string[];
+  selectedCompareModalIds: string[];
   selectedStoryboardModalIds: string[];
   selectedScriptFrameModalIds: string[];
   selectedSceneFrameModalIds: string[];
   upscaleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  multiangleCameraModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   removeBgModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   eraseModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   vectorizeModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  multiangleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  nextSceneModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  compareModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>;
   storyboardModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   scriptFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
   sceneFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
   setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setVectorizeModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setMultiangleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setNextSceneModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  setCompareModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>>>;
   setStoryboardModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setScriptFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
   setSceneFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
   setSelectedUpscaleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedMultiangleCameraModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVectorizeModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedMultiangleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedNextSceneModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedCompareModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedStoryboardModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedScriptFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedSceneFrameModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
-  onPersistMultiangleModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistCompareModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistSceneFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
@@ -114,6 +129,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   selectedImageIndices,
   selectedImageModalIds,
   selectedVideoModalIds,
+  selectedVideoEditorModalIds,
   selectedMusicModalIds,
   selectedTextInputIds,
   images,
@@ -124,6 +140,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setTextInputStates,
   setImageModalStates,
   setVideoModalStates,
+  videoEditorModalStates,
+  setVideoEditorModalStates,
   setMusicModalStates,
   textInputStates,
   imageModalStates,
@@ -133,49 +151,66 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSelectedTextInputIds,
   setSelectedImageModalIds,
   setSelectedVideoModalIds,
+  setSelectedVideoEditorModalIds,
   setSelectedMusicModalIds,
   onPersistImageModalMove,
   onPersistVideoModalMove,
+  onPersistVideoEditorModalMove,
   onPersistMusicModalMove,
   onPersistTextModalMove,
   onImageUpdate,
   selectedUpscaleModalIds,
+  selectedMultiangleCameraModalIds,
   selectedRemoveBgModalIds,
   selectedEraseModalIds,
   selectedExpandModalIds,
   selectedVectorizeModalIds,
+  selectedNextSceneModalIds = [],
+  selectedCompareModalIds = [],
   selectedStoryboardModalIds,
   selectedScriptFrameModalIds,
   selectedSceneFrameModalIds,
   upscaleModalStates,
+  multiangleCameraModalStates,
   removeBgModalStates,
   eraseModalStates,
   expandModalStates,
   vectorizeModalStates,
+  nextSceneModalStates = [],
+  compareModalStates = [],
   storyboardModalStates,
   scriptFrameModalStates,
   sceneFrameModalStates,
   setUpscaleModalStates,
+  setMultiangleCameraModalStates,
   setRemoveBgModalStates,
   setEraseModalStates,
   setExpandModalStates,
   setVectorizeModalStates,
+  setNextSceneModalStates,
+  setCompareModalStates,
   setStoryboardModalStates,
   setScriptFrameModalStates,
   setSceneFrameModalStates,
   setSelectedUpscaleModalIds,
+  setSelectedMultiangleCameraModalIds,
   setSelectedRemoveBgModalIds,
   setSelectedEraseModalIds,
   setSelectedExpandModalIds,
   setSelectedVectorizeModalIds,
+  setSelectedNextSceneModalIds,
+  setSelectedCompareModalIds,
   setSelectedStoryboardModalIds,
   setSelectedScriptFrameModalIds,
   setSelectedSceneFrameModalIds,
   onPersistUpscaleModalMove,
+  onPersistMultiangleCameraModalMove,
   onPersistRemoveBgModalMove,
   onPersistEraseModalMove,
   onPersistExpandModalMove,
   onPersistVectorizeModalMove,
+  onPersistNextSceneModalMove,
+  onPersistCompareModalMove,
   onPersistStoryboardModalMove,
   onPersistScriptFrameModalMove,
   onPersistSceneFrameModalMove,
@@ -186,12 +221,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     textInputs: Map<string, { x: number; y: number }>;
     imageModals: Map<string, { x: number; y: number }>;
     videoModals: Map<string, { x: number; y: number }>;
+    videoEditorModals: Map<string, { x: number; y: number }>;
     musicModals: Map<string, { x: number; y: number }>;
     upscaleModals: Map<string, { x: number; y: number }>;
+    multiangleCameraModals: Map<string, { x: number; y: number }>;
     removeBgModals: Map<string, { x: number; y: number }>;
     eraseModals: Map<string, { x: number; y: number }>;
     expandModals: Map<string, { x: number; y: number }>;
     vectorizeModals: Map<string, { x: number; y: number }>;
+    nextSceneModals: Map<string, { x: number; y: number }>;
+    compareModals: Map<string, { x: number; y: number }>;
     storyboardModals: Map<string, { x: number; y: number }>;
     scriptFrameModals: Map<string, { x: number; y: number }>;
     sceneFrameModals: Map<string, { x: number; y: number }>;
@@ -217,6 +256,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   }, []);
 
   // Calculate total number of selected items
+  // Note: selectedCanvasTextIds is not passed to this component, so it's not included in the count
+  // This is intentional as canvas text uses a different selection system
   const totalSelected = selectedImageIndices.length +
     selectedImageModalIds.length +
     selectedVideoModalIds.length +
@@ -350,6 +391,22 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       });
     });
 
+    selectedVideoEditorModalIds.forEach((id) => {
+      const modal = videoEditorModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
+      // Total bounding box: 100px width, 120px height (100px circle + label space)
+      components.push({
+        type: 'videoEditorModal',
+        id,
+        key: `videoEditorModal-${id}`,
+        width: 100,
+        height: 120,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
     selectedMusicModalIds.forEach((id) => {
       const modal = musicModalStates.find((m) => m.id === id);
       if (!modal) return;
@@ -373,6 +430,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         key: `upscaleModal-${id}`,
         width: modal.frameWidth || 600,
         height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedMultiangleCameraModalIds.forEach((id) => {
+      const modal = multiangleCameraModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'multiangleCameraModal',
+        id,
+        key: `multiangleCameraModal-${id}`,
+        width: 100,
+        height: 100,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -429,6 +500,37 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         key: `vectorizeModal-${id}`,
         width: modal.frameWidth || 600,
         height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedNextSceneModalIds.forEach((id) => {
+      const modal = nextSceneModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      components.push({
+        type: 'nextSceneModal',
+        id,
+        key: `nextSceneModal-${id}`,
+        width: modal.frameWidth || 600,
+        height: modal.frameHeight || 400,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedCompareModalIds.forEach((id) => {
+      const modal = compareModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      // Compare modal can be 100x100 when collapsed or 500x600 when expanded
+      const width = modal.isExpanded ? (modal.width || 500) : 100;
+      const height = modal.isExpanded ? (modal.height || 600) : 100;
+      components.push({
+        type: 'compareModal',
+        id,
+        key: `compareModal-${id}`,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -526,6 +628,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           break;
         case 'videoModal':
           videoModalUpdates.set(target.id as string, { x: currentX, y: currentY });
+          break;
+        case 'videoEditorModal':
+          // VideoEditor modals are handled in the drag handlers, not in arrange
           break;
         case 'musicModal':
           musicModalUpdates.set(target.id as string, { x: currentX, y: currentY });
@@ -947,7 +1052,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   // Show SelectionBox if:
   // 1. There's a selection rect AND it's a drag selection with 2+ components, OR
   // 2. There's a selection rect AND a group is selected (for group dragging and ungroup button)
-  if (selectionTightRect && isDragSelection && totalSelected >= 2) {
+  if (selectionTightRect) {
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
       <>
@@ -982,12 +1087,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               textInputs: new Map<string, { x: number; y: number }>(),
               imageModals: new Map<string, { x: number; y: number }>(),
               videoModals: new Map<string, { x: number; y: number }>(),
+              videoEditorModals: new Map<string, { x: number; y: number }>(),
               musicModals: new Map<string, { x: number; y: number }>(),
               upscaleModals: new Map<string, { x: number; y: number }>(),
+              multiangleCameraModals: new Map<string, { x: number; y: number }>(),
               removeBgModals: new Map<string, { x: number; y: number }>(),
               eraseModals: new Map<string, { x: number; y: number }>(),
               expandModals: new Map<string, { x: number; y: number }>(),
               vectorizeModals: new Map<string, { x: number; y: number }>(),
+              nextSceneModals: new Map<string, { x: number; y: number }>(),
+              compareModals: new Map<string, { x: number; y: number }>(),
               storyboardModals: new Map<string, { x: number; y: number }>(),
               scriptFrameModals: new Map<string, { x: number; y: number }>(),
               sceneFrameModals: new Map<string, { x: number; y: number }>(),
@@ -1025,6 +1134,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               }
             });
 
+            // Store original video editor modal positions
+            selectedVideoEditorModalIds.forEach(modalId => {
+              const modalState = videoEditorModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.videoEditorModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
             // Store original music modal positions
             selectedMusicModalIds.forEach(modalId => {
               const modalState = musicModalStates.find(m => m.id === modalId);
@@ -1038,6 +1155,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const modalState = upscaleModalStates.find(m => m.id === modalId);
               if (modalState) {
                 originalPositions.upscaleModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original multiangle camera modal positions
+            selectedMultiangleCameraModalIds.forEach(modalId => {
+              const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y });
               }
             });
 
@@ -1070,6 +1195,37 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const modalState = vectorizeModalStates.find(m => m.id === modalId);
               if (modalState) {
                 originalPositions.vectorizeModals.set(modalId, { x: modalState.x, y: modalState.y });
+              }
+            });
+
+            // Store original next scene modal positions
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1201',message:'onDragStart: NextScene/Compare check',data:{selectedNextSceneCount:selectedNextSceneModalIds.length,selectedCompareCount:selectedCompareModalIds.length,nextSceneStatesCount:nextSceneModalStates.length,compareStatesCount:compareModalStates.length,selectedNextSceneIds:selectedNextSceneModalIds,selectedCompareIds:selectedCompareModalIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            selectedNextSceneModalIds.forEach(modalId => {
+              const modalState = nextSceneModalStates.find(m => m.id === modalId);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1203',message:'onDragStart: Finding NextScene modal',data:{modalId,found:!!modalState,modalX:modalState?.x,modalY:modalState?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
+              if (modalState) {
+                originalPositions.nextSceneModals.set(modalId, { x: modalState.x, y: modalState.y });
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1205',message:'onDragStart: Stored NextScene original pos',data:{modalId,x:modalState.x,y:modalState.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
+              }
+            });
+
+            // Store original compare modal positions
+            selectedCompareModalIds.forEach(modalId => {
+              const modalState = compareModalStates.find(m => m.id === modalId);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1211',message:'onDragStart: Finding Compare modal',data:{modalId,found:!!modalState,modalX:modalState?.x,modalY:modalState?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              // #endregion
+              if (modalState) {
+                originalPositions.compareModals.set(modalId, { x: modalState.x, y: modalState.y });
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1213',message:'onDragStart: Stored Compare original pos',data:{modalId,x:modalState.x,y:modalState.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
               }
             });
 
@@ -1160,6 +1316,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               }
             });
 
+            // Move all selected video editor modals by delta in real-time (from original positions)
+            selectedVideoEditorModalIds.forEach(modalId => {
+              const originalPos = originalPositions.videoEditorModals.get(modalId);
+              if (originalPos) {
+                setVideoEditorModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
             // Move all selected music modals by delta in real-time (from original positions)
             selectedMusicModalIds.forEach(modalId => {
               const originalPos = originalPositions.musicModals.get(modalId);
@@ -1179,6 +1349,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               const originalPos = originalPositions.upscaleModals.get(modalId);
               if (originalPos) {
                 setUpscaleModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
+            // Move all selected multiangle camera modals by delta in real-time
+            selectedMultiangleCameraModalIds.forEach(modalId => {
+              const originalPos = originalPositions.multiangleCameraModals.get(modalId);
+              if (originalPos) {
+                setMultiangleCameraModalStates((prev) =>
                   prev.map((modalState) =>
                     modalState.id === modalId
                       ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
@@ -1241,6 +1425,53 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       : modalState
                   )
                 );
+              }
+            });
+
+            // Move all selected next scene modals by delta in real-time (from original positions)
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1417',message:'onDragMove: NextScene/Compare check',data:{selectedNextSceneCount:selectedNextSceneModalIds.length,selectedCompareCount:selectedCompareModalIds.length,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            selectedNextSceneModalIds.forEach(modalId => {
+              const originalPos = originalPositions.nextSceneModals.get(modalId);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1418',message:'onDragMove: Getting NextScene original pos',data:{modalId,hasOriginalPos:!!originalPos,originalX:originalPos?.x,originalY:originalPos?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              if (originalPos) {
+                const newX = originalPos.x + deltaX;
+                const newY = originalPos.y + deltaY;
+                setNextSceneModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: newX, y: newY }
+                      : modalState
+                  )
+                );
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1426',message:'onDragMove: Updated NextScene state',data:{modalId,newX,newY,originalX:originalPos.x,originalY:originalPos.y,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                // #endregion
+              }
+            });
+
+            // Move all selected compare modals by delta in real-time (from original positions)
+            selectedCompareModalIds.forEach(modalId => {
+              const originalPos = originalPositions.compareModals.get(modalId);
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1432',message:'onDragMove: Getting Compare original pos',data:{modalId,hasOriginalPos:!!originalPos,originalX:originalPos?.x,originalY:originalPos?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+              if (originalPos) {
+                const newX = originalPos.x + deltaX;
+                const newY = originalPos.y + deltaY;
+                setCompareModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: newX, y: newY }
+                      : modalState
+                  )
+                );
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1440',message:'onDragMove: Updated Compare state',data:{modalId,newX,newY,originalX:originalPos.x,originalY:originalPos.y,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                // #endregion
               }
             });
 
@@ -1341,6 +1572,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               });
             }
 
+            // Persist final positions for video editor modals
+            if (onPersistVideoEditorModalMove) {
+              selectedVideoEditorModalIds.forEach((modalId) => {
+                const modalState = videoEditorModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistVideoEditorModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+
             // Persist final positions for music generator modals
             if (onPersistMusicModalMove) {
               selectedMusicModalIds.forEach((modalId) => {
@@ -1356,6 +1597,15 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 const modalState = upscaleModalStates.find(m => m.id === modalId);
                 if (modalState) {
                   Promise.resolve(onPersistUpscaleModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for multiangle camera modals
+            if (onPersistMultiangleCameraModalMove) {
+              selectedMultiangleCameraModalIds.forEach((modalId) => {
+                const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistMultiangleCameraModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
                 }
               });
             }
@@ -1392,6 +1642,24 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 const modalState = vectorizeModalStates.find(m => m.id === modalId);
                 if (modalState) {
                   Promise.resolve(onPersistVectorizeModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for next scene modals
+            if (onPersistNextSceneModalMove) {
+              selectedNextSceneModalIds.forEach((modalId) => {
+                const modalState = nextSceneModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistNextSceneModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                }
+              });
+            }
+            // Persist final positions for compare modals
+            if (onPersistCompareModalMove) {
+              selectedCompareModalIds.forEach((modalId) => {
+                const modalState = compareModalStates.find(m => m.id === modalId);
+                if (modalState) {
+                  Promise.resolve(onPersistCompareModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
                 }
               });
             }
@@ -1518,10 +1786,10 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         y={Math.min(selectionBox.startY, selectionBox.currentY)}
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-        fill="rgba(147, 197, 253, 0.3)"
-        stroke="#60A5FA"
-        strokeWidth={4}
-        dash={[5, 5]}
+        fill="rgba(59, 130, 246, 0.2)"
+        stroke="#2563EB"
+        strokeWidth={2}
+        dash={[4, 4]}
         listening={false}
         globalCompositeOperation="source-over"
         cornerRadius={0}
@@ -1541,10 +1809,10 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           y={0}
           width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
           height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-          fill="rgba(147, 197, 253, 0.3)"
-          stroke="#60A5FA"
-          strokeWidth={4}
-          dash={[5, 5]}
+          fill="rgba(59, 130, 246, 0.2)"
+          stroke="#2563EB"
+          strokeWidth={2}
+          dash={[4, 4]}
           listening={false}
           globalCompositeOperation="source-over"
           cornerRadius={0}

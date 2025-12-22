@@ -7,6 +7,46 @@ import Konva from 'konva';
 import { VideoModalState, Connection, ImageModalState, TextModalState } from './types';
 import { ImageUpload } from '@/types/canvas';
 
+/**
+ * Calculate aspect ratio string (e.g., "9:16") from width and height
+ */
+function calculateAspectRatioFromDimensions(width?: number, height?: number): string {
+  if (!width || !height || width <= 0 || height <= 0) return '16:9';
+  
+  const ratio = width / height;
+  const tolerance = 0.01;
+  
+  const commonRatios: Array<{ ratio: number; label: string }> = [
+    { ratio: 1.0, label: '1:1' },
+    { ratio: 4 / 3, label: '4:3' },
+    { ratio: 3 / 4, label: '3:4' },
+    { ratio: 16 / 9, label: '16:9' },
+    { ratio: 9 / 16, label: '9:16' },
+    { ratio: 3 / 2, label: '3:2' },
+    { ratio: 2 / 3, label: '2:3' },
+    { ratio: 21 / 9, label: '21:9' },
+    { ratio: 9 / 21, label: '9:21' },
+    { ratio: 16 / 10, label: '16:10' },
+    { ratio: 10 / 16, label: '10:16' },
+    { ratio: 5 / 4, label: '5:4' },
+    { ratio: 4 / 5, label: '4:5' },
+  ];
+  
+  for (const common of commonRatios) {
+    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
+      return common.label;
+    }
+  }
+  
+  // Calculate GCD for custom ratios
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const divisor = gcd(width, height);
+  const w = width / divisor;
+  const h = height / divisor;
+  if (w <= 100 && h <= 100) return `${w}:${h}`;
+  return `${Math.round(ratio * 100) / 100}:1`;
+}
+
 interface VideoModalOverlaysProps {
   videoModalStates: VideoModalState[];
   selectedVideoModalId: string | null;
@@ -223,7 +263,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           generatedVideoUrl={modalState.generatedVideoUrl}
           initialModel={modalState.model}
           initialFrame={modalState.frame}
-          initialAspectRatio={modalState.aspectRatio}
+          initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}
           initialDuration={modalState.duration || 5}
           initialResolution={modalState.resolution}
           initialPrompt={modalState.prompt}
@@ -267,29 +307,9 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           onDownload={async () => {
             // Download the generated video if available
             if (modalState.generatedVideoUrl) {
-              try {
-                // Fetch the video to handle CORS issues
-                const response = await fetch(modalState.generatedVideoUrl);
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `generated-video-${modalState.id}-${Date.now()}.mp4`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-              } catch (error) {
-                console.error('Failed to download video:', error);
-                // Fallback: try direct download
-                const link = document.createElement('a');
-                link.href = modalState.generatedVideoUrl!;
-                link.download = `generated-video-${modalState.id}-${Date.now()}.mp4`;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }
+              const { downloadVideo, generateDownloadFilename } = await import('@/lib/downloadUtils');
+              const filename = generateDownloadFilename('generated-video', modalState.id, 'mp4');
+              await downloadVideo(modalState.generatedVideoUrl, filename);
             }
           }}
           onDuplicate={() => {

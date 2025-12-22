@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface RemoveBgImageFrameProps {
@@ -108,7 +108,7 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
         </div>
       )}
 
-      <ConnectionNodes
+      <PluginConnectionNodes
         id={id}
         scale={scale}
         isHovered={isHovered}

@@ -83,9 +83,6 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
   const controlsBg = isDark ? '#121212' : '#ffffff';
-  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
-  const pinBorder = isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)');
-  const pinIconColor = isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563');
   const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
   const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
   const dropdownBg = isDark ? '#121212' : '#ffffff';
@@ -121,57 +118,6 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
 
   return (
     <>
-      {/* Pin Icon Button - Bottom Right (only for generated images, not uploaded) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onSetIsPinned(!isPinned);
-        }}
-        style={{
-          position: 'absolute',
-          bottom: `${8 * scale}px`,
-          right: `${8 * scale}px`,
-          width: `${28 * scale}px`,
-          height: `${28 * scale}px`,
-          borderRadius: `${6 * scale}px`,
-          backgroundColor: pinBg,
-          border: `1px solid ${pinBorder}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 20,
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
-          pointerEvents: 'auto',
-          boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-        }}
-        onMouseEnter={(e) => {
-          if (!isPinned) {
-            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isPinned) {
-            e.currentTarget.style.backgroundColor = pinBg;
-          }
-        }}
-        title={isPinned ? 'Unpin controls' : 'Pin controls'}
-      >
-        <svg
-          width={16 * scale}
-          height={16 * scale}
-          viewBox="0 0 24 24"
-          fill={isPinned ? '#437eb5' : 'none'}
-          stroke={pinIconColor}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-        </svg>
-      </button>
-
       {/* Controls - Behind Frame, Slides Out on Hover */}
       <div
         className="controls-overlay"
@@ -214,7 +160,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 onGenerate();
               }
             }}
-            placeholder={isPromptDisabled ? "Connected to text input..." : "Enter prompt here..."}
+            placeholder="Enter prompt here..."
             disabled={isPromptDisabled}
             style={{
               flex: 1,
@@ -521,7 +467,9 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                   transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
                 }}
               >
-                <span>{selectedResolution}</span>
+                <span>
+                  {availableResolutions.find(r => r.value === selectedResolution)?.label || selectedResolution}
+                </span>
                 <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isResolutionDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -552,7 +500,10 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                       key={resolution.value}
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
+                        // Change resolution immediately
                         onResolutionChange(resolution.value);
+                        // Close dropdown after state update
                         onSetIsResolutionDropdownOpen(false);
                       }}
                       style={{

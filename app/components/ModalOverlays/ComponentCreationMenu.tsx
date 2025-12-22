@@ -17,6 +17,8 @@ interface ComponentCreationMenuProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setUpscaleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }) => void | Promise<void>;
+  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
@@ -27,8 +29,6 @@ interface ComponentCreationMenuProps {
   setVectorizeModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
   setNextSceneModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
-  onPersistMultiangleModalCreate?: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
-  setMultiangleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   setStoryboardModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
@@ -47,6 +47,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   onPersistMusicModalCreate,
   onPersistUpscaleModalCreate,
   setUpscaleModalStates,
+  onPersistMultiangleCameraModalCreate,
+  setMultiangleCameraModalStates,
   onPersistRemoveBgModalCreate,
   setRemoveBgModalStates,
   onPersistEraseModalCreate,
@@ -57,8 +59,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   setVectorizeModalStates,
   onPersistNextSceneModalCreate,
   setNextSceneModalStates,
-  onPersistMultiangleModalCreate,
-  setMultiangleModalStates,
   onPersistStoryboardModalCreate,
   setStoryboardModalStates,
   onPersistConnectorCreate,
@@ -106,12 +106,12 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
     { id: 'video', label: 'Video Generation', type: 'video' },
     { id: 'music', label: 'Music Generation', type: 'music' },
     { id: 'upscale-plugin', label: 'Upscale Plugin', type: 'plugin' },
+    { id: 'multiangle-camera-plugin', label: 'Multiangle Camera Plugin', type: 'plugin' },
     { id: 'removebg-plugin', label: 'Remove BG Plugin', type: 'plugin' },
     { id: 'erase-plugin', label: 'Erase Plugin', type: 'plugin' },
     { id: 'expand-plugin', label: 'Expand Plugin', type: 'plugin' },
     { id: 'vectorize-plugin', label: 'Vectorize Plugin', type: 'plugin' },
     { id: 'next-scene-plugin', label: 'Next Scene Plugin', type: 'plugin' },
-    { id: 'multiangle-plugin', label: 'Multiangle Plugin', type: 'plugin' },
     { id: 'storyboard-plugin', label: 'Storyboard Plugin', type: 'plugin' },
   ];
 
@@ -131,7 +131,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
         return ['image', 'video', 'music', 'storyboard-plugin'];
 
       case 'image':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin', 'storyboard-plugin'];
+        return ['image', 'video', 'upscale-plugin', 'multiangle-camera-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin', 'storyboard-plugin'];
 
       case 'video':
       case 'music':
@@ -143,7 +143,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
       case 'expand':
       case 'vectorize':
       case 'nextscene':
-        return ['image', 'video', 'upscale-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin'];
+      case 'multiangle-camera':
+        return ['image', 'video', 'upscale-plugin', 'multiangle-camera-plugin', 'removebg-plugin', 'erase-plugin', 'expand-plugin', 'vectorize-plugin', 'next-scene-plugin'];
 
       default:
         return null;
@@ -327,6 +328,18 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setUpscaleModalStates(prev => [...prev, newUpscale]);
                 Promise.resolve(onPersistUpscaleModalCreate(newUpscale)).catch(console.error);
+              } else if (comp.id === 'multiangle-camera-plugin' && comp.type === 'plugin' && onPersistMultiangleCameraModalCreate && setMultiangleCameraModalStates) {
+                // Create multiangle camera plugin modal
+                newComponentId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const newMultiangleCamera = {
+                  id: newComponentId,
+                  x: canvasX,
+                  y: canvasY,
+                  sourceImageUrl: null,
+                  isExpanded: false,
+                };
+                setMultiangleCameraModalStates(prev => [...prev, newMultiangleCamera]);
+                Promise.resolve(onPersistMultiangleCameraModalCreate(newMultiangleCamera)).catch(console.error);
               } else if (comp.id === 'removebg-plugin' && comp.type === 'plugin' && onPersistRemoveBgModalCreate && setRemoveBgModalStates) {
                 // Create remove bg plugin modal
                 newComponentId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -411,21 +424,6 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 };
                 setNextSceneModalStates(prev => [...prev, newNextScene]);
                 Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
-              } else if (comp.id === 'multiangle-plugin' && comp.type === 'plugin' && onPersistMultiangleModalCreate && setMultiangleModalStates) {
-                newComponentId = `multiangle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const newMultiangle = {
-                  id: newComponentId,
-                  x: canvasX,
-                  y: canvasY,
-                  multiangleImageUrl: null,
-                  sourceImageUrl: null,
-                  localMultiangleImageUrl: null,
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isProcessing: false,
-                };
-                setMultiangleModalStates(prev => [...prev, newMultiangle]);
-                Promise.resolve(onPersistMultiangleModalCreate(newMultiangle)).catch(console.error);
               } else if (comp.id === 'storyboard-plugin' && comp.type === 'plugin' && onPersistStoryboardModalCreate && setStoryboardModalStates) {
                 newComponentId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 const newStoryboard = {

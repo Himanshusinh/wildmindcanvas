@@ -1,8 +1,10 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'multiangle' | 'next-scene-plugin';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'multiangle-camera' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'next-scene-plugin' | 'compare';
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   generatedImageUrl?: string | null;
   generatedVideoUrl?: string | null;
   generatedMusicUrl?: string | null;
@@ -12,7 +14,6 @@ export type GeneratorOverlay = {
   replacedImageUrl?: string | null;
   expandedImageUrl?: string | null;
   vectorizedImageUrl?: string | null;
-  multiangleImageUrl?: string | null;
   sourceImageUrl?: string | null;
   localUpscaledImageUrl?: string | null;
   localRemovedBgImageUrl?: string | null;
@@ -20,7 +21,6 @@ export type GeneratorOverlay = {
   localReplacedImageUrl?: string | null;
   localExpandedImageUrl?: string | null;
   localVectorizedImageUrl?: string | null;
-  localMultiangleImageUrl?: string | null;
   nextSceneImageUrl?: string | null;
   localNextSceneImageUrl?: string | null;
   mode?: string;

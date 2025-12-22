@@ -143,46 +143,22 @@ export function createImageHandlers(
     if (!imageData?.url) return;
 
     try {
-      let downloadUrl: string;
+      const { downloadFile, generateDownloadFilename } = await import('@/lib/downloadUtils');
+      
+      // Determine file extension based on type
+      const extension = imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png';
+      const prefix = imageData.type === 'video' ? 'video' : imageData.type === 'model3d' ? 'model' : 'image';
+      
+      // Generate filename
       let filename: string;
-
-      if (imageData.url.startsWith('blob:')) {
-        // For blob URLs, download directly (local files)
-        const response = await fetch(imageData.url);
-        const blob = await response.blob();
-        filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : imageData.type === 'model3d' ? 'gltf' : 'png'}`;
-
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        return;
+      if (imageData.file?.name) {
+        filename = imageData.file.name;
       } else {
-        // Use proxy download endpoint for Zata URLs and external URLs
-        const { buildProxyDownloadUrl } = await import('@/lib/proxyUtils');
-        downloadUrl = buildProxyDownloadUrl(imageData.url);
-
-        // Extract filename from URL or use default
-        try {
-          const urlObj = new URL(imageData.url);
-          filename = urlObj.pathname.split('/').pop() || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        } catch {
-          filename = imageData.file?.name || `image-${Date.now()}.${imageData.type === 'video' ? 'mp4' : 'png'}`;
-        }
+        filename = generateDownloadFilename(prefix, `image-${index}`, extension);
       }
 
-      // Create download link using proxy
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filename;
-      a.target = '_blank'; // Open in new tab as fallback
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Use downloadFile utility which handles Zata URLs, CORS, and proper download
+      await downloadFile(imageData.url, filename);
     } catch (error) {
       console.error('Failed to download:', error);
       alert('Failed to download. Please try again.');
@@ -259,6 +235,8 @@ export function createImageHandlers(
     const baseId = `${modalId || 'image'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const jobEntries: any[] = Array.from({ length: queuedCount }, (_, idx) => ({
       id: `${baseId}-${idx}`,
+      type: 'image' as const,
+      operationName: 'Generating Image',
       prompt: (prompt || '').trim() || 'Untitled prompt',
       model,
       total: queuedCount,
@@ -346,6 +324,11 @@ export function createImageHandlers(
       );
 
       console.log('Image generated successfully:', result);
+      
+      // Remove queue items immediately after generation completes
+      const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
+      setters.setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+
       // Return URL(s) for generator overlay
       // Always return images array if present (even for single image when imageCount > 1)
       if (result.images && Array.isArray(result.images) && result.images.length > 0) {
@@ -358,11 +341,11 @@ export function createImageHandlers(
       return { url: result.url };
     } catch (error: any) {
       console.error('Error generating image:', error);
-      alert(error.message || 'Failed to generate image. Please try again.');
-      throw error; // Re-throw to let the modal handle the error display
-    } finally {
+      // Remove from queue on error
       const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
       setters.setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+      alert(error.message || 'Failed to generate image. Please try again.');
+      throw error; // Re-throw to let the modal handle the error display
     }
   };
 

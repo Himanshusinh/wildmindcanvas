@@ -1,9 +1,13 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, MultiangleGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '../types';
+import { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
   onPersistUpscaleModalMove: (id: string, updates: Partial<UpscaleGenerator>) => Promise<void>;
   onPersistUpscaleModalDelete: (id: string) => Promise<void>;
+  onPersistMultiangleCameraModalCreate: (modal: MultiangleCameraGenerator) => Promise<void>;
+  onPersistMultiangleCameraModalMove: (id: string, updates: Partial<MultiangleCameraGenerator>) => Promise<void>;
+  onPersistMultiangleCameraModalDelete: (id: string) => Promise<void>;
   onPersistRemoveBgModalCreate: (modal: RemoveBgGenerator) => Promise<void>;
   onPersistRemoveBgModalMove: (id: string, updates: Partial<RemoveBgGenerator>) => Promise<void>;
   onPersistRemoveBgModalDelete: (id: string) => Promise<void>;
@@ -19,9 +23,6 @@ export interface PluginHandlers {
   onPersistNextSceneModalCreate: (modal: NextSceneGenerator) => Promise<void>;
   onPersistNextSceneModalMove: (id: string, updates: Partial<NextSceneGenerator>) => Promise<void>;
   onPersistNextSceneModalDelete: (id: string) => Promise<void>;
-  onPersistMultiangleModalCreate: (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => Promise<void>;
-  onPersistMultiangleModalMove: (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => Promise<void>;
-  onPersistMultiangleModalDelete: (id: string) => Promise<void>;
   onPersistStoryboardModalCreate: (modal: StoryboardGenerator) => Promise<void>;
   onPersistStoryboardModalMove: (id: string, updates: Partial<StoryboardGenerator>) => Promise<void>;
   onPersistStoryboardModalDelete: (id: string) => Promise<void>;
@@ -35,10 +36,14 @@ export interface PluginHandlers {
   onPersistVideoEditorModalMove: (id: string, updates: Partial<VideoEditorGenerator>) => Promise<void>;
   onPersistVideoEditorModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onMultiangleCamera: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onVectorize: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
+  onPersistCompareModalCreate: (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => Promise<void>;
+  onPersistCompareModalMove: (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => Promise<void>;
+  onPersistCompareModalDelete: (id: string) => Promise<void>;
 }
 
 export function createPluginHandlers(
@@ -239,6 +244,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `upscale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'upscale',
+      operationName: 'Upscaling',
+      model: model || 'Crystal Upscaler',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
       const { upscaleImageForCanvas } = await import('@/lib/api');
@@ -250,12 +267,184 @@ export function createPluginHandlers(
       );
 
       console.log('[onUpscale] Upscale completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       // Extract URL from result - result should be the data object with url property
       const upscaledUrl = result?.url || (typeof result === 'string' ? result : null);
       console.log('[onUpscale] Extracted URL:', upscaledUrl);
       return upscaledUrl;
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      throw error;
+    }
+  };
+
+  const onPersistMultiangleCameraModalCreate = async (modal: MultiangleCameraGenerator) => {
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast create multiangle-camera', modal.id);
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'multiangle-camera',
+        x: modal.x,
+        y: modal.y,
+        sourceImageUrl: modal.sourceImageUrl || null,
+      });
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'multiangle-camera-plugin',
+            x: modal.x,
+            y: modal.y,
+            meta: {
+              sourceImageUrl: modal.sourceImageUrl || null,
+            },
+          },
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleCameraModalMove = async (id: string, updates: Partial<MultiangleCameraGenerator>) => {
+    const prevItem = state.multiangleCameraGenerators.find(m => m.id === id);
+    if (!prevItem) {
+      console.warn('[onPersistMultiangleCameraModalMove] Modal not found:', id);
+      return;
+    }
+
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast move multiangle-camera', id);
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      const inverseUpdates: any = {};
+      for (const k of Object.keys(updates)) {
+        (inverseUpdates as any)[k] = (prevItem as any)[k];
+      }
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates },
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+      });
+    }
+  };
+
+  const onPersistMultiangleCameraModalDelete = async (id: string) => {
+    const prevItem = state.multiangleCameraGenerators.find(m => m.id === id);
+    // Optimistic update
+    setters.setMultiangleCameraGenerators(prev => prev.filter(m => m.id !== id));
+    // Broadcast via realtime
+    if (realtimeActive) {
+      console.log('[Realtime] broadcast delete multiangle-camera', id);
+      realtimeRef.current?.sendDelete(id);
+    }
+    // Also remove any connectors that referenced this element
+    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
+    // Always append op for undo/redo and persistence
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: {},
+        inverse: prevItem ? {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id,
+              type: 'multiangle-camera-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              meta: {
+                sourceImageUrl: prevItem.sourceImageUrl || null,
+              },
+            },
+          },
+          requestId: '',
+          clientTs: 0,
+        } as any : undefined as any,
+      });
+    }
+  };
+
+  const onMultiangleCamera = async (
+    sourceImageUrl?: string,
+    prompt?: string,
+    loraScale?: number,
+    aspectRatio?: string,
+    moveForward?: number,
+    verticalTilt?: number,
+    rotateDegrees?: number,
+    useWideAngle?: boolean
+  ) => {
+    if (!sourceImageUrl || !projectId) {
+      console.error('[onMultiangleCamera] Missing sourceImageUrl or projectId');
+      return null;
+    }
+
+    const queueId = `multiangle-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'image', // Use 'image' type as multiangle generates images
+      operationName: 'Multiangle Camera',
+      model: 'Qwen Multiangle',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
+    try {
+      console.log('[onMultiangleCamera] Starting multiangle generation:', {
+        sourceImageUrl,
+        prompt,
+        loraScale,
+        aspectRatio,
+        moveForward,
+        verticalTilt,
+        rotateDegrees,
+        useWideAngle,
+      });
+      const { multiangleImageForCanvas } = await import('@/lib/api');
+      const result = await multiangleImageForCanvas(
+        sourceImageUrl,
+        projectId,
+        prompt,
+        loraScale,
+        aspectRatio,
+        moveForward,
+        verticalTilt,
+        rotateDegrees,
+        useWideAngle
+      );
+
+      console.log('[onMultiangleCamera] Multiangle generation completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+      // Extract URL from result
+      const resultUrl = result?.url || (typeof result === 'string' ? result : null);
+      console.log('[onMultiangleCamera] Extracted URL:', resultUrl);
+      return resultUrl;
+    } catch (error: any) {
+      console.error('[onMultiangleCamera] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -452,6 +641,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `removebg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'removebg',
+      operationName: 'Removing Background',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onRemoveBg] Starting remove bg:', { model, backgroundType, scaleValue, sourceImageUrl });
       const { removeBgImageForCanvas } = await import('@/lib/api');
@@ -464,9 +665,16 @@ export function createPluginHandlers(
       );
 
       console.log('[onRemoveBg] Remove bg completed:', result);
+      // Mark as completed instead of removing immediately
+      const completedAt = Date.now();
+      setters.setGenerationQueue((prev) =>
+        prev.map((item) => (item.id === queueId ? { ...item, completed: true, completedAt } : item))
+      );
       return result.url || null;
     } catch (error: any) {
       console.error('[onRemoveBg] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -619,6 +827,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `erase-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'erase',
+      operationName: 'Erasing',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     // Mask is now optional - image is composited with white mask overlay
     // The composited image already contains the mask, so mask parameter is not required
     console.log('[onErase] Starting erase:', {
@@ -647,9 +867,13 @@ export function createPluginHandlers(
       );
 
       console.log('[onErase] Erase completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onErase] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -802,6 +1026,9 @@ export function createPluginHandlers(
         type: 'video-editor',
         x: modal.x,
         y: modal.y,
+        width: modal.width,
+        height: modal.height,
+        color: modal.color
       });
     }
     if (projectId && opManagerInitialized) {
@@ -814,7 +1041,11 @@ export function createPluginHandlers(
             type: 'video-editor-trigger',
             x: modal.x,
             y: modal.y,
-            meta: {},
+            width: modal.width,
+            height: modal.height,
+            meta: {
+              color: modal.color
+            }
           },
         },
         inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
@@ -833,24 +1064,36 @@ export function createPluginHandlers(
     }
     if (projectId && opManagerInitialized && prev) {
       const structuredUpdates: any = {};
-      if ('x' in updates) structuredUpdates.x = updates.x;
-      if ('y' in updates) structuredUpdates.y = updates.y;
+      const existingMeta = {
+        color: prev.color || '#000000'
+      };
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
 
       const inverseUpdates: any = {};
       if ('x' in updates) inverseUpdates.x = prev.x;
       if ('y' in updates) inverseUpdates.y = prev.y;
+      if ('width' in updates) inverseUpdates.width = prev.width;
+      if ('height' in updates) inverseUpdates.height = prev.height;
+
+      const inverseMeta: any = {};
+      if ('color' in updates) inverseMeta.color = prev.color || '#000000';
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
 
       await appendOp({
         type: 'update',
         elementId: id,
         data: { updates: structuredUpdates },
-        inverse: {
-          type: 'update',
-          elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
       });
     }
   };
@@ -867,7 +1110,7 @@ export function createPluginHandlers(
       await appendOp({
         type: 'delete',
         elementId: id,
-        data: {},
+        data: null,
         inverse: {
           type: 'create',
           elementId: id,
@@ -877,12 +1120,159 @@ export function createPluginHandlers(
               type: 'video-editor-trigger',
               x: prevItem.x,
               y: prevItem.y,
-              meta: {},
-            },
-          },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+              width: prevItem.width,
+              height: prevItem.height,
+              meta: {
+                color: prevItem.color
+              }
+            }
+          }
+        } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalCreate = async (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => {
+    setters.setCompareGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
+    if (realtimeActive) {
+      realtimeRef.current?.sendCreate({
+        id: modal.id,
+        type: 'compare',
+        x: modal.x,
+        y: modal.y,
+        width: modal.width,
+        height: modal.height,
+        scale: modal.scale,
+        prompt: modal.prompt,
+        model: modal.model
+      });
+    }
+    if (projectId && opManagerInitialized) {
+      await appendOp({
+        type: 'create',
+        elementId: modal.id,
+        data: {
+          element: {
+            id: modal.id,
+            type: 'compare-plugin',
+            x: modal.x,
+            y: modal.y,
+            width: modal.width,
+            height: modal.height,
+            meta: {
+              scale: modal.scale,
+              prompt: modal.prompt,
+              model: modal.model
+            }
+          }
+        },
+        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalMove = async (id: string, updates: Partial<{ x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>) => {
+    setters.setCompareGenerators(prevState => {
+      const prev = prevState.find(m => m.id === id);
+      if (prev) {
+        if (realtimeActive) {
+          realtimeRef.current?.sendUpdate(id, updates as any);
+        }
+
+        // Handle persistence side-effect here or use a useEffect/separate handler
+        // But for now let's just update local state safely
+      }
+      return prevState.map(m => m.id === id ? { ...m, ...updates } : m);
+    });
+
+    // We need 'prev' for the logic below (sending to backend). 
+    // Since we can't easily extract it from the setter synchronously without ref access,
+    // let's try to access it via property if available, or just skip if missing.
+    // However, existing handlers use 'state.' which implies 'state' is a ref or fresh prop?
+    // Looking at file, 'state' is a prop. If it's stale, that's an issue.
+    // Let's protect the find.
+    const prev = state.compareGenerators?.find(m => m.id === id);
+    if (!prev) return;
+
+    setters.setCompareGenerators(prevState =>
+      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
+    );
+    if (realtimeActive) {
+      realtimeRef.current?.sendUpdate(id, updates as any);
+    }
+    if (projectId && opManagerInitialized && prev) {
+      const structuredUpdates: any = {};
+      const existingMeta = {
+        scale: prev.scale ?? 1,
+        prompt: prev.prompt ?? '',
+        model: prev.model ?? 'base'
+      };
+
+      const metaUpdates = { ...existingMeta };
+      for (const k of Object.keys(updates || {})) {
+        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+          structuredUpdates[k] = (updates as any)[k];
+        } else {
+          (metaUpdates as any)[k] = (updates as any)[k];
+        }
+      }
+      structuredUpdates.meta = metaUpdates;
+
+      const inverseUpdates: any = {};
+      if ('x' in updates) inverseUpdates.x = prev.x;
+      if ('y' in updates) inverseUpdates.y = prev.y;
+      if ('width' in updates) inverseUpdates.width = (prev as any).width;
+      if ('height' in updates) inverseUpdates.height = (prev as any).height;
+
+      const inverseMeta: any = {};
+      if ('scale' in updates) inverseMeta.scale = prev.scale ?? existingMeta.scale;
+      if ('prompt' in updates) inverseMeta.prompt = prev.prompt ?? existingMeta.prompt;
+      if ('model' in updates) inverseMeta.model = prev.model ?? existingMeta.model;
+
+      if (Object.keys(inverseMeta).length > 0) {
+        inverseUpdates.meta = inverseMeta;
+      }
+
+      await appendOp({
+        type: 'update',
+        elementId: id,
+        data: { updates: structuredUpdates },
+        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any
+      });
+    }
+  };
+
+  const onPersistCompareModalDelete = async (id: string) => {
+    const prevItem = state.compareGenerators.find(m => m.id === id);
+    setters.setCompareGenerators(prev => prev.filter(m => m.id !== id));
+    if (realtimeActive) {
+      realtimeRef.current?.sendDelete(id);
+    }
+    await removeAndPersistConnectorsForElement(id);
+    if (projectId && opManagerInitialized && prevItem) {
+      await appendOp({
+        type: 'delete',
+        elementId: id,
+        data: null,
+        inverse: {
+          type: 'create',
+          elementId: id,
+          data: {
+            element: {
+              id: prevItem.id,
+              type: 'compare-plugin',
+              x: prevItem.x,
+              y: prevItem.y,
+              width: prevItem.width,
+              height: prevItem.height,
+              meta: {
+                scale: prevItem.scale,
+                prompt: prevItem.prompt,
+                model: prevItem.model
+              }
+            }
+          }
+        } as any
       });
     }
   };
@@ -905,6 +1295,18 @@ export function createPluginHandlers(
       console.error('[onExpand] Missing frame information', { canvasSize, originalImageSize, originalImageLocation });
       throw new Error('Frame information is required for expand. Please ensure the image is positioned in the frame.');
     }
+
+    const queueId = `expand-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'expand',
+      operationName: 'Expanding',
+      model,
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
 
     console.log('[onExpand] Starting expand:', {
       model,
@@ -929,9 +1331,13 @@ export function createPluginHandlers(
       );
 
       console.log('[onExpand] Expand completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onExpand] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
@@ -1263,6 +1669,18 @@ export function createPluginHandlers(
       return null;
     }
 
+    const queueId = `vectorize-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueItem: GenerationQueueItem = {
+      id: queueId,
+      type: 'vectorize',
+      operationName: 'Vectorizing',
+      model: mode || 'simple',
+      total: 1,
+      index: 1,
+      startedAt: Date.now(),
+    };
+    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
     try {
       console.log('[onVectorize] Starting vectorize:', { sourceImageUrl, mode });
       const { vectorizeImageForCanvas } = await import('@/lib/api');
@@ -1273,172 +1691,17 @@ export function createPluginHandlers(
       );
 
       console.log('[onVectorize] Vectorize completed:', result);
+      // Remove from queue immediately after completion
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       return result.url || null;
     } catch (error: any) {
       console.error('[onVectorize] Error:', error);
+      // Remove from queue on error
+      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
       throw error;
     }
   };
 
-  // Multiangle plugin handlers
-  const onPersistMultiangleModalCreate = async (modal: { id: string; x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => {
-    // Optimistic update
-    setters.setMultiangleGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-    // Broadcast via realtime
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast create multiangle', modal.id);
-      realtimeRef.current?.sendCreate({
-        id: modal.id,
-        type: 'multiangle-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: {
-          multiangleImageUrl: modal.multiangleImageUrl || null,
-          frameWidth: modal.frameWidth || 400,
-          frameHeight: modal.frameHeight || 500,
-          isProcessing: modal.isProcessing || false,
-        },
-      });
-    }
-    // Always append op for undo/redo and persistence
-    if (projectId && opManagerInitialized) {
-      await appendOp({
-        type: 'create',
-        elementId: modal.id,
-        data: {
-          element: {
-            id: modal.id,
-            type: 'multiangle-plugin',
-            x: modal.x,
-            y: modal.y,
-            meta: {
-              multiangleImageUrl: modal.multiangleImageUrl || null,
-              frameWidth: modal.frameWidth || 400,
-              frameHeight: modal.frameHeight || 500,
-              isProcessing: modal.isProcessing || false,
-            },
-          },
-        },
-        inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
-      });
-    }
-  };
-
-  const onPersistMultiangleModalMove = async (id: string, updates: Partial<{ x: number; y: number; multiangleImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => {
-    // 1. Capture previous state (for inverse op)
-    const prev = state.multiangleGenerators.find(m => m.id === id);
-
-    // 2. Optimistic update (triggers snapshot useEffect)
-    setters.setMultiangleGenerators(prevState =>
-      prevState.map(m => m.id === id ? { ...m, ...updates } : m)
-    );
-
-    // 3. Broadcast via realtime
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast move multiangle', id);
-      realtimeRef.current?.sendUpdate(id, updates as any);
-    }
-
-    // 4. Append op for undo/redo
-    if (projectId && opManagerInitialized) {
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        multiangleImageUrl: prev.multiangleImageUrl || null,
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isProcessing: prev.isProcessing || false,
-      } : {
-        multiangleImageUrl: null,
-        frameWidth: 400,
-        frameHeight: 500,
-        isProcessing: false,
-      };
-
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
-        }
-      }
-      structuredUpdates.meta = metaUpdates;
-
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('multiangleImageUrl' in updates) inverseMeta.multiangleImageUrl = prev.multiangleImageUrl || null;
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-        if ('isProcessing' in updates) inverseMeta.isProcessing = prev.isProcessing || false;
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
-        }
-      }
-
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
-          type: 'update',
-          elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
-      });
-    }
-  };
-
-  const onPersistMultiangleModalDelete = async (id: string) => {
-    console.log('[page.tsx] onPersistMultiangleModalDelete called', id);
-    const prevItem = state.multiangleGenerators.find(m => m.id === id);
-    // Update state IMMEDIATELY and SYNCHRONOUSLY
-    setters.setMultiangleGenerators(prev => {
-      const filtered = prev.filter(m => m.id !== id);
-      console.log('[page.tsx] multiangleGenerators updated, remaining:', filtered.length);
-      return filtered;
-    });
-    // Then do async operations
-    if (realtimeActive) {
-      console.log('[Realtime] broadcast delete multiangle', id);
-      realtimeRef.current?.sendDelete(id);
-    }
-    // Remove connectors
-    try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-    // Always append op for undo/redo and persistence
-    if (projectId && opManagerInitialized) {
-      await appendOp({
-        type: 'delete',
-        elementId: id,
-        data: {},
-        inverse: prevItem ? {
-          type: 'create',
-          elementId: id,
-          data: {
-            element: {
-              id,
-              type: 'multiangle-plugin',
-              x: prevItem.x,
-              y: prevItem.y,
-              meta: {
-                multiangleImageUrl: prevItem.multiangleImageUrl || null,
-                frameWidth: prevItem.frameWidth || 400,
-                frameHeight: prevItem.frameHeight || 500,
-                isProcessing: prevItem.isProcessing || false,
-              },
-            },
-          },
-          requestId: '',
-          clientTs: 0,
-        } as any : undefined as any,
-      });
-    }
-  };
 
 
   // Storyboard plugin handlers
@@ -2044,9 +2307,15 @@ export function createPluginHandlers(
   };
 
   return {
+    onPersistCompareModalCreate,
+    onPersistCompareModalMove,
+    onPersistCompareModalDelete,
     onPersistUpscaleModalCreate,
     onPersistUpscaleModalMove,
     onPersistUpscaleModalDelete,
+    onPersistMultiangleCameraModalCreate,
+    onPersistMultiangleCameraModalMove,
+    onPersistMultiangleCameraModalDelete,
     onPersistRemoveBgModalCreate,
     onPersistRemoveBgModalMove,
     onPersistRemoveBgModalDelete,
@@ -2059,10 +2328,8 @@ export function createPluginHandlers(
     onPersistNextSceneModalCreate,
     onPersistNextSceneModalMove,
     onPersistNextSceneModalDelete,
-    onPersistMultiangleModalCreate,
-    onPersistMultiangleModalMove,
-    onPersistMultiangleModalDelete,
     onUpscale,
+    onMultiangleCamera,
     onRemoveBg,
     onErase,
     onPersistExpandModalCreate,

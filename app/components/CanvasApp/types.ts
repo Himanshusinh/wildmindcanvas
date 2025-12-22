@@ -74,6 +74,13 @@ export interface UpscaleGenerator {
   isUpscaling?: boolean;
 }
 
+export interface MultiangleCameraGenerator {
+  id: string;
+  x: number;
+  y: number;
+  sourceImageUrl?: string | null;
+}
+
 export interface RemoveBgGenerator {
   id: string;
   x: number;
@@ -141,17 +148,17 @@ export interface NextSceneGenerator {
   isProcessing?: boolean;
 }
 
-export interface MultiangleGenerator {
+export interface CompareGenerator {
   id: string;
   x: number;
   y: number;
-  multiangleImageUrl?: string | null;
-  sourceImageUrl?: string | null;
-  localMultiangleImageUrl?: string | null;
-  frameWidth?: number;
-  frameHeight?: number;
-  isProcessing?: boolean;
+  width?: number;
+  height?: number;
+  scale?: number;
+  prompt?: string;
+  model?: string;
 }
+
 
 export interface StoryboardGenerator {
   id: string;
@@ -226,12 +233,13 @@ export interface CanvasAppState {
   videoEditorGenerators: VideoEditorGenerator[];
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
+  multiangleCameraGenerators: MultiangleCameraGenerator[];
   removeBgGenerators: RemoveBgGenerator[];
   eraseGenerators: EraseGenerator[];
   expandGenerators: ExpandGenerator[];
   vectorizeGenerators: VectorizeGenerator[];
+  compareGenerators: CompareGenerator[];
   nextSceneGenerators: NextSceneGenerator[];
-  multiangleGenerators: MultiangleGenerator[];
   storyboardGenerators: StoryboardGenerator[];
   scriptFrameGenerators: ScriptFrameGenerator[];
   sceneFrameGenerators: SceneFrameGenerator[];
@@ -248,12 +256,13 @@ export interface CanvasAppSetters {
   setVideoEditorGenerators: React.Dispatch<React.SetStateAction<VideoEditorGenerator[]>>;
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
+  setMultiangleCameraGenerators: React.Dispatch<React.SetStateAction<MultiangleCameraGenerator[]>>;
   setRemoveBgGenerators: React.Dispatch<React.SetStateAction<RemoveBgGenerator[]>>;
   setEraseGenerators: React.Dispatch<React.SetStateAction<EraseGenerator[]>>;
   setExpandGenerators: React.Dispatch<React.SetStateAction<ExpandGenerator[]>>;
   setVectorizeGenerators: React.Dispatch<React.SetStateAction<VectorizeGenerator[]>>;
+  setCompareGenerators: React.Dispatch<React.SetStateAction<CompareGenerator[]>>;
   setNextSceneGenerators: React.Dispatch<React.SetStateAction<NextSceneGenerator[]>>;
-  setMultiangleGenerators: React.Dispatch<React.SetStateAction<MultiangleGenerator[]>>;
   setStoryboardGenerators: React.Dispatch<React.SetStateAction<StoryboardGenerator[]>>;
   setScriptFrameGenerators: React.Dispatch<React.SetStateAction<ScriptFrameGenerator[]>>;
   setSceneFrameGenerators: React.Dispatch<React.SetStateAction<SceneFrameGenerator[]>>;

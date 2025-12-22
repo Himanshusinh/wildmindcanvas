@@ -108,7 +108,7 @@ export const NextSceneImageFrame: React.FC<NextSceneImageFrameProps> = ({
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
           </svg>
-          <p style={{ fontSize: `${12 * scale}px`, margin: 0, opacity: 0.6 }}>Connect an image to vectorize</p>
+          <p style={{ fontSize: `${12 * scale}px`, margin: 0, opacity: 0.6 }}>Connect an image to generate next scene</p>
         </div>
       )}
 

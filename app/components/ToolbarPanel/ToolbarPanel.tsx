@@ -33,6 +33,8 @@ const ensureThemeTransitionStyles = () => {
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
   const [isDark, setIsDark] = useState(false);
+  const [hoveredTool, setHoveredTool] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastToolClick = useRef<{ tool?: string; time: number }>({ time: 0 });
 
@@ -236,7 +238,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           <button
             key={tool.id}
             onClick={() => handleToolClick(tool.id)}
-            title={tool.label}
             style={{
               width: '36px',
               height: '36px',
@@ -249,31 +250,42 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
               backgroundColor: selectedTool === tool.id
                 ? (isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.3)')
                 : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)'),
-              color: selectedTool === tool.id 
-                ? (isDark ? '#60a5fa' : '#3b82f6') 
+              color: selectedTool === tool.id
+                ? (isDark ? '#60a5fa' : '#3b82f6')
                 : (isDark ? '#cccccc' : '#4b5563'),
               transition: 'all 0.3s ease',
               boxShadow: selectedTool === tool.id
                 ? (isDark ? '0 4px 12px rgba(96, 165, 250, 0.3)' : '0 4px 12px rgba(59, 130, 246, 0.3)')
                 : 'none',
+              position: 'relative',
             }}
             onMouseEnter={(e) => {
               // Force pointer cursor when hovering toolbar icons to avoid
               // global stage cursors (grab) leaking through.
-              try { document.body.style.cursor = 'pointer'; } catch (err) {}
+              try { document.body.style.cursor = 'pointer'; } catch (err) { }
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.18)';
                 e.currentTarget.style.color = isDark ? '#ffffff' : '#1f2937';
                 e.currentTarget.style.boxShadow = isDark ? '0 6px 16px rgba(255, 255, 255, 0.1)' : '0 6px 16px rgba(0,0,0,0.08)';
               }
+              // Show tooltip instantly on the right side
+              const rect = e.currentTarget.getBoundingClientRect();
+              setHoveredTool(tool.label);
+              setTooltipPosition({
+                x: rect.right + 8,
+                y: rect.top + rect.height / 2,
+              });
             }}
             onMouseLeave={(e) => {
-              try { document.body.style.cursor = ''; } catch (err) {}
+              try { document.body.style.cursor = ''; } catch (err) { }
               if (selectedTool !== tool.id) {
                 e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
                 e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
                 e.currentTarget.style.boxShadow = 'none';
               }
+              // Hide tooltip
+              setHoveredTool(null);
+              setTooltipPosition(null);
             }}
           >
             {tool.icon}
@@ -282,7 +294,6 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
 
         <button
           onClick={handleThemeToggle}
-          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           style={{
             width: '36px',
             height: '36px',
@@ -297,12 +308,20 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            try { document.body.style.cursor = 'pointer'; } catch (err) {}
+            try { document.body.style.cursor = 'pointer'; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.08)';
+            const rect = e.currentTarget.getBoundingClientRect();
+            setHoveredTool(isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            setTooltipPosition({
+              x: rect.right + 8,
+              y: rect.top + rect.height / 2,
+            });
           }}
           onMouseLeave={(e) => {
-            try { document.body.style.cursor = ''; } catch (err) {}
+            try { document.body.style.cursor = ''; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+            setHoveredTool(null);
+            setTooltipPosition(null);
           }}
         >
           {isDark ? (
@@ -323,7 +342,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             </svg>
           )}
         </button>
-        
+
         {/* Divider */}
         <div
           style={{
@@ -334,11 +353,10 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'background-color 0.3s ease',
           }}
         />
-        
+
         {/* Upload Button */}
         <button
           onClick={handleUploadClick}
-          title="Upload"
           style={{
             width: '36px',
             height: '36px',
@@ -353,16 +371,24 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
             transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            try { document.body.style.cursor = 'pointer'; } catch (err) {}
+            try { document.body.style.cursor = 'pointer'; } catch (err) { }
             e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.3)';
             e.currentTarget.style.color = '#22c55e';
             e.currentTarget.style.transform = 'scale(1.1)';
+            const rect = e.currentTarget.getBoundingClientRect();
+            setHoveredTool('Upload');
+            setTooltipPosition({
+              x: rect.right + 8,
+              y: rect.top + rect.height / 2,
+            });
           }}
           onMouseLeave={(e) => {
-            try { document.body.style.cursor = ''; } catch (err) {}
+            try { document.body.style.cursor = ''; } catch (err) { }
             e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.1)';
             e.currentTarget.style.color = isDark ? '#cccccc' : '#4b5563';
             e.currentTarget.style.transform = 'scale(1)';
+            setHoveredTool(null);
+            setTooltipPosition(null);
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -372,6 +398,50 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
           </svg>
         </button>
       </div>
+      {/* Custom Tooltip */}
+      {hoveredTool && tooltipPosition && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translateY(-50%)',
+            padding: '6px 12px',
+            backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(0, 0, 0, 0.9)',
+            color: isDark ? '#ffffff' : '#ffffff',
+            fontSize: '12px',
+            fontWeight: 500,
+            borderRadius: '6px',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 10002,
+            boxShadow: isDark 
+              ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.3)',
+            border: isDark 
+              ? '1px solid rgba(255, 255, 255, 0.1)' 
+              : '1px solid rgba(255, 255, 255, 0.1)',
+            opacity: 1,
+            transition: 'opacity 0s', // Instant appearance
+          }}
+        >
+          {hoveredTool}
+          {/* Arrow pointing left */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '-5px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderTop: '5px solid transparent',
+              borderBottom: '5px solid transparent',
+              borderRight: `5px solid ${isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(0, 0, 0, 0.9)'}`,
+            }}
+          />
+        </div>
+      )}
     </>
   );
 };

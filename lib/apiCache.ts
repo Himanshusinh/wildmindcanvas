@@ -39,12 +39,31 @@ export function setCachedRequest<T>(key: string, promise: Promise<T>): Promise<T
   };
   cache.set(key, entry);
 
-  // When promise resolves, store the data
+  // When promise resolves, store the data (but only if it's valid)
   promise
     .then((data) => {
       if (entry) {
-        entry.data = data;
-        entry.promise = undefined;
+        // Only cache valid user data (for getCurrentUser specifically)
+        if (key === 'getCurrentUser') {
+          // Validate user object before caching (using type-safe property checks)
+          if (data && typeof data === 'object' && data !== null && 'uid' in data && 'username' in data && 'email' in data) {
+            const userData = data as { uid: string; username: string; email: string; credits?: number };
+            if (userData.uid && userData.username && userData.email) {
+              entry.data = data;
+              entry.promise = undefined;
+            } else {
+              // Invalid user data - don't cache it
+              cache.delete(key);
+            }
+          } else {
+            // Invalid user data - don't cache it
+            cache.delete(key);
+          }
+        } else {
+          // For other requests, cache normally
+          entry.data = data;
+          entry.promise = undefined;
+        }
       }
     })
     .catch(() => {

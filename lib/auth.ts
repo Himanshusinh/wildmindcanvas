@@ -59,11 +59,91 @@ export function isAuthenticated(): boolean {
 }
 
 /**
+ * Get Firebase ID token for Bearer authentication (fallback when cookies don't work)
+ * Note: wildmindcanvas doesn't have Firebase configured, so we rely on tokens stored in localStorage
+ * from the main www.wildmindai.com app
+ */
+async function getFirebaseIdToken(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+
+    // First, check if token was passed via URL hash (from parent window when opening project)
+    // This allows cross-subdomain authentication when localStorage isn't shared
+    if (typeof window !== 'undefined') {
+      try {
+        const hash = window.location.hash;
+        const authTokenMatch = hash.match(/authToken=([^&]+)/);
+        if (authTokenMatch) {
+          const passedToken = decodeURIComponent(authTokenMatch[1]);
+          if (passedToken && passedToken.startsWith('eyJ')) {
+            // Store it for future use
+            try {
+              localStorage.setItem('authToken', passedToken);
+            } catch {}
+            // Clear hash to avoid exposing token
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            return passedToken;
+          }
+        }
+      } catch (e) {
+        // Ignore hash parsing errors
+      }
+    }
+
+    // Try to get token from localStorage (faster)
+    // These are set by the main www.wildmindai.com app when user logs in
+    const storedToken = localStorage.getItem('authToken');
+    if (storedToken && storedToken.startsWith('eyJ')) {
+      return storedToken;
+    }
+
+    // Try to get from user object (set by main app)
+    const userString = localStorage.getItem('user');
+    if (userString) {
+      try {
+        const userObj = JSON.parse(userString);
+        const token = userObj?.idToken || userObj?.token || null;
+        if (token && token.startsWith('eyJ')) {
+          return token;
+        }
+      } catch {}
+    }
+
+    // Try other localStorage keys that might contain the token
+    const idToken = localStorage.getItem('idToken');
+    if (idToken && idToken.startsWith('eyJ')) {
+      return idToken;
+    }
+
+    // Try Firebase auth user object (if main app stored it)
+    try {
+      const firebaseUser = localStorage.getItem('firebase:authUser');
+      if (firebaseUser) {
+        const userObj = JSON.parse(firebaseUser);
+        const token = userObj?.stsTokenManager?.accessToken || userObj?.accessToken || null;
+        if (token && token.startsWith('eyJ')) {
+          return token;
+        }
+      }
+    } catch {}
+
+    return null;
+  } catch (error) {
+    console.warn('[checkAuthStatus] Error getting Firebase token:', error);
+    return null;
+  }
+}
+
+/**
  * Check authentication status with the API gateway
  * Verifies that the session cookie is still valid
  * 
  * CRITICAL FIX: In production, cookies should be shared across subdomains
  * (www.wildmindai.com <-> studio.wildmindai.com) if cookie domain is set to .wildmindai.com
+ * 
+ * NEW: Also supports Bearer token authentication as fallback when cookies don't work
  */
 export async function checkAuthStatus(): Promise<boolean> {
   try {
@@ -137,15 +217,31 @@ export async function checkAuthStatus(): Promise<boolean> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-    try {
-      logDebug('Making fetch request', { url: apiUrl, credentials: 'include' });
+    // Try to get Bearer token as fallback (even if cookie exists, it might not work due to domain issues)
+    const bearerToken = await getFirebaseIdToken();
+    
+    logDebug('Making fetch request', { 
+      url: apiUrl, 
+      credentials: 'include',
+      hasBearerToken: !!bearerToken,
+      authStrategy: bearerToken ? 'Bearer token (fallback)' : 'Session cookie only'
+    });
 
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+      logDebug('Using Bearer token authentication (works across subdomains)');
+    }
+
+    try {
       const response = await fetch(apiUrl, {
         method: 'GET',
         credentials: 'include', // CRITICAL: Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         signal: controller.signal,
       });
 
@@ -170,8 +266,29 @@ export async function checkAuthStatus(): Promise<boolean> {
 
       if (response.ok) {
         const data = await response.json();
-        logDebug('Response data', { hasUser: !!data?.data?.user, userId: data?.data?.user?.uid });
-        return !!data?.data?.user;
+        const hasUser = !!data?.data?.user;
+        const userId = data?.data?.user?.uid;
+        
+        logDebug('Response data', { 
+          hasUser, 
+          userId,
+          responseStatus: data?.responseStatus,
+          hasData: !!data?.data,
+          userKeys: data?.data?.user ? Object.keys(data.data.user) : [],
+        });
+        
+        // CRITICAL: Only return true if we have a valid user with required fields
+        if (hasUser && userId && data?.data?.user?.username && data?.data?.user?.email) {
+          return true;
+        } else {
+          logDebug('Response OK but user object is invalid or missing required fields', {
+            hasUser,
+            hasUserId: !!userId,
+            hasUsername: !!data?.data?.user?.username,
+            hasEmail: !!data?.data?.user?.email,
+          });
+          return false;
+        }
       }
 
       // 401 or other error means not authenticated
@@ -183,17 +300,44 @@ export async function checkAuthStatus(): Promise<boolean> {
         errorData = { raw: errorText.substring(0, 200) };
       }
 
+      // If 401 and we haven't tried Bearer token yet, retry with Bearer token only
+      if (response.status === 401 && bearerToken) {
+        logDebug('401 with Bearer token - token may be invalid, trying fresh token...');
+        // Try getting a fresh token
+        const freshToken = await getFirebaseIdToken();
+        if (freshToken && freshToken !== bearerToken) {
+          logDebug('Got fresh token, retrying with fresh Bearer token...');
+          const retryResponse = await fetch(apiUrl, {
+            method: 'GET',
+            credentials: 'omit', // Don't send cookies on retry
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${freshToken}`,
+            },
+            signal: controller.signal,
+          });
+          
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            logDebug('✅ Retry with fresh Bearer token succeeded!', { hasUser: !!retryData?.data?.user });
+            return !!retryData?.data?.user;
+          }
+        }
+      }
+
       logDebug('Response not OK', {
         status: response.status,
         errorText: errorText.substring(0, 200),
         errorData,
+        hasBearerToken: !!bearerToken,
         note: isProd ? 'Cookie may not be shared across subdomains - check COOKIE_DOMAIN env var' : '',
         diagnosis: response.status === 401 ? {
           possibleCauses: [
             '1. COOKIE_DOMAIN env var is NOT set in backend (most likely)',
             '2. Cookie was set without Domain attribute (old cookie before env var was set)',
             '3. User is not logged in on www.wildmindai.com',
-            '4. Cookie domain mismatch (cookie set for www.wildmindai.com instead of .wildmindai.com)'
+            '4. Cookie domain mismatch (cookie set for www.wildmindai.com instead of .wildmindai.com)',
+            bearerToken ? '5. Bearer token is invalid or expired' : '5. No Bearer token available (user not logged in via Firebase)'
           ],
           howToFix: [
             '1. Go to Render.com → API Gateway service → Environment tab',
@@ -201,7 +345,8 @@ export async function checkAuthStatus(): Promise<boolean> {
             '3. Restart backend service',
             '4. Log in again on www.wildmindai.com (old cookies won\'t have domain)',
             '5. Check DevTools → Application → Cookies → verify Domain: .wildmindai.com',
-            '6. Then try studio.wildmindai.com again'
+            '6. Then try studio.wildmindai.com again',
+            bearerToken ? '7. Bearer token fallback attempted but failed - user may need to log in again' : '7. No Bearer token available - ensure user is logged in via Firebase'
           ],
           testEndpoint: 'https://api-gateway-services-wildmind.onrender.com/api/auth/debug/cookie-config'
         } : 'Unknown error'
@@ -279,8 +424,8 @@ export async function checkAuthStatus(): Promise<boolean> {
       }
       return false;
     }
-  } catch (error) {
-    console.error('Error checking auth status:', error);
+  } catch (outerError) {
+    console.error('Error checking auth status:', outerError);
     return false;
   }
 }

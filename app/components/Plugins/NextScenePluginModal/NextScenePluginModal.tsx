@@ -6,12 +6,16 @@ import { NextSceneLabel } from './NextSceneLabel';
 // import { ModalActionIcons } from '../../common/ModalActionIcons'; // Not used in Vectorize either
 import { NextSceneControls } from './NextSceneControls';
 import { NextSceneImageFrame } from './NextSceneImageFrame';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
+import { useCanvasFrameDim, useConnectedSourceImages, useLatestRef, usePersistedPopupState } from '../PluginComponents';
+import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 import { API_BASE_URL } from '@/lib/api';
 
 interface NextScenePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   // onVectorize removed - specific handler not needed for UI-only
@@ -60,7 +64,7 @@ interface NextScenePluginModalProps {
     aspectRatio?: string;
     loraScale?: number;
   }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -71,6 +75,7 @@ interface NextScenePluginModalProps {
 
 export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   nextSceneImageUrl,
@@ -103,15 +108,12 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   images = [],
   onPersistConnectorCreate,
 }) => {
-  const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
-  const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const { isDimmed, setIsDimmed } = useCanvasFrameDim(id);
+  const { isPopupOpen, setIsPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
   const [mode, setMode] = useState<string>(initialMode ?? 'scene'); // Default mode 'scene'
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localNextSceneImageUrl, setLocalNextSceneImageUrl] = useState<string | null>(initialLocalNextSceneImageUrl ?? null);
@@ -121,19 +123,32 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   const [aspectRatio, setAspectRatio] = useState<string>(initialAspectRatio || '1:1');
   const [loraScale, setLoraScale] = useState<number>(initialLoraScale !== undefined ? initialLoraScale : 1.15);
   const [trueGuidanceScale, setTrueGuidanceScale] = useState<number>(0);
+  const [resolution, setResolution] = useState<'1K' | '2K' | '4K'>('2K'); // Multi-angle resolution
+  const [multiangleModel, setMultiangleModel] = useState<string>('Google nano banana pro'); // Multi-angle model
 
-  const onOptionsChangeRef = useRef(onOptionsChange);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const hasDraggedRef = useRef(false);
+  const onOptionsChangeRef = useLatestRef(onOptionsChange);
 
-  // Update ref when callback changes
-  useEffect(() => {
-    onOptionsChangeRef.current = onOptionsChange;
-  }, [onOptionsChange]);
+  // Multi-angle shot prompts
+  const MULTIANGLE_SHOT_PROMPTS = [
+    { shot: 1, type: 'Establishing Shot', prompt: 'Wide angle, full body shot, showing the character in the environment, cinematic scale.' },
+    { shot: 2, type: 'Medium Shot', prompt: 'Waist-up framing, natural pose, eye-level camera, balanced composition.' },
+    { shot: 3, type: 'Close-up', prompt: 'Head and shoulders portrait, shallow depth of field, sharp focus on facial details.' },
+    { shot: 4, type: '180° Shift', prompt: 'View from behind the subject, looking away from camera, showing back of clothing and hair.' },
+    { shot: 5, type: 'Low Angle', prompt: 'Worm\'s-eye view looking up at the subject, making them appear heroic and powerful.' },
+    { shot: 6, type: 'High Angle', prompt: 'Bird\'s-eye view looking down from above, showing the subject and the floor/ground.' },
+    { shot: 7, type: '3/4 Profile', prompt: 'Subject turned at a 45-degree angle, highlighting facial contours and side profile.' },
+    { shot: 8, type: 'OTS Shot', prompt: 'Exact same character, standing in profile view from the side, clear silhouette, cinematic lighting, maintaining all clothing and facial details.' },
+    { shot: 9, type: 'Extreme Close-up', prompt: 'Extreme close-up of the subject\'s face, focusing on the eyes and skin texture, maintaining identical features and lighting from the original image, bokeh background.' },
+  ];
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NextScenePluginModal.tsx:131',message:'NextScene modal position props changed',data:{id,x,y,screenX,screenY,scale,positionX:position.x,positionY:position.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  }, [id, x, y, screenX, screenY, scale, position.x, position.y]);
+  // #endregion
   const isDark = useIsDarkTheme();
   const circleDiameter = 100 * scale;
   const controlsWidthPx = `${400 * scale}px`;
@@ -146,39 +161,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   // Detect if this is a result image (media-like, no controls) - simplified to false like Vectorize
   const isResultImage = false;
 
-  // Detect connected image nodes (from image generators or canvas images)
-  const connectedImageSources = useMemo(() => {
-    if (!id) return [];
-
-    // Find all connections to this node
-    const conns = connections.filter(c => c.to === id && c.from);
-    if (!conns.length) return [];
-
-    const sources: string[] = [];
-
-    conns.forEach(conn => {
-      // First check if it's from an image generator modal
-      const sourceModal = imageModalStates?.find(m => m.id === conn.from);
-      if (sourceModal?.generatedImageUrl) {
-        sources.push(sourceModal.generatedImageUrl);
-        return;
-      }
-
-      // Then check if it's from a canvas image (uploaded image)
-      if (images && images.length > 0) {
-        const canvasImage = images.find(img => {
-          const imgId = img.elementId || (img as any).id;
-          return imgId === conn.from;
-        });
-        if (canvasImage?.url) {
-          sources.push(canvasImage.url);
-          return;
-        }
-      }
-    });
-
-    return sources;
-  }, [id, connections, imageModalStates, images]);
+  const connectedImageSources = useConnectedSourceImages({ id, connections, imageModalStates, images });
 
   // Restore images and mode from props on mount or when props change
   useEffect(() => {
@@ -194,9 +177,9 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   }, [initialMode, initialSourceImageUrl, initialLocalNextSceneImageUrl]);
 
   useEffect(() => {
-    // If we have connected images, update local state
+    // Handle connection changes: update or clear source image
     if (connectedImageSources.length > 0) {
-      // Always use the first one as primary source for single scene mode
+      // Connection exists: update source image if different
       const firstSource = connectedImageSources[0];
       if (firstSource !== sourceImageUrl) {
         setSourceImageUrl(firstSource);
@@ -205,8 +188,21 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         if (!initialLocalNextSceneImageUrl) {
           setLocalNextSceneImageUrl(null);
         }
-        if (onOptionsChangeRef.current && firstSource !== initialSourceImageUrl) {
+        // Persist the source image URL
+        if (onOptionsChangeRef.current) {
           onOptionsChangeRef.current({ sourceImageUrl: firstSource });
+        }
+      }
+    } else {
+      // Connection deleted: clear source image if it was from a connection
+      // Only clear if current sourceImageUrl matches what was connected (or if no initialSourceImageUrl was set)
+      if (sourceImageUrl && (!initialSourceImageUrl || sourceImageUrl === initialSourceImageUrl)) {
+        setSourceImageUrl(null);
+        // Clear dimming
+        setIsDimmed(false);
+        // Clear persisted source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: null });
         }
       }
     }
@@ -229,106 +225,20 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
     }
   }, [localNextSceneImageUrl, nextSceneImageUrl]);
 
-  // Listen for dimming events
-  useEffect(() => {
-    const handleDim = (e: CustomEvent) => {
-      if (e.detail?.frameId === id) {
-        // Only dim if explicitly set to true, otherwise clear dimming
-        setIsDimmed(e.detail?.dimmed === true);
-      }
-    };
-    window.addEventListener('canvas-frame-dim' as any, handleDim);
-    return () => {
-      window.removeEventListener('canvas-frame-dim' as any, handleDim);
-    };
-  }, [id]);
+  // Dimming handled by shared hook
 
-  // Handle mouse down to start dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-    const isButton = target.tagName === 'BUTTON' || target.closest('button');
-    const isImage = target.tagName === 'IMG';
-    const isControls = target.closest('.controls-overlay');
-    // Check if clicking on action icons (ModalActionIcons container or its children)
-    const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-
-    if (isInput || isButton || isImage || isControls || isActionIcons) {
-      return;
-    }
-
-    if (onSelect) {
-      onSelect();
-    }
-
-    // Track initial mouse position to detect drag vs click
-    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-    hasDraggedRef.current = false;
-
-    setIsDraggingContainer(true);
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
-    lastCanvasPosRef.current = { x, y };
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  // Handle drag
-  useEffect(() => {
-    if (!isDraggingContainer) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
-
-      // Check if mouse moved significantly (more than 5px) to detect drag
-      if (dragStartPosRef.current) {
-        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-        if (dx > 5 || dy > 5) {
-          hasDraggedRef.current = true;
-        }
-      }
-
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
-
-      onPositionChange(newCanvasX, newCanvasY);
-      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-    };
-
-    const handleMouseUp = () => {
-      const wasDragging = hasDraggedRef.current;
-      setIsDraggingContainer(false);
-      dragStartPosRef.current = null;
-
-      // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
-      }
-
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
-      }
-
-      // Reset drag flag
-      hasDraggedRef.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
+  const { isDragging: isDraggingContainer, onMouseDown: handleMouseDown } = useCanvasModalDrag({
+    enabled: isOpen,
+    x,
+    y,
+    scale,
+    position,
+    containerRef,
+    onPositionChange,
+    onPositionCommit,
+    onSelect,
+    onTap: () => togglePopup(),
+  });
 
 
   const handleNextScene = async () => {
@@ -338,7 +248,9 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       sourceImageUrl,
       prompt,
       aspectRatio,
-      loraScale
+      loraScale,
+      mode,
+      resolution
     });
 
     if (isProcessing || externalIsProcessing) {
@@ -351,19 +263,151 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       return;
     }
 
-    // Prompt is optional
-    /*
-    if (mode === 'scene' && !prompt) {
-      alert('Please enter a prompt');
-      return;
-    }
-    */
-
     setIsProcessing(true);
     if (onOptionsChange) {
       onOptionsChange({ isProcessing: true } as any);
     }
 
+    // Handle multi-angle mode - generate 9 different shots
+    if (mode === 'multiangle') {
+      try {
+        const projectId = window.location.pathname.split('/project/')[1] || 'default-project';
+        const { generateImageForCanvas } = await import('@/lib/api');
+        
+        // Calculate frame dimensions based on aspect ratio
+        const [w, h] = aspectRatio.split(':').map(Number);
+        const ar = w && h ? (w / h) : 1;
+        const baseSize = 600;
+        const frameWidth = Math.round(baseSize);
+        const frameHeight = Math.round(baseSize / ar);
+
+        // Create 9 image modals in a 3x3 grid
+        const modalIds: string[] = [];
+        const gridCols = 3;
+        const gridGap = 650; // Gap between modals
+        const startX = x + (400 * scale + 50) / scale; // Start to the right of plugin
+        const startY = y - (gridGap * 1.5) / scale; // Center vertically
+
+        // Create all 9 modals first (optimistic UI)
+        for (let i = 0; i < 9; i++) {
+          const col = i % gridCols;
+          const row = Math.floor(i / gridCols);
+          const modalId = `image-multiangle-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+          modalIds.push(modalId);
+          
+          const targetX = startX + (col * gridGap) / scale;
+          const targetY = startY + (row * gridGap) / scale;
+
+          if (onPersistImageModalCreate) {
+            onPersistImageModalCreate({
+              id: modalId,
+              x: targetX,
+              y: targetY,
+              generatedImageUrl: null,
+              frameWidth,
+              frameHeight,
+              model: multiangleModel === 'Google nano banana pro' 
+                ? `Google nano banana pro ${resolution}` 
+                : multiangleModel === 'Seedream 4.5'
+                ? `Seedream 4.5 ${resolution}`
+                : multiangleModel, // Use selected model (with resolution appended for Seedream 4.5)
+              frame: 'Frame',
+              aspectRatio: aspectRatio || '1:1',
+              prompt: MULTIANGLE_SHOT_PROMPTS[i].prompt,
+              isGenerating: true,
+            });
+          }
+
+          // Connect plugin to each modal
+          if (onPersistConnectorCreate && id) {
+            onPersistConnectorCreate({
+              from: id,
+              to: modalId,
+              color: '#437eb5',
+              fromX: x + (100 * scale) + 20,
+              fromY: y + (50 * scale),
+              toX: targetX,
+              toY: targetY + (frameHeight / 2),
+              fromAnchor: 'send',
+              toAnchor: 'receive',
+            });
+          }
+        }
+
+        // Generate all 9 images in parallel
+        console.log('[NextScenePluginModal] Generating 9 multi-angle shots in parallel...');
+        
+        // Build model string based on selected model
+        let modelString = multiangleModel;
+        if (multiangleModel === 'Google nano banana pro') {
+          modelString = `Google nano banana pro ${resolution}`;
+        } else if (multiangleModel === 'Seedream 4.5') {
+          modelString = `Seedream 4.5 ${resolution}`;
+        }
+        
+        const generationPromises = MULTIANGLE_SHOT_PROMPTS.map(async (shot, index) => {
+          const shotPrompt = shot.prompt;
+          const modalId = modalIds[index];
+          
+          try {
+            const result = await generateImageForCanvas(
+              shotPrompt,
+              modelString, // Use selected model (with resolution for nano banana pro)
+              aspectRatio,
+              projectId,
+              undefined, // width
+              undefined, // height
+              1, // imageCount
+              sourceImageUrl, // sourceImageUrl for image-to-image
+              undefined, // sceneNumber
+              undefined, // previousSceneImageUrl
+              undefined // storyboardMetadata
+            );
+
+            // Update the modal with the result
+            if (onUpdateImageModalState) {
+              onUpdateImageModalState(modalId, {
+                generatedImageUrl: result.url,
+                isGenerating: false,
+              });
+            }
+
+            return { index, success: true, url: result.url };
+          } catch (error: any) {
+            console.error(`[NextScenePluginModal] Failed to generate shot ${shot.shot}:`, error);
+            // Update modal to show error
+            if (onUpdateImageModalState) {
+              onUpdateImageModalState(modalId, {
+                isGenerating: false,
+              });
+            }
+            return { index, success: false, error: error.message };
+          }
+        });
+
+        const results = await Promise.all(generationPromises);
+        const successCount = results.filter(r => r.success).length;
+        console.log(`[NextScenePluginModal] Multi-angle generation completed: ${successCount}/9 successful`);
+
+        if (successCount === 0) {
+          alert('All multi-angle generations failed. Please try again.');
+        } else if (successCount < 9) {
+          alert(`${successCount}/9 images generated successfully. Some generations failed.`);
+        }
+
+      } catch (error: any) {
+        console.error('[NextScenePluginModal] Multi-angle generation error:', error);
+        alert(`Multi-angle generation failed: ${error.message}`);
+      } finally {
+        setIsProcessing(false);
+        if (onOptionsChange) {
+          onOptionsChange({ isProcessing: false } as any);
+        }
+      }
+      return; // Exit early for multi-angle mode
+    }
+
+    // Original single scene/nextscene logic below
     // 1. Create a new image modal placeholder immediately (Optimistic UI)
     const newModalId = `image-nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const frameWidth = 600;
@@ -485,22 +529,18 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-modal-component="nextscene"
-      data-overlay-id={id}
+    <PluginNodeShell
+      modalKey="nextscene"
+      id={id}
+      containerRef={containerRef}
+      screenX={screenX}
+      screenY={screenY}
+      isHovered={isHovered}
+      isSelected={Boolean(isSelected)}
+      isDimmed={isDimmed}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        position: 'absolute',
-        left: `${screenX}px`,
-        top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
-        userSelect: 'none',
-        opacity: isDimmed ? 0.4 : 1,
-
-      }}
     >
       {/* Plugin node design with icon and label */}
       <div
@@ -619,10 +659,10 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
             zIndex: 20,
           }}
         >
-          {/* Use Vector icon for now or placeholder */}
+          {/* Next Scene icon */}
           <img
-            src="/icons/vector.svg"
-            alt="NextScene"
+            src="/icons/film-editing.svg"
+            alt="Next Scene"
             style={{
               width: `${40 * scale}px`,
               height: `${40 * scale}px`,
@@ -638,7 +678,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}
@@ -706,6 +746,14 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
                   setTrueGuidanceScale(val);
                   // if (onOptionsChange) onOptionsChange({ trueGuidanceScale: val } as any); // If we add it to interface later
                 }}
+                resolution={resolution}
+                onResolutionChange={(val) => {
+                  setResolution(val);
+                }}
+                model={multiangleModel}
+                onModelChange={(val) => {
+                  setMultiangleModel(val);
+                }}
               />
               <NextSceneImageFrame
                 id={id}
@@ -726,6 +774,6 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         )}
       </div>
 
-    </div>
+    </PluginNodeShell>
   );
 };

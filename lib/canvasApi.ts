@@ -6,6 +6,83 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.wildmindai.com';
 const CANVAS_API = `${API_BASE_URL}/api/canvas`;
 
+/**
+ * Get Bearer token for authentication (fallback when cookies don't work)
+ * Uses the same logic as checkAuthStatus to get token from localStorage or URL hash
+ */
+async function getFirebaseIdToken(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+
+    // First, check if token was passed via URL hash (from parent window when opening project)
+    if (typeof window !== 'undefined') {
+      try {
+        const hash = window.location.hash;
+        const authTokenMatch = hash.match(/authToken=([^&]+)/);
+        if (authTokenMatch) {
+          const passedToken = decodeURIComponent(authTokenMatch[1]);
+          if (passedToken && passedToken.startsWith('eyJ')) {
+            // Store it for future use
+            try {
+              localStorage.setItem('authToken', passedToken);
+            } catch {}
+            return passedToken;
+          }
+        }
+      } catch (e) {
+        // Ignore hash parsing errors
+      }
+    }
+
+    // Try to get token from localStorage
+    const storedToken = localStorage.getItem('authToken');
+    if (storedToken && storedToken.startsWith('eyJ')) {
+      return storedToken;
+    }
+
+    // Try to get from user object
+    const userString = localStorage.getItem('user');
+    if (userString) {
+      try {
+        const userObj = JSON.parse(userString);
+        const token = userObj?.idToken || userObj?.token || null;
+        if (token && token.startsWith('eyJ')) {
+          return token;
+        }
+      } catch {}
+    }
+
+    // Try idToken directly
+    const idToken = localStorage.getItem('idToken');
+    if (idToken && idToken.startsWith('eyJ')) {
+      return idToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[CanvasAPI] Error getting Firebase token:', error);
+    return null;
+  }
+}
+
+/**
+ * Build headers with Bearer token if available
+ */
+async function buildAuthHeaders(): Promise<HeadersInit> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  const bearerToken = await getFirebaseIdToken();
+  if (bearerToken) {
+    headers['Authorization'] = `Bearer ${bearerToken}`;
+  }
+  
+  return headers;
+}
+
 export interface CanvasProject {
   id: string;
   name: string;
@@ -46,25 +123,32 @@ export interface GeneratorOverlayDTO {
 }
 
 export async function listGenerators(projectId: string): Promise<GeneratorOverlayDTO[]> {
-  const res = await fetch(`${CANVAS_API}/projects/${projectId}/generators`, { credentials: 'include' });
+  const headers = await buildAuthHeaders();
+  const res = await fetch(`${CANVAS_API}/projects/${projectId}/generators`, {
+    credentials: 'include',
+    headers,
+  });
   if (!res.ok) return [];
   const json = await res.json().catch(() => ({ data: { overlays: [] } }));
   return json?.data?.overlays || [];
 }
 
 export async function upsertGenerator(projectId: string, overlay: GeneratorOverlayDTO): Promise<void> {
+  const headers = await buildAuthHeaders();
   await fetch(`${CANVAS_API}/projects/${projectId}/generators/${encodeURIComponent(overlay.id)}`, {
     method: 'PUT',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(overlay),
   });
 }
 
 export async function deleteGenerator(projectId: string, overlayId: string): Promise<void> {
+  const headers = await buildAuthHeaders();
   await fetch(`${CANVAS_API}/projects/${projectId}/generators/${encodeURIComponent(overlayId)}`, {
     method: 'DELETE',
     credentials: 'include',
+    headers,
   });
 }
 
@@ -78,12 +162,11 @@ export async function createProject(name: string, description?: string): Promise
     body.description = description;
   }
 
+  const headers = await buildAuthHeaders();
   const response = await fetch(`${CANVAS_API}/projects`, {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -100,8 +183,10 @@ export async function createProject(name: string, description?: string): Promise
  * Get a Canvas project
  */
 export async function getProject(projectId: string): Promise<CanvasProject | null> {
+  const headers = await buildAuthHeaders();
   const response = await fetch(`${CANVAS_API}/projects/${projectId}`, {
     credentials: 'include',
+    headers,
   });
 
   if (!response.ok) {
@@ -119,12 +204,11 @@ export async function updateProject(
   projectId: string,
   updates: Partial<{ name: string; description: string; settings: CanvasProject['settings'] }>
 ): Promise<CanvasProject> {
+  const headers = await buildAuthHeaders();
   const response = await fetch(`${CANVAS_API}/projects/${projectId}`, {
     method: 'PATCH',
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(updates),
   });
 
@@ -144,12 +228,11 @@ export async function appendOp(
   projectId: string,
   op: CanvasOp
 ): Promise<{ opId: string; opIndex: number }> {
+  const headers = await buildAuthHeaders();
   const response = await fetch(`${CANVAS_API}/projects/${projectId}/ops`, {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(op),
   });
 
@@ -170,10 +253,12 @@ export async function getOps(
   fromOp: number,
   limit: number = 100
 ): Promise<CanvasOp[]> {
+  const headers = await buildAuthHeaders();
   const response = await fetch(
     `${CANVAS_API}/projects/${projectId}/ops?fromOp=${fromOp}&limit=${limit}`,
     {
       credentials: 'include',
+      headers,
     }
   );
 
@@ -201,18 +286,55 @@ export async function listProjects(limit: number = 20): Promise<CanvasProject[]>
   // Create new request
   const requestPromise = (async () => {
     try {
+      const headers = await buildAuthHeaders();
       const response = await fetch(`${CANVAS_API}/projects?limit=${limit}`, {
         credentials: 'include',
+        headers,
       });
 
       if (!response.ok) {
+        // Handle 401 Unauthorized specifically
+        if (response.status === 401) {
+          console.error('[CanvasAPI] 401 Unauthorized - Authentication required', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+          });
+          
+          // Try to get error message from response
+          let errorMessage = 'Unauthorized';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData?.message || errorData?.error || 'Unauthorized';
+          } catch {
+            // If JSON parsing fails, use status text
+            errorMessage = response.statusText || 'Unauthorized';
+          }
+          
+          // Throw a specific error that can be caught by callers
+          throw new Error(`Authentication required: ${errorMessage}. Please log in again.`);
+        }
+        
+        // For other errors, log and return empty array (existing behavior)
+        console.warn('[CanvasAPI] Failed to fetch projects:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+        });
         return [];
       }
 
       const result = await response.json();
       return result.data?.projects || [];
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      // Re-throw authentication errors so callers can handle them
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        throw error;
+      }
+      
+      // For other errors, log and return empty array
+      console.error('[CanvasAPI] Error fetching projects:', error);
       return [];
     }
   })();
@@ -240,8 +362,10 @@ export async function getSnapshot(
     ? `${CANVAS_API}/projects/${projectId}/snapshot?fromOp=${fromOp}`
     : `${CANVAS_API}/projects/${projectId}/snapshot`;
 
+  const headers = await buildAuthHeaders();
   const response = await fetch(url, {
     credentials: 'include',
+    headers,
   });
 
   if (!response.ok) {
@@ -266,7 +390,11 @@ export async function getCurrentSnapshot(
   } | null;
 }> {
   const url = `${CANVAS_API}/projects/${projectId}/snapshot/current`;
-  const response = await fetch(url, { credentials: 'include' });
+  const headers = await buildAuthHeaders();
+  const response = await fetch(url, {
+    credentials: 'include',
+    headers,
+  });
   if (!response.ok) {
     throw new Error('Failed to get current snapshot');
   }
@@ -282,10 +410,11 @@ export async function setCurrentSnapshot(
   snapshot: { elements: Record<string, any>; metadata?: Record<string, any> }
 ): Promise<void> {
   const url = `${CANVAS_API}/projects/${projectId}/snapshot/current`;
+  const headers = await buildAuthHeaders();
   const response = await fetch(url, {
     method: 'PUT',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(snapshot),
   });
   if (!response.ok) {

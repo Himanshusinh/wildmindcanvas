@@ -3,6 +3,63 @@ import { getCachedRequest, setCachedRequest } from './apiCache';
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 const API_GATEWAY_URL = `${API_BASE_URL}/api`;
 
+/**
+ * Get Bearer token for authentication (fallback when cookies don't work)
+ * Shared helper function for all canvas API calls
+ */
+async function getBearerTokenForCanvas(): Promise<string | null> {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return null;
+    }
+
+    // Check URL hash first (token passed from parent window)
+    try {
+      const hash = window.location.hash;
+      const authTokenMatch = hash.match(/authToken=([^&]+)/);
+      if (authTokenMatch) {
+        const passedToken = decodeURIComponent(authTokenMatch[1]);
+        if (passedToken && passedToken.startsWith('eyJ')) {
+          // Store it for future use
+          try {
+            localStorage.setItem('authToken', passedToken);
+          } catch {}
+          return passedToken;
+        }
+      }
+    } catch {}
+
+    // Try localStorage
+    const storedToken = localStorage.getItem('authToken');
+    if (storedToken && storedToken.startsWith('eyJ')) {
+      return storedToken;
+    }
+
+    // Try user object
+    const userString = localStorage.getItem('user');
+    if (userString) {
+      try {
+        const userObj = JSON.parse(userString);
+        const token = userObj?.idToken || userObj?.token || null;
+        if (token && token.startsWith('eyJ')) {
+          return token;
+        }
+      } catch {}
+    }
+
+    // Try idToken directly
+    const idToken = localStorage.getItem('idToken');
+    if (idToken && idToken.startsWith('eyJ')) {
+      return idToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('[getBearerTokenForCanvas] Error getting token:', error);
+    return null;
+  }
+}
+
 export interface ImageGenerationRequest {
   prompt: string;
   model: string;
@@ -214,8 +271,63 @@ export async function generateImageForCanvas(
   storyboardMetadata?: Record<string, string>
 ): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
+  // Increased to 10 minutes for image-to-image generation which can take longer
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout (600 seconds)
+
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  const bearerToken = await getBearerTokenForCanvas();
+  
+  if (!bearerToken) {
+    console.warn('[generateImageForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
+  }
+
+  // Helper function to convert blob URLs to data URIs
+  const convertBlobUrlToDataUri = async (blobUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('[generateImageForCanvas] Failed to convert blob URL to data URI:', error);
+      throw new Error('Failed to convert blob URL to data URI. Please try again.');
+    }
+  };
+
+  // Convert blob URLs to data URIs before sending to backend
+  let processedSourceImageUrl = sourceImageUrl;
+  if (sourceImageUrl && sourceImageUrl.startsWith('blob:')) {
+    console.log('[generateImageForCanvas] Converting blob URL to data URI:', sourceImageUrl.substring(0, 50));
+    try {
+      // Handle comma-separated blob URLs
+      const urls = sourceImageUrl.split(',').map(url => url.trim());
+      const convertedUrls = await Promise.all(
+        urls.map(url => url.startsWith('blob:') ? convertBlobUrlToDataUri(url) : url)
+      );
+      processedSourceImageUrl = convertedUrls.join(',');
+      console.log('[generateImageForCanvas] ✅ Successfully converted blob URL(s) to data URI(s)');
+    } catch (error: any) {
+      console.error('[generateImageForCanvas] ❌ Failed to convert blob URL:', error);
+      throw new Error('Failed to process image URL. Please try again or use a different image.');
+    }
+  }
+
+  let processedPreviousSceneImageUrl = previousSceneImageUrl;
+  if (previousSceneImageUrl && previousSceneImageUrl.startsWith('blob:')) {
+    console.log('[generateImageForCanvas] Converting previous scene blob URL to data URI');
+    try {
+      processedPreviousSceneImageUrl = await convertBlobUrlToDataUri(previousSceneImageUrl);
+      console.log('[generateImageForCanvas] ✅ Successfully converted previous scene blob URL to data URI');
+    } catch (error: any) {
+      console.error('[generateImageForCanvas] ❌ Failed to convert previous scene blob URL:', error);
+      throw new Error('Failed to process previous scene image URL. Please try again.');
+    }
+  }
 
   try {
     const requestBody = {
@@ -225,9 +337,9 @@ export async function generateImageForCanvas(
       height,
       aspectRatio, // Pass aspectRatio for proper model mapping
       imageCount, // Pass imageCount to generate multiple images
-      sourceImageUrl, // Pass comma-separated reference image URLs (backend will split them)
+      sourceImageUrl: processedSourceImageUrl, // Use processed URL (data URI instead of blob URL)
       sceneNumber, // Scene number for storyboard generation
-      previousSceneImageUrl, // Previous scene's generated image URL (for Scene 2+)
+      previousSceneImageUrl: processedPreviousSceneImageUrl, // Use processed URL (data URI instead of blob URL)
       storyboardMetadata, // Metadata for storyboard (character, background, etc.)
       meta: {
         source: 'canvas',
@@ -235,8 +347,19 @@ export async function generateImageForCanvas(
       },
     };
 
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+      console.log('[generateImageForCanvas] Using Bearer token authentication');
+    }
+
     console.log('[generateImageForCanvas] 📤 STEP 6: Sending request to backend:', {
       url: `${API_GATEWAY_URL}/canvas/generate`,
+      hasBearerToken: !!bearerToken,
       requestBody: {
         ...requestBody,
         sourceImageUrl: sourceImageUrl || 'NONE',
@@ -249,10 +372,8 @@ export async function generateImageForCanvas(
 
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate`, {
       method: 'POST',
-      credentials: 'include', // Include cookies (app_session)
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      credentials: 'include', // Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
+      headers,
       signal: controller.signal,
       body: JSON.stringify(requestBody),
     });
@@ -309,7 +430,7 @@ export async function generateImageForCanvas(
     clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout. Image generation is taking too long. Please try again.');
+      throw new Error('Request timeout. Image generation is taking longer than expected (10 minutes). This may happen with complex image-to-image generation. Please try again or use a simpler prompt.');
     }
 
     if (error.message) {
@@ -337,13 +458,28 @@ export async function generateVideoForCanvas(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  const bearerToken = await getBearerTokenForCanvas();
+  
+  if (!bearerToken) {
+    console.warn('[generateVideoForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
+  }
+
   try {
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+      console.log('[generateVideoForCanvas] Using Bearer token authentication');
+    }
+
     const response = await fetch(`${API_GATEWAY_URL}/canvas/generate-video`, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         prompt,
@@ -536,6 +672,98 @@ export async function vectorizeImageForCanvas(
     };
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Multiangle camera image generation for Canvas
+ */
+export async function multiangleImageForCanvas(
+  image: string,
+  projectId: string,
+  prompt?: string,
+  loraScale?: number,
+  aspectRatio?: string,
+  moveForward?: number,
+  verticalTilt?: number,
+  rotateDegrees?: number,
+  useWideAngle?: boolean
+): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/replicate/multiangle`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        image,
+        prompt: prompt || '',
+        lora_scale: loraScale !== undefined ? loraScale : 1.25,
+        aspect_ratio: aspectRatio || 'match_input_image',
+        move_forward: moveForward !== undefined ? Math.max(0, Math.min(10, moveForward)) : 0,
+        vertical_tilt: verticalTilt !== undefined ? verticalTilt : 0,
+        rotate_degrees: rotateDegrees !== undefined ? Math.max(-90, Math.min(90, rotateDegrees)) : 0,
+        wide_angle: useWideAngle === true,
+        meta: {
+          source: 'canvas',
+          projectId,
+        },
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate multiangle image');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate multiangle image');
+    }
+
+    // Return the data object directly (contains url, storagePath, mediaId, generationId)
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Multiangle generation is taking too long. Please try again.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to generate multiangle image. Please check your connection and try again.');
   }
 }
 
@@ -1445,37 +1673,152 @@ export async function getReplicateQueueResult(requestId: string): Promise<any> {
 export async function getCurrentUser(): Promise<{ uid: string; username: string; email: string; credits?: number } | null> {
   const cacheKey = 'getCurrentUser';
 
-  // Check cache first
+  // Check cache first (but only if it's a valid user object, not null or empty)
   const cached = getCachedRequest<{ uid: string; username: string; email: string; credits?: number } | null>(cacheKey);
   if (cached) {
-    return cached;
+    const cachedValue = await cached;
+    // Only return cached value if it's a valid user object
+    if (cachedValue && cachedValue.uid && cachedValue.username && cachedValue.email) {
+      return cachedValue;
+    }
+    // If cached value is null or invalid, don't use it - make a fresh request
+  }
+
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  let bearerToken: string | null = null;
+  try {
+    // Use the same token retrieval logic as checkAuthStatus
+    if (typeof window !== 'undefined') {
+      // Check URL hash first (token passed from parent window)
+      try {
+        const hash = window.location.hash;
+        const authTokenMatch = hash.match(/authToken=([^&]+)/);
+        if (authTokenMatch) {
+          const passedToken = decodeURIComponent(authTokenMatch[1]);
+          if (passedToken && passedToken.startsWith('eyJ')) {
+            bearerToken = passedToken;
+            // Store it for future use
+            try {
+              localStorage.setItem('authToken', passedToken);
+            } catch {}
+          }
+        }
+      } catch {}
+
+      // Try localStorage
+      if (!bearerToken) {
+        const storedToken = localStorage.getItem('authToken');
+        if (storedToken && storedToken.startsWith('eyJ')) {
+          bearerToken = storedToken;
+        }
+      }
+
+      // Try user object
+      if (!bearerToken) {
+        const userString = localStorage.getItem('user');
+        if (userString) {
+          try {
+            const userObj = JSON.parse(userString);
+            const token = userObj?.idToken || userObj?.token || null;
+            if (token && token.startsWith('eyJ')) {
+              bearerToken = token;
+            }
+          } catch {}
+        }
+      }
+
+      // Try idToken directly
+      if (!bearerToken) {
+        const idToken = localStorage.getItem('idToken');
+        if (idToken && idToken.startsWith('eyJ')) {
+          bearerToken = idToken;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[getCurrentUser] Failed to get Bearer token:', error);
   }
 
   // Create new request
   const requestPromise = (async () => {
     try {
+      // Build headers with Bearer token if available
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (bearerToken) {
+        headers['Authorization'] = `Bearer ${bearerToken}`;
+        console.log('[getCurrentUser] Using Bearer token authentication');
+      }
+
       const response = await fetch(`${API_GATEWAY_URL}/auth/me`, {
         method: 'GET',
-        credentials: 'include', // Include cookies (app_session)
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include', // Include cookies (app_session) - works across subdomains if domain=.wildmindai.com
+        headers,
       });
 
       if (!response.ok) {
+        // If 401 and we have a Bearer token, the token might be invalid
+        if (response.status === 401) {
+          const errorText = await response.text().catch(() => '');
+          let errorData: any = null;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {}
+          
+          const errorMessage = errorData?.message || errorText || 'Unauthorized';
+          console.warn('[getCurrentUser] 401 Unauthorized', {
+            hasBearerToken: !!bearerToken,
+            errorMessage,
+            note: bearerToken ? 'Bearer token provided but rejected - token may be expired or invalid' : 'No Bearer token available - cookies not working'
+          });
+        }
         return null;
       }
 
-      const result = await response.json();
+      const result = await response.json().catch(() => {
+        console.error('[getCurrentUser] Failed to parse JSON response');
+        return null;
+      });
+
+      if (!result) {
+        console.warn('[getCurrentUser] No response data');
+        return null;
+      }
+
       if (result.responseStatus === 'success' && result.data?.user) {
-        return {
+        const user = {
           uid: result.data.user.uid,
           username: result.data.user.username,
           email: result.data.user.email,
           credits: result.data.credits,
         };
+        
+        // Validate user object has required fields
+        if (!user.uid || !user.username || !user.email) {
+          console.warn('[getCurrentUser] User object missing required fields', user);
+          return null;
+        }
+        
+        return user;
       }
 
+      // If responseStatus is 'error', log the error message
+      if (result.responseStatus === 'error') {
+        console.warn('[getCurrentUser] API returned error status', {
+          message: result.message,
+          hasData: !!result.data,
+        });
+      } else {
+        console.warn('[getCurrentUser] Response not in expected format', {
+          responseStatus: result.responseStatus,
+          hasData: !!result.data,
+          hasUser: !!result.data?.user,
+          resultKeys: Object.keys(result || {}),
+        });
+      }
+      
       return null;
     } catch (error) {
       console.error('Error fetching user info:', error);
@@ -1484,7 +1827,29 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
   })();
 
   // Cache the request
-  return setCachedRequest(cacheKey, requestPromise);
+  const cachedPromise = setCachedRequest(cacheKey, requestPromise);
+  
+  // Validate the result before returning (don't cache invalid responses)
+  return cachedPromise.then(result => {
+    // If result is null or invalid, don't cache it
+    if (!result || !result.uid || !result.username || !result.email) {
+      // Clear cache if invalid data was stored
+      try {
+        const { clearCache } = require('./apiCache');
+        clearCache(cacheKey);
+      } catch {}
+      return null;
+    }
+    return result;
+  }).catch(error => {
+    // On error, clear cache and return null
+    try {
+      const { clearCache } = require('./apiCache');
+      clearCache(cacheKey);
+    } catch {}
+    console.error('[getCurrentUser] Request failed:', error);
+    return null;
+  });
 }
 
 /**

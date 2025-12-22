@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ConnectionNodes } from './ConnectionNodes';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface UpscaleImageFrameProps {
@@ -110,7 +110,7 @@ export const UpscaleImageFrame: React.FC<UpscaleImageFrameProps> = ({
         </div>
       )}
 
-      <ConnectionNodes
+      <PluginConnectionNodes
         id={id}
         scale={scale}
         isHovered={isHovered}

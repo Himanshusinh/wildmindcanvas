@@ -104,6 +104,25 @@ export function buildSnapshotElements(
     };
   });
 
+  // Multiangle Camera generators
+  state.multiangleCameraGenerators.forEach((modal) => {
+    if (!modal || !modal.id) return;
+    const metaObj: any = {
+      sourceImageUrl: modal.sourceImageUrl || null,
+    };
+    // Attach any connections originating from this element into its meta
+    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
+      metaObj.connections = connectionsBySource[modal.id];
+    }
+    elements[modal.id] = {
+      id: modal.id,
+      type: 'multiangle-camera-plugin',
+      x: modal.x,
+      y: modal.y,
+      meta: metaObj,
+    };
+  });
+
   // Remove BG generators
   state.removeBgGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;
@@ -205,6 +224,27 @@ export function buildSnapshotElements(
     };
   });
 
+  // Compare generators
+  state.compareGenerators.forEach((g) => {
+    const metaObj: any = {
+      scale: g.scale,
+      prompt: g.prompt,
+      model: g.model,
+    };
+    if (connectionsBySource[g.id] && connectionsBySource[g.id].length) {
+      metaObj.connections = connectionsBySource[g.id];
+    }
+    elements[g.id] = {
+      id: g.id,
+      type: 'compare-plugin',
+      x: g.x,
+      y: g.y,
+      width: g.width,
+      height: g.height,
+      meta: metaObj,
+    };
+  });
+
   // NextScene generators
   state.nextSceneGenerators.forEach((modal) => {
     if (!modal || !modal.id) return;
@@ -230,28 +270,6 @@ export function buildSnapshotElements(
     };
   });
 
-  // Multiangle generators
-  state.multiangleGenerators.forEach((modal) => {
-    if (!modal || !modal.id) return;
-    const metaObj: any = {
-      multiangleImageUrl: modal.multiangleImageUrl || null,
-      sourceImageUrl: modal.sourceImageUrl || null,
-      localMultiangleImageUrl: modal.localMultiangleImageUrl || null,
-      frameWidth: modal.frameWidth || 400,
-      frameHeight: modal.frameHeight || 500,
-      isProcessing: modal.isProcessing || false,
-    };
-    if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-      metaObj.connections = connectionsBySource[modal.id];
-    }
-    elements[modal.id] = {
-      id: modal.id,
-      type: 'multiangle-plugin',
-      x: modal.x,
-      y: modal.y,
-      meta: metaObj,
-    };
-  });
 
   // Storyboard generators
   state.storyboardGenerators.forEach((modal) => {

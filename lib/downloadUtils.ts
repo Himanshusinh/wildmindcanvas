@@ -1,24 +1,32 @@
 /**
- * Download utility functions for high-quality image downloads
+ * Download utility functions for high-quality media downloads
  */
 
 /**
- * Downloads an image from a URL while preserving original quality
+ * Downloads a file (image, video, audio) from a URL while preserving original quality
  * Uses blob fetching to handle CORS and ensure no quality loss
+ * For Zata URLs, uses proxy download endpoint to ensure proper download headers
  * 
- * @param imageUrl - The URL of the image to download
- * @param filename - The desired filename for the downloaded image
+ * @param fileUrl - The URL of the file to download
+ * @param filename - The desired filename for the downloaded file
  */
-export async function downloadImage(imageUrl: string, filename: string): Promise<void> {
+export async function downloadFile(fileUrl: string, filename: string): Promise<void> {
     try {
+        // Use proxy download URL for Zata URLs to ensure proper download headers
+        let downloadUrl = fileUrl;
+        if (fileUrl.includes('zata.ai') || fileUrl.includes('zata')) {
+            const { buildProxyDownloadUrl } = await import('./proxyUtils');
+            downloadUrl = buildProxyDownloadUrl(fileUrl);
+        }
+
         // Method 1: Fetch as blob (handles CORS, preserves quality)
-        const response = await fetch(imageUrl, {
+        const response = await fetch(downloadUrl, {
             mode: 'cors',
             credentials: 'same-origin',
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
+            throw new Error(`Failed to fetch file: ${response.statusText}`);
         }
 
         const blob = await response.blob();
@@ -30,6 +38,7 @@ export async function downloadImage(imageUrl: string, filename: string): Promise
         link.style.display = 'none';
 
         // CRITICAL: Append to body, click, and remove
+        // DO NOT set target="_blank" - this causes opening in new tab instead of downloading
         document.body.appendChild(link);
 
         // Trigger download
@@ -41,14 +50,14 @@ export async function downloadImage(imageUrl: string, filename: string): Promise
             window.URL.revokeObjectURL(blobUrl);
         }, 100);
 
-        console.log(`✅ Image downloaded successfully: ${filename}`);
+        console.log(`✅ File downloaded successfully: ${filename}`);
     } catch (error) {
-        console.error('Failed to download image via blob method:', error);
+        console.error('Failed to download file via blob method:', error);
 
-        // Fallback: Try direct download with proper attributes
+        // Fallback: Try direct download with proper attributes (for non-Zata URLs)
         try {
             const link = document.createElement('a');
-            link.href = imageUrl;
+            link.href = fileUrl;
             link.download = filename;
             link.style.display = 'none';
 
@@ -63,12 +72,45 @@ export async function downloadImage(imageUrl: string, filename: string): Promise
                 document.body.removeChild(link);
             }, 100);
 
-            console.log(`✅ Image downloaded successfully (fallback method): ${filename}`);
+            console.log(`✅ File downloaded successfully (fallback method): ${filename}`);
         } catch (fallbackError) {
-            console.error('Failed to download image (both methods failed):', fallbackError);
-            throw new Error('Unable to download image. Please try again.');
+            console.error('Failed to download file (both methods failed):', fallbackError);
+            throw new Error('Unable to download file. Please try again.');
         }
     }
+}
+
+/**
+ * Downloads an image from a URL while preserving original quality
+ * Uses blob fetching to handle CORS and ensure no quality loss
+ * 
+ * @param imageUrl - The URL of the image to download
+ * @param filename - The desired filename for the downloaded image
+ */
+export async function downloadImage(imageUrl: string, filename: string): Promise<void> {
+    return downloadFile(imageUrl, filename);
+}
+
+/**
+ * Downloads a video from a URL while preserving original quality
+ * Uses blob fetching to handle CORS and ensure no quality loss
+ * 
+ * @param videoUrl - The URL of the video to download
+ * @param filename - The desired filename for the downloaded video
+ */
+export async function downloadVideo(videoUrl: string, filename: string): Promise<void> {
+    return downloadFile(videoUrl, filename);
+}
+
+/**
+ * Downloads an audio/music file from a URL while preserving original quality
+ * Uses blob fetching to handle CORS and ensure no quality loss
+ * 
+ * @param audioUrl - The URL of the audio file to download
+ * @param filename - The desired filename for the downloaded audio file
+ */
+export async function downloadAudio(audioUrl: string, filename: string): Promise<void> {
+    return downloadFile(audioUrl, filename);
 }
 
 /**

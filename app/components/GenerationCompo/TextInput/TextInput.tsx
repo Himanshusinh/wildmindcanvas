@@ -21,6 +21,7 @@ interface TextInputProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onValueChange?: (value: string) => void;
+  onSendPrompt?: (text: string) => void;
   stageRef: React.RefObject<any>;
   scale: number;
   position: { x: number; y: number };
@@ -43,6 +44,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   onDelete,
   onDuplicate,
   onValueChange,
+  onSendPrompt,
   stageRef,
   scale,
   position,
@@ -78,6 +80,20 @@ export const TextInput: React.FC<TextInputProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  // Listen for pin toggle keyboard shortcut (P key)
+  useEffect(() => {
+    const handleTogglePin = (e: Event) => {
+      const ce = e as CustomEvent;
+      const { selectedTextInputIds } = ce.detail || {};
+      // Check if this text input is selected
+      if (selectedTextInputIds && Array.isArray(selectedTextInputIds) && selectedTextInputIds.includes(id)) {
+        setIsPinned(prev => !prev);
+      }
+    };
+    window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
+    return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
+  }, [id]);
 
 
   const isDark = useIsDarkTheme();
@@ -156,11 +172,12 @@ export const TextInput: React.FC<TextInputProps> = ({
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Capture so child stopPropagation can't block drag end
+    window.addEventListener('mouseup', handleMouseUp, true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [isDragging, dragOffset, scale, position, onPositionChange]);
 
@@ -187,15 +204,15 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
 
     setIsEnhancing(true);
-    setEnhanceStatus('Preparing storyboard script...');
+    setEnhanceStatus('Enhancing prompt...');
     try {
       const { queryCanvasPrompt } = await import('@/lib/api');
       const result = await queryCanvasPrompt(text, undefined, {
         onAttempt: (attempt, maxAttempts) => {
           if (attempt === 1) {
-            setEnhanceStatus('Generating storyboard scenes...');
+            setEnhanceStatus('Enhancing prompt...');
           } else {
-            setEnhanceStatus(`Still generating (${attempt}/${maxAttempts})...`);
+            setEnhanceStatus(`Enhancing (${attempt}/${maxAttempts})...`);
           }
         },
       });
@@ -204,6 +221,12 @@ export const TextInput: React.FC<TextInputProps> = ({
         (typeof result?.response === 'string' && result.response.trim());
 
       if (enhancedText) {
+        // Update the text in the same input box
+        setText(enhancedText);
+        if (onValueChange) {
+          onValueChange(enhancedText);
+        }
+        // Also call onScriptGenerated for backwards compatibility
         if (onScriptGenerated) {
           onScriptGenerated(id, enhancedText);
         }
@@ -217,6 +240,20 @@ export const TextInput: React.FC<TextInputProps> = ({
     } finally {
       setIsEnhancing(false);
       setEnhanceStatus('');
+    }
+  };
+
+  // Find connected components (image/video modals)
+  const connectedComponents = connections.filter(c => c.from === id);
+  const hasConnectedComponents = connectedComponents.length > 0;
+
+  const handleSendPrompt = () => {
+    if (!text.trim() || !hasConnectedComponents) return;
+    
+    // Call onSendPrompt to update sentValue in the parent state
+    // This will trigger the useEffect in connected components to sync the prompt
+    if (onSendPrompt) {
+      onSendPrompt(text);
     }
   };
 
@@ -267,7 +304,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: `${1 * scale}px`,
-        padding: `${12 * scale}px`,
+        padding: `${20 * scale}px ${12 * scale}px`,
+        paddingTop: `${24 * scale}px`,
+        paddingBottom: `${24 * scale}px`,
         backgroundColor: isDark ? '#121212' : '#ffffff',
         borderRadius: (isHovered || isPinned) ? '0px' : `${12 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
@@ -277,9 +316,12 @@ export const TextInput: React.FC<TextInputProps> = ({
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
+        minWidth: `${400 * scale}px`,
+        maxWidth: `${400 * scale}px`,
         cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
         overflow: 'visible',
+        boxSizing: 'border-box',
       }}
     >
       <TextModalTooltip
@@ -293,6 +335,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         onDelete={onDelete}
         onDuplicate={onDuplicate}
         variant="default"
+        isPinned={isPinned}
+        onTogglePin={() => setIsPinned(!isPinned)}
       />
 
       <div style={{ position: 'relative' }}>
@@ -327,59 +371,9 @@ export const TextInput: React.FC<TextInputProps> = ({
           connections={connections}
           storyboardModalStates={storyboardModalStates}
           onHoverChange={requestHoverState}
+          onSendPrompt={handleSendPrompt}
+          hasConnectedComponents={hasConnectedComponents}
         />
-
-        {/* Pin Icon Button - Below Input Box */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsPinned(!isPinned);
-          }}
-          style={{
-            position: 'absolute',
-            bottom: `${-32 * scale}px`,
-            right: `${8 * scale}px`,
-            width: `${28 * scale}px`,
-            height: `${28 * scale}px`,
-            borderRadius: `${6 * scale}px`,
-            backgroundColor: isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff'),
-            border: `1px solid ${isDark ? (isPinned ? '#437eb5' : 'rgba(255, 255, 255, 0.15)') : (isPinned ? '#437eb5' : 'rgba(0, 0, 0, 0.1)')}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 20,
-            opacity: isHovered ? 1 : 0,
-            transition: 'opacity 0.18s ease, background-color 0.3s ease, border-color 0.3s ease',
-            pointerEvents: 'auto',
-            boxShadow: isPinned ? `0 ${2 * scale}px ${8 * scale}px rgba(67, 126, 181, 0.3)` : 'none',
-          }}
-          onMouseEnter={(e) => {
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#121212') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : '#ffffff');
-            if (!isPinned) {
-              e.currentTarget.style.backgroundColor = pinBg;
-            }
-          }}
-          title={isPinned ? 'Unpin controls' : 'Pin controls'}
-        >
-          <svg
-            width={16 * scale}
-            height={16 * scale}
-            viewBox="0 0 24 24"
-            fill={isPinned ? '#437eb5' : 'none'}
-            stroke={isDark ? (isPinned ? '#437eb5' : '#cccccc') : (isPinned ? '#437eb5' : '#4b5563')}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 17v5M9 10V7a3 3 0 0 1 6 0v3M5 10h14l-1 7H6l-1-7z" />
-          </svg>
-        </button>
 
         <TextModalNodes
           id={id}
@@ -410,6 +404,8 @@ export const TextInput: React.FC<TextInputProps> = ({
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}
         onEnhance={handleEnhance}
+        onSendPrompt={handleSendPrompt}
+        hasConnectedComponents={hasConnectedComponents}
       />
     </div>
   );

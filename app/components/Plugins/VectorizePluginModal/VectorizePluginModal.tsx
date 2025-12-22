@@ -6,11 +6,15 @@ import { VectorizeLabel } from './VectorizeLabel';
 import { ModalActionIcons } from '../../common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
-import { ConnectionNodes } from '../UpscalePluginModal/ConnectionNodes';
+import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
+import { PluginNodeShell } from '../PluginComponents';
+import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface VectorizePluginModalProps {
   isOpen: boolean;
+  isExpanded?: boolean;
   id?: string;
   onClose: () => void;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
@@ -33,7 +37,7 @@ interface VectorizePluginModalProps {
   initialLocalVectorizedImageUrl?: string | null;
   onOptionsChange?: (opts: { mode?: string; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; isVectorizing?: boolean }) => void;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean }) => void;
+  onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -44,6 +48,7 @@ interface VectorizePluginModalProps {
 
 export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   isOpen,
+  isExpanded,
   id,
   onClose,
   onVectorize,
@@ -74,26 +79,16 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   images = [],
   onPersistConnectorCreate,
 }) => {
-  const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isVectorizing, setIsVectorizing] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
-  const [isDimmed, setIsDimmed] = useState(false);
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const { isDimmed, setIsDimmed } = useCanvasFrameDim(id);
+  const { isPopupOpen, togglePopup } = usePersistedPopupState({ isExpanded, id, onUpdateModalState, defaultOpen: false });
   const [mode, setMode] = useState<string>(initialMode ?? 'simple');
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(initialSourceImageUrl ?? null);
   const [localVectorizedImageUrl, setLocalVectorizedImageUrl] = useState<string | null>(initialLocalVectorizedImageUrl ?? null);
-  const onOptionsChangeRef = useRef(onOptionsChange);
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const hasDraggedRef = useRef(false);
-
-  // Update ref when callback changes
-  useEffect(() => {
-    onOptionsChangeRef.current = onOptionsChange;
-  }, [onOptionsChange]);
+  const onOptionsChangeRef = useLatestRef(onOptionsChange);
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -110,31 +105,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   // Detect if this is a vectorized image result (media-like, no controls)
   const isVectorizedImage = false; // Always show controls for the plugin
 
-  // Detect connected image nodes (from image generators or canvas images)
-  const connectedImageSource = useMemo(() => {
-    if (!id) return null;
-    const conn = connections.find(c => c.to === id && c.from);
-    if (!conn) return null;
-
-    // First check if it's from an image generator modal
-    const sourceModal = imageModalStates?.find(m => m.id === conn.from);
-    if (sourceModal?.generatedImageUrl) {
-      return sourceModal.generatedImageUrl;
-    }
-
-    // Then check if it's from a canvas image (uploaded image)
-    if (images && images.length > 0) {
-      const canvasImage = images.find(img => {
-        const imgId = img.elementId || (img as any).id;
-        return imgId === conn.from;
-      });
-      if (canvasImage?.url) {
-        return canvasImage.url;
-      }
-    }
-
-    return null;
-  }, [id, connections, imageModalStates, images]);
+  const connectedImageSource = useConnectedSourceImage({ id, connections, imageModalStates, images });
 
   // Restore images and mode from props on mount or when props change
   useEffect(() => {
@@ -150,17 +121,33 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   }, [initialMode, initialSourceImageUrl, initialLocalVectorizedImageUrl]);
 
   useEffect(() => {
-    if (connectedImageSource && connectedImageSource !== sourceImageUrl) {
-      setSourceImageUrl(connectedImageSource);
-      // Clear dimming when image is connected
-      setIsDimmed(false);
-      // Reset vectorized image when source changes (only if not persisted)
-      if (!initialLocalVectorizedImageUrl) {
-        setLocalVectorizedImageUrl(null);
+    // Handle connection changes: update or clear source image
+    if (connectedImageSource) {
+      // Connection exists: update source image if different
+      if (connectedImageSource !== sourceImageUrl) {
+        setSourceImageUrl(connectedImageSource);
+        // Clear dimming when image is connected
+        setIsDimmed(false);
+        // Reset vectorized image when source changes (only if not persisted)
+        if (!initialLocalVectorizedImageUrl) {
+          setLocalVectorizedImageUrl(null);
+        }
+        // Persist the source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+        }
       }
-      // Persist the source image URL (only if it actually changed from initial)
-      if (onOptionsChangeRef.current && connectedImageSource !== initialSourceImageUrl) {
-        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+    } else {
+      // Connection deleted: clear source image if it was from a connection
+      // Only clear if current sourceImageUrl matches what was connected (or if no initialSourceImageUrl was set)
+      if (sourceImageUrl && (!initialSourceImageUrl || sourceImageUrl === initialSourceImageUrl)) {
+        setSourceImageUrl(null);
+        // Clear dimming
+        setIsDimmed(false);
+        // Clear persisted source image URL
+        if (onOptionsChangeRef.current) {
+          onOptionsChangeRef.current({ sourceImageUrl: null });
+        }
       }
     }
   }, [connectedImageSource, initialLocalVectorizedImageUrl, initialSourceImageUrl, sourceImageUrl]);
@@ -182,116 +169,18 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
     }
   }, [localVectorizedImageUrl, vectorizedImageUrl]);
 
-  // Listen for dimming events
-  useEffect(() => {
-    const handleDim = (e: CustomEvent) => {
-      if (e.detail?.frameId === id) {
-        // Only dim if explicitly set to true, otherwise clear dimming
-        setIsDimmed(e.detail?.dimmed === true);
-      }
-    };
-    window.addEventListener('canvas-frame-dim' as any, handleDim);
-    return () => {
-      window.removeEventListener('canvas-frame-dim' as any, handleDim);
-    };
-  }, [id]);
-
-  // Handle mouse down to start dragging
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
-    const isButton = target.tagName === 'BUTTON' || target.closest('button');
-    const isImage = target.tagName === 'IMG';
-    const isControls = target.closest('.controls-overlay');
-    // Check if clicking on action icons (ModalActionIcons container or its children)
-    const isActionIcons = target.closest('[data-action-icons]') || target.closest('button[title="Delete"], button[title="Download"], button[title="Duplicate"]');
-
-    console.log('[VectorizePluginModal] handleMouseDown', {
-      timestamp: Date.now(),
-      target: target.tagName,
-      isInput,
-      isButton,
-      isImage,
-      isControls: !!isControls,
-      isActionIcons: !!isActionIcons,
-    });
-
-    if (isInput || isButton || isImage || isControls || isActionIcons) {
-      return;
-    }
-
-    if (onSelect) {
-      onSelect();
-    }
-
-    // Track initial mouse position to detect drag vs click
-    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-    hasDraggedRef.current = false;
-
-    setIsDraggingContainer(true);
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (rect) {
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
-    lastCanvasPosRef.current = { x, y };
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  // Handle drag
-  useEffect(() => {
-    if (!isDraggingContainer) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
-
-      // Check if mouse moved significantly (more than 5px) to detect drag
-      if (dragStartPosRef.current) {
-        const dx = Math.abs(e.clientX - dragStartPosRef.current.x);
-        const dy = Math.abs(e.clientY - dragStartPosRef.current.y);
-        if (dx > 5 || dy > 5) {
-          hasDraggedRef.current = true;
-        }
-      }
-
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
-
-      onPositionChange(newCanvasX, newCanvasY);
-      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-    };
-
-    const handleMouseUp = () => {
-      const wasDragging = hasDraggedRef.current;
-      setIsDraggingContainer(false);
-      dragStartPosRef.current = null;
-
-      // Only toggle popup if it was a click (not a drag)
-      if (!wasDragging) {
-        setIsPopupOpen(prev => !prev);
-      }
-
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
-      }
-
-      // Reset drag flag
-      hasDraggedRef.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit, x, y]);
+  const { isDragging: isDraggingContainer, onMouseDown: handleMouseDown } = useCanvasModalDrag({
+    enabled: isOpen,
+    x,
+    y,
+    scale,
+    position,
+    containerRef,
+    onPositionChange,
+    onPositionCommit,
+    onSelect,
+    onTap: () => togglePopup(),
+  });
 
 
   const handleVectorize = async () => {
@@ -446,22 +335,18 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={containerRef}
-      data-modal-component="vectorize"
-      data-overlay-id={id}
+    <PluginNodeShell
+      modalKey="vectorize"
+      id={id}
+      containerRef={containerRef}
+      screenX={screenX}
+      screenY={screenY}
+      isHovered={isHovered}
+      isSelected={Boolean(isSelected)}
+      isDimmed={isDimmed}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        position: 'absolute',
-        left: `${screenX}px`,
-        top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
-        userSelect: 'none',
-        opacity: isDimmed ? 0.4 : 1,
-        transition: 'opacity 0.2s ease',
-      }}
     >
       {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
       {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
@@ -539,7 +424,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             }}
           />
 
-          <ConnectionNodes
+          <PluginConnectionNodes
             id={id}
             scale={scale}
             isHovered={isHovered}
@@ -605,7 +490,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
         )}
       </div>
 
-    </div>
+    </PluginNodeShell>
   );
 };
 
