@@ -28,7 +28,11 @@ interface StoryboardControlsProps {
     backgroundNamesMap: Record<number, string>;
     onBackgroundNamesMapChange: (map: Record<number, string>) => void;
     extraTopPadding?: number;
+    scriptText?: string | null;
+    hasActiveTextInputConnection?: boolean;
+    hasExistingScenes?: boolean;
 }
+
 
 export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
     id,
@@ -55,7 +59,11 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
     backgroundNamesMap,
     onBackgroundNamesMapChange,
     extraTopPadding,
+    scriptText,
+    hasActiveTextInputConnection = false,
+    hasExistingScenes = false,
 }) => {
+
     const isDark = useIsDarkTheme();
     const [selectedCharacterIndex, setSelectedCharacterIndex] = useState<number | null>(null);
     const [selectedPropsIndex, setSelectedPropsIndex] = useState<number | null>(null);
@@ -537,6 +545,22 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                 </div>
             )}
 
+            {/* Script Display - Show connected TextInput script */}
+            {hasActiveTextInputConnection && scriptText && (
+                <div style={{
+                    marginTop: `${12 * scale}px`,
+                    padding: `${8 * scale}px`,
+                    borderRadius: `${8 * scale}px`,
+                    backgroundColor: isDark ? 'rgba(67, 126, 181, 0.1)' : 'rgba(67, 126, 181, 0.05)',
+                    border: `1px solid rgba(67, 126, 181, 0.3)`,
+                }}>
+                    <label style={{ ...labelStyle, color: '#437eb5' }}>
+                        📜 Connected Script
+                    </label>
+                </div>
+            )}
+
+
             {/* Generate Button */}
             <button
                 onClick={onGenerate}
@@ -556,7 +580,7 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                 onMouseEnter={(e) => e.currentTarget.style.background = '#3b6ea0'}
                 onMouseLeave={(e) => e.currentTarget.style.background = '#437eb5'}
             >
-                Generate Storyboard
+                {hasExistingScenes ? '🔄 Update Storyboard' : '✨ Generate Storyboard'}
             </button>
         </div>
     );

@@ -41,6 +41,7 @@ interface StoryboardModalOverlaysProps {
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
   textInputStates?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
   imageModalStates?: ImageModalState[];
+  sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number;[key: string]: any }>;
   images?: ImageUpload[];
   onGenerateStoryboard?: (storyboardId: string, inputs: {
     characterInput?: string;
@@ -69,6 +70,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
   connections = [],
   textInputStates = [],
   imageModalStates = [],
+  sceneFrameModalStates = [],
   images = [],
   onGenerateStoryboard,
 }) => {
@@ -216,6 +218,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
             connections={connections}
             textInputStates={textInputStates}
             imageModalStates={imageModalStates}
+            sceneFrameModalStates={sceneFrameModalStates}
             images={images}
             onGenerate={(inputs) => {
               if (onGenerateStoryboard) {

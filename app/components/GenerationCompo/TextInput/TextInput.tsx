@@ -95,6 +95,8 @@ export const TextInput: React.FC<TextInputProps> = ({
     return () => window.removeEventListener('canvas-toggle-pin', handleTogglePin as any);
   }, [id]);
 
+  // Detect if this TextInput has a connected Storyboard
+  const connectedStoryboardId = connections.find(conn => conn.from === id)?.to;
 
   const isDark = useIsDarkTheme();
 
@@ -204,6 +206,57 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
 
     setIsEnhancing(true);
+
+    // If connected to storyboard, generate story/script text instead of enhancing prompt
+    if (connectedStoryboardId) {
+      setEnhanceStatus('Generating story...');
+      try {
+        const { queryCanvasPrompt } = await import('@/lib/api');
+        const result = await queryCanvasPrompt(text, undefined, {
+          onAttempt: (attempt, maxAttempts) => {
+            if (attempt === 1) {
+              setEnhanceStatus('Generating story...');
+            } else {
+              setEnhanceStatus(`Generating (${attempt}/${maxAttempts})...`);
+            }
+          },
+        });
+        const generatedStory =
+          (typeof result?.enhanced_prompt === 'string' && result.enhanced_prompt.trim()) ||
+          (typeof result?.response === 'string' && result.response.trim());
+
+        if (generatedStory) {
+          // Update the text in the same input box
+          setText(generatedStory);
+          if (onValueChange) {
+            onValueChange(generatedStory);
+          }
+
+          // Send the generated story to connected storyboard (as scriptText)
+          window.dispatchEvent(new CustomEvent('text-script-generated', {
+            detail: {
+              componentId: connectedStoryboardId,
+              scriptText: generatedStory,
+              textInputId: id, // Include text input ID for queue removal
+            }
+          }));
+
+          console.log('[TextInput] ✅ Story generated and sent to storyboard');
+        } else {
+          console.warn('[TextInput] No story text returned from generation');
+          alert('Failed to generate story. Please try again.');
+        }
+      } catch (error: any) {
+        console.error('[TextInput] Error generating story:', error);
+        alert(`Failed to generate story: ${error.message || 'Unknown error'}`);
+      } finally {
+        setIsEnhancing(false);
+        setEnhanceStatus('');
+      }
+      return;
+    }
+
+    // Otherwise, enhance the prompt normally (not connected to storyboard)
     setEnhanceStatus('Enhancing prompt...');
     try {
       const { queryCanvasPrompt } = await import('@/lib/api');
@@ -248,11 +301,21 @@ export const TextInput: React.FC<TextInputProps> = ({
   const hasConnectedComponents = connectedComponents.length > 0;
 
   const handleSendPrompt = () => {
-    if (!text.trim() || !hasConnectedComponents) return;
-    
-    // Call onSendPrompt to update sentValue in the parent state
-    // This will trigger the useEffect in connected components to sync the prompt
-    if (onSendPrompt) {
+    if (!text.trim()) return;
+
+    // If connected to storyboard, transfer text as script
+    if (connectedStoryboardId) {
+      window.dispatchEvent(new CustomEvent('text-script-generated', {
+        detail: {
+          componentId: connectedStoryboardId,
+          scriptText: text,
+          textInputId: id, // Include text input ID for queue removal
+        }
+      }));
+    }
+
+    // Also call onSendPrompt for other connected components
+    if (hasConnectedComponents && onSendPrompt) {
       onSendPrompt(text);
     }
   };

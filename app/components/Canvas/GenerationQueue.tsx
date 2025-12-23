@@ -5,7 +5,7 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 export type GenerationQueueItem = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'upscale' | 'vectorize' | 'removebg' | 'erase' | 'expand' | 'storyboard' | 'script' | 'scene';
+  type: 'image' | 'video' | 'music' | 'upscale' | 'vectorize' | 'removebg' | 'erase' | 'expand' | 'storyboard' | 'script' | 'scene' | 'error';
   operationName: string; // Display name like "Generating Image", "Upscaling", etc.
   prompt?: string; // Optional - plugins may not have prompts
   model: string;
@@ -14,6 +14,7 @@ export type GenerationQueueItem = {
   startedAt: number;
   completed?: boolean; // Track if operation completed successfully
   completedAt?: number; // Timestamp when operation completed (to freeze elapsed time)
+  error?: boolean; // Track if this is an error message
 };
 
 interface GenerationQueueProps {
@@ -35,13 +36,13 @@ const formatElapsed = (startedAt: number, completedAt?: number) => {
 
 const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
   const isDark = useIsDarkTheme();
-  const [localItems, setLocalItems] = useState<GenerationQueueItem[]>(items.filter(item => !item.completed));
+  const [localItems, setLocalItems] = useState<GenerationQueueItem[]>(items.filter(item => !item.completed || item.error));
   const [, setTick] = useState(0); // Force re-render for elapsed time updates
 
-  // Sync local items with props and filter out completed items immediately
+  // Sync local items with props and filter out completed items (but keep errors)
   useEffect(() => {
-    // Remove completed items immediately - don't show them in queue
-    const activeItems = items.filter(item => !item.completed);
+    // Remove completed items immediately - don't show them in queue (but keep errors)
+    const activeItems = items.filter(item => !item.completed || item.error);
     setLocalItems(activeItems);
   }, [items]);
 
@@ -49,7 +50,7 @@ const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
   useEffect(() => {
     const hasActiveItems = localItems.some(item => !item.completed);
     if (!hasActiveItems) return; // No need to update if all items are completed
-    
+
     const interval = setInterval(() => {
       setTick((prev) => prev + 1);
     }, 1000);
@@ -70,7 +71,7 @@ const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(226, 232, 240, 0.8)';
   const textColor = isDark ? '#ffffff' : '#1e293b'; // Use pure white for dark theme for better visibility
   const secondaryTextColor = isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.5)'; // For elapsed time and indicators
-  const shadowColor = isDark 
+  const shadowColor = isDark
     ? '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3)'
     : '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)';
   const spinnerBorderColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(203, 213, 225, 0.7)';
@@ -143,7 +144,37 @@ const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
                 flexShrink: 0,
               }}
             >
-              {isCompleted ? (
+              {item.error ? (
+                // Red warning icon for errors
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    backgroundColor: '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M6 4V6M6 8H6.01M6 11C3.24 11 1 8.76 1 6C1 3.24 3.24 1 6 1C8.76 1 11 3.24 11 6C11 8.76 8.76 11 6 11Z"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              ) : isCompleted ? (
                 // Green checkmark when completed
                 <div
                   style={{

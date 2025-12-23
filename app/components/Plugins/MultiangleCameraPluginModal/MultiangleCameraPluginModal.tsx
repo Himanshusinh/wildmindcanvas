@@ -111,12 +111,12 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
     if (connectedImageSource) {
       // Connection exists: update source image if different
       if (connectedImageSource !== sourceImageUrl) {
-        setSourceImageUrl(connectedImageSource);
-        // Clear dimming when image is connected
-        setIsDimmed(false);
+      setSourceImageUrl(connectedImageSource);
+      // Clear dimming when image is connected
+      setIsDimmed(false);
         // Persist the source image URL
         if (onOptionsChangeRef.current) {
-          onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
         }
       }
     } else {

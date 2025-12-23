@@ -174,9 +174,8 @@ interface CanvasProps {
   onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
   onPluginSidebarOpen?: () => void;
   isUIHidden?: boolean;
+  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/app/components/Canvas/GenerationQueue').GenerationQueueItem[]>>;
 }
-
-
 
 export const Canvas: React.FC<CanvasProps> = ({
   images = [],
@@ -294,7 +293,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   onPersistConnectorDelete,
   onPluginSidebarOpen,
   isUIHidden = false,
+  setGenerationQueue,
 }) => {
+
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -891,9 +892,24 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleScriptGenerationStart = (textModalId: string) => {
-    // Script generation starts - no need to create script frames anymore
-    // The generated story will be shown in the text input itself
+    // Script generation starts - add to queue
     console.log('[Canvas] Script generation started for text input:', textModalId);
+
+    if (setGenerationQueue) {
+      const queueId = `script-${textModalId}-${Date.now()}`;
+      setGenerationQueue((prev) => [
+        ...prev,
+        {
+          id: queueId,
+          type: 'script',
+          operationName: 'Generating Script',
+          model: 'Gemini',
+          total: 1,
+          index: 0,
+          startedAt: Date.now(),
+        },
+      ]);
+    }
   };
 
   const handleTextScriptGenerated = async (textModalId: string, script: string) => {
@@ -901,11 +917,33 @@ export const Canvas: React.FC<CanvasProps> = ({
     const sanitizedScript = sanitizeScriptOutput(script);
     if (!sanitizedScript) return;
 
+    // Remove script generation from queue
+    if (setGenerationQueue) {
+      setGenerationQueue((prev) => {
+        // Mark as completed with timestamp
+        const updated = prev.map(item => {
+          if (item.type === 'script' && item.id.includes(textModalId)) {
+            return { ...item, completed: true, completedAt: Date.now() };
+          }
+          return item;
+        });
+
+        // Remove completed items after 1 second
+        setTimeout(() => {
+          setGenerationQueue((current) =>
+            current.filter(item => !(item.completed && item.type === 'script' && item.id.includes(textModalId)))
+          );
+        }, 1000);
+
+        return updated;
+      });
+    }
+
     // Update the text input's value to show the generated story
-    setTextInputStates(prev => prev.map(t => 
+    setTextInputStates(prev => prev.map(t =>
       t.id === textModalId ? { ...t, value: sanitizedScript } : t
     ));
-    
+
     // Persist the text input update
     if (onPersistTextModalMove) {
       Promise.resolve(onPersistTextModalMove(textModalId, { value: sanitizedScript })).catch(console.error);
@@ -916,7 +954,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       .filter(conn => conn.from === textModalId)
       .map(conn => conn.to)
       .filter(Boolean);
-    
+
     if (!storyboardTargets.length) return;
 
     // Find target plugin IDs (only direct storyboard plugin connections, no script frames)
@@ -1285,30 +1323,82 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Get script text from connected text input or from storyboard's scriptText
     let scriptText: string | null = null;
-    
+    let hasActiveConnection = false;
+
     // Find connected text input
     const textInputConnection = (connections ?? []).find(conn => conn.to === storyboardId);
     if (textInputConnection) {
       const connectedTextInput = textInputStates.find(t => t.id === textInputConnection.from);
       if (connectedTextInput?.value) {
         scriptText = connectedTextInput.value;
+        hasActiveConnection = true;
         console.log('[Canvas] ✅ Found script from connected text input:', scriptText.substring(0, 100) + '...');
       }
     }
-    
-    // Fallback to storyboard's stored scriptText
-    if (!scriptText && storyboard.scriptText) {
-      scriptText = storyboard.scriptText;
-      console.log('[Canvas] ✅ Using script from storyboard scriptText:', scriptText.substring(0, 100) + '...');
+
+    // Only use stored scriptText if there's an active connection
+    // This prevents using stale data from disconnected text inputs
+    if (!scriptText && !hasActiveConnection && storyboard.scriptText) {
+      console.warn('[Canvas] ⚠️ Found stored scriptText but no active text input connection. Requiring active connection.');
     }
 
-    if (!scriptText || !scriptText.trim()) {
-      console.warn('[Canvas] ⚠️ No script text found. Please connect a text input with a generated story.');
-      alert('Please connect a text input with a generated story first.');
+    if (!scriptText || !scriptText.trim() || !hasActiveConnection) {
+      console.warn('[Canvas] ⚠️ No script text found or no active connection. Please connect a text input with a generated story.');
+
+      // Show error in queue instead of alert
+      if (setGenerationQueue) {
+        const errorId = `error-${storyboardId}-${Date.now()}`;
+        setGenerationQueue((prev) => [
+          ...prev,
+          {
+            id: errorId,
+            type: 'error',
+            operationName: 'Connect Script First',
+            model: '',
+            total: 1,
+            index: 0,
+            startedAt: Date.now(),
+            error: true,
+          },
+        ]);
+
+        // Remove error message after 5 seconds
+        setTimeout(() => {
+          setGenerationQueue((current) =>
+            current.filter(item => item.id !== errorId)
+          );
+        }, 5000);
+      }
       return;
     }
 
+    // Check if updating existing scenes
+    const existingScenes = sceneFrameModalStates.filter(
+      scene => scene.scriptFrameId === storyboardId
+    ).sort((a, b) => a.sceneNumber - b.sceneNumber);
+    const isUpdate = existingScenes.length > 0;
+
+    console.log(`[Canvas] ${isUpdate ? '🔄 Updating' : '✨ Generating'} storyboard with ${existingScenes.length} existing scenes`);
+
+    // Add to queue for scene generation
+    if (setGenerationQueue) {
+      const queueId = `scene-${storyboardId}-${Date.now()}`;
+      setGenerationQueue((prev) => [
+        ...prev,
+        {
+          id: queueId,
+          type: 'scene',
+          operationName: isUpdate ? 'Updating Scenes' : 'Generating Scenes',
+          model: 'Gemini',
+          total: 1,
+          index: 0,
+          startedAt: Date.now(),
+        },
+      ]);
+    }
+
     // Create stitched reference image from all connected images
+
     let stitchedImageUrl: string | undefined = undefined;
     try {
       stitchedImageUrl = await createStitchedImageForStoryboard(storyboardId);
@@ -1341,6 +1431,28 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Generate scenes directly from the script text
     await handleGenerateScenesFromStoryboard(storyboardId, scriptText);
+
+    // Remove scene generation from queue
+    if (setGenerationQueue) {
+      setGenerationQueue((prev) => {
+        // Mark as completed with timestamp
+        const updated = prev.map(item => {
+          if (item.type === 'scene' && item.id.includes(storyboardId)) {
+            return { ...item, completed: true, completedAt: Date.now() };
+          }
+          return item;
+        });
+
+        // Remove completed items after 1 second
+        setTimeout(() => {
+          setGenerationQueue((current) =>
+            current.filter(item => !(item.completed && item.type === 'scene' && item.id.includes(storyboardId)))
+          );
+        }, 1000);
+
+        return updated;
+      });
+    }
   };
 
   // Scene frame handlers - NEW: Generate scenes directly from storyboard (no script frames)
@@ -1368,8 +1480,175 @@ export const Canvas: React.FC<CanvasProps> = ({
       frameHeight: storyboard.frameHeight || 500,
     };
 
-    // Continue with scene generation logic (same as before, but without script frame dependency)
-    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+    // Check if this is an update (existing scenes) or initial generation
+    const existingScenes = sceneFrameModalStates.filter(
+      scene => scene.scriptFrameId === storyboardId
+    ).sort((a, b) => a.sceneNumber - b.sceneNumber);
+
+    if (existingScenes.length > 0) {
+      // Smart update: preserve existing scenes, update content, add/remove as needed
+      await handleSmartSceneUpdate(storyboardId, textToUse, frameToUse, existingScenes);
+    } else {
+      // Initial generation: create all new scenes
+      await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+    }
+  };
+
+  // Smart update function that preserves existing scenes
+  const handleSmartSceneUpdate = async (
+    storyboardId: string,
+    scriptText: string,
+    frameToUse: { x: number; y: number; frameWidth: number; frameHeight: number },
+    existingScenes: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string;[key: string]: any }>
+  ) => {
+    console.log('[Canvas] 🔄 Smart update: preserving existing scenes');
+
+    try {
+      // Generate new scenes from updated script
+      const result = await generateScenesFromStory(scriptText);
+      const { storyWorld, scenes } = result;
+
+      if (!scenes || scenes.length === 0) {
+        console.warn('[Canvas] No scenes generated from updated script');
+        return;
+      }
+
+      const oldCount = existingScenes.length;
+      const newCount = scenes.length;
+      const minCount = Math.min(oldCount, newCount);
+
+      console.log('[Canvas] Scene count comparison:', {
+        old: oldCount,
+        new: newCount,
+        willUpdate: minCount,
+        willAdd: Math.max(0, newCount - oldCount),
+        willRemove: Math.max(0, oldCount - newCount),
+      });
+
+      // Store updated Story World
+      upsertStoryWorld(storyboardId, storyWorld);
+
+      // Map scene_outline by scene_number
+      const outlineByNumber: Record<number, import('@/types/storyWorld').StorySceneOutline> = {};
+      storyWorld.scene_outline.forEach(s => {
+        outlineByNumber[s.scene_number] = s;
+      });
+
+      // 1. Update existing scenes (1 to minCount)
+      for (let i = 0; i < minCount; i++) {
+        const existingScene = existingScenes[i];
+        const newSceneData = scenes[i];
+        const outline = outlineByNumber[newSceneData.scene_number];
+
+        console.log(`[Canvas] Updating scene ${i + 1}:`, {
+          sceneId: existingScene.id,
+          newContent: newSceneData.content.substring(0, 100) + '...',
+        });
+
+        // Update scene content and metadata
+        setSceneFrameModalStates(prev => prev.map(s =>
+          s.id === existingScene.id
+            ? {
+              ...s,
+              content: newSceneData.content,
+              characterIds: outline?.character_ids,
+              locationId: outline?.location_id,
+              mood: outline?.mood,
+            }
+            : s
+        ));
+
+        // Persist the update
+        if (onPersistSceneFrameModalMove) {
+          Promise.resolve(onPersistSceneFrameModalMove(existingScene.id, {
+            content: newSceneData.content,
+          })).catch(console.error);
+        }
+      }
+
+      // 2. Add new scenes if script is longer
+      if (newCount > oldCount) {
+        console.log(`[Canvas] Adding ${newCount - oldCount} new scenes`);
+
+        const { calculateSceneFramePositions } = await import('@/app/components/Plugins/StoryboardPluginModal/sceneUtils');
+        const positions = calculateSceneFramePositions(frameToUse.x, frameToUse.y, scenes.length, frameToUse.frameWidth, frameToUse.frameHeight);
+
+        for (let i = oldCount; i < newCount; i++) {
+          const newSceneData = scenes[i];
+          const outline = outlineByNumber[newSceneData.scene_number];
+
+          const newSceneFrame = {
+            id: `scene-${storyboardId}-${newSceneData.scene_number}-${Date.now()}`,
+            scriptFrameId: storyboardId,
+            sceneNumber: newSceneData.scene_number,
+            x: positions[i].x,
+            y: positions[i].y,
+            frameWidth: 350,
+            frameHeight: 300,
+            content: newSceneData.content,
+            characterIds: outline?.character_ids,
+            locationId: outline?.location_id,
+            mood: outline?.mood,
+            characterNames: [], // Initialize as empty array
+            locationName: undefined, // Initialize as undefined
+          };
+
+          setSceneFrameModalStates(prev => [...prev, newSceneFrame]);
+
+          if (onPersistSceneFrameModalCreate) {
+            Promise.resolve(onPersistSceneFrameModalCreate(newSceneFrame)).catch(console.error);
+          }
+
+          // Create connection from storyboard to new scene
+          if (onPersistConnectorCreate) {
+            Promise.resolve(onPersistConnectorCreate({
+              from: storyboardId,
+              to: newSceneFrame.id,
+              color: '#437eb5',
+            })).catch(console.error);
+          }
+        }
+      }
+
+      // 3. Remove excess scenes if script is shorter
+      if (newCount < oldCount) {
+        console.log(`[Canvas] Removing ${oldCount - newCount} excess scenes`);
+
+        for (let i = newCount; i < oldCount; i++) {
+          const sceneToDelete = existingScenes[i];
+
+          // Delete scene frame
+          setSceneFrameModalStates(prev => prev.filter(s => s.id !== sceneToDelete.id));
+
+          if (onPersistSceneFrameModalDelete) {
+            Promise.resolve(onPersistSceneFrameModalDelete(sceneToDelete.id)).catch(console.error);
+          }
+
+          // Delete associated image modals
+          const associatedImages = imageModalStates.filter(img => img.id.includes(sceneToDelete.id));
+          for (const img of associatedImages) {
+            setImageModalStates(prev => prev.filter(i => i.id !== img.id));
+            if (onPersistImageModalDelete) {
+              Promise.resolve(onPersistImageModalDelete(img.id)).catch(console.error);
+            }
+          }
+
+          // Delete connections
+          const sceneConnections = (connections ?? []).filter(
+            conn => conn.to === sceneToDelete.id || conn.from === sceneToDelete.id
+          );
+          for (const conn of sceneConnections) {
+            if (conn.id && onPersistConnectorDelete) {
+              Promise.resolve(onPersistConnectorDelete(conn.id)).catch(console.error);
+            }
+          }
+        }
+      }
+
+      console.log('[Canvas] ✅ Smart scene update complete');
+    } catch (error) {
+      console.error('[Canvas] Error in smart scene update:', error);
+    }
   };
 
   // Internal function to generate scenes (extracted from old handleGenerateScenes)
@@ -1939,24 +2218,53 @@ export const Canvas: React.FC<CanvasProps> = ({
     overrideText?: string,
     overrideFrame?: { x: number; y: number; frameWidth: number; frameHeight: number }
   ) => {
+    // Check if this is a storyboard ID (no script frame) or a script frame ID
     const scriptFrame = scriptFrameModalStates.find(f => f.id === scriptFrameId);
-    const textToUse = overrideText || scriptFrame?.text;
-    const frameToUse = overrideFrame || scriptFrame;
+    const storyboard = storyboardModalStates.find(sb => sb.id === scriptFrameId);
 
-    if (!frameToUse || !textToUse) {
-      console.warn('[Canvas] No script frame or text found for', scriptFrameId);
-      return;
+    if (scriptFrame) {
+      // Traditional flow: script frame → generate scenes
+      const textToUse = overrideText || scriptFrame?.text;
+      const frameToUse = overrideFrame || scriptFrame;
+
+      if (!frameToUse || !textToUse) {
+        console.warn('[Canvas] No script frame or text found for', scriptFrameId);
+        return;
+      }
+
+      // Get the storyboard ID (parent of script frame)
+      const storyboardId = scriptFrame?.pluginId;
+      if (!storyboardId) {
+        console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
+        return;
+      }
+
+      // Use the new function with storyboardId
+      await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
+    } else if (storyboard && storyboard.scriptText) {
+      // New flow: storyboard with scriptText directly → generate scenes
+      console.log('[Canvas] 📖 Generating scenes from storyboard scriptText');
+
+      const textToUse = overrideText || storyboard.scriptText;
+      if (!textToUse || !textToUse.trim()) {
+        console.warn('[Canvas] No script text found in storyboard', scriptFrameId);
+        alert('No script text found. Please use the arrow button to send text from TextInput first.');
+        return;
+      }
+
+      // Create a virtual frame for the storyboard position
+      const frameToUse = overrideFrame || {
+        x: storyboard.x,
+        y: storyboard.y,
+        frameWidth: storyboard.frameWidth || 500,
+        frameHeight: storyboard.frameHeight || 400,
+      };
+
+      await generateScenesFromStoryboardInternal(scriptFrameId, textToUse, frameToUse);
+    } else {
+      console.warn('[Canvas] Neither script frame nor storyboard found for', scriptFrameId);
+      alert('Could not find script or storyboard data.');
     }
-
-    // Get the storyboard ID (parent of script frame)
-    const storyboardId = scriptFrame?.pluginId;
-    if (!storyboardId) {
-      console.warn('[Canvas] No storyboard ID found for script frame', scriptFrameId);
-      return;
-    }
-
-    // Use the new function with storyboardId
-    await generateScenesFromStoryboardInternal(storyboardId, textToUse, frameToUse);
   };
 
   const handleDeleteSceneFrame = (frameId: string) => {
@@ -2865,57 +3173,15 @@ export const Canvas: React.FC<CanvasProps> = ({
   }, [projectId, JSON.stringify(externalSceneFrameModals || [])]);
 
   useEffect(() => {
-    setScriptFrameModalStates(prev => {
-      const mapped: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
-      storyboardModalStates.forEach(modal => {
-        const script = sanitizeScriptOutput(modal.scriptText);
+    // DISABLED: No longer automatically create script frames
+    // Stories are now shown in TextInput only, and script is accessed via arrow button
+    // when connected to a Storyboard plugin
+    setScriptFrameModalStates([]);
 
-        // Only create script frame if script is valid and complete
-        // Check for minimum length and ensure it's not a loading state
-        const isValidScript = script &&
-          script.trim().length > 50 &&
-          !script.includes('...') &&
-          !script.toLowerCase().includes('generating') &&
-          !script.toLowerCase().includes('loading');
-
-        if (!isValidScript) {
-          console.log('[Canvas] Skipping script frame creation - script not ready for storyboard:', modal.id);
-          return;
-        }
-
-        const frameId = `script-${modal.id}`;
-        const baseX = (modal.x ?? 0) + (modal.frameWidth || 400) + 60;
-        const baseY = modal.y ?? 0;
-        const existing = prev.find(frame => frame.pluginId === modal.id);
-        if (existing) {
-          mapped.push({
-            ...existing,
-            text: script,
-            // Keep existing position to allow dragging
-            x: existing.x,
-            y: existing.y,
-            frameWidth: modal.frameWidth || existing.frameWidth,
-            frameHeight: existing.frameHeight,
-          });
-        } else {
-          // Only use base position for new frames
-          console.log('[Canvas] Creating new script frame for storyboard:', modal.id);
-          mapped.push({
-            id: frameId,
-            pluginId: modal.id,
-            x: baseX,
-            y: baseY,
-            frameWidth: modal.frameWidth || 360,
-            frameHeight: 260,
-            text: script,
-          });
-        }
-      });
-      // Also keep any script frames that might not be in the current storyboard list (though they should be deleted if storyboard is deleted)
-      // Actually, if storyboard is deleted, we probably want to delete the script frame too.
-      // The current logic only includes frames for existing storyboards.
-      return mapped;
-    });
+    // Previous logic kept for reference:
+    // - Script frames used to auto-populate when storyboard had scriptText
+    // - Now storyboard accesses scriptText directly from connected TextInput
+    // - Prevents duplicate frame visualization
   }, [storyboardModalStates]);
 
   // NOTE: Removed automatic scene generation from script frames
@@ -3383,6 +3649,52 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => window.removeEventListener('resize', updateViewport);
   }, []);
 
+  // Listen for text-script-generated events from TextInput send button
+  useEffect(() => {
+    const handleTextScriptEvent = (e: Event) => {
+      const event = e as CustomEvent<{ componentId: string; scriptText: string; textInputId?: string }>;
+      const { componentId, scriptText, textInputId } = event.detail;
+
+      // Update storyboard with script text
+      setStoryboardModalStates(prev => {
+        const updated = prev.map(modal =>
+          modal.id === componentId ? { ...modal, scriptText } : modal
+        );
+        return updated;
+      });
+
+      // Persist the script text
+      if (onPersistStoryboardModalMove) {
+        Promise.resolve(onPersistStoryboardModalMove(componentId, { scriptText })).catch(console.error);
+      }
+
+      // Remove script generation from queue if textInputId is provided
+      if (textInputId && setGenerationQueue) {
+        setGenerationQueue((prev) => {
+          // Mark as completed with timestamp
+          const updated = prev.map(item => {
+            if (item.type === 'script' && item.id.includes(textInputId)) {
+              return { ...item, completed: true, completedAt: Date.now() };
+            }
+            return item;
+          });
+
+          // Remove completed items after 1 second
+          setTimeout(() => {
+            setGenerationQueue((current) =>
+              current.filter(item => !(item.completed && item.type === 'script' && item.id.includes(textInputId)))
+            );
+          }, 1000);
+
+          return updated;
+        });
+      }
+    };
+
+    window.addEventListener('text-script-generated', handleTextScriptEvent as EventListener);
+    return () => window.removeEventListener('text-script-generated', handleTextScriptEvent as EventListener);
+  }, [onPersistStoryboardModalMove]);
+
   // Center viewport on components after they are loaded (fixes refresh positioning)
   // If no components exist, center on the infinite canvas center
   const shouldCenterOnLoadRef = useRef(true);
@@ -3599,16 +3911,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           stage.draggable(false);
           setIsPanning(false);
         }
-        
+
         // Adjust position by wheel deltas (invert sign if needed based on UX)
         // Use requestAnimationFrame for smooth updates
         requestAnimationFrame(() => {
-        setPosition(prev => {
-          // Invert deltas so two-finger drag direction matches canvas movement
-          // (drag up → canvas moves up, drag left → canvas moves left)
-          const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-          setTimeout(() => updateViewportCenter(newPos, scale), 0);
-          return newPos;
+          setPosition(prev => {
+            // Invert deltas so two-finger drag direction matches canvas movement
+            // (drag up → canvas moves up, drag left → canvas moves left)
+            const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+            setTimeout(() => updateViewportCenter(newPos, scale), 0);
+            return newPos;
           });
         });
         return;
@@ -3683,7 +3995,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Always reset middle button state to prevent stuck selection
         setIsMiddleButtonPressed(false);
         setIsPanning(false);
-        
+
         // Disable stage dragging to ensure clean state
         const stage = stageRef.current;
         if (stage) {
@@ -3921,8 +4233,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (isSelecting || wasDrag) {
         mouseDownTarget = null;
         mouseDownPos = null;
-            return;
-          }
+        return;
+      }
 
       // Check if click is inside any modal component
       // Also check for contentEditable elements (canvas text components)
@@ -3999,7 +4311,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
-    
+
     // Store initial selection rectangle coordinates if not set
     if (!selectionRectCoords) {
       setSelectionRectCoords({
@@ -4050,7 +4362,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
-        
+
         // Also update selection rectangle coordinates (Konva pattern) - update immediately
         setSelectionRectCoords(prev => {
           if (!prev) {
@@ -4229,7 +4541,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedNextSceneModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4242,7 +4554,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedCompareModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4301,7 +4613,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
         // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
@@ -4387,7 +4699,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
           // Collect all selected component positions and dimensions
           selectedImageIndices.forEach(idx => {
-          const img = images[idx];
+            const img = images[idx];
             if (img && img.type !== 'model3d') {
               const dims = getComponentDimensions('image', idx);
               allSelectedComponents.push({
@@ -4400,7 +4712,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedImageModalIds.forEach(id => {
-          const m = imageModalStates.find(mm => mm.id === id);
+            const m = imageModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('imageModal', id);
               allSelectedComponents.push({
@@ -4413,7 +4725,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedVideoModalIds.forEach(id => {
-          const m = videoModalStates.find(mm => mm.id === id);
+            const m = videoModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('videoModal', id);
               allSelectedComponents.push({
@@ -4426,7 +4738,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedMusicModalIds.forEach(id => {
-          const m = musicModalStates.find(mm => mm.id === id);
+            const m = musicModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('musicModal', id);
               allSelectedComponents.push({
@@ -4438,8 +4750,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
-            selectedTextInputIds.forEach(id => {
-              const t = textInputStates.find(tt => tt.id === id);
+          selectedTextInputIds.forEach(id => {
+            const t = textInputStates.find(tt => tt.id === id);
             if (t) {
               const dims = getComponentDimensions('textInput', id);
               allSelectedComponents.push({
@@ -4628,15 +4940,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (selectionRectCoords) {
         setSelectionRectCoords(null);
       }
-        return;
-      }
+      return;
+    }
 
     // Use requestAnimationFrame to throttle updates for smooth performance
     let rafId: number | null = null;
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
-    
+
     // Store initial selection rectangle coordinates if not set
     if (!selectionRectCoords) {
       setSelectionRectCoords({
@@ -4687,7 +4999,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
-        
+
         // Also update selection rectangle coordinates (Konva pattern) - update immediately
         setSelectionRectCoords(prev => {
           if (!prev) {
@@ -4866,7 +5178,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedNextSceneModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4879,7 +5191,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedCompareModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4938,7 +5250,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
         // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
@@ -5573,8 +5885,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (!clickedOnEmpty) {
         return;
       }
-      
-        if (pointerPos) {
+
+      if (pointerPos) {
         // Initialize region selection rectangle (Konva pattern)
         const canvasX = (pointerPos.x - position.x) / scale;
         const canvasY = (pointerPos.y - position.y) / scale;
@@ -5584,18 +5896,18 @@ export const Canvas: React.FC<CanvasProps> = ({
           x2: canvasX,
           y2: canvasY,
         });
-        
-          setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
+
+        setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
         setPendingSelectionStartCanvas({ x: canvasX, y: canvasY });
-          setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
-          setSelectionBox(null);
-          // Don't clear selection box if it's a group - groups persist
-          {
-            setSelectionTightRect(null);
-            setIsDragSelection(false);
-          }
+        setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
+        setSelectionBox(null);
+        // Don't clear selection box if it's a group - groups persist
+        {
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
         }
-        return;
+      }
+      return;
     }
 
     // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
@@ -5720,7 +6032,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           currentY: pendingSelectionStartCanvas.y,
         });
         setIsSelecting(true);
-        
+
         // Update selection rectangle coordinates
         setSelectionRectCoords({
           x1: pendingSelectionStartCanvas.x,
@@ -5803,21 +6115,21 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Always reset middle button state and panning state
       setIsMiddleButtonPressed(false);
       setIsPanning(false);
-      
+
       // Disable stage dragging to ensure clean state
       const stage = e.target.getStage();
       if (stage) {
         stage.draggable(false);
       }
-      
+
       // Prevent default browser behavior (navigation)
       e.evt.preventDefault();
       e.evt.stopPropagation();
-      
+
       // Return early to prevent any other mouse up handling
       return;
     }
-    
+
     const stage = e.target.getStage();
     const target = e.target;
 
@@ -5826,7 +6138,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (selectionRectCoords) {
       const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
       const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
-      
+
       // Only process selection if rectangle has meaningful size (at least 5px to avoid accidental clicks)
       if (rectWidth >= 5 && rectHeight >= 5) {
         const selectionRect = {
@@ -6027,16 +6339,16 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (newSelectedCanvasTextIds.length > 0) {
           setSelectedCanvasTextId?.(newSelectedCanvasTextIds[0]);
         }
-        
+
         // Hide selection rectangle after processing (with timeout like in example)
         setTimeout(() => {
           setSelectionRectCoords(null);
         }, 0);
-        
+
         // Clear selectionBox to prevent double processing
         setSelectionBox(null);
         setIsSelecting(false);
-        
+
         // Return early to skip the existing selectionBox logic below
         return;
       } else {
@@ -6417,7 +6729,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       setPosition(newPos);
       updateViewportCenter(newPos, scale);
     }
-    
+
     // Reset panning state
     setIsPanning(false);
   };

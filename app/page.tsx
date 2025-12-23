@@ -125,7 +125,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         y: 500000,
         scale: 1,
       };
-      
+
       // Update ref to track current projectId
       prevProjectIdRef.current = projectId;
     } else if (!projectId) {
@@ -945,19 +945,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
         snapshotLoadedRef.current = false;
         return;
       }
-      
+
       // Store the projectId at the start of this effect to prevent race conditions
       const currentProjectId = projectId;
-      
+
       // Skip if we already loaded this project's snapshot
       if (snapshotLoadedRef.current) {
         console.log('[Project] Snapshot already loaded for project:', currentProjectId);
         return;
       }
-      
+
       // Small delay to ensure state has been cleared first
       await new Promise(resolve => setTimeout(resolve, 150));
-      
+
       // Double-check projectId hasn't changed during the delay
       if (currentProjectId !== projectId) {
         console.log('[Project] ProjectId changed during snapshot load, aborting:', {
@@ -966,11 +966,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
         return;
       }
-      
+
       try {
         console.log('[Project] Loading snapshot for project:', currentProjectId);
         const { snapshot } = await apiGetCurrentSnapshot(currentProjectId);
-        
+
         // Triple-check projectId hasn't changed after async call
         if (currentProjectId !== projectId) {
           console.log('[Project] ProjectId changed after snapshot fetch, ignoring snapshot:', {
@@ -979,14 +979,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
           });
           return;
         }
-        
+
         // For new projects, snapshot should be null or empty - don't load anything
         if (!snapshot || !snapshot.elements || Object.keys(snapshot.elements).length === 0) {
           console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
           snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
           return;
         }
-        
+
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
           const newImages: ImageUpload[] = [];
@@ -1720,7 +1720,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
   const isSpacePressedRef = useRef(false);
   const selectedToolRef = useRef(selectedTool);
-  
+
   // Keep ref in sync with state
   useEffect(() => {
     selectedToolRef.current = selectedTool;
@@ -1740,7 +1740,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (tool === selectedTool) {
       setToolClickCounter(prev => prev + 1);
     }
-    
+
     // Update previousToolRef when user manually selects a tool (unless Space is currently pressed)
     // This ensures proper restoration when Space is released
     // Note: We update for all tools, so if user manually selects 'move', then presses Space,
@@ -1748,7 +1748,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (!isSpacePressedRef.current) {
       previousToolRef.current = tool;
     }
-    
+
     setSelectedTool(tool);
     console.log('Selected tool:', tool);
 
@@ -1783,24 +1783,24 @@ export function CanvasApp({ user }: CanvasAppProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle Space key
       if (e.code !== 'Space' && e.key !== ' ') return;
-      
+
       // Don't activate if user is typing in an input/textarea
       const target = e.target as HTMLElement;
       const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
       const isContentEditable = target?.hasAttribute('contenteditable') || target?.getAttribute('contenteditable') === 'true';
-      
+
       if (isInputElement || isContentEditable) {
         return; // Let Space work normally in inputs
       }
-      
+
       // Prevent default browser behavior (scrolling)
       e.preventDefault();
-      
+
       // If Space is already pressed, ignore
       if (isSpacePressedRef.current) return;
-      
+
       isSpacePressedRef.current = true;
-      
+
       // Save current tool (only if not already in move mode)
       // This ensures we restore to the correct tool when Space is released
       const currentTool = selectedToolRef.current;
@@ -1810,23 +1810,23 @@ export function CanvasApp({ user }: CanvasAppProps) {
       }
       // If already in move mode, don't change anything (user might have manually selected move)
     };
-    
+
     const handleKeyUp = (e: KeyboardEvent) => {
       // Only handle Space key
       if (e.code !== 'Space' && e.key !== ' ') return;
-      
+
       // Don't interfere if user is typing in an input/textarea
       const target = e.target as HTMLElement;
       const isInputElement = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
       const isContentEditable = target?.hasAttribute('contenteditable') || target?.getAttribute('contenteditable') === 'true';
-      
+
       if (isInputElement || isContentEditable) {
         return; // Let Space work normally in inputs
       }
-      
+
       // Prevent default browser behavior
       e.preventDefault();
-      
+
       // If Space was pressed, restore previous tool
       if (isSpacePressedRef.current) {
         isSpacePressedRef.current = false;
@@ -1837,15 +1837,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }
       }
     };
-    
+
     // Use capture phase to catch events early
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     window.addEventListener('keyup', handleKeyUp, { capture: true });
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
       window.removeEventListener('keyup', handleKeyUp, { capture: true } as any);
-      
+
       // Cleanup: if Space was held when component unmounts, restore tool
       if (isSpacePressedRef.current && selectedToolRef.current === 'move') {
         setSelectedTool(previousToolRef.current);
@@ -2626,6 +2626,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
               }}
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
+              setGenerationQueue={setGenerationQueue}
               onToolSelect={handleToolSelect}
               canvasTextStates={canvasTextStates}
               setCanvasTextStates={setCanvasTextStates}

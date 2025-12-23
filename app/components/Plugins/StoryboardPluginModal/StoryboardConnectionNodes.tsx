@@ -94,10 +94,8 @@ export const StoryboardConnectionNodes: React.FC<StoryboardConnectionNodesProps>
 
     return (
         <>
-            {/* Three Receive Nodes (Left) - One for each anchor type */}
-            {renderReceiveNode('receive-character', 30, 'Character image ')}
-            {renderReceiveNode('receive-background', 50, 'Background Input')}
-            {renderReceiveNode('receive-props', 70, 'Props Input')}
+            {/* Single Receive Node (Left) - Connected to TextInput */}
+            {renderReceiveNode('receive', 50, 'Text Input')}
             {/* Send Node (Right) - Circle */}
             <div
                 data-node-id={id}

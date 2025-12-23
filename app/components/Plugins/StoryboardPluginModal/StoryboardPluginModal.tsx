@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '../../common/canvasCaptureGuard';
 import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
@@ -40,6 +40,7 @@ interface StoryboardPluginModalProps {
   initialPropsNamesMap?: Record<number, string>;
   initialBackgroundNamesMap?: Record<number, string>;
   imageModalStates?: ImageModalState[];
+  sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number;[key: string]: any }>;
   images?: ImageUpload[];
   onGenerate?: (inputs: {
     characterInput?: string;
@@ -79,6 +80,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   initialPropsNamesMap = {},
   initialBackgroundNamesMap = {},
   imageModalStates = [],
+  sceneFrameModalStates = [],
   images = [],
   onGenerate,
 }) => {
@@ -206,7 +208,34 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   const connectedBackgroundImages = getConnectedImages('receive-background');
   const connectedPropsImages = getConnectedImages('receive-props');
 
+  // Check if there's an active text input connection
+  const hasActiveTextInputConnection = !!(id && connections.some(conn => {
+    // Check if connection is TO this storyboard from a text input
+    if (conn.to === id) {
+      // Check if the source is a text input
+      const isTextInput = textInputStates.some(t => t.id === conn.from);
+      return isTextInput;
+    }
+    return false;
+  }));
+
+  // Check if this storyboard has any existing scene frames
+  const hasExistingScenes = useMemo(() => {
+    const existingScenes = sceneFrameModalStates.some(scene => {
+      // Scenes are connected to storyboard via scriptFrameId
+      return scene.scriptFrameId === id;
+    });
+    console.log('[StoryboardPluginModal] hasExistingScenes check:', {
+      storyboardId: id,
+      hasExistingScenes: existingScenes,
+      totalScenes: sceneFrameModalStates.length,
+      matchingScenes: sceneFrameModalStates.filter(s => s.scriptFrameId === id).length,
+    });
+    return existingScenes;
+  }, [sceneFrameModalStates, id]);
+
   if (!isOpen) return null;
+
 
   return (
     <PluginNodeShell
@@ -350,6 +379,9 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
               frameBorderColor={frameBorderColor}
               frameBorderWidth={frameBorderWidth}
               extraTopPadding={popupOverlap + 16 * scale}
+              scriptText={scriptText}
+              hasActiveTextInputConnection={hasActiveTextInputConnection}
+              hasExistingScenes={hasExistingScenes}
               onCharacterInputChange={(val) => {
                 setCharacterInput(val);
                 updateOptions({ characterInput: val });
@@ -384,6 +416,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
                 updateOptions({ backgroundNamesMap: map });
               }}
             />
+
           </div>
         )}
       </div>
