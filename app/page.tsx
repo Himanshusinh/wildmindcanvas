@@ -160,13 +160,16 @@ export function CanvasApp({ user }: CanvasAppProps) {
         // This is a snapshot - op.data is the elements map
         // Replace entire images array with snapshot (don't append, as snapshot is the source of truth)
         const elements = op.data as Record<string, any>;
+        const metadata = (op.data as any).metadata || {};
+        const isV1_1 = metadata.version === '1.1' || parseFloat(metadata.version) >= 1.1;
+
         const newImages: ImageUpload[] = [];
-        const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }> = [];
-        const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null }> = [];
-        const newVideoEditorGenerators: Array<{ id: string; x: number; y: number }> = [];
-        const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null }> = [];
-        const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
-        const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
+        const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newVideoEditorGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }> = [];
+        const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }> = [];
+        const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
         const newCompareGenerators: CompareGenerator[] = [];
 
         Object.values(elements).forEach((element: any) => {
@@ -177,14 +180,52 @@ export function CanvasApp({ user }: CanvasAppProps) {
               imageUrl = buildProxyResourceUrl(imageUrl);
             }
 
+            // Resolve bounds mapping
+            let width = 400;
+            let height = 400;
+
+            if (isV1_1 && element.bounds) {
+              // strict mode
+              width = element.bounds.width;
+              height = element.bounds.height;
+            } else if (element.bounds) {
+              // element has bounds but older version (trust bounds anyway if present)
+              width = element.bounds.width;
+              height = element.bounds.height;
+            } else {
+              // legacy inference
+              if (element.type === 'compare-plugin') {
+                width = element.width || 800;
+                height = element.height || 600;
+              } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
+                width = element.width || 400;
+                height = element.height || 400;
+              } else if (element.type === 'text' || element.type === 'canvas-text') {
+                width = element.width || 300;
+                height = element.height || 100;
+              } else {
+                // generators
+                width = element.meta?.frameWidth || 400;
+                height = element.meta?.frameHeight || 500;
+              }
+            }
+
+            // DEV validation
+            if (process.env.NODE_ENV === 'development') {
+              if (width <= 0 || height <= 0) {
+                console.warn('[Hydration] Invalid bounds detected for element', element.id, { width, height });
+              }
+            }
+
+
             if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
               const newImage: ImageUpload = {
                 type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
                 url: imageUrl,
                 x: element.x || 0,
                 y: element.y || 0,
-                width: element.width || 400,
-                height: element.height || 400,
+                width: width,
+                height: height,
                 ...(element.id && { elementId: element.id }),
               };
               newImages.push(newImage);
@@ -195,19 +236,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 y: element.y || 0,
                 generatedImageUrl: element.meta?.generatedImageUrl || null,
                 sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl
+                frameWidth: width,
+                frameHeight: height,
               } as any);
             } else if (element.type === 'video-generator') {
-              newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null });
+              newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: width, frameHeight: height });
             } else if (element.type === 'video-editor-trigger') {
               newVideoEditorGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0 });
             } else if (element.type === 'music-generator') {
-              newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null });
+              newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: width, frameHeight: height });
             } else if (element.type === 'upscale-plugin') {
-              newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+              newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale, frameWidth: width, frameHeight: height });
             } else if (element.type === 'multiangle-camera-plugin') {
               newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
             } else if (element.type === 'compare-plugin') {
-              newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: element.width, height: element.height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
+              newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: width, height: height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
             }
           }
         });
@@ -691,7 +734,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           generationQueue,
           compareGenerators,
         });
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
       } catch (e) {
         console.warn('Failed to persist snapshot after connector removals', e);
       }
@@ -933,7 +976,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             elements[gid] = groupsRef.current[gid];
           });
         }
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
@@ -2351,7 +2394,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         generationQueue,
                         compareGenerators,
                       });
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
                       console.log('[Connector] apiSetCurrentSnapshot success', { projectId, ssRes });
                     } catch (e) {
                       console.warn('[Connector] Failed to persist snapshot after connector create', e);
@@ -2397,7 +2440,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         generationQueue,
                         compareGenerators,
                       });
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
                       console.log('[Connector] apiSetCurrentSnapshot success after delete', { projectId, ssRes });
                     } catch (e) { console.warn('[Connector] Failed to persist snapshot after connector delete', e); }
                   } catch (e) {
@@ -2450,7 +2493,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Inject the group element into the elements map
                       elements[group.id] = elementPayload;
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
                       console.log('[Group] apiSetCurrentSnapshot success (create)', { projectId, ssRes });
                       // Keep a local copy so autosave includes groups
                       groupsRef.current[group.id] = elementPayload;
@@ -2500,7 +2543,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Merge/replace the group element in the snapshot
                       elements[id] = { id, type: 'group', x: (updates as any).x ?? prev?.x, y: (updates as any).y ?? prev?.y, width: (updates as any).width ?? prev?.width, height: (updates as any).height ?? prev?.height, padding: (updates as any).padding ?? prev?.padding, children: (updates as any).children ?? prev?.children ?? [], meta: { name: (updates as any).meta?.name ?? prev?.meta?.name ?? 'Group', createdAt: (updates as any).meta?.createdAt ?? prev?.meta?.createdAt } };
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
                       console.log('[Group] apiSetCurrentSnapshot success (update)', { projectId, ssRes });
                       // Update local copy used for autosave
                       groupsRef.current[id] = elements[id];
@@ -2544,7 +2587,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Ensure group is not present in snapshot (don't inject it)
                       if (elements[group.id]) delete elements[group.id];
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
                       console.log('[Group] apiSetCurrentSnapshot success (delete)', { projectId, ssRes });
                       // Remove from local cache so autosave won't re-insert
                       if (groupsRef.current[group.id]) delete groupsRef.current[group.id];

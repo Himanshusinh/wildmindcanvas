@@ -144,10 +144,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'NextScenePluginModal.tsx:131',message:'NextScene modal position props changed',data:{id,x,y,screenX,screenY,scale,positionX:position.x,positionY:position.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  }, [id, x, y, screenX, screenY, scale, position.x, position.y]);
+  // #region agent log - Removed
   // #endregion
   const isDark = useIsDarkTheme();
   const circleDiameter = 100 * scale;
@@ -273,7 +270,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       try {
         const projectId = window.location.pathname.split('/project/')[1] || 'default-project';
         const { generateImageForCanvas } = await import('@/lib/api');
-        
+
         // Calculate frame dimensions based on aspect ratio
         const [w, h] = aspectRatio.split(':').map(Number);
         const ar = w && h ? (w / h) : 1;
@@ -294,7 +291,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           const row = Math.floor(i / gridCols);
           const modalId = `image-multiangle-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
           modalIds.push(modalId);
-          
+
           const targetX = startX + (col * gridGap) / scale;
           const targetY = startY + (row * gridGap) / scale;
 
@@ -306,11 +303,11 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
               generatedImageUrl: null,
               frameWidth,
               frameHeight,
-              model: multiangleModel === 'Google nano banana pro' 
-                ? `Google nano banana pro ${resolution}` 
+              model: multiangleModel === 'Google nano banana pro'
+                ? `Google nano banana pro ${resolution}`
                 : multiangleModel === 'Seedream 4.5'
-                ? `Seedream 4.5 ${resolution}`
-                : multiangleModel, // Use selected model (with resolution appended for Seedream 4.5)
+                  ? `Seedream 4.5 ${resolution}`
+                  : multiangleModel, // Use selected model (with resolution appended for Seedream 4.5)
               frame: 'Frame',
               aspectRatio: aspectRatio || '1:1',
               prompt: MULTIANGLE_SHOT_PROMPTS[i].prompt,
@@ -336,7 +333,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
 
         // Generate all 9 images in parallel
         console.log('[NextScenePluginModal] Generating 9 multi-angle shots in parallel...');
-        
+
         // Build model string based on selected model
         let modelString = multiangleModel;
         if (multiangleModel === 'Google nano banana pro') {
@@ -344,11 +341,11 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         } else if (multiangleModel === 'Seedream 4.5') {
           modelString = `Seedream 4.5 ${resolution}`;
         }
-        
+
         const generationPromises = MULTIANGLE_SHOT_PROMPTS.map(async (shot, index) => {
           const shotPrompt = shot.prompt;
           const modalId = modalIds[index];
-          
+
           try {
             const result = await generateImageForCanvas(
               shotPrompt,

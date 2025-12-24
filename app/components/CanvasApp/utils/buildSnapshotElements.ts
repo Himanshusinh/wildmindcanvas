@@ -41,7 +41,7 @@ export function buildSnapshotElements(
     if (connectionsBySource[id] && connectionsBySource[id].length) {
       meta.connections = connectionsBySource[id];
     }
-    elements[id] = { id, type, x: img.x || 0, y: img.y || 0, width: img.width, height: img.height, rotation: img.rotation || 0, meta };
+    elements[id] = { id, type, x: img.x || 0, y: img.y || 0, bounds: { width: img.width || 400, height: img.height || 400 }, rotation: img.rotation || 0, meta };
   });
 
   // Generators (image/video/music)
@@ -57,25 +57,25 @@ export function buildSnapshotElements(
       prompt: g.prompt
     };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-    elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, meta: metaObj };
+    elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, bounds: { width: g.frameWidth || 400, height: g.frameHeight || 400 }, meta: metaObj };
   });
 
   state.videoGenerators.forEach((g) => {
     const metaObj: any = { generatedVideoUrl: g.generatedVideoUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt, taskId: (g as any).taskId, generationId: (g as any).generationId, status: (g as any).status };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-    elements[g.id] = { id: g.id, type: 'video-generator', x: g.x, y: g.y, meta: metaObj };
+    elements[g.id] = { id: g.id, type: 'video-generator', x: g.x, y: g.y, bounds: { width: g.frameWidth || 400, height: g.frameHeight || 400 }, meta: metaObj };
   });
 
   state.videoEditorGenerators.forEach((g) => {
     const metaObj: any = {};
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-    elements[g.id] = { id: g.id, type: 'video-editor-trigger', x: g.x, y: g.y, meta: metaObj };
+    elements[g.id] = { id: g.id, type: 'video-editor-trigger', x: g.x, y: g.y, bounds: { width: 64, height: 64 }, meta: metaObj };
   });
 
   state.musicGenerators.forEach((g) => {
     const metaObj: any = { generatedMusicUrl: g.generatedMusicUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
     if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
-    elements[g.id] = { id: g.id, type: 'music-generator', x: g.x, y: g.y, meta: metaObj };
+    elements[g.id] = { id: g.id, type: 'music-generator', x: g.x, y: g.y, bounds: { width: g.frameWidth || 400, height: g.frameHeight || 400 }, meta: metaObj };
   });
 
   // Upscale generators
@@ -100,6 +100,7 @@ export function buildSnapshotElements(
       type: 'upscale-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -119,6 +120,7 @@ export function buildSnapshotElements(
       type: 'multiangle-camera-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: 400, height: 500 }, // Default dimensions
       meta: metaObj,
     };
   });
@@ -146,6 +148,7 @@ export function buildSnapshotElements(
       type: 'removebg-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -171,6 +174,7 @@ export function buildSnapshotElements(
       type: 'erase-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -195,6 +199,7 @@ export function buildSnapshotElements(
       type: 'expand-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -220,6 +225,7 @@ export function buildSnapshotElements(
       type: 'vectorize-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -239,8 +245,7 @@ export function buildSnapshotElements(
       type: 'compare-plugin',
       x: g.x,
       y: g.y,
-      width: g.width,
-      height: g.height,
+      bounds: { width: g.width || 800, height: g.height || 600 },
       meta: metaObj,
     };
   });
@@ -266,6 +271,7 @@ export function buildSnapshotElements(
       type: 'next-scene-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -543,6 +549,7 @@ export function buildSnapshotElements(
       type: 'storyboard-plugin',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 400, height: modal.frameHeight || 500 },
       meta: metaObj,
     };
   });
@@ -564,6 +571,7 @@ export function buildSnapshotElements(
       type: 'script-frame',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 360, height: modal.frameHeight || 260 },
       meta: metaObj,
     };
   });
@@ -591,13 +599,14 @@ export function buildSnapshotElements(
       type: 'scene-frame',
       x: modal.x,
       y: modal.y,
+      bounds: { width: modal.frameWidth || 350, height: modal.frameHeight || 300 },
       meta: metaObj,
     };
   });
 
   // Text input overlays (generators) - persist current value
   state.textGenerators.forEach((t) => {
-    elements[t.id] = { id: t.id, type: 'text-generator', x: t.x, y: t.y, meta: { value: t.value || '' } };
+    elements[t.id] = { id: t.id, type: 'text-generator', x: t.x, y: t.y, bounds: { width: 300, height: 100 }, meta: { value: t.value || '' } }; // Default text area size
   });
 
   // Canvas text (rich text) elements - persist all properties
@@ -624,6 +633,7 @@ export function buildSnapshotElements(
         type: 'canvas-text',
         x: text.x,
         y: text.y,
+        bounds: { width: text.width || 300, height: text.height || 100 },
         meta: metaObj,
       };
     });
@@ -645,6 +655,7 @@ export function buildSnapshotElements(
         y: g.y,
         width: g.width,
         height: g.height,
+        bounds: { width: g.width, height: g.height },
         padding: g.padding,
         children: g.children || [], // Persist children
         meta: metaObj,

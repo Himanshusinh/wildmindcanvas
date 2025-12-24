@@ -4303,43 +4303,46 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Create canvas pattern - updates based on theme
   useEffect(() => {
     const createPattern = () => {
+      // Create SVG pattern based on themes and constants
       const isDark = document.documentElement.classList.contains('dark');
-      setIsDarkTheme(isDark);
-      const canvas = document.createElement('canvas');
-      canvas.width = DOT_SPACING;
-      canvas.height = DOT_SPACING;
-      const ctx = canvas.getContext('2d');
+      setIsDarkTheme(isDark); // Keep local state in sync
 
-      if (ctx) {
-        if (isDark) {
-          // Dark theme: Black background with white dots
-          ctx.fillStyle = '#121212';
-          ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
-          ctx.fillStyle = `rgba(255, 255, 255, ${DOT_OPACITY})`;
-        } else {
-          // Light theme: White background with black dots
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, DOT_SPACING, DOT_SPACING);
-          ctx.fillStyle = `rgba(0, 0, 0, ${DOT_OPACITY})`;
-        }
+      const dotColor = isDark ? 'rgba(75, 75, 75, 0.4)' : `rgba(0, 0, 0, ${DOT_OPACITY})`;
+      const bgColor = isDark ? '#121212' : '#ffffff';
 
-        ctx.beginPath();
-        ctx.arc(DOT_SPACING / 2, DOT_SPACING / 2, DOT_SIZE / 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      // Ensure we have valid spacing
+      const spacing = DOT_SPACING || 30;
+      const radius = (DOT_SIZE || 4) / 2;
+      const center = spacing / 2;
+
+      // SVG string construction
+      const svgString = `
+        <svg width="${spacing}" height="${spacing}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="dotPattern" x="0" y="0" width="${spacing}" height="${spacing}" patternUnits="userSpaceOnUse">
+              <rect width="${spacing}" height="${spacing}" fill="${bgColor}" />
+              <circle cx="${center}" cy="${center}" r="${radius}" fill="${dotColor}" />
+            </pattern>
+          </defs>
+          <rect width="${spacing}" height="${spacing}" fill="url(#dotPattern)" />
+        </svg>
+      `.trim();
 
       const img = new Image();
       img.onload = () => {
         setPatternImage(img);
       };
-      img.src = canvas.toDataURL();
+      img.src = `data:image/svg+xml;base64,${btoa(svgString)}`;
     };
 
-    createPattern();
+    // Keep initial call
+    if (typeof window !== 'undefined') {
+      createPattern();
+    }
 
     // Watch for theme changes
     const observer = new MutationObserver(() => {
-      createPattern();
+      setTimeout(createPattern, 50);
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 
@@ -7698,6 +7701,8 @@ export const Canvas: React.FC<CanvasProps> = ({
               height={canvasSize.height}
               fillPatternImage={patternImage}
               fillPatternRepeat="repeat"
+              fillPatternScaleX={1 / Math.pow(scale, 0.9)}
+              fillPatternScaleY={1 / Math.pow(scale, 0.9)}
               name="background-rect"
             />
           )}

@@ -88,10 +88,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
 
     const screenX = x * scale + position.x;
     const screenY = y * scale + position.y;
-    // #region agent log
-    useEffect(() => {
-      fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ComparePluginModal.tsx:90',message:'Compare modal position props changed',data:{id,x,y,screenX,screenY,scale,positionX:position.x,positionY:position.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    }, [id, x, y, screenX, screenY, scale, position.x, position.y]);
+    // #region agent log - Removed
     // #endregion
     const circleDiameter = 100 * scale;
 
