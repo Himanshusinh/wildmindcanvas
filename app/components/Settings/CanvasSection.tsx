@@ -20,13 +20,13 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
   const hoverBorder = isDark ? 'rgba(96, 165, 250, 0.4)' : 'rgba(59, 130, 246, 0.3)';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ 
-        padding: '20px', 
-        background: containerBg, 
+      <div style={{
+        padding: '20px',
+        background: containerBg,
         borderRadius: '12px',
         transition: 'background-color 0.3s ease'
       }}>
-        
+
 
         {/* Cursor Type */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
@@ -52,7 +52,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
               </svg>
             </button>
-            
+
             {/* Gaming Pointer (Crosshair) */}
             <button
               onClick={() => setCanvasSettings((prev) => ({ ...prev, cursorType: 'crosshair' }))}
@@ -74,6 +74,52 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <line x1="12" y1="8" x2="12" y2="16" />
                 <line x1="8" y1="12" x2="16" y2="12" />
               </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Mouse Type (Navigation Mode) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>input Type</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Pad (Trackpad) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, navigationMode: 'trackpad' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.navigationMode === 'trackpad' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.navigationMode === 'trackpad' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                gap: '8px'
+              }}
+              title="Pad (Trackpad behavior)"
+            >
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#437eb5' : textColor, fontWeight: 500 }}>Pad</span>
+            </button>
+
+            {/* Standard (Mouse) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, navigationMode: 'mouse' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.navigationMode === 'mouse' ? '#437eb5' : borderColor}`,
+                background: canvasSettings.navigationMode === 'mouse' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                gap: '8px'
+              }}
+              title="Standard (Mouse behavior)"
+            >
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#437eb5' : textColor, fontWeight: 500 }}>Standard</span>
             </button>
           </div>
         </div>
@@ -110,7 +156,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <circle cx="18" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
               </svg>
             </button>
-            
+
             {/* None */}
             <button
               onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'none' as BackgroundType }))}
@@ -132,7 +178,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
               </svg>
             </button>
-            
+
             {/* Lines Vertical */}
             <button
               onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'lines-vertical' as BackgroundType }))}
@@ -155,7 +201,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <line x1="18" y1="4" x2="18" y2="20" />
               </svg>
             </button>
-            
+
             {/* Lines Horizontal */}
             <button
               onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'lines-horizontal' as BackgroundType }))}
@@ -178,7 +224,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 <line x1="4" y1="18" x2="20" y2="18" />
               </svg>
             </button>
-            
+
             {/* Lines Both (Grid) */}
             <button
               onClick={() => setCanvasSettings((prev) => ({ ...prev, backgroundType: 'grid' as BackgroundType }))}

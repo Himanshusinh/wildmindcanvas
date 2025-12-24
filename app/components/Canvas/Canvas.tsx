@@ -4356,6 +4356,32 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => observer.disconnect();
   }, []);
 
+  // Navigation Mode State (Managed by SettingsPopup, listened here)
+  const [navigationMode, setNavigationMode] = useState<'trackpad' | 'mouse'>('trackpad');
+
+  useEffect(() => {
+    // Initial Load
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('canvasSettings');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.navigationMode) setNavigationMode(parsed.navigationMode);
+        } catch { }
+      }
+    }
+
+    // Listen for changes
+    const handleSettingsChange = (e: CustomEvent) => {
+      if (e.detail && e.detail.navigationMode) {
+        setNavigationMode(e.detail.navigationMode);
+      }
+    };
+
+    window.addEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
+    return () => window.removeEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
+  }, []);
+
   // Handle wheel zoom
   useEffect(() => {
     const stage = stageRef.current;
@@ -4379,15 +4405,34 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Generalize navigation: Pan by default, Zoom with Modifier (or Pinch)
       // This unifies behavior across Mac (Trackpad/Magic Mouse) and Windows (Trackpad/Mouse Wheel)
 
+      e.preventDefault();
+
       const isModifier = e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
       const absDeltaX = Math.abs(e.deltaX || 0);
       const absDeltaY = Math.abs(e.deltaY || 0);
 
+      // Determine interaction type based on Navigation Mode and Modifiers
+      // Default / Trackpad Mode:
+      // - Wheel (no mod) -> PAN
+      // - Wheel + Mod (or Pinch) -> ZOOM
+
+      // Mouse Mode ("Standard"):
+      // - Wheel (no mod) -> ZOOM
+      // - Wheel + Mod -> PAN (or just ignore mod for pan?)
+      // Actually usually Mouse Mode: Wheel->Zoom, Space+Drag->Pan. 
+      // But let's allow Wheel+Mod -> Pan for flexibility if they want 2D scrolling.
+
+      let isZoomAction = isModifier; // Default for Trackpad
+      if (navigationMode === 'mouse') {
+        isZoomAction = !isModifier; // Invert for Mouse
+      }
+
+      // Special case: Pinch gesture on trackpad often sets ctrlKey=true
+      // If use pinch zoom, it will be detected as Zoom in Trackpad mode.
+      // In Mouse mode, simple wheel should be Zoom. 
+
       // PANNING:
-      // If no modifier keys are pressed, treat as PAN.
-      // - Trackpads (Windows/Mac): deltaX/deltaY are provided.
-      // - Mouse Wheel: usually provides deltaY (vertical pan).
-      if (!isModifier) {
+      if (!isZoomAction) {
         // Disable stage dragging during pan to prevent conflicts
         if (stage) {
           stage.draggable(false);
@@ -4405,7 +4450,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       }
 
       // ZOOMING:
-      // Executed if a modifier key (like Ctrl for pinch-zoom) is pressed.
       const oldScale = scale;
       const pointer = stage.getPointerPosition();
       if (!pointer) return;
@@ -4437,7 +4481,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       container.addEventListener('wheel', handleWheel, { passive: false });
       return () => container.removeEventListener('wheel', handleWheel);
     }
-  }, [scale, position]);
+  }, [scale, position, navigationMode]);
+
+
 
   // Track if space key is pressed for panning
   const [isSpacePressed, setIsSpacePressed] = useState(false);

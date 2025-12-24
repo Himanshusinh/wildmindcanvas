@@ -21,7 +21,7 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
       if (stored) {
         try {
           return JSON.parse(stored);
-        } catch {}
+        } catch { }
       }
     }
     return {
@@ -31,6 +31,7 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
       backgroundColor: '#ffffff',
       dotSize: 4,
       gridSpacing: 30,
+      navigationMode: 'trackpad',
     };
   });
 
