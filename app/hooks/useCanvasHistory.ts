@@ -13,6 +13,7 @@ export interface CanvasHistoryState {
     storyboardModalStates: any[];
     scriptFrameModalStates: any[];
     sceneFrameModalStates: any[];
+    groupContainerStates: any[];
     connections: any[];
     upscaleModalStates: any[];
     multiangleCameraModalStates: any[];

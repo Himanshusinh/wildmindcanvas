@@ -8,6 +8,7 @@ import { ImageModalFrame } from './ImageModalFrame';
 import { ImageModalNodes } from './ImageModalNodes';
 import { ImageModalControls } from './ImageModalControls';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { imageCache } from '@/lib/imageCache';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ interface ImageUploadModalProps {
   sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
+  draggable?: boolean;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -100,6 +102,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   refImages = {},  // Flat map of character/location names to image URLs
   frameWidth,
   frameHeight,
+  draggable = true,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -206,10 +209,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     const scene = (sceneFrameModalStates || []).find(s => s.id === connection.from);
     if (scene) {
       const sceneContent = scene.content || '';
-      return { 
-        id: scene.id, 
-        value: sceneContent, 
-        sentValue: sceneContent 
+      return {
+        id: scene.id,
+        value: sceneContent,
+        sentValue: sceneContent
       };
     }
 
@@ -451,10 +454,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           if (isZTurbo) {
             // For Z Image Turbo, resolution value is the base size (512, 768, 1024, 1280, 1440)
             baseSize = Number(selectedResolution) || 1024;
-            
+
             // Round to nearest multiple of 16
             const roundTo16 = (val: number) => Math.round(val / 16) * 16;
-            
+
             if (ratio >= 1) {
               width = roundTo16(Math.round(baseSize * ratio));
               height = roundTo16(baseSize);
@@ -462,7 +465,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               width = roundTo16(baseSize);
               height = roundTo16(Math.round(baseSize / ratio));
             }
-            
+
             // Clamp to 64-1440 (per backend implementation)
             width = Math.max(64, Math.min(1440, width));
             height = Math.max(64, Math.min(1440, height));
@@ -471,10 +474,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           else if (isPImage) {
             // For P-Image, resolution value is the base size (512, 768, 1024, 1280, 1440)
             baseSize = Number(selectedResolution) || 1024;
-            
+
             // Round to nearest multiple of 16
             const roundTo16 = (val: number) => Math.round(val / 16) * 16;
-            
+
             if (ratio >= 1) {
               width = roundTo16(Math.round(baseSize * ratio));
               height = roundTo16(baseSize);
@@ -482,7 +485,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               width = roundTo16(baseSize);
               height = roundTo16(Math.round(baseSize / ratio));
             }
-            
+
             // Clamp to 256-1440
             width = Math.max(256, Math.min(1440, width));
             height = Math.max(256, Math.min(1440, height));
@@ -1014,7 +1017,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             const ar = w && h ? (w / h) : 1;
             const rawHeight = ar ? Math.round(calculatedFrameWidth / ar) : 600;
             const calculatedFrameHeight = Math.max(400, rawHeight);
-            
+
             onUpdateModalState(modalIds[i], {
               generatedImageUrl: imageUrls[i],
               isGenerating: false, // Mark as completed
@@ -1123,7 +1126,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         const modelLower = model.toLowerCase();
         const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
         const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
-        
+
         // For Z Image Turbo and P-Image, only accept valid resolutions
         if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
           if (resolution !== selectedResolution) {
@@ -1149,7 +1152,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           const modelLower = model.toLowerCase();
           const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
           const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
-          
+
           // For Z Image Turbo and P-Image, only accept valid resolutions
           if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
             setSelectedResolution(resolution);
@@ -1359,7 +1362,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const getFinalModelName = (modelOverride?: string) => {
     const targetModel = modelOverride || selectedModel;
     const modelLower = targetModel.toLowerCase();
-    
+
     // Map frontend model names to backend model names for Replicate models
     if (modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo')) {
       return 'Z Image Turbo';
@@ -1410,6 +1413,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isImage = target.tagName === 'IMG';
     const isControls = target.closest('.controls-overlay');
+
+    // Check if dragging is allowed
+    if (draggable === false && !isInput && !isButton && !isControls) {
+      return;
+    }
 
     // Call onSelect when clicking on the modal (this will trigger context menu)
     if (onSelect && !isInput && !isButton && !isControls) {
@@ -1517,51 +1525,61 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
       {/* Auto-resize effect for Plugin Results (Upscale, Vectorize, etc.) */}
       {/* This ensures the frame expands/collapses to fit the generated image dimensions */}
+
       {(() => {
         useEffect(() => {
-          if (generatedImageUrl && isUploadedImage) {
+          let mounted = true;
+          if (generatedImageUrl) {
             // STRICT SAFETY CHECK:
             // If we have already processed this exact image URL, do absolutely nothing.
             if (processedImageRef.current === generatedImageUrl) {
               return;
             }
 
-            const img = new window.Image();
-            img.onload = () => {
-              const naturalWidth = img.naturalWidth;
-              const naturalHeight = img.naturalHeight;
+            // Use proxy URL for consistency with CanvasImage and to avoid CORS issues
+            // This ensures we hit the same cache key as the canvas elements
+            const urlToLoad = (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata'))
+              ? buildProxyResourceUrl(generatedImageUrl)
+              : generatedImageUrl;
 
-              if (naturalWidth && naturalHeight) {
-                const MAX_WIDTH = 600;
-                let newWidth = Math.min(Math.max(naturalWidth, 300), MAX_WIDTH);
-                let newHeight = Math.round(newWidth * (naturalHeight / naturalWidth));
+            imageCache.load(urlToLoad)
+              .then((img) => {
+                if (!mounted) return;
 
-                // Mark this URL as processed BEFORE triggering any updates
+                // Mark processed
                 processedImageRef.current = generatedImageUrl;
 
-                console.log('[ImageUploadModal] Auto-resizing for plugin result:', {
-                  model: selectedModel,
-                  natural: `${naturalWidth}x${naturalHeight}`,
-                  new: `${newWidth}x${newHeight}`
-                });
+                const naturalWidth = img.naturalWidth;
+                const naturalHeight = img.naturalHeight;
 
-                const newAspectRatio = `${newWidth}:${newHeight}`;
+                if (naturalWidth && naturalHeight) {
+                  setImageResolution({ width: naturalWidth, height: naturalHeight });
+                }
 
-                if (onOptionsChange) {
-                  // Only trigger update if dimensions actually need changing
-                  // (though the ref guard handles the loop, this prevents one unnecessary render if coincidentally correct)
-                  if (frameWidth !== newWidth || frameHeight !== newHeight) {
-                    onOptionsChange({
-                      frameWidth: newWidth,
-                      frameHeight: newHeight,
-                      aspectRatio: newAspectRatio,
-                    } as any);
+                if (!isUploadedImage && naturalWidth && naturalHeight) {
+                  const MAX_WIDTH = 600;
+                  let newWidth = Math.min(Math.max(naturalWidth, 300), MAX_WIDTH);
+                  let newHeight = Math.round(newWidth * (naturalHeight / naturalWidth));
+                  const newAspectRatio = `${newWidth}:${newHeight}`;
+
+                  if (onOptionsChange) {
+                    if (frameWidth !== newWidth || frameHeight !== newHeight) {
+                      onOptionsChange({
+                        frameWidth: newWidth,
+                        frameHeight: newHeight,
+                        aspectRatio: newAspectRatio,
+                        model: selectedModel,
+                        frame: selectedFrame,
+                      } as any);
+                    }
                   }
                 }
-              }
-            };
-            img.src = generatedImageUrl;
+              })
+              .catch(e => {
+                console.warn('[ImageUploadModal] Failed to load image', e);
+              });
           }
+          return () => { mounted = false; };
         }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange, frameWidth, frameHeight]);
         return null;
       })()}
@@ -1702,13 +1720,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               if (newAspectRatio !== selectedAspectRatio) {
                 setSelectedAspectRatio(newAspectRatio);
               }
-              
+
               // Update resolution when switching models
               // Calculate available resolutions for the new model
               const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
               const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
               let availableResolutionsForModel: Array<{ value: string; label: string }> = [];
-              
+
               if (isZTurbo) {
                 availableResolutionsForModel = [
                   { value: '1024', label: '1024px' },
@@ -1753,7 +1771,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   { value: '4K', label: '4K' },
                 ];
               }
-              
+
               // Update resolution if current is not valid for the new model
               if (availableResolutionsForModel.length > 0) {
                 const isValidResolution = availableResolutionsForModel.some(r => r.value === selectedResolution);
@@ -1763,7 +1781,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   setSelectedResolution(newResolution);
                 }
               }
-              
+
               if (onOptionsChange) {
                 const [w, h] = newAspectRatio.split(':').map(Number);
                 const frameWidth = 600;
@@ -1786,14 +1804,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 // The aspect ratio change should only affect the next generation (image-to-image)
                 if (generatedImageUrl) {
                   // Keep existing frame dimensions, only update aspect ratio for next generation
-                  const opts: any = { 
-                    model: selectedModel, 
-                    frame: selectedFrame, 
-                    prompt, 
+                  const opts: any = {
+                    model: selectedModel,
+                    frame: selectedFrame,
+                    prompt,
                     aspectRatio: ratio, // Update aspect ratio for next generation
                     frameWidth: frameWidth, // Keep existing frame width
                     frameHeight: frameHeight, // Keep existing frame height
-                    imageCount 
+                    imageCount
                   };
                   onOptionsChange(opts);
                 } else {
@@ -1803,14 +1821,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   const ar = w && h ? (w / h) : 1;
                   const rawHeight = Math.round(calculatedFrameWidth / ar);
                   const calculatedFrameHeight = Math.max(400, rawHeight);
-                  const opts: any = { 
-                    model: selectedModel, 
-                    frame: selectedFrame, 
-                    prompt, 
+                  const opts: any = {
+                    model: selectedModel,
+                    frame: selectedFrame,
+                    prompt,
                     aspectRatio: ratio,
-                    frameWidth: calculatedFrameWidth, 
-                    frameHeight: calculatedFrameHeight, 
-                    imageCount 
+                    frameWidth: calculatedFrameWidth,
+                    frameHeight: calculatedFrameHeight,
+                    imageCount
                   };
                   onOptionsChange(opts);
                 }
@@ -1828,7 +1846,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               userInitiatedResolutionChangeRef.current = true;
               // Update resolution state immediately
               setSelectedResolution(resolution);
-              
+
               if (onOptionsChange) {
                 // Helper to get model name with NEW resolution
                 const getModelNameWithResolution = (res: string) => {
@@ -1854,7 +1872,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   }
                   return selectedModel;
                 };
-                
+
                 // Calculate frame dimensions based on CURRENT aspect ratio (not resolution)
                 // Frame size should only change when aspect ratio changes, not resolution
                 const [w, h] = selectedAspectRatio.split(':').map(Number);

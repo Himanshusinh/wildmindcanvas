@@ -56,6 +56,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
+  // Keep a local ref of group elements so autosave can include them even though Canvas manages them locally
+  const groupsRef = useRef<Record<string, any>>({});
+  const [initialGroupContainerStates, setInitialGroupContainerStates] = useState<any[]>([]);
   const snapshotLoadedRef = useRef(false);
   const realtimeRef = useRef<RealtimeClient | null>(null);
   const [realtimeActive, setRealtimeActive] = useState(false);
@@ -924,6 +927,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           generationQueue,
           compareGenerators,
         });
+        // Merge any known group elements we've persisted via the group handlers so autosave doesn't wipe them out
+        if (groupsRef.current && Object.keys(groupsRef.current).length > 0) {
+          Object.keys(groupsRef.current).forEach((gid) => {
+            elements[gid] = groupsRef.current[gid];
+          });
+        }
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
       } catch (e) {
@@ -989,6 +998,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
+          // Extract group elements and store them for Canvas initialisation and autosave merging
+          const loadedGroups: any[] = [];
+          Object.values(elements).forEach((element: any) => {
+            if (element && element.type === 'group') {
+              // Normalize serialized snapshot element into Canvas GroupContainerState shape
+              const normalized = {
+                id: element.id,
+                name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : '',
+                x: typeof element.x === 'number' ? element.x : 0,
+                y: typeof element.y === 'number' ? element.y : 0,
+                width: typeof element.width === 'number' ? element.width : 0,
+                height: typeof element.height === 'number' ? element.height : 0,
+                padding: element.padding ?? 20,
+                children: Array.isArray(element.children) ? element.children : [], // Hydrate children
+                meta: {
+                  name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : 'Group',
+                  ...element.meta
+                }
+              } as any;
+              loadedGroups.push(normalized);
+              // Keep serialized element in groupsRef
+              groupsRef.current[element.id] = {
+                id: element.id,
+                type: 'group',
+                x: normalized.x,
+                y: normalized.y,
+                width: normalized.width,
+                height: normalized.height,
+                padding: normalized.padding,
+                children: normalized.children,
+                meta: normalized.meta
+              };
+            }
+          });
+          if (loadedGroups.length > 0) setInitialGroupContainerStates(loadedGroups);
           const newImages: ImageUpload[] = [];
           const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
@@ -2202,7 +2246,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
             <Canvas
               key={projectId}
               isUIHidden={isUIHidden}
+              initialGroupContainerStates={initialGroupContainerStates}
               images={images}
+              setImages={setImages}
               onViewportChange={handleViewportChange}
               onImageUpdate={handleImageUpdate}
               onImageDelete={handleImageDelete}
@@ -2356,6 +2402,157 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     } catch (e) { console.warn('[Connector] Failed to persist snapshot after connector delete', e); }
                   } catch (e) {
                     console.error('Failed to persist connector delete', e);
+                  }
+                }
+              }}
+              onPersistGroupCreate={async (group) => {
+                // Append create op for group so it is persisted and undoable
+                if (!group || !group.id) return;
+                if (projectId && opManagerInitialized) {
+                  try {
+                    const elementPayload = {
+                      id: group.id,
+                      type: 'group',
+                      x: group.x,
+                      y: group.y,
+                      width: group.width,
+                      height: group.height,
+                      padding: group.padding,
+                      children: group.children || [],
+                      meta: { name: group.meta?.name ?? 'Group', createdAt: group.meta?.createdAt },
+                    } as any;
+                    const inverse = { type: 'delete', elementId: group.id, data: {}, requestId: '', clientTs: 0 } as any;
+                    console.log('[Group] appending create op for group', group.id, elementPayload);
+                    await appendOp({ type: 'create', elementId: group.id, data: { element: elementPayload }, inverse } as any);
+
+                    // Force-persist snapshot including the new group element so it appears immediately
+                    try {
+                      const elements = buildSnapshotElements({
+                        images,
+                        imageGenerators,
+                        videoGenerators,
+                        videoEditorGenerators,
+                        musicGenerators,
+                        upscaleGenerators,
+                        multiangleCameraGenerators,
+                        removeBgGenerators,
+                        eraseGenerators,
+                        expandGenerators,
+                        vectorizeGenerators,
+                        nextSceneGenerators,
+                        storyboardGenerators,
+                        scriptFrameGenerators,
+                        sceneFrameGenerators,
+                        textGenerators,
+                        connectors,
+                        generationQueue,
+                        compareGenerators,
+                      });
+                      // Inject the group element into the elements map
+                      elements[group.id] = elementPayload;
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      console.log('[Group] apiSetCurrentSnapshot success (create)', { projectId, ssRes });
+                      // Keep a local copy so autosave includes groups
+                      groupsRef.current[group.id] = elementPayload;
+                    } catch (e) {
+                      console.warn('[Group] Failed to persist snapshot after create', e);
+                    }
+
+                  } catch (e) {
+                    console.error('Failed to persist group create', e);
+                  }
+                }
+              }}
+              onPersistGroupUpdate={async (id, updates, prev) => {
+                if (!id) return;
+                if (projectId && opManagerInitialized) {
+                  try {
+                    const inverseUpdates: any = {};
+                    if (prev) {
+                      for (const k of Object.keys(updates || {})) {
+                        (inverseUpdates as any)[k] = (prev as any)[k];
+                      }
+                    }
+                    await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                    console.log('[Group] appended update op', id, updates);
+                    // Force snapshot persist so updated group is reflected immediately
+                    try {
+                      const elements = buildSnapshotElements({
+                        images,
+                        imageGenerators,
+                        videoGenerators,
+                        videoEditorGenerators,
+                        musicGenerators,
+                        upscaleGenerators,
+                        multiangleCameraGenerators,
+                        removeBgGenerators,
+                        eraseGenerators,
+                        expandGenerators,
+                        vectorizeGenerators,
+                        nextSceneGenerators,
+                        storyboardGenerators,
+                        scriptFrameGenerators,
+                        sceneFrameGenerators,
+                        textGenerators,
+                        connectors,
+                        generationQueue,
+                        compareGenerators,
+                      });
+                      // Merge/replace the group element in the snapshot
+                      elements[id] = { id, type: 'group', x: (updates as any).x ?? prev?.x, y: (updates as any).y ?? prev?.y, width: (updates as any).width ?? prev?.width, height: (updates as any).height ?? prev?.height, padding: (updates as any).padding ?? prev?.padding, children: (updates as any).children ?? prev?.children ?? [], meta: { name: (updates as any).meta?.name ?? prev?.meta?.name ?? 'Group', createdAt: (updates as any).meta?.createdAt ?? prev?.meta?.createdAt } };
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      console.log('[Group] apiSetCurrentSnapshot success (update)', { projectId, ssRes });
+                      // Update local copy used for autosave
+                      groupsRef.current[id] = elements[id];
+                    } catch (e) {
+                      console.warn('[Group] Failed to persist snapshot after update', e);
+                    }
+                  } catch (e) {
+                    console.error('Failed to persist group update', e);
+                  }
+                }
+              }}
+              onPersistGroupDelete={async (group) => {
+                if (!group || !group.id) return;
+                if (projectId && opManagerInitialized) {
+                  try {
+                    const inverse = { type: 'create', elementId: group.id, data: { element: { id: group.id, type: 'group', x: group.x, y: group.y, width: group.width, height: group.height, padding: group.padding, children: group.children || [], meta: { name: group.meta?.name ?? 'Group', createdAt: group.meta?.createdAt } } }, requestId: '', clientTs: 0 } as any;
+                    console.log('[Group] appending delete op for group', group.id);
+                    await appendOp({ type: 'delete', elementId: group.id, data: {}, inverse } as any);
+                    // Force snapshot persist so deleted group is removed immediately
+                    try {
+                      const elements = buildSnapshotElements({
+                        images,
+                        imageGenerators,
+                        videoGenerators,
+                        videoEditorGenerators,
+                        musicGenerators,
+                        upscaleGenerators,
+                        multiangleCameraGenerators,
+                        removeBgGenerators,
+                        eraseGenerators,
+                        expandGenerators,
+                        vectorizeGenerators,
+                        nextSceneGenerators,
+                        storyboardGenerators,
+                        scriptFrameGenerators,
+                        sceneFrameGenerators,
+                        textGenerators,
+                        connectors,
+                        generationQueue,
+                        compareGenerators,
+                      });
+                      // Ensure group is not present in snapshot (don't inject it)
+                      if (elements[group.id]) delete elements[group.id];
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+                      console.log('[Group] apiSetCurrentSnapshot success (delete)', { projectId, ssRes });
+                      // Remove from local cache so autosave won't re-insert
+                      if (groupsRef.current[group.id]) delete groupsRef.current[group.id];
+                    } catch (e) {
+                      console.warn('[Group] Failed to persist snapshot after delete', e);
+                    }
+                  } catch (e) {
+                    console.error('Failed to persist group delete', e);
                   }
                 }
               }}

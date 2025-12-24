@@ -13,10 +13,10 @@ import { getReferenceImagesForText } from '@/app/components/Plugins/StoryboardPl
  */
 function calculateAspectRatioFromDimensions(width?: number, height?: number): string {
   if (!width || !height || width <= 0 || height <= 0) return '1:1';
-  
+
   const ratio = width / height;
   const tolerance = 0.01;
-  
+
   const commonRatios: Array<{ ratio: number; label: string }> = [
     { ratio: 1.0, label: '1:1' },
     { ratio: 4 / 3, label: '4:3' },
@@ -32,13 +32,13 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
     { ratio: 5 / 4, label: '5:4' },
     { ratio: 4 / 5, label: '4:5' },
   ];
-  
+
   for (const common of commonRatios) {
     if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
       return common.label;
     }
   }
-  
+
   // Calculate GCD for custom ratios
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
   const divisor = gcd(width, height);
@@ -85,6 +85,7 @@ interface ImageModalOverlaysProps {
   sceneFrameModalStates?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
+  isComponentDraggable?: (id: string) => boolean;
 }
 
 export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
@@ -111,6 +112,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   sceneFrameModalStates = [],
   scriptFrameModalStates = [],
   storyboardModalStates = [],
+  isComponentDraggable,
 }) => {
   return (
     <>
@@ -119,6 +121,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           key={modalState.id}
           isOpen={true}
           id={modalState.id}
+          draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
           onClose={() => {
             setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedImageModalId(null);
@@ -172,8 +175,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
           onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height) => {
-            console.log('[ImageModalOverlays] onGenerate called!', { 
-              modalId: modalState.id, 
+            console.log('[ImageModalOverlays] onGenerate called!', {
+              modalId: modalState.id,
               hasOnImageGenerate: !!onImageGenerate,
               sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
             });
@@ -185,7 +188,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // Fall back to modalState.sourceImageUrl only for scene-based generation
                 let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
                 const sceneNumber = (modalState as any).sceneNumber;
-                
+
                 console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
                   fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
                   fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
@@ -466,7 +469,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
                 // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
                 const targetFrameId = modalId || modalState.id;
-                
+
                 console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
                   modalIdParam: modalId || 'NONE',
                   modalStateId: modalState.id,
@@ -504,7 +507,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                   const ar = w && h ? (w / h) : 1;
                   const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
                   const frameHeight = Math.max(400, rawHeight);
-                  
+
                   setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
                     ...m,
                     generatedImageUrl: imageUrls[0] || null,

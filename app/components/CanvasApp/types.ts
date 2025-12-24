@@ -245,6 +245,7 @@ export interface CanvasAppState {
   sceneFrameGenerators: SceneFrameGenerator[];
   textGenerators: TextGenerator[];
   canvasTextStates?: import('@/app/components/ModalOverlays/types').CanvasTextState[];
+  groupContainerStates?: import('@/app/types/groupContainer').GroupContainerState[];
   connectors: Connector[];
   generationQueue: GenerationQueueItem[];
 }

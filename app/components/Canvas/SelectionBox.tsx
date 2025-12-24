@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Rect, Group, Text, Transformer } from 'react-konva';
+import { Rect, Group, Text, Transformer, Line } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 
@@ -119,6 +119,9 @@ interface SelectionBoxProps {
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistScriptFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistSceneFrameModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onCreateGroup?: () => void;
+  isGroupSelected?: boolean;
+  onUngroup?: () => void;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -214,6 +217,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   onPersistStoryboardModalMove,
   onPersistScriptFrameModalMove,
   onPersistSceneFrameModalMove,
+  onCreateGroup,
+  isGroupSelected,
+  onUngroup,
 }) => {
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
@@ -1200,17 +1206,17 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
             // Store original next scene modal positions
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1201',message:'onDragStart: NextScene/Compare check',data:{selectedNextSceneCount:selectedNextSceneModalIds.length,selectedCompareCount:selectedCompareModalIds.length,nextSceneStatesCount:nextSceneModalStates.length,compareStatesCount:compareModalStates.length,selectedNextSceneIds:selectedNextSceneModalIds,selectedCompareIds:selectedCompareModalIds},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1201', message: 'onDragStart: NextScene/Compare check', data: { selectedNextSceneCount: selectedNextSceneModalIds.length, selectedCompareCount: selectedCompareModalIds.length, nextSceneStatesCount: nextSceneModalStates.length, compareStatesCount: compareModalStates.length, selectedNextSceneIds: selectedNextSceneModalIds, selectedCompareIds: selectedCompareModalIds }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
             // #endregion
             selectedNextSceneModalIds.forEach(modalId => {
               const modalState = nextSceneModalStates.find(m => m.id === modalId);
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1203',message:'onDragStart: Finding NextScene modal',data:{modalId,found:!!modalState,modalX:modalState?.x,modalY:modalState?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1203', message: 'onDragStart: Finding NextScene modal', data: { modalId, found: !!modalState, modalX: modalState?.x, modalY: modalState?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
               // #endregion
               if (modalState) {
                 originalPositions.nextSceneModals.set(modalId, { x: modalState.x, y: modalState.y });
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1205',message:'onDragStart: Stored NextScene original pos',data:{modalId,x:modalState.x,y:modalState.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1205', message: 'onDragStart: Stored NextScene original pos', data: { modalId, x: modalState.x, y: modalState.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
                 // #endregion
               }
             });
@@ -1219,12 +1225,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedCompareModalIds.forEach(modalId => {
               const modalState = compareModalStates.find(m => m.id === modalId);
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1211',message:'onDragStart: Finding Compare modal',data:{modalId,found:!!modalState,modalX:modalState?.x,modalY:modalState?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1211', message: 'onDragStart: Finding Compare modal', data: { modalId, found: !!modalState, modalX: modalState?.x, modalY: modalState?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
               // #endregion
               if (modalState) {
                 originalPositions.compareModals.set(modalId, { x: modalState.x, y: modalState.y });
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1213',message:'onDragStart: Stored Compare original pos',data:{modalId,x:modalState.x,y:modalState.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1213', message: 'onDragStart: Stored Compare original pos', data: { modalId, x: modalState.x, y: modalState.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
                 // #endregion
               }
             });
@@ -1430,12 +1436,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
             // Move all selected next scene modals by delta in real-time (from original positions)
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1417',message:'onDragMove: NextScene/Compare check',data:{selectedNextSceneCount:selectedNextSceneModalIds.length,selectedCompareCount:selectedCompareModalIds.length,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1417', message: 'onDragMove: NextScene/Compare check', data: { selectedNextSceneCount: selectedNextSceneModalIds.length, selectedCompareCount: selectedCompareModalIds.length, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
             // #endregion
             selectedNextSceneModalIds.forEach(modalId => {
               const originalPos = originalPositions.nextSceneModals.get(modalId);
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1418',message:'onDragMove: Getting NextScene original pos',data:{modalId,hasOriginalPos:!!originalPos,originalX:originalPos?.x,originalY:originalPos?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1418', message: 'onDragMove: Getting NextScene original pos', data: { modalId, hasOriginalPos: !!originalPos, originalX: originalPos?.x, originalY: originalPos?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
               // #endregion
               if (originalPos) {
                 const newX = originalPos.x + deltaX;
@@ -1448,7 +1454,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   )
                 );
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1426',message:'onDragMove: Updated NextScene state',data:{modalId,newX,newY,originalX:originalPos.x,originalY:originalPos.y,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1426', message: 'onDragMove: Updated NextScene state', data: { modalId, newX, newY, originalX: originalPos.x, originalY: originalPos.y, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
                 // #endregion
               }
             });
@@ -1457,7 +1463,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedCompareModalIds.forEach(modalId => {
               const originalPos = originalPositions.compareModals.get(modalId);
               // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1432',message:'onDragMove: Getting Compare original pos',data:{modalId,hasOriginalPos:!!originalPos,originalX:originalPos?.x,originalY:originalPos?.y},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1432', message: 'onDragMove: Getting Compare original pos', data: { modalId, hasOriginalPos: !!originalPos, originalX: originalPos?.x, originalY: originalPos?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
               // #endregion
               if (originalPos) {
                 const newX = originalPos.x + deltaX;
@@ -1470,7 +1476,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   )
                 );
                 // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SelectionBox.tsx:1440',message:'onDragMove: Updated Compare state',data:{modalId,newX,newY,originalX:originalPos.x,originalY:originalPos.y,deltaX,deltaY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1440', message: 'onDragMove: Updated Compare state', data: { modalId, newX, newY, originalX: originalPos.x, originalY: originalPos.y, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
                 // #endregion
               }
             });
@@ -1702,23 +1708,83 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           }}
         >
           {/* Group name is rendered by GroupLabel component, not here */}
-          <Rect
-            x={0}
-            y={0}
-            width={selectionTightRect.width}
-            height={selectionTightRect.height}
-            fill="rgba(96, 165, 250, 0.22)"
-            stroke="#2563EB"
-            strokeWidth={4}
-            dash={[6, 6]}
-            listening={true}
-            cornerRadius={0}
-          />
+          {!isGroupSelected && (
+            <Rect
+              x={0}
+              y={0}
+              width={selectionTightRect.width}
+              height={selectionTightRect.height}
+              fill="rgba(96, 165, 250, 0.22)"
+              stroke="#2563EB"
+              strokeWidth={4}
+              dash={[6, 6]}
+              listening={true}
+              cornerRadius={0}
+            />
+          )}
           {/* Toolbar buttons at top center, outside selection area */}
           <Group
             x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
             y={-40}
           >
+            {/* Group/Ungroup button */}
+            <Group
+              x={0}
+              onClick={(e) => {
+                e.cancelBubble = true;
+                if (isGroupSelected) {
+                  onUngroup?.();
+                } else {
+                  onCreateGroup?.();
+                }
+              }}
+              onMouseEnter={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'pointer';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'default';
+                }
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={36}
+                height={36}
+                fill="#ffffff"
+                stroke="rgba(15,23,42,0.12)"
+                strokeWidth={1}
+                cornerRadius={10}
+                shadowColor="rgba(15,23,42,0.18)"
+                shadowBlur={6}
+                shadowOffset={{ x: 0, y: 3 }}
+              />
+              <Group x={9} y={9}>
+                {isGroupSelected ? (
+                  // Ungroup Icon: 4 squares with a red slash
+                  <>
+                    <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
+                    <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
+                    <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
+                    <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
+                    <Line points={[0, 18, 18, 0]} stroke="#ef4444" strokeWidth={2.5} lineCap="round" />
+                  </>
+                ) : (
+                  // Group Icon: 4 squares
+                  <>
+                    <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                    <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                    <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                    <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  </>
+                )}
+              </Group>
+            </Group>
             {/* Arrange button */}
             <Group
               x={48}
@@ -1823,6 +1889,47 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 18}
             y={-40}
           >
+            {/* Group button */}
+            <Group
+              x={0}
+              onClick={(e) => {
+                e.cancelBubble = true;
+                onCreateGroup?.();
+              }}
+              onMouseEnter={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'pointer';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const stage = e.target.getStage();
+                if (stage) {
+                  stage.container().style.cursor = 'default';
+                }
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={36}
+                height={36}
+                fill="#ffffff"
+                stroke="rgba(15,23,42,0.12)"
+                strokeWidth={1}
+                cornerRadius={10}
+                shadowColor="rgba(15,23,42,0.18)"
+                shadowBlur={6}
+                shadowOffset={{ x: 0, y: 3 }}
+              />
+              <Group x={9} y={9}>
+                {/* 4 small squares in 2x2 grid */}
+                <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+              </Group>
+            </Group>
             {/* Arrange button */}
             <Group
               x={48}

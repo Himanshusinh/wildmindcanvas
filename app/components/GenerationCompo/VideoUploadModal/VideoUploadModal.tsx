@@ -58,7 +58,7 @@ interface VideoUploadModalProps {
   onAddToCanvas?: (url: string) => void;
   isSelected?: boolean;
   initialModel?: string;
-  initialFrame?: string; 
+  initialFrame?: string;
   initialAspectRatio?: string;
   initialPrompt?: string;
   initialDuration?: number;
@@ -68,6 +68,7 @@ interface VideoUploadModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: ImageUpload[];
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
+  draggable?: boolean;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -101,6 +102,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   imageModalStates = [],
   images = [],
   textInputStates = [],
+  draggable = true,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -137,7 +139,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     // Find connection where this modal is the target (to === id)
     const connection = connections.find(c => c.to === id);
     if (!connection) return null;
-    
+
     // Find the text input state that matches the connection source
     const textInput = textInputStates.find(t => t.id === connection.from);
     return textInput || null;
@@ -147,7 +149,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
   const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
   const onOptionsChangeRef = useRef(onOptionsChange);
-  
+
   // Update ref when onOptionsChange changes
   useEffect(() => {
     onOptionsChangeRef.current = onOptionsChange;
@@ -190,8 +192,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const [isFrameOrderSwapped, setIsFrameOrderSwapped] = useState(false);
@@ -208,8 +210,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
   // Detect if this is an uploaded video (from library, local storage, or media)
   // Check if model is 'Library Video' or 'Uploaded Video', or if there's no prompt and video exists (and not generating)
-  const isUploadedVideo = 
-    initialModel === 'Library Video' || 
+  const isUploadedVideo =
+    initialModel === 'Library Video' ||
     initialModel === 'Uploaded Video' ||
     (!initialPrompt && !prompt && generatedVideoUrl && !isGenerating);
 
@@ -254,7 +256,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       hasInitializedDefaultsRef.current = false;
       return;
     }
-    
+
     const isCurrentVeo31 = selectedModel.toLowerCase().includes('veo 3.1');
     const targetModel = isCurrentVeo31 ? selectedModel : 'Veo 3.1';
     const defaultAspectRatio = getModelDefaultAspectRatio(targetModel);
@@ -325,11 +327,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           : lastFrameUrl;
 
         await onGenerate(
-          promptToUse, 
-          selectedModel, 
-          selectedFrame, 
-          selectedAspectRatio, 
-          selectedDuration, 
+          promptToUse,
+          selectedModel,
+          selectedFrame,
+          selectedAspectRatio,
+          selectedDuration,
           selectedResolution,
           generationFirstFrame || undefined,
           generationLastFrame || undefined
@@ -397,7 +399,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   // Listen for frame dim events (when dragging connection near disallowed frame)
   useEffect(() => {
     if (!id) return;
-    
+
     const handleFrameDim = (e: Event) => {
       const ce = e as CustomEvent;
       const { frameId, dimmed } = ce.detail || {};
@@ -405,7 +407,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         setIsDimmed(dimmed === true);
       }
     };
-    
+
     window.addEventListener('canvas-frame-dim', handleFrameDim as any);
     return () => {
       window.removeEventListener('canvas-frame-dim', handleFrameDim as any);
@@ -444,6 +446,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isControls = target.closest('.controls-overlay');
     // Allow drag even when clicking video/image content so user can still reposition after generation.
+    if (draggable === false && !isInput && !isButton && !isControls) {
+      return;
+    }
     if (onSelect && !isInput && !isButton && !isControls) {
       onSelect();
     }

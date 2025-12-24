@@ -12,10 +12,10 @@ import { ImageUpload } from '@/types/canvas';
  */
 function calculateAspectRatioFromDimensions(width?: number, height?: number): string {
   if (!width || !height || width <= 0 || height <= 0) return '16:9';
-  
+
   const ratio = width / height;
   const tolerance = 0.01;
-  
+
   const commonRatios: Array<{ ratio: number; label: string }> = [
     { ratio: 1.0, label: '1:1' },
     { ratio: 4 / 3, label: '4:3' },
@@ -31,13 +31,13 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
     { ratio: 5 / 4, label: '5:4' },
     { ratio: 4 / 5, label: '4:5' },
   ];
-  
+
   for (const common of commonRatios) {
     if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
       return common.label;
     }
   }
-  
+
   // Calculate GCD for custom ratios
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
   const divisor = gcd(width, height);
@@ -66,6 +66,7 @@ interface VideoModalOverlaysProps {
   scale: number;
   position: { x: number; y: number };
   textInputStates?: TextModalState[];
+  isComponentDraggable?: (id: string) => boolean;
 }
 
 export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
@@ -87,6 +88,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   scale,
   position,
   textInputStates,
+  isComponentDraggable,
 }) => {
   return (
     <>
@@ -95,6 +97,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           key={modalState.id}
           isOpen={true}
           id={modalState.id}
+          draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
           onClose={() => {
             setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedVideoModalId(null);

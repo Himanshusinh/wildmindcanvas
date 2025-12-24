@@ -9,6 +9,7 @@ import { ContextMenu } from '@/app/components/ContextMenu';
 import { CanvasImage } from './CanvasImage';
 import { TextElements } from './TextElements';
 import { ModalOverlays } from '@/app/components/ModalOverlays';
+import { GroupContainerOverlay } from './GroupContainerOverlay';
 import { SelectionBox } from './SelectionBox';
 import { MediaActionIcons } from './MediaActionIcons';
 import AvatarButton from './AvatarButton';
@@ -31,6 +32,7 @@ import { useKeyboardShortcuts } from '@/app/components/CanvasApp/hooks/useKeyboa
 
 interface CanvasProps {
   images?: ImageUpload[];
+  setImages?: React.Dispatch<React.SetStateAction<ImageUpload[]>>;
   onViewportChange?: (center: { x: number; y: number }, scale: number) => void;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
   onImageDelete?: (index: number) => void;
@@ -151,6 +153,12 @@ interface CanvasProps {
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
+  // Group persistence callbacks
+  onPersistGroupCreate?: (group: import('../../types/groupContainer').GroupContainerState) => void | Promise<void>;
+  onPersistGroupUpdate?: (id: string, updates: Partial<import('../../types/groupContainer').GroupContainerState>, prev?: import('../../types/groupContainer').GroupContainerState) => void | Promise<void>;
+  onPersistGroupDelete?: (group: import('../../types/groupContainer').GroupContainerState) => void | Promise<void>;
+  // Allow initial groups to be provided from parent snapshot hydration
+  initialGroupContainerStates?: import('../../types/groupContainer').GroupContainerState[];
   // Compare plugin persistence callbacks
   compareModalStates?: import('@/app/components/ModalOverlays/types').CompareModalState[];
   setCompareModalStates?: React.Dispatch<React.SetStateAction<import('@/app/components/ModalOverlays/types').CompareModalState[]>>;
@@ -291,13 +299,20 @@ export const Canvas: React.FC<CanvasProps> = ({
   onConnectionsChange,
   onPersistConnectorCreate,
   onPersistConnectorDelete,
+  // Group persistence callbacks (injected by page.tsx)
+  onPersistGroupCreate,
+  onPersistGroupUpdate,
+  onPersistGroupDelete,
   onPluginSidebarOpen,
   isUIHidden = false,
   setGenerationQueue,
+  initialGroupContainerStates,
+  setImages,
 }) => {
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<Konva.Stage>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const dimensionCacheRef = useRef(new Map<string, { width: number; height: number }>());
 
   // Helper function to check if a scene can be generated (sequential generation)
   const canGenerateScene = (sceneNumber: number, scriptFrameId: string): boolean => {
@@ -401,10 +416,13 @@ export const Canvas: React.FC<CanvasProps> = ({
   const effectiveSelectedCanvasTextId = selectedCanvasTextId ?? localSelectedCanvasTextId;
   const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId ?? setLocalSelectedCanvasTextId;
   const [storyboardModalStates, setStoryboardModalStates] = useState<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; namedImages?: { characters?: Record<string, string>; backgrounds?: Record<string, string>; props?: Record<string, string> }; stitchedImageUrl?: string }>>([]);
-  const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<import('@/app/components/ModalOverlays/types').ScriptFrameModalState>>([]);
+  const [scriptFrameModalStates, setScriptFrameModalStates] = useState<Array<import('../ModalOverlays/types').ScriptFrameModalState>>([]);
   const [sceneFrameModalStates, setSceneFrameModalStates] = useState<Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string; characterIds?: string[]; locationId?: string; mood?: string }>>([]);
+  // Group Container state - stores groups of canvas items
+  const [groupContainerStates, setGroupContainerStates] = useState<import('../../types/groupContainer').GroupContainerState[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   // Story World state - stores character/location/style data per storyboard
-  const [storyWorldStates, setStoryWorldStates] = useState<Array<{ storyboardId: string; storyWorld: import('@/types/storyWorld').StoryWorld }>>([]);
+  const [storyWorldStates, setStoryWorldStates] = useState<Array<{ storyboardId: string; storyWorld: import('../../../types/storyWorld').StoryWorld }>>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [selectedImageIndices, setSelectedImageIndices] = useState<number[]>([]); // Multiple selection
   const [selectedTextInputId, setSelectedTextInputId] = useState<string | null>(null);
@@ -473,6 +491,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     storyboardModalStates,
     scriptFrameModalStates,
     sceneFrameModalStates,
+    groupContainerStates,
     connections,
     upscaleModalStates,
     multiangleCameraModalStates,
@@ -484,7 +503,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     videoEditorModalStates,
   }), [
     images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
-    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, connections,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, groupContainerStates, connections,
     upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
     nextSceneModalStates, videoEditorModalStates
   ]);
@@ -503,6 +522,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     setStoryboardModalStates(state.storyboardModalStates || []);
     setScriptFrameModalStates(state.scriptFrameModalStates || []);
     setSceneFrameModalStates(state.sceneFrameModalStates || []);
+    setGroupContainerStates(state.groupContainerStates || []);
     setUpscaleModalStates(state.upscaleModalStates || []);
     setRemoveBgModalStates(state.removeBgModalStates || []);
     setEraseModalStates(state.eraseModalStates || []);
@@ -554,6 +574,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       storyboardModalStates,
       scriptFrameModalStates,
       sceneFrameModalStates,
+      groupContainerStates,
       connections,
       upscaleModalStates,
       multiangleCameraModalStates,
@@ -1651,6 +1672,460 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // ===== GROUP CONTAINER HANDLERS =====
+
+  // Initialize groups from parent-provided snapshot data on first load
+  useEffect(() => {
+    try {
+      if (initialGroupContainerStates && initialGroupContainerStates.length && typeof setGroupContainerStates === 'function') {
+        setGroupContainerStates(prev => (prev && prev.length > 0) ? prev : initialGroupContainerStates);
+      }
+    } catch (e) {
+      console.warn('[Canvas] Failed to initialize groupContainerStates from initial props', e);
+    }
+  }, [initialGroupContainerStates]);
+
+  // Calculate grouped component IDs for efficiently disabling drag
+  const groupedComponentIds = useMemo(() => {
+    const ids = new Set<string>();
+    groupContainerStates.forEach(group => {
+      if (group.children) {
+        group.children.forEach(child => ids.add(child.id));
+      }
+    });
+    return ids;
+  }, [groupContainerStates]);
+
+  // Helper to check if component is draggable (not in a group)
+  const isComponentDraggable = useCallback((id: string) => {
+    return !groupedComponentIds.has(id);
+  }, [groupedComponentIds]);
+
+  // Helper to get item bounds by ID
+  const getItemBounds = (itemId: string): { x: number; y: number; width: number; height: number } | null => {
+    // Check images
+    const image = images.find(img => img.elementId === itemId);
+    if (image) {
+      const bounds = { x: image.x || 0, y: image.y || 0, width: image.width || 300, height: image.height || 300 };
+      console.log('[getItemBounds] Image bounds:', itemId, bounds);
+      return bounds;
+    }
+
+    // Check image modals
+    const imageModal = imageModalStates.find(m => m.id === itemId);
+    if (imageModal) {
+      const bounds = { x: imageModal.x, y: imageModal.y, width: imageModal.frameWidth || 300, height: imageModal.frameHeight || 300 };
+      console.log('[getItemBounds] Image modal bounds:', itemId, bounds);
+      return bounds;
+    }
+
+    // Check text inputs
+    const textInput = textInputStates.find(t => t.id === itemId);
+    if (textInput) return { x: textInput.x, y: textInput.y, width: 400, height: 60 };
+
+    // Check storyboards
+    const storyboard = storyboardModalStates.find(s => s.id === itemId);
+    if (storyboard) return { x: storyboard.x, y: storyboard.y, width: storyboard.frameWidth || 400, height: storyboard.frameHeight || 500 };
+
+    // Check scenes
+    const scene = sceneFrameModalStates.find(s => s.id === itemId);
+    if (scene) return { x: scene.x, y: scene.y, width: scene.frameWidth || 350, height: scene.frameHeight || 300 };
+
+    // Check videos
+    const video = videoModalStates.find(v => v.id === itemId);
+    if (video) {
+      const bounds = { x: video.x, y: video.y, width: video.frameWidth || 300, height: video.frameHeight || 300 };
+      console.log('[getItemBounds] Video modal bounds:', itemId, bounds);
+      return bounds;
+    }
+
+    // Check script frames
+    const scriptFrame = scriptFrameModalStates.find(s => s.id === itemId);
+    if (scriptFrame) return { x: scriptFrame.x, y: scriptFrame.y, width: scriptFrame.frameWidth || 400, height: scriptFrame.frameHeight || 500 };
+
+    // Check music modals (circular trigger usually, estimated bounds)
+    const music = musicModalStates.find(m => m.id === itemId);
+    if (music) return { x: music.x, y: music.y, width: 100, height: 120 };
+
+    // Check upscale modals
+    const upscale = upscaleModalStates.find(u => u.id === itemId);
+    if (upscale) return { x: upscale.x, y: upscale.y, width: upscale.frameWidth || 300, height: upscale.frameHeight || 300 };
+
+    // Check removeBg modals
+    const removeBg = removeBgModalStates.find(r => r.id === itemId);
+    if (removeBg) return { x: removeBg.x, y: removeBg.y, width: removeBg.frameWidth || 300, height: removeBg.frameHeight || 300 };
+
+    // Check erase modals
+    const erase = eraseModalStates.find(e => e.id === itemId);
+    if (erase) return { x: erase.x, y: erase.y, width: erase.frameWidth || 300, height: erase.frameHeight || 300 };
+
+    // Check expand modals
+    const expand = expandModalStates.find(e => e.id === itemId);
+    if (expand) return { x: expand.x, y: expand.y, width: expand.frameWidth || 300, height: expand.frameHeight || 300 };
+
+    // Check vectorize modals
+    const vectorize = vectorizeModalStates.find(v => v.id === itemId);
+    if (vectorize) return { x: vectorize.x, y: vectorize.y, width: vectorize.frameWidth || 300, height: vectorize.frameHeight || 300 };
+
+    // Check next scene modals
+    const nextScene = nextSceneModalStates.find(n => n.id === itemId);
+    if (nextScene) return { x: nextScene.x, y: nextScene.y, width: nextScene.frameWidth || 300, height: nextScene.frameHeight || 300 };
+
+    return null;
+  };
+
+  // Helper function to calculate group container bounds
+  const calculateGroupBounds = (itemIds: string[]) => {
+    if (itemIds.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    itemIds.forEach(id => {
+      const bounds = getItemBounds(id);
+      if (bounds) {
+        minX = Math.min(minX, bounds.x);
+        minY = Math.min(minY, bounds.y);
+        maxX = Math.max(maxX, bounds.x + bounds.width);
+        maxY = Math.max(maxY, bounds.y + bounds.height);
+      }
+    });
+
+    if (minX === Infinity) return null;
+
+    const padding = 20;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: (maxX - minX) + (padding * 2),
+      height: (maxY - minY) + (padding * 2),
+    };
+  };
+
+  // Create group from currently selected items
+  const handleCreateGroup = () => {
+    console.log('[Canvas] Creating group from selected items');
+    // Collect all selected item IDs
+    const allSelectedIds = [
+      ...selectedImageIndices.map(idx => images[idx]?.elementId).filter(Boolean),
+      ...selectedImageModalIds,
+      ...selectedVideoModalIds,
+      ...selectedTextInputIds,
+      ...selectedStoryboardModalIds,
+      ...selectedScriptFrameModalIds,
+      ...selectedSceneFrameModalIds,
+      ...selectedMusicModalIds,
+      ...selectedUpscaleModalIds,
+      ...selectedRemoveBgModalIds,
+      ...selectedEraseModalIds,
+      ...selectedExpandModalIds,
+      ...selectedVectorizeModalIds,
+    ] as string[];
+
+    console.log('[Canvas] Creating group with', allSelectedIds.length, 'items:', allSelectedIds);
+
+    if (allSelectedIds.length < 2) {
+      alert('Please select at least 2 items to create a group');
+      return;
+    }
+
+    // Calculate bounds. Prefer the selection tight rect (if present) so
+    // the visual selection region converts exactly into the group box.
+    // Apply the same internal padding (20px) so the group appears larger
+    // than the tight selection.
+    let bounds = null as null | { x: number; y: number; width: number; height: number };
+    if (selectionTightRect) {
+      const pad = 20;
+      bounds = {
+        x: selectionTightRect.x - pad,
+        y: selectionTightRect.y - pad,
+        width: selectionTightRect.width + pad * 2,
+        height: selectionTightRect.height + pad * 2,
+      };
+    } else {
+      bounds = calculateGroupBounds(allSelectedIds);
+    }
+
+    if (!bounds) {
+      alert('Could not calculate bounds for selected items');
+      return;
+    }
+
+    // Create group container
+    const newGroup: import('../../types/groupContainer').GroupContainerState = {
+      id: `group-${Date.now()}`,
+      type: 'group',
+      children: [],
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      padding: 20,
+      meta: {
+        name: 'New Group',
+        createdAt: Date.now(),
+      }
+    };
+
+    // Populate children with relative coordinates
+    // Images
+    selectedImageIndices.forEach(idx => {
+      const img = images[idx];
+      if (img && img.elementId) {
+        newGroup.children.push({
+          id: img.elementId,
+          type: 'image',
+          relativeTransform: {
+            x: (img.x || 0) - bounds!.x,
+            y: (img.y || 0) - bounds!.y,
+            scaleX: 1, // Store scale if available in img
+            scaleY: 1, // Store scale if available in img
+            rotation: 0 // Store rotation if available
+          }
+        });
+      }
+    });
+
+    // Helper to add modal children
+    const addModalChildren = (ids: string[], states: any[], type: string) => {
+      ids.forEach(id => {
+        const state = states.find(s => s.id === id);
+        if (state) {
+          newGroup.children.push({
+            id: state.id,
+            type: type,
+            relativeTransform: {
+              x: state.x - bounds!.x,
+              y: state.y - bounds!.y,
+              scaleX: 1, // Default scale
+              scaleY: 1, // Default scale
+              rotation: 0 // Default rotation
+            }
+          });
+        }
+      });
+    };
+
+    addModalChildren(selectedImageModalIds, imageModalStates, 'image-modal');
+    addModalChildren(selectedVideoModalIds, videoModalStates, 'video-modal');
+    addModalChildren(selectedTextInputIds, textInputStates, 'text-input');
+    addModalChildren(selectedStoryboardModalIds, storyboardModalStates, 'storyboard');
+    addModalChildren(selectedScriptFrameModalIds, scriptFrameModalStates, 'script-frame');
+    addModalChildren(selectedSceneFrameModalIds, sceneFrameModalStates, 'scene-frame');
+    addModalChildren(selectedMusicModalIds, musicModalStates, 'music-modal');
+    // Add other modals similarly...
+
+    console.log('[Canvas] ✅ Group created:', newGroup);
+
+    setGroupContainerStates(prev => [...prev, newGroup]);
+    // Clear selections and also clear the selection boxes (tight rect / marquee)
+    // so the selection region is replaced by the group UI only.
+    clearAllSelections(true);
+    // Persist group creation if callback provided
+    if (onPersistGroupCreate) {
+      Promise.resolve(onPersistGroupCreate(newGroup)).catch((e) => console.warn('[Canvas] Failed to persist group create', e));
+    }
+  };
+
+  const handleUngroup = () => {
+    console.log('[Canvas] Ungrouping selected groups');
+    if (selectedGroupIds.length === 0) return;
+
+    // Capture groups to delete for persistence
+    const groupsToDelete = groupContainerStates.filter(g => selectedGroupIds.includes(g.id));
+
+    // Remove selected groups from state without modifying children positions
+    // (since we decided to keep absolute positions up-to-date even if not rendering them)
+    // WAIT: If we are not updating absolute positions during drag, then on UNGROUP we MUST calculate them!
+    // But the user said: "Ungroup... child.absoluteX = group.x + child.relativeX"
+    // So yes, we need to update positions here effectively.
+    // However, if we simply delete the group, the items revert to their last known 'absolute' positions.
+    // If we didn't update them during drag, they will jump back.
+    // So we MUST update them to their new absolute positions here.
+
+    // Update all children positions to their current absolute location
+    groupsToDelete.forEach(group => {
+      group.children.forEach(child => {
+        const absX = group.x + child.relativeTransform.x;
+        const absY = group.y + child.relativeTransform.y;
+
+        // Update state based on type
+        // Update state based on type
+        switch (child.type) {
+          case 'image':
+            if (onImageUpdate) {
+              const idx = images.findIndex(img => (img as any).elementId === child.id);
+              if (idx !== -1) {
+                onImageUpdate(idx, { x: absX, y: absY });
+              }
+            }
+            break;
+          case 'image-modal':
+            setImageModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistImageModalMove) onPersistImageModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'video-modal':
+            setVideoModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistVideoModalMove) onPersistVideoModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'text-input':
+            setTextInputStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistTextModalMove) onPersistTextModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'music-modal':
+            setMusicModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistMusicModalMove) onPersistMusicModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'upscale':
+            setUpscaleModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistUpscaleModalMove) onPersistUpscaleModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'multiangle-camera':
+            setMultiangleCameraModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistMultiangleCameraModalMove) onPersistMultiangleCameraModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'removebg':
+            setRemoveBgModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistRemoveBgModalMove) onPersistRemoveBgModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'erase':
+            setEraseModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistEraseModalMove) onPersistEraseModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'expand':
+            setExpandModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistExpandModalMove) onPersistExpandModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'vectorize':
+            setVectorizeModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistVectorizeModalMove) onPersistVectorizeModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'storyboard':
+            setStoryboardModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistStoryboardModalMove) onPersistStoryboardModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'script-frame':
+            setScriptFrameModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistScriptFrameModalMove) onPersistScriptFrameModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'scene-frame':
+            setSceneFrameModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistSceneFrameModalMove) onPersistSceneFrameModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'next-scene':
+            setNextSceneModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistNextSceneModalMove) onPersistNextSceneModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'compare':
+            setCompareModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistCompareModalMove) onPersistCompareModalMove(child.id, { x: absX, y: absY });
+            break;
+          case 'video-editor':
+            setVideoEditorModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
+            if (onPersistVideoEditorModalMove) onPersistVideoEditorModalMove(child.id, { x: absX, y: absY });
+            break;
+        }
+      });
+    });
+
+    setGroupContainerStates(prev => prev.filter(g => !selectedGroupIds.includes(g.id)));
+
+    // Clear selection
+    setSelectedGroupIds([]);
+
+    // Persist deletes (pass full group object so caller can build inverse)
+    if (onPersistGroupDelete) {
+      groupsToDelete.forEach(g => {
+        Promise.resolve(onPersistGroupDelete(g)).catch((e) => console.warn('[Canvas] Failed to persist group delete', e));
+      });
+    }
+  };
+
+  // Handle group movement - moves group container and all members
+  const handleGroupMove = (groupId: string, newX: number, newY: number) => {
+    // Finalize drag: persist based on stored drag start state (if present) or fall back to current group
+    const dragState = dragStateRef.current[groupId];
+    const prevGroup = dragState?.startGroup || groupContainerStates.find(g => g.id === groupId);
+    if (!prevGroup) return;
+
+    // Ensure final group position already applied by drag handler; if not, patch it
+    setGroupContainerStates(prev => prev.map(g => g.id === groupId ? { ...g, x: newX, y: newY } : g));
+
+    // Persist group position update: pass prev for inverse creation
+    if (onPersistGroupUpdate) {
+      Promise.resolve(onPersistGroupUpdate(groupId, { x: newX, y: newY }, prevGroup)).catch((e) => console.warn('[Canvas] Failed to persist group move', e));
+    }
+
+    // Persist uploaded member positions (use stored start member positions if available)
+    // Persist uploaded member positions (use stored start member positions if available)
+    // NOTE: With relative positioning, we generally don't need to persist individual member moves
+    // because they are implied by the group move. However, if the backend expects updates for all items,
+    // we might need to iterate children.
+    // For now, assume persisting the group move is sufficient as individual items are children.
+
+    // Cleanup drag state
+    if (dragStateRef.current[groupId]) delete dragStateRef.current[groupId];
+  };
+
+  // Drag lifecycle handlers for smooth member movement
+  const dragStateRef = useRef<Record<string, any>>({});
+  const dragRequestIdRef = useRef<number | null>(null);
+
+  const handleGroupDragStart = (groupId: string, startX: number, startY: number) => {
+    const group = groupContainerStates.find(g => g.id === groupId);
+    if (!group) return;
+
+    // NOTE: We no longer track individual member starts here because we don't need to
+    // revert them individually or calculate offsets manually—relative rendering handles it.
+
+    dragStateRef.current[groupId] = {
+      startGroup: { ...group },
+      last: { x: startX, y: startY },
+      start: { x: startX, y: startY },
+    };
+  };
+
+  const handleGroupDrag = (groupId: string, newX: number, newY: number) => {
+    // Cancel any pending frame
+    if (dragRequestIdRef.current) {
+      cancelAnimationFrame(dragRequestIdRef.current);
+    }
+
+    // Schedule update
+    dragRequestIdRef.current = requestAnimationFrame(() => {
+      const ds = dragStateRef.current[groupId];
+      if (!ds) return;
+      const last = ds.last;
+      const deltaX = newX - last.x;
+      const deltaY = newY - last.y;
+      if (deltaX === 0 && deltaY === 0) return;
+
+      // Update last
+      ds.last = { x: newX, y: newY };
+
+      // Update group position visually
+      setGroupContainerStates(prev => prev.map(g => g.id === groupId ? { ...g, x: (g.x || 0) + deltaX, y: (g.y || 0) + deltaY } : g));
+
+      // NO individual member updates during drag - handled by relative rendering
+
+      dragRequestIdRef.current = null;
+    });
+  };
+
+  // Handle group name change
+  // Handle group name change
+  const handleGroupNameChange = (groupId: string, newName: string) => {
+    setGroupContainerStates(prev => prev.map(g =>
+      g.id === groupId ? { ...g, meta: { ...g.meta, name: newName } } : g
+    ));
+    if (onPersistGroupUpdate) {
+      const prev = groupContainerStates.find(g => g.id === groupId);
+      Promise.resolve(onPersistGroupUpdate(groupId, { meta: { ...prev?.meta, name: newName } }, prev)).catch((e) => console.warn('[Canvas] Failed to persist group rename', e));
+    }
+  };
+
   // Internal function to generate scenes (extracted from old handleGenerateScenes)
   const generateScenesFromStoryboardInternal = async (
     storyboardId: string,
@@ -2335,7 +2810,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   };
 
   // Story World helper functions
-  const upsertStoryWorld = (storyboardId: string, storyWorld: import('@/types/storyWorld').StoryWorld) => {
+  const upsertStoryWorld = (storyboardId: string, storyWorld: import('../../../types/storyWorld').StoryWorld) => {
     setStoryWorldStates(prev => {
       const existingIndex = prev.findIndex(sw => sw.storyboardId === storyboardId);
       if (existingIndex === -1) {
@@ -2347,7 +2822,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  const getStoryWorld = (storyboardId: string): import('@/types/storyWorld').StoryWorld | undefined => {
+  const getStoryWorld = (storyboardId: string): import('../../../types/storyWorld').StoryWorld | undefined => {
     return storyWorldStates.find(sw => sw.storyboardId === storyboardId)?.storyWorld;
   };
 
@@ -4540,9 +5015,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (!selectedNextSceneModalIdsList.includes(modal.id)) {
               selectedNextSceneModalIdsList.push(modal.id);
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-            // #endregion
+
           }
         });
 
@@ -4553,9 +5026,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (!selectedCompareModalIdsList.includes(modal.id)) {
               selectedCompareModalIdsList.push(modal.id);
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-            // #endregion
+
           }
         });
 
@@ -4612,9 +5083,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -5177,9 +5645,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (!selectedNextSceneModalIdsList.includes(modal.id)) {
               selectedNextSceneModalIdsList.push(modal.id);
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-            // #endregion
+
           }
         });
 
@@ -5190,9 +5656,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (!selectedCompareModalIdsList.includes(modal.id)) {
               selectedCompareModalIdsList.push(modal.id);
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-            // #endregion
+
           }
         });
 
@@ -5249,9 +5713,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         const mergedCompareIds = [...new Set([...(selectedCompareModalIds || []), ...selectedCompareModalIdsList])];
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
-        // #endregion
+
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
         setSelectedSceneFrameModalIds(selectedSceneFrameModalIdsList);
@@ -7160,6 +7622,34 @@ export const Canvas: React.FC<CanvasProps> = ({
     setSelectedNextSceneModalIds(prev => prev.filter(mid => mid !== id));
   };
 
+  // Helper to calculate effective positions for grouped items
+  const getEffectiveStates = useCallback(<T extends { id: string, x?: number, y?: number }>(states: T[], type: string): T[] => {
+    // Create a map of localized overrides
+    const overrides = new Map<string, { x: number, y: number }>();
+    groupContainerStates.forEach(group => {
+      if (group.children) {
+        group.children.forEach(child => {
+          if (child.type === type) {
+            overrides.set(child.id, {
+              x: group.x + child.relativeTransform.x,
+              y: group.y + child.relativeTransform.y
+            });
+          }
+        });
+      }
+    });
+
+    if (overrides.size === 0) return states;
+
+    return states.map(state => {
+      const override = overrides.get(state.id);
+      if (override) {
+        return { ...state, x: override.x, y: override.y };
+      }
+      return state;
+    });
+  }, [groupContainerStates]);
+
   return (
     <div
       ref={containerRef}
@@ -7214,6 +7704,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           {/* Images and Videos */}
           {images
             .filter((img) => img.type !== 'model3d' && img.type !== 'text')
+            .filter((img) => !groupedComponentIds.has(img.elementId || '')) // Filter out grouped images
             .map((imageData, index) => {
               const actualIndex = images.findIndex(img => img === imageData);
               return (
@@ -7224,6 +7715,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                   stageRef={stageRef}
                   position={position}
                   scale={scale}
+                  isDraggable={isComponentDraggable(imageData.elementId || `canvas-image-${actualIndex}`)}
                   onUpdate={(updates) => {
                     handleImageUpdateWithGroup(actualIndex, updates);
                     // Clear real-time position when drag ends (when position is not being updated)
@@ -7299,6 +7791,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           <SelectionBox
             selectionBox={selectionBox}
             selectionTightRect={selectionTightRect}
+            isGroupSelected={selectedGroupIds.length > 0}
+            onUngroup={handleUngroup}
             isSelecting={isSelecting}
             isDragSelection={isDragSelection}
             selectedImageIndices={selectedImageIndices}
@@ -7389,6 +7883,36 @@ export const Canvas: React.FC<CanvasProps> = ({
             onPersistStoryboardModalMove={handleStoryboardModalMove}
             onPersistScriptFrameModalMove={handleScriptFrameModalMove}
             onPersistSceneFrameModalMove={handleSceneFrameModalMove}
+            onCreateGroup={handleCreateGroup}
+          />
+          {/* Group Container Overlay */}
+          <GroupContainerOverlay
+            groups={groupContainerStates}
+            scale={scale}
+            position={position}
+            selectedGroupIds={selectedGroupIds}
+            onGroupMove={handleGroupMove}
+            onGroupDrag={handleGroupDrag}
+            onGroupDragStart={handleGroupDragStart}
+            onGroupNameChange={handleGroupNameChange}
+            onGroupSelect={(id) => {
+              clearAllSelections();
+              setSelectedGroupIds([id]);
+            }}
+            onUngroup={(id: string) => {
+              // Find the group object
+              const group = groupContainerStates.find(g => g.id === id);
+              // Ungroup a specific group id (remove the group container)
+              setGroupContainerStates(prev => prev.filter(g => g.id !== id));
+              // If it was selected, clear selection
+              setSelectedGroupIds(prev => prev.filter(gid => gid !== id));
+              // Persist delete if handler provided (pass full group)
+              if (onPersistGroupDelete && group) {
+                Promise.resolve(onPersistGroupDelete(group)).catch((e) => console.warn('[Canvas] Failed to persist group delete', e));
+              }
+            }}
+            getItemBounds={getItemBounds}
+            images={images}
           />
           {/* Region selection rectangle (Konva pattern) */}
           {selectionRectCoords && (
@@ -7462,24 +7986,25 @@ export const Canvas: React.FC<CanvasProps> = ({
       />
       {/* Modal Overlays */}
       <ModalOverlays
-        textInputStates={textInputStates}
-        imageModalStates={imageModalStates}
-        videoModalStates={videoModalStates}
-        videoEditorModalStates={videoEditorModalStates}
-        musicModalStates={musicModalStates}
-        upscaleModalStates={upscaleModalStates}
-        multiangleCameraModalStates={multiangleCameraModalStates}
-        removeBgModalStates={removeBgModalStates}
-        eraseModalStates={eraseModalStates}
-        expandModalStates={expandModalStates}
-        vectorizeModalStates={vectorizeModalStates}
-        nextSceneModalStates={nextSceneModalStates}
-        storyboardModalStates={storyboardModalStates}
-        scriptFrameModalStates={scriptFrameModalStates}
-        sceneFrameModalStates={sceneFrameModalStates}
+        textInputStates={getEffectiveStates(textInputStates, 'text-input')}
+        imageModalStates={getEffectiveStates(imageModalStates, 'image-modal')}
+        videoModalStates={getEffectiveStates(videoModalStates, 'video-modal')}
+        videoEditorModalStates={getEffectiveStates(videoEditorModalStates, 'video-editor')}
+        musicModalStates={getEffectiveStates(musicModalStates, 'music-modal')}
+        upscaleModalStates={getEffectiveStates(upscaleModalStates, 'upscale')}
+        isComponentDraggable={isComponentDraggable}
+        multiangleCameraModalStates={getEffectiveStates(multiangleCameraModalStates, 'multiangle-camera')}
+        removeBgModalStates={getEffectiveStates(removeBgModalStates, 'removebg')}
+        eraseModalStates={getEffectiveStates(eraseModalStates, 'erase')}
+        expandModalStates={getEffectiveStates(expandModalStates, 'expand')}
+        vectorizeModalStates={getEffectiveStates(vectorizeModalStates, 'vectorize')}
+        nextSceneModalStates={getEffectiveStates(nextSceneModalStates, 'next-scene')}
+        storyboardModalStates={getEffectiveStates(storyboardModalStates, 'storyboard')}
+        scriptFrameModalStates={getEffectiveStates(scriptFrameModalStates, 'script-frame')}
+        sceneFrameModalStates={getEffectiveStates(sceneFrameModalStates, 'scene-frame')}
 
         // Compare Plugin
-        compareModalStates={compareModalStates}
+        compareModalStates={getEffectiveStates(compareModalStates, 'compare')}
         selectedCompareModalId={selectedCompareModalId}
         selectedCompareModalIds={selectedCompareModalIds}
         setCompareModalStates={setCompareModalStates}
@@ -7667,6 +8192,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           position={position}
           onImageDelete={onImageDelete}
           onImageDuplicate={onImageDuplicate}
+          onCreateGroup={handleCreateGroup}
           setSelectedImageIndex={setSelectedImageIndex}
           setSelectedImageIndices={setSelectedImageIndices}
         />

@@ -476,6 +476,7 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
+  isComponentDraggable?: (id: string) => boolean;
 }
 
 export interface CompareModalState {

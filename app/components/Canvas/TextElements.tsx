@@ -12,6 +12,7 @@ interface TextElementsProps {
   setContextMenuImageIndex: (index: number | null) => void;
   setContextMenuOpen: (open: boolean) => void;
   handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
+  isComponentDraggable?: (id: string) => boolean;
 }
 
 export const TextElements: React.FC<TextElementsProps> = ({
@@ -23,6 +24,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
   setContextMenuImageIndex,
   setContextMenuOpen,
   handleImageUpdateWithGroup,
+  isComponentDraggable,
 }) => {
   return (
     <>
@@ -46,7 +48,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
                 fontSize={fontSize}
                 fontFamily={textData.fontFamily || 'Arial'}
                 fill={textData.fill || '#000000'}
-                draggable
+                draggable={isComponentDraggable ? isComponentDraggable(textData.elementId || `text-${actualIndex}`) : true}
                 onDragEnd={(e) => {
                   const node = e.target;
                   handleImageUpdateWithGroup(actualIndex, {

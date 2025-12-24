@@ -5,6 +5,7 @@ import { Group, Rect, Text, Image as KonvaImage, Circle, Path } from 'react-konv
 import Konva from 'konva';
 import { ImageUpload } from '@/types/canvas';
 import { buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { imageCache } from '@/lib/imageCache';
 
 interface CanvasImageProps {
   imageData: ImageUpload;
@@ -16,6 +17,7 @@ interface CanvasImageProps {
   stageRef?: React.RefObject<any>;
   position?: { x: number; y: number };
   scale?: number;
+  isDraggable?: boolean;
 }
 
 export const CanvasImage: React.FC<CanvasImageProps> = ({
@@ -28,6 +30,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   stageRef,
   position = { x: 0, y: 0 },
   scale = 1,
+  isDraggable = true,
 }) => {
   const [img, setImg] = useState<HTMLImageElement | HTMLVideoElement | null>(null);
   const [isSelected, setIsSelected] = useState(false);
@@ -103,7 +106,9 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
   const url = getImageUrl(imageData.url); // Type narrowing
 
+
   useEffect(() => {
+    let mounted = true;
 
     if (isVideo) {
       const video = document.createElement('video');
@@ -116,6 +121,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
       video.onloadedmetadata = () => {
         // Ensure video is paused and at first frame
+        if (!mounted) return;
         video.pause();
         video.currentTime = 0;
         setImg(video);
@@ -125,7 +131,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
         // Force initial frame display after a small delay to ensure video is ready
         setTimeout(() => {
-          if (videoRef.current && imageRef.current) {
+          if (mounted && videoRef.current && imageRef.current) {
             videoRef.current.currentTime = 0;
             imageRef.current.getLayer()?.batchDraw();
           }
@@ -134,6 +140,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
       // Ensure first frame is loaded and displayed
       video.onloadeddata = () => {
+        if (!mounted) return;
         if (video.readyState >= 2) { // HAVE_CURRENT_DATA
           video.currentTime = 0;
           // Force a frame update
@@ -145,17 +152,24 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
 
       // When video seeks to first frame, update the display
       video.onseeked = () => {
+        if (!mounted) return;
         if (video.currentTime === 0 && imageRef.current) {
           // Force update to show first frame
           imageRef.current.getLayer()?.batchDraw();
         }
       };
 
-      video.onplay = () => setIsPlaying(true);
-      video.onpause = () => setIsPlaying(false);
+      video.onplay = () => {
+        if (mounted) setIsPlaying(true);
+      };
+      video.onpause = () => {
+        if (mounted) setIsPlaying(false);
+      };
       video.onended = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
+        if (mounted) {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }
       };
       video.ontimeupdate = () => {
         if (!isDragging && videoRef.current) {
@@ -164,7 +178,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             cancelAnimationFrame(timeUpdateRef.current);
           }
           timeUpdateRef.current = requestAnimationFrame(() => {
-            if (videoRef.current && !isDragging) {
+            if (mounted && videoRef.current && !isDragging) {
               setCurrentTime(videoRef.current.currentTime);
             }
           });
@@ -172,6 +186,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       };
 
       return () => {
+        mounted = false;
         if (videoRef.current) {
           videoRef.current.pause();
           videoRef.current.src = '';
@@ -182,15 +197,21 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         URL.revokeObjectURL(url);
       };
     } else {
-      const image = new Image();
-      image.crossOrigin = 'anonymous';
-      image.src = url;
-      image.onload = () => {
-        setImg(image);
-        originalAspectRatio.current = image.width / image.height;
-      };
+      // Use global cache for images
+      imageCache.load(url)
+        .then((image) => {
+          if (mounted) {
+            setImg(image);
+            originalAspectRatio.current = image.width / image.height;
+          }
+        })
+        .catch((err) => {
+          console.error('[CanvasImage] Failed to load image', err);
+        });
+
       return () => {
-        URL.revokeObjectURL(url);
+        mounted = false;
+        // Do NOT revoke object URL here as it might be used by other components via cache
       };
     }
   }, [url, isVideo]);
@@ -404,7 +425,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         name={`canvas-image-${index}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        draggable={true}
+        draggable={isDraggable}
         x={x}
         y={y}
         rotation={rotation}

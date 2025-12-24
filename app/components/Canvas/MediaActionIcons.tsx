@@ -10,6 +10,7 @@ interface MediaActionIconsProps {
   position: { x: number; y: number };
   onImageDelete?: (index: number) => void;
   onImageDuplicate?: (index: number) => void;
+  onCreateGroup?: () => void;
   setSelectedImageIndex: (index: number | null) => void;
   setSelectedImageIndices: (indices: number[]) => void;
 }
@@ -21,6 +22,7 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
   position,
   onImageDelete,
   onImageDuplicate,
+  onCreateGroup,
   setSelectedImageIndex,
   setSelectedImageIndices,
 }) => {
@@ -159,6 +161,51 @@ export const MediaActionIcons: React.FC<MediaActionIconsProps> = ({
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+      )}
+
+      {/* Group Icon */}
+      {onCreateGroup && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateGroup();
+          }}
+          title="Group Selection"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: `${28 * scale}px`,
+            height: `${28 * scale}px`,
+            padding: 0,
+            backgroundColor: bgColor,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: `1px solid ${borderColor}`,
+            borderRadius: `${8 * scale}px`,
+            color: textColor,
+            cursor: 'pointer',
+            transition: 'none',
+            boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(147, 51, 234, 0.2)';
+            e.currentTarget.style.color = '#9333ea';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = bgColor;
+            e.currentTarget.style.color = textColor;
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
           </svg>
         </button>
       )}

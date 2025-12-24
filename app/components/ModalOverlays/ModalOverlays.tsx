@@ -94,6 +94,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistCanvasTextCreate,
   onPersistCanvasTextMove,
   onPersistCanvasTextDelete,
+  isComponentDraggable, // New prop
 
   clearAllSelections,
   setTextInputStates,
@@ -319,6 +320,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         sceneFrameModalStates={sceneFrameModalStates ?? []}
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         storyboardModalStates={storyboardModalStates ?? []}
+        isComponentDraggable={isComponentDraggable}
       />
 
       <VideoModalOverlays
@@ -340,6 +342,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
         textInputStates={textInputStates}
+        isComponentDraggable={isComponentDraggable}
       />
 
       <VideoEditorModalOverlays

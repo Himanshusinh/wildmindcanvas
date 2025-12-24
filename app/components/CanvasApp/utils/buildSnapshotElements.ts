@@ -629,6 +629,29 @@ export function buildSnapshotElements(
     });
   }
 
+  // Group containers - persist group metadata so groups survive reloads
+  if (state.groupContainerStates) {
+    state.groupContainerStates.forEach((g) => {
+      if (!g || !g.id) return;
+      const metaObj: any = {
+        name: g.meta?.name || 'Group', // Use meta.name
+        createdAt: g.meta?.createdAt,
+      };
+
+      elements[g.id] = {
+        id: g.id,
+        type: 'group',
+        x: g.x,
+        y: g.y,
+        width: g.width,
+        height: g.height,
+        padding: g.padding,
+        children: g.children || [], // Persist children
+        meta: metaObj,
+      };
+    });
+  }
+
   // Note: connectors are stored inside the source element's meta.connections (see connectionsBySource)
   // Also include connector elements as top-level elements so snapshots contain explicit connector records
   const connectorsToUseFinal = connectorsOverride ?? state.connectors;
