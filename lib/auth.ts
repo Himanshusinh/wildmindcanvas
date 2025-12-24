@@ -81,7 +81,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
             // Store it for future use
             try {
               localStorage.setItem('authToken', passedToken);
-            } catch {}
+            } catch { }
             // Clear hash to avoid exposing token
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
             return passedToken;
@@ -108,7 +108,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
         if (token && token.startsWith('eyJ')) {
           return token;
         }
-      } catch {}
+      } catch { }
     }
 
     // Try other localStorage keys that might contain the token
@@ -127,7 +127,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
           return token;
         }
       }
-    } catch {}
+    } catch { }
 
     return null;
   } catch (error) {
@@ -219,9 +219,9 @@ export async function checkAuthStatus(): Promise<boolean> {
 
     // Try to get Bearer token as fallback (even if cookie exists, it might not work due to domain issues)
     const bearerToken = await getFirebaseIdToken();
-    
-    logDebug('Making fetch request', { 
-      url: apiUrl, 
+
+    logDebug('Making fetch request', {
+      url: apiUrl,
       credentials: 'include',
       hasBearerToken: !!bearerToken,
       authStrategy: bearerToken ? 'Bearer token (fallback)' : 'Session cookie only'
@@ -231,7 +231,7 @@ export async function checkAuthStatus(): Promise<boolean> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (bearerToken) {
       headers['Authorization'] = `Bearer ${bearerToken}`;
       logDebug('Using Bearer token authentication (works across subdomains)');
@@ -268,15 +268,15 @@ export async function checkAuthStatus(): Promise<boolean> {
         const data = await response.json();
         const hasUser = !!data?.data?.user;
         const userId = data?.data?.user?.uid;
-        
-        logDebug('Response data', { 
-          hasUser, 
+
+        logDebug('Response data', {
+          hasUser,
           userId,
           responseStatus: data?.responseStatus,
           hasData: !!data?.data,
           userKeys: data?.data?.user ? Object.keys(data.data.user) : [],
         });
-        
+
         // CRITICAL: Only return true if we have a valid user with required fields
         if (hasUser && userId && data?.data?.user?.username && data?.data?.user?.email) {
           return true;
@@ -316,7 +316,7 @@ export async function checkAuthStatus(): Promise<boolean> {
             },
             signal: controller.signal,
           });
-          
+
           if (retryResponse.ok) {
             const retryData = await retryResponse.json();
             logDebug('✅ Retry with fresh Bearer token succeeded!', { hasUser: !!retryData?.data?.user });
@@ -402,6 +402,14 @@ export async function checkAuthStatus(): Promise<boolean> {
       const error = fetchError as Error;
       if (error.name === 'AbortError') {
         logDebug('Auth check timeout - API Gateway may be unreachable', { apiUrl });
+
+        // In development, allow access even if API times out (likely hanging)
+        const isDev = typeof window !== 'undefined' &&
+          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isDev) {
+          logDebug('Development mode: Allowing access despite API timeout');
+          return true; // Allow access in dev mode
+        }
       } else if (error.message === 'Failed to fetch' || error.message?.includes('ERR_CONNECTION_REFUSED')) {
         logDebug('Failed to fetch auth status - API Gateway may not be running', {
           apiBase,

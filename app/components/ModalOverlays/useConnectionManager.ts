@@ -83,13 +83,13 @@ export function useConnectionManager({
     }
 
     // Check basic allowed connections
-      const allowedMap: Record<string, string[]> = {
-        text: ['image', 'video', 'music', 'storyboard'],
-        image: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-        video: ['video'],
-        music: ['video'],
-        nextscene: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-      };
+    const allowedMap: Record<string, string[]> = {
+      text: ['image', 'video', 'music', 'storyboard'],
+      image: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      video: ['video'],
+      music: ['video'],
+      nextscene: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+    };
 
     if (!allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
       return false;
@@ -104,7 +104,7 @@ export function useConnectionManager({
       'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
       'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
     ];
-    
+
     const fromModal = imageModalStates.find(m => m.id === fromId);
     const isFromMedia = fromModal && (
       fromModal.model === 'Library Image' ||
@@ -168,7 +168,7 @@ export function useConnectionManager({
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
       }
-      
+
       // Mark that we're processing this connection to prevent handleUp from interfering
       processingConnectionRef.current = true;
 
@@ -230,7 +230,7 @@ export function useConnectionManager({
         'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
         'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
       ];
-      
+
       const fromModal = imageModalStates.find(m => m.id === activeDrag.from);
       const isFromMedia = fromModal && (
         fromModal.model === 'Library Image' ||
@@ -310,11 +310,11 @@ export function useConnectionManager({
       // Always create connection if we have valid from/to and validation passed
       const fromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
       const toCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-      
+
       // If we couldn't compute centers, try to get them from the actual DOM nodes
       let finalFromCenter = fromCenter;
       let finalToCenter = toCenter;
-      
+
       if (!finalFromCenter) {
         const fromNode = document.querySelector(`[data-node-id="${activeDrag.from}"][data-node-side="send"]`);
         if (fromNode) {
@@ -322,7 +322,7 @@ export function useConnectionManager({
           finalFromCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
         }
       }
-      
+
       if (!finalToCenter) {
         const toNode = document.querySelector(`[data-node-id="${id}"][data-node-side="${targetSide}"]`);
         if (toNode) {
@@ -330,20 +330,20 @@ export function useConnectionManager({
           finalToCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
         }
       }
-      
+
       // Only proceed if we have both centers
       // If we can't compute centers, try one more time with a small delay (DOM might not be ready)
       if (!finalFromCenter || !finalToCenter) {
         // Retry once after a brief delay to allow DOM to update
         setTimeout(() => {
           if (!activeDrag) return; // Connection might have been created already
-          
+
           const retryFromCenter = computeNodeCenter(activeDrag.from, 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
           const retryToCenter = computeNodeCenter(id, targetSide, stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates);
-          
+
           let retryFinalFromCenter = retryFromCenter;
           let retryFinalToCenter = retryToCenter;
-          
+
           if (!retryFinalFromCenter) {
             const fromNode = document.querySelector(`[data-node-id="${activeDrag.from}"][data-node-side="send"]`);
             if (fromNode) {
@@ -351,7 +351,7 @@ export function useConnectionManager({
               retryFinalFromCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             }
           }
-          
+
           if (!retryFinalToCenter) {
             const toNode = document.querySelector(`[data-node-id="${id}"][data-node-side="${targetSide}"]`);
             if (toNode) {
@@ -359,7 +359,7 @@ export function useConnectionManager({
               retryFinalToCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             }
           }
-          
+
           if (retryFinalFromCenter && retryFinalToCenter) {
             const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
             const newConn: Connection = {
@@ -373,7 +373,7 @@ export function useConnectionManager({
               toY: retryFinalToCenter.y,
               toAnchor: targetSide
             };
-            
+
             const exists = effectiveConnections.find((c: any) => c.from === activeDrag.from && c.to === id && c.toAnchor === targetSide);
             if (!exists) {
               if (onConnectionsChange) {
@@ -381,12 +381,12 @@ export function useConnectionManager({
               } else {
                 setLocalConnections(prev => [...prev, newConn]);
               }
-              
+
               if (onPersistConnectorCreate) {
                 try { Promise.resolve(onPersistConnectorCreate(newConn)).catch(console.error); } catch (e) { console.error('onPersistConnectorCreate failed', e); }
               }
             }
-            
+
             processingConnectionRef.current = false;
             setActiveDrag(null);
             try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
@@ -405,7 +405,7 @@ export function useConnectionManager({
         processingConnectionRef.current = true; // Mark as processing before the retry
         return; // Exit early, will retry in setTimeout
       }
-      
+
       const connectorId = `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
       // Include toAnchor in the connection
@@ -532,7 +532,7 @@ export function useConnectionManager({
     };
     const handleUp = (e?: MouseEvent | PointerEvent) => {
       if (!activeDrag) return;
-      
+
       if (!e) {
         // No event data, just clean up
         setActiveDrag(null);
@@ -546,10 +546,10 @@ export function useConnectionManager({
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
       }
-      
+
       const mouseX = e.clientX;
       const mouseY = e.clientY;
-      
+
       // Check if we're near any receive node (fallback for when pointer capture prevents node's onPointerUp from firing)
       const receiveNodes = Array.from(document.querySelectorAll('[data-node-side^="receive"]'));
       let nearestNode: { id: string; side: string; distance: number } | null = null;
@@ -566,34 +566,34 @@ export function useConnectionManager({
         const distance = Math.sqrt(
           Math.pow(mouseX - nodeCenterX, 2) + Math.pow(mouseY - nodeCenterY, 2)
         );
-        
+
         if (distance < proximityThreshold) {
           if (!nearestNode || distance < nearestNode.distance) {
             nearestNode = { id: nodeId, side: nodeSide, distance };
           }
         }
       }
-      
+
       // If we found a nearby receive node, try to connect to it
       if (nearestNode && nearestNode.id !== activeDrag.from) {
         // Use the same validation logic as handleComplete
         const isValid = checkConnectionValidity(activeDrag.from, nearestNode.id, nearestNode.side);
-        
+
         if (isValid) {
           // Manually trigger the connection by dispatching canvas-node-complete
           // This ensures the connection is created even if the node's onPointerUp didn't fire
           // handleComplete will process this event and perform all validation
           try {
-            window.dispatchEvent(new CustomEvent('canvas-node-complete', { 
-              detail: { 
-                id: nearestNode.id, 
-                side: nearestNode.side 
-              } 
+            window.dispatchEvent(new CustomEvent('canvas-node-complete', {
+              detail: {
+                id: nearestNode.id,
+                side: nearestNode.side
+              }
             }));
           } catch (err) {
             console.warn('Failed to dispatch canvas-node-complete', err);
           }
-          
+
           // Give handleComplete time to process
           setTimeout(() => {
             if (activeDrag && !processingConnectionRef.current) {
@@ -611,11 +611,11 @@ export function useConnectionManager({
           return;
         }
       }
-      
+
       // Check if pointer was directly on a receive node element
       const target = e.target as HTMLElement;
       const receiveNode = target.closest('[data-node-side^="receive"]');
-      
+
       if (receiveNode || processingConnectionRef.current) {
         // If dropping on a node or connection is being processed, give handleComplete time to process
         // handleComplete will clear activeDrag when connection is created
@@ -628,7 +628,7 @@ export function useConnectionManager({
               try {
                 window.dispatchEvent(new CustomEvent('canvas-frame-dim', { detail: { frameId: dimmedFrameId, dimmed: false } }));
               } catch (err) { }
-              setDimmedFrameId(null); 
+              setDimmedFrameId(null);
             }
             try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
           }

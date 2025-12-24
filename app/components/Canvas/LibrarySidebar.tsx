@@ -123,8 +123,8 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      // Load more when user is 50px from bottom
-      if (scrollTop + clientHeight >= scrollHeight - 50 && !loading && hasMore) {
+      // Load more when user is 300px from bottom (earlier fetch)
+      if (scrollTop + clientHeight >= scrollHeight - 300 && !loading && hasMore) {
         const nextPage = page + 1;
         setPage(nextPage);
         fetchMediaLibrary(nextPage);
@@ -247,7 +247,18 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                   <img
                     src={mediaUrl}
                     alt={item.prompt || 'Media'}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      opacity: 0,
+                      animation: 'fadeIn 0.3s ease forwards'
+                    }}
+                    onLoad={(e) => {
+                      (e.target as HTMLImageElement).style.opacity = '1';
+                    }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -415,4 +426,18 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
 };
 
 export default LibrarySidebar;
+
+// Add global style for fade in animation
+const styles = `
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}
 
