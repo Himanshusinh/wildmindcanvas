@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { listProjects, createProject, CanvasProject } from '@/lib/canvasApi';
 
 interface ProjectSelectorProps {
   onProjectSelect: (project: CanvasProject) => void;
   currentProjectId?: string | null;
+  startWithCreate?: boolean;
 }
 
-export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSelectorProps) {
+export function ProjectSelector({ onProjectSelect, currentProjectId, startWithCreate }: ProjectSelectorProps) {
   const [projects, setProjects] = useState<CanvasProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -16,6 +17,7 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
   const [newProjectName, setNewProjectName] = useState('Untitled');
   const creatingRef = useRef(false); // Prevent duplicate creation requests
   const [isDark, setIsDark] = useState(false);
+  const [hasOpenedCreate, setHasOpenedCreate] = useState(false);
 
   useEffect(() => {
     const checkTheme = () => {
@@ -31,6 +33,37 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
     loadProjects();
   }, []);
 
+  // Helper to generate unique project name (Untitled, Untitled 1, etc.)
+  const getUniqueProjectName = (existingProjects: CanvasProject[]) => {
+    const baseName = "Untitled";
+    const existingNames = new Set(existingProjects.map(p => p.name));
+
+    if (!existingNames.has(baseName)) {
+      return baseName;
+    }
+
+    let counter = 1;
+    while (existingNames.has(`${baseName} ${counter}`)) {
+      counter++;
+    }
+    return `${baseName} ${counter}`;
+  };
+
+  const handeOpenCreateModal = useCallback(() => {
+    setNewProjectName(getUniqueProjectName(projects));
+    setShowCreateModal(true);
+  }, [projects]);
+
+  // Handle startWithCreate prop - open modal once projects are loaded
+  useEffect(() => {
+    if (startWithCreate && !loading && !hasOpenedCreate && projects) {
+      setHasOpenedCreate(true);
+      // We need to pass the projects explicitly because state might not be updated in closure if we relied on 'projects' dependency only
+      setNewProjectName(getUniqueProjectName(projects));
+      setShowCreateModal(true);
+    }
+  }, [startWithCreate, loading, hasOpenedCreate, projects]);
+
   const loadProjects = async () => {
     try {
       setLoading(true);
@@ -38,18 +71,19 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
       setProjects(userProjects);
 
       // If no current project and we have projects, select the first one
-      if (!currentProjectId && userProjects.length > 0) {
+      // BUT skip this if we are starting with create mode
+      if (!currentProjectId && userProjects.length > 0 && !startWithCreate) {
         onProjectSelect(userProjects[0]);
       }
     } catch (error) {
       console.error('Failed to load projects:', error);
-      
+
       // Handle authentication errors specifically
       if (error instanceof Error && error.message.includes('Authentication required')) {
         // Check if we're on a different subdomain and might need to log in
         const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
         const isStudioSubdomain = hostname.includes('studio.wildmindai.com') || hostname.includes('studio');
-        
+
         if (isStudioSubdomain) {
           console.warn('[ProjectSelector] Authentication failed - user may need to log in on main site first', {
             hostname,
@@ -78,27 +112,27 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
     try {
       creatingRef.current = true;
       setIsCreating(true);
-      
+
       // Clear localStorage and URL BEFORE creating project to ensure clean state
       if (typeof window !== 'undefined') {
         // Clear old project data from localStorage
         localStorage.removeItem('canvas-project-id');
         localStorage.removeItem('canvas-project-name');
-        
+
         // Clear URL parameters
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('projectId');
         window.history.replaceState({}, '', newUrl.toString());
       }
-      
+
       console.log('[ProjectSelector] Creating new project:', newProjectName.trim());
       const project = await createProject(newProjectName.trim());
       console.log('[ProjectSelector] New project created:', { id: project.id, name: project.name });
-      
+
       setProjects(prev => [project, ...prev]);
       setShowCreateModal(false);
       setNewProjectName('Untitled');
-      
+
       // Select the newly created project immediately (no delay needed since we already cleared localStorage)
       console.log('[ProjectSelector] Selecting newly created project:', project.id);
       onProjectSelect(project);
@@ -186,7 +220,7 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Select Project</h2>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={handeOpenCreateModal}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             + New Project
@@ -197,7 +231,7 @@ export function ProjectSelector({ onProjectSelect, currentProjectId }: ProjectSe
           <div className="text-center py-12">
             <p className="mb-4" style={{ color: subTextColor }}>No projects found</p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={handeOpenCreateModal}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Create Your First Project

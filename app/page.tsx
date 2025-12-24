@@ -81,6 +81,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setProjectName,
     setShowProjectSelector,
     handleProjectSelect,
+    startWithCreate,
   } = useProject({ currentUser });
 
   // Use UI visibility hook
@@ -2269,6 +2270,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         <ProjectSelector
           onProjectSelect={handleProjectSelect}
           currentProjectId={projectId}
+          startWithCreate={startWithCreate}
         />
       )}
       <div className="w-full h-full relative">

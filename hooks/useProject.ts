@@ -11,6 +11,7 @@ interface UseProjectReturn {
   projectName: string;
   showProjectSelector: boolean;
   isInitializing: boolean;
+  startWithCreate: boolean;
   setProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   setProjectName: React.Dispatch<React.SetStateAction<string>>;
   setShowProjectSelector: React.Dispatch<React.SetStateAction<boolean>>;
@@ -30,6 +31,7 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
   });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [startWithCreate, setStartWithCreate] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const initRef = useRef(false); // Prevent multiple initializations
   const isSelectingRef = useRef(false); // Track if we're in the middle of selecting a project
@@ -64,11 +66,12 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
 
         if (urlProjectId) {
           if (urlProjectId === 'new') {
-            // Handle 'new' case - clear localStorage and show selector
-            console.log('[useProject] URL has projectId=new, clearing localStorage and showing selector');
+            // Handle 'new' case - clear localStorage and show selector with create mode
+            console.log('[useProject] URL has projectId=new, clearing localStorage and showing selector in create mode');
             localStorage.removeItem('canvas-project-id');
             localStorage.removeItem('canvas-project-name');
             setIsInitializing(false);
+            setStartWithCreate(true);
             setShowProjectSelector(true);
             initRef.current = false;
             return;
@@ -128,26 +131,26 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
 
   const handleProjectSelect = (project: CanvasProject) => {
     console.log('[useProject] Selecting project:', { id: project.id, name: project.name });
-    
+
     // Mark that we're selecting a project to prevent re-initialization
     isSelectingRef.current = true;
-    
+
     // Clear any existing project state first
     setProjectId(null);
-    
+
     // Clear localStorage first to ensure clean state
     localStorage.removeItem('canvas-project-id');
     localStorage.removeItem('canvas-project-name');
-    
+
     // Use setTimeout to ensure state clears before setting new project
     setTimeout(() => {
       console.log('[useProject] Setting new project after clear:', { id: project.id, name: project.name });
-      
+
       // Set the new project
       setProjectId(project.id);
       setProjectName(project.name);
       setShowProjectSelector(false);
-      
+
       // Set localStorage with new project
       localStorage.setItem('canvas-project-id', project.id);
       localStorage.setItem('canvas-project-name', project.name);
@@ -159,10 +162,10 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
         window.history.replaceState({}, '', newUrl.toString());
         console.log('[useProject] Updated URL with projectId:', project.id);
       }
-      
+
       // Mark initialization as complete and allow future initializations
       initRef.current = true;
-      
+
       // Clear the selecting flag after a delay to allow state to settle
       setTimeout(() => {
         isSelectingRef.current = false;
@@ -180,6 +183,7 @@ export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn
     setProjectName,
     setShowProjectSelector,
     handleProjectSelect,
+    startWithCreate,
   };
 }
 
