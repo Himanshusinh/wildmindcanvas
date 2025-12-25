@@ -20,6 +20,7 @@ import {
 } from '@/lib/videoModelConfig';
 import { ImageUpload } from '@/types/canvas';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
+import { buildProxyMediaUrl } from '@/lib/proxyUtils';
 
 const VIDEO_MODEL_OPTIONS = [
   'Sora 2 Pro',
@@ -184,6 +185,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const [width, height] = ratio.split(':').map(Number);
     return `${width} / ${height}`;
   };
+
+  // Proxy the video URL for display and metadata checks
+  const proxiedVideoUrl = useMemo(() => {
+    if (!generatedVideoUrl) return null;
+    return buildProxyMediaUrl(generatedVideoUrl);
+  }, [generatedVideoUrl]);
 
 
 
@@ -378,7 +385,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
   // Load video and get its resolution (works for both generated and uploaded videos)
   useEffect(() => {
-    if (generatedVideoUrl) {
+    if (proxiedVideoUrl) {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous'; // Allow CORS for external videos
       video.preload = 'metadata'; // Only load metadata, not the full video
@@ -390,11 +397,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       video.onerror = () => {
         setVideoResolution(null);
       };
-      video.src = generatedVideoUrl;
+      video.src = proxiedVideoUrl;
     } else {
       setVideoResolution(null);
     }
-  }, [generatedVideoUrl]);
+  }, [proxiedVideoUrl]);
 
   // Listen for frame dim events (when dragging connection near disallowed frame)
   useEffect(() => {
@@ -553,7 +560,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           isUploadedVideo={!!isUploadedVideo}
           isSelected={!!isSelected}
           isDraggingContainer={isDraggingContainer}
-          generatedVideoUrl={generatedVideoUrl}
+          generatedVideoUrl={proxiedVideoUrl}
           isGenerating={isGenerating}
           frameBorderColor={frameBorderColor}
           frameBorderWidth={frameBorderWidth}
