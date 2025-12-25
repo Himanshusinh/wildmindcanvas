@@ -45,7 +45,7 @@ interface ImageUploadModalProps {
   frameWidth?: number;
   frameHeight?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
+  onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number, options?: Record<string, any>) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
@@ -278,7 +278,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
-    'Seedream v4 4K',
     'Upscale',
     'Remove BG'
   ];
@@ -342,8 +341,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Seedream v4 4K',
     'Seedream 4.5',
-    'Runway Gen4 Image',
-    'Runway Gen4 Image Turbo'
+    // 'Runway Gen4 Image',
+    // 'Runway Gen4 Image Turbo'
   ];
   const ALL_MODELS = [
     'Google Nano Banana',
@@ -358,9 +357,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
-    'Seedream v4 4K',
-    'Runway Gen4 Image',
-    'Runway Gen4 Image Turbo',
+    // 'Seedream v4 4K',
+    // 'Runway Gen4 Image',
+    // 'Runway Gen4 Image Turbo',
     'Z Image Turbo',
     'P-Image'
   ];
@@ -444,6 +443,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         const modelLower = selectedModel.toLowerCase();
         const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
         const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+        const isFluxUltra = modelLower.includes('flux pro 1.1 ultra');
 
         if (selectedResolution) {
           const [wRatio, hRatio] = selectedAspectRatio.split(':').map(Number);
@@ -489,6 +489,22 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             // Clamp to 256-1440
             width = Math.max(256, Math.min(1440, width));
             height = Math.max(256, Math.min(1440, height));
+          }
+          // Flux Pro 1.1 Ultra, Flux 2 Pro & Seedream models: Strict Fit Inside Logic
+          else if (isFluxUltra || modelLower.includes('flux 2 pro') || modelLower.includes('seedream')) {
+            if (selectedResolution === '4K') baseSize = 4096;
+            else if (selectedResolution === '2K') baseSize = 2048;
+            else baseSize = 1024; // Default 1K
+
+            if (ratio >= 1) {
+              // Landscape/Square: Width is max (baseSize), Height scales down
+              width = baseSize;
+              height = Math.round(baseSize / ratio);
+            } else {
+              // Portrait: Height is max (baseSize), Width scales down
+              width = Math.round(baseSize * ratio);
+              height = baseSize;
+            }
           }
           // Other models
           else {
@@ -973,7 +989,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           imageCount,
           finalSourceImageUrlParam,
           width,
-          height
+          height,
+          { style: undefined } // Pass style options (placeholder until UI is added)
         );
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
 
@@ -1311,12 +1328,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
-    // Seedream 4.5 supports 1K, 2K, 4K (check before general seedream)
+    // Flux Pro 1.1 Ultra & Flux 2 Pro support 1K, 2K
+    if (modelLower.includes('flux pro 1.1 ultra') || modelLower.includes('flux 2 pro')) {
+      return [
+        { value: '1K', label: '1K' },
+        { value: '2K', label: '2K' },
+      ];
+    }
+
+    // Flux 2 Pro supports 1K, 2K, 1024x2048
+    // Seedream models (v4, v4.5) support 1K, 2K, 4K
     if (
-      modelLower.includes('seedream-4.5') ||
-      modelLower.includes('seedream_v45') ||
-      modelLower.includes('seedreamv45') ||
-      (modelLower.includes('seedream') && (modelLower.includes('4.5') || modelLower.includes('v4.5') || modelLower.includes('v45')))
+      modelLower.includes('seedream')
     ) {
       return [
         { value: '1K', label: '1K' },
@@ -1325,16 +1348,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
-    // Seedream v4, Imagen, and Flux Pro 1.1 models support 1K, 2K, 4K
-    if (
-      modelLower.includes('seedream') ||
-      modelLower.includes('imagen') ||
-      modelLower.includes('flux pro 1.1')
-    ) {
+    // Imagen 4 Fast - no resolution selector
+    if (modelLower.includes('imagen 4 fast') && !modelLower.includes('edit')) {
+      return [];
+    }
+
+    // Google Imagen 4 (Base) - supports 1K/2K/4K but default to 1K
+    if (modelLower.includes('imagen 4') || modelLower.includes('imagen4')) {
       return [
         { value: '1K', label: '1K' },
         { value: '2K', label: '2K' },
-        { value: '4K', label: '4K' },
       ];
     }
 

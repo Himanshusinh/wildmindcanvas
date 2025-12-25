@@ -214,6 +214,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onScriptGenerationStart,
   onGenerateStoryboard,
   projectId,
+  setGenerationQueue,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
 
@@ -343,6 +344,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
         textInputStates={textInputStates}
         isComponentDraggable={isComponentDraggable}
+        setGenerationQueue={setGenerationQueue}
       />
 
       <VideoEditorModalOverlays

@@ -59,7 +59,8 @@ interface CanvasProps {
     previousSceneImageUrl?: string,
     storyboardMetadata?: Record<string, string>,
     width?: number,
-    height?: number
+    height?: number,
+    options?: Record<string, any>
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   generatedImageUrl?: string | null;
   isVideoModalOpen?: boolean;
@@ -4718,6 +4719,12 @@ export const Canvas: React.FC<CanvasProps> = ({
     imageModalStates,
     videoModalStates,
     musicModalStates,
+    // Group Deletion
+    selectedGroupIds,
+    groupContainerStates,
+    setGroupContainerStates,
+    setSelectedGroupIds,
+    onPersistGroupDelete,
     // Zoom to selection
     setScale,
     setPosition,
@@ -7965,6 +7972,20 @@ export const Canvas: React.FC<CanvasProps> = ({
             }}
             getItemBounds={getItemBounds}
             images={images}
+            onChildSelect={(elementId, type) => {
+              // Handle selection of a child within a group
+              if (type === 'image') {
+                const imgIndex = images.findIndex(img => img.elementId === elementId);
+                if (imgIndex !== -1) {
+                  // Clear other selections (including the group itself)
+                  clearAllSelections();
+                  // Select the image
+                  setSelectedImageIndices([imgIndex]);
+                  setSelectedImageIndex(imgIndex);
+                }
+              }
+              // Add other types if needed (text/video)
+            }}
           />
           {/* Region selection rectangle (Konva pattern) */}
           {selectionRectCoords && (
@@ -8227,6 +8248,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         onPersistConnectorCreate={onPersistConnectorCreate}
         onPersistConnectorDelete={onPersistConnectorDelete}
         onPluginSidebarOpen={onPluginSidebarOpen}
+        setGenerationQueue={setGenerationQueue}
         projectId={projectId}
         onGenerateStoryboard={handleGenerateStoryboard}
       />

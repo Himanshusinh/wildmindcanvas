@@ -172,9 +172,9 @@ export interface StoryboardGenerator {
   backgroundNamesMap?: Record<number, string>;
   // Direct name -> image URL mappings (auto-updated from names maps + connections)
   namedImages?: {
-    characters?: Record<string, string>; // "Aryan" -> imageUrl
-    backgrounds?: Record<string, string>; // "Restaurant" -> imageUrl
-    props?: Record<string, string>; // "Rose" -> imageUrl
+    characters?: Record<string, string>; 
+    backgrounds?: Record<string, string>; 
+    props?: Record<string, string>; 
   };
 }
 
@@ -248,6 +248,7 @@ export interface CanvasAppState {
   groupContainerStates?: import('@/app/types/groupContainer').GroupContainerState[];
   connectors: Connector[];
   generationQueue: GenerationQueueItem[];
+  showImageGenerationModal?: boolean;
 }
 
 export interface CanvasAppSetters {
@@ -270,6 +271,9 @@ export interface CanvasAppSetters {
   setTextGenerators: React.Dispatch<React.SetStateAction<TextGenerator[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;
   setGenerationQueue: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
+  setShowImageGenerationModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setGeneratedImage?: React.Dispatch<React.SetStateAction<string | null>>;
+  setGeneratedImages?: Function;
 }
 
 export interface ViewportCenter {

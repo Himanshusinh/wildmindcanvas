@@ -90,6 +90,9 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
           <video
             ref={videoRef}
             src={generatedVideoUrl}
+            crossOrigin="anonymous"
+            playsInline
+            muted
             style={{
               width: '100%',
               height: '100%',
@@ -109,7 +112,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
                 videoRef.current.pause();
                 setIsPlaying(false);
               } else {
-                videoRef.current.play().catch(() => {});
+                videoRef.current.play().catch(() => { });
                 setIsPlaying(true);
                 setWasJustPlayed(true);
               }

@@ -179,6 +179,13 @@ interface UseKeyboardShortcutsProps {
   setSelectedCompareModalIds: (ids: string[]) => void;
   onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
 
+  // Group Deletion
+  selectedGroupIds?: string[];
+  groupContainerStates?: any[];
+  setGroupContainerStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedGroupIds?: (ids: string[]) => void;
+  onPersistGroupDelete?: (group: any) => void | Promise<void>;
+
   // Select All
   images: ImageUpload[];
   textInputStates: any[];
@@ -338,6 +345,12 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedNextSceneModalId,
     setSelectedNextSceneModalIds,
     onPersistNextSceneModalDelete,
+    // Group Deletion
+    selectedGroupIds,
+    groupContainerStates,
+    setGroupContainerStates,
+    setSelectedGroupIds,
+    onPersistGroupDelete,
     images,
     textInputStates,
     imageModalStates,
@@ -389,12 +402,12 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           (target?.getAttribute('contenteditable') === 'true') ||
           (target?.closest && target.closest('[contenteditable="true"]') !== null);
         const isTyping = isInputElement || isContentEditable;
-        
+
         // Don't trigger if user is typing
         if (isTyping) return;
-        
+
         e.preventDefault();
-        
+
         // Check if there are any selected components
         const hasSelection = selectedImageIndices.length > 0 ||
           selectedImageModalIds.length > 0 ||
@@ -402,7 +415,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           selectedMusicModalIds.length > 0 ||
           selectedTextInputIds.length > 0 ||
           (selectedCanvasTextIds && selectedCanvasTextIds.length > 0);
-        
+
         if (hasSelection) {
           // Dispatch custom event to toggle pin for selected components
           // Components will listen to this event and check if they're selected
@@ -564,8 +577,42 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           const imageIndicesToDelete = [...selectedImageIndices];
           if (selectedImageIndex !== null) imageIndicesToDelete.push(selectedImageIndex);
 
+          // Group Deletion
+          const groupIdsToDelete = [...(selectedGroupIds || [])];
+          if (groupIdsToDelete.length > 0) {
+            hasDeletions = true;
+
+            // Delete groups
+            groupIdsToDelete.forEach(groupId => {
+              const group = groupContainerStates?.find(g => g.id === groupId);
+              if (group && onPersistGroupDelete) {
+                Promise.resolve(onPersistGroupDelete(group)).catch(console.error);
+              }
+
+              // Also find and delete children images to ensure clean removal
+              // (If users want to keep images, they should use 'Ungroup')
+              if (group && group.children) {
+                group.children.forEach((child: any) => {
+                  if (child.type === 'image') {
+                    const idx = images.findIndex(img => img.elementId === child.id);
+                    if (idx !== -1) {
+                      imageIndicesToDelete.push(idx);
+                    }
+                  }
+                });
+              }
+            });
+
+            if (setGroupContainerStates) {
+              setGroupContainerStates(prev => prev.filter(g => !groupIdsToDelete.includes(g.id)));
+            }
+            if (setSelectedGroupIds) {
+              setSelectedGroupIds([]);
+            }
+          }
+
           if (imageIndicesToDelete.length > 0) {
-            hasDeletions = true; 
+            hasDeletions = true;
             // Sort descending to delete without shifting indices
             const sortedIndices = [...new Set(imageIndicesToDelete)].sort((a, b) => b - a);
             sortedIndices.forEach(index => {

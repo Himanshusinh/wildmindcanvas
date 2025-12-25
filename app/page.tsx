@@ -18,13 +18,13 @@ import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
 import { useOpManager } from '@/hooks/useOpManager';
 import { useProject } from '@/hooks/useProject';
 import { useUIVisibility } from '@/hooks/useUIVisibility';
-import { buildProxyDownloadUrl, buildProxyResourceUrl } from '@/lib/proxyUtils';
+import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl } from '@/lib/proxyUtils';
 import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
 import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
 import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
 import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/app/components/CanvasApp/types';
-import { CanvasTextState } from '@/app/components/ModalOverlays/types';
+import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/app/components/ModalOverlays/types';
 import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
 
 interface CanvasAppProps {
@@ -33,10 +33,10 @@ interface CanvasAppProps {
 
 export function CanvasApp({ user }: CanvasAppProps) {
   const [images, setImages] = useState<ImageUpload[]>([]);
-  const [imageGenerators, setImageGenerators] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
-  const [videoGenerators, setVideoGenerators] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }>>([]);
+  const [imageGenerators, setImageGenerators] = useState<ImageModalState[]>([]);
+  const [videoGenerators, setVideoGenerators] = useState<VideoModalState[]>([]);
   const [videoEditorGenerators, setVideoEditorGenerators] = useState<Array<{ id: string; x: number; y: number }>>([]);
-  const [musicGenerators, setMusicGenerators] = useState<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
+  const [musicGenerators, setMusicGenerators] = useState<MusicModalState[]>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>>([]);
   const [multiangleCameraGenerators, setMultiangleCameraGenerators] = useState<Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }>>([]);
   const [compareGenerators, setCompareGenerators] = useState<Array<{ id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }>>([]);
@@ -52,7 +52,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [selectedCanvasTextId, setSelectedCanvasTextId] = useState<string | null>(null);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
-  const [textGenerators, setTextGenerators] = useState<Array<{ id: string; x: number; y: number; value?: string }>>([]);
+  const [textGenerators, setTextGenerators] = useState<TextModalState[]>([]);
   const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
@@ -165,10 +165,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const isV1_1 = metadata.version === '1.1' || parseFloat(metadata.version) >= 1.1;
 
         const newImages: ImageUpload[] = [];
-        const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
-        const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newImageGenerators: ImageModalState[] = [];
+        const newVideoGenerators: VideoModalState[] = [];
         const newVideoEditorGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }> = [];
-        const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newMusicGenerators: MusicModalState[] = [];
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }> = [];
         const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
         const newCompareGenerators: CompareGenerator[] = [];
@@ -231,21 +231,67 @@ export function CanvasApp({ user }: CanvasAppProps) {
               };
               newImages.push(newImage);
             } else if (element.type === 'image-generator') {
+              let genImageUrl = element.meta?.generatedImageUrl || null;
+              if (genImageUrl && (genImageUrl.includes('zata.ai') || genImageUrl.includes('zata'))) {
+                genImageUrl = buildProxyResourceUrl(genImageUrl);
+              }
+              let srcImageUrl = element.meta?.sourceImageUrl || null;
+              if (srcImageUrl && (srcImageUrl.includes('zata.ai') || srcImageUrl.includes('zata'))) {
+                srcImageUrl = buildProxyResourceUrl(srcImageUrl);
+              }
               newImageGenerators.push({
                 id: element.id,
                 x: element.x || 0,
                 y: element.y || 0,
-                generatedImageUrl: element.meta?.generatedImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl
+                generatedImageUrl: genImageUrl,
+                sourceImageUrl: srcImageUrl,
                 frameWidth: width,
                 frameHeight: height,
+                model: element.meta?.model,
+                frame: element.meta?.frame,
+                aspectRatio: element.meta?.aspectRatio,
+                prompt: element.meta?.prompt,
               } as any);
             } else if (element.type === 'video-generator') {
-              newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: width, frameHeight: height });
+              let genVideoUrl = element.meta?.generatedVideoUrl || null;
+              if (genVideoUrl && (genVideoUrl.includes('zata.ai') || genVideoUrl.includes('zata'))) {
+                genVideoUrl = buildProxyMediaUrl(genVideoUrl);
+              }
+              newVideoGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                generatedVideoUrl: genVideoUrl,
+                frameWidth: width,
+                frameHeight: height,
+                model: element.meta?.model,
+                frame: element.meta?.frame,
+                aspectRatio: element.meta?.aspectRatio,
+                prompt: element.meta?.prompt,
+                duration: element.meta?.duration,
+                taskId: element.meta?.taskId,
+                generationId: element.meta?.generationId,
+                status: element.meta?.status,
+              });
             } else if (element.type === 'video-editor-trigger') {
               newVideoEditorGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0 });
             } else if (element.type === 'music-generator') {
-              newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: width, frameHeight: height });
+              let genMusicUrl = element.meta?.generatedMusicUrl || null;
+              if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
+                genMusicUrl = buildProxyMediaUrl(genMusicUrl);
+              }
+              newMusicGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                generatedMusicUrl: genMusicUrl,
+                frameWidth: width,
+                frameHeight: height,
+                model: element.meta?.model,
+                frame: element.meta?.frame,
+                aspectRatio: element.meta?.aspectRatio,
+                prompt: element.meta?.prompt,
+              });
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale, frameWidth: width, frameHeight: height });
             } else if (element.type === 'multiangle-camera-plugin') {
@@ -297,18 +343,51 @@ export function CanvasApp({ user }: CanvasAppProps) {
         } else if (element.type === 'image-generator') {
           setImageGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
+            let genImageUrl = element.meta?.generatedImageUrl || null;
+            if (genImageUrl && (genImageUrl.includes('zata.ai') || genImageUrl.includes('zata'))) {
+              genImageUrl = buildProxyResourceUrl(genImageUrl);
+            }
+            let srcImageUrl = element.meta?.sourceImageUrl || null;
+            if (srcImageUrl && (srcImageUrl.includes('zata.ai') || srcImageUrl.includes('zata'))) {
+              srcImageUrl = buildProxyResourceUrl(srcImageUrl);
+            }
             return [...prev, {
               id: element.id,
               x: element.x || 0,
               y: element.y || 0,
-              generatedImageUrl: element.meta?.generatedImageUrl || null,
-              sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl
+              generatedImageUrl: genImageUrl,
+              sourceImageUrl: srcImageUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              frameWidth: element.bounds?.width || 400,
+              frameHeight: element.bounds?.height || 500,
             } as any];
           });
         } else if (element.type === 'video-generator') {
           setVideoGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null }];
+            let genVideoUrl = element.meta?.generatedVideoUrl || null;
+            if (genVideoUrl && (genVideoUrl.includes('zata.ai') || genVideoUrl.includes('zata'))) {
+              genVideoUrl = buildProxyMediaUrl(genVideoUrl);
+            }
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedVideoUrl: genVideoUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              duration: element.meta?.duration,
+              taskId: element.meta?.taskId,
+              generationId: element.meta?.generationId,
+              status: element.meta?.status,
+              frameWidth: element.bounds?.width || 600,
+              frameHeight: element.bounds?.height || 400,
+            }];
           });
         } else if (element.type === 'video-editor-trigger') {
           setVideoEditorGenerators((prev) => {
@@ -318,7 +397,22 @@ export function CanvasApp({ user }: CanvasAppProps) {
         } else if (element.type === 'music-generator') {
           setMusicGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null }];
+            let genMusicUrl = element.meta?.generatedMusicUrl || null;
+            if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
+              genMusicUrl = buildProxyMediaUrl(genMusicUrl);
+            }
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedMusicUrl: genMusicUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              frameWidth: element.bounds?.width || 400,
+              frameHeight: element.bounds?.height || 500,
+            }];
           });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
@@ -1415,6 +1509,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
   }, [canUndo, canRedo, undo, redo]);
 
+  // State definitions moved up to be available for canvasSetters
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
+  const [toolClickCounter, setToolClickCounter] = useState(0);
+  const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
+  const isSpacePressedRef = useRef(false);
+  const selectedToolRef = useRef(selectedTool);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedToolRef.current = selectedTool;
+  }, [selectedTool]);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isPluginSidebarOpen, setIsPluginSidebarOpen] = useState(false);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
+
   // Create state and setters objects for handlers (after all dependencies are defined, including processMediaFile)
   // Note: handlers are created here but processMediaFile is defined later - we'll use a wrapper
   const canvasState: CanvasAppState = {
@@ -1459,6 +1573,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setCompareGenerators,
     setConnectors,
     setGenerationQueue,
+
+    setShowImageGenerationModal: setIsImageModalOpen,
+    setGeneratedImage: setGeneratedImageUrl,
+    setGeneratedImages: () => { }, // No-op as not used but destructured
+
 
   };
 
@@ -1803,24 +1922,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleTextCreate = imageHandlers.handleTextCreate;
   const handleAddImageToCanvas = imageHandlers.handleAddImageToCanvas;
 
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
-  const [toolClickCounter, setToolClickCounter] = useState(0);
-  const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
-  const isSpacePressedRef = useRef(false);
-  const selectedToolRef = useRef(selectedTool);
 
-  // Keep ref in sync with state
-  useEffect(() => {
-    selectedToolRef.current = selectedTool;
-  }, [selectedTool]);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const [isPluginSidebarOpen, setIsPluginSidebarOpen] = useState(false);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
-  const [generatedMusicUrl, setGeneratedMusicUrl] = useState<string | null>(null);
 
   const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text') => {
     // Always update to trigger effect, even if tool is the same

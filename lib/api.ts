@@ -23,11 +23,11 @@ async function getBearerTokenForCanvas(): Promise<string | null> {
           // Store it for future use
           try {
             localStorage.setItem('authToken', passedToken);
-          } catch {}
+          } catch { }
           return passedToken;
         }
       }
-    } catch {}
+    } catch { }
 
     // Try localStorage
     const storedToken = localStorage.getItem('authToken');
@@ -44,7 +44,7 @@ async function getBearerTokenForCanvas(): Promise<string | null> {
         if (token && token.startsWith('eyJ')) {
           return token;
         }
-      } catch {}
+      } catch { }
     }
 
     // Try idToken directly
@@ -268,7 +268,9 @@ export async function generateImageForCanvas(
   sourceImageUrl?: string,
   sceneNumber?: number,
   previousSceneImageUrl?: string,
-  storyboardMetadata?: Record<string, string>
+  storyboardMetadata?: Record<string, string>,
+  seed?: number,
+  options?: Record<string, any>
 ): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
   // Create AbortController for timeout
   // Increased to 10 minutes for image-to-image generation which can take longer
@@ -277,7 +279,7 @@ export async function generateImageForCanvas(
 
   // Get Bearer token for authentication (fallback when cookies don't work)
   const bearerToken = await getBearerTokenForCanvas();
-  
+
   if (!bearerToken) {
     console.warn('[generateImageForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
   }
@@ -313,7 +315,7 @@ export async function generateImageForCanvas(
       console.log('[generateImageForCanvas] ✅ Successfully converted blob URL(s) to data URI(s)');
     } catch (error: any) {
       console.error('[generateImageForCanvas] ❌ Failed to convert blob URL:', error);
-      throw new Error('Failed to process image URL. Please try again or use a different image.');
+      throw new Error('Failed to process image URL. Please try again.');
     }
   }
 
@@ -341,6 +343,8 @@ export async function generateImageForCanvas(
       sceneNumber, // Scene number for storyboard generation
       previousSceneImageUrl: processedPreviousSceneImageUrl, // Use processed URL (data URI instead of blob URL)
       storyboardMetadata, // Metadata for storyboard (character, background, etc.)
+      seed, // Pass explicit seed if provided
+      options, // Pass options (style, etc.)
       meta: {
         source: 'canvas',
         projectId,
@@ -351,7 +355,7 @@ export async function generateImageForCanvas(
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (bearerToken) {
       headers['Authorization'] = `Bearer ${bearerToken}`;
       console.log('[generateImageForCanvas] Using Bearer token authentication');
@@ -460,7 +464,7 @@ export async function generateVideoForCanvas(
 
   // Get Bearer token for authentication (fallback when cookies don't work)
   const bearerToken = await getBearerTokenForCanvas();
-  
+
   if (!bearerToken) {
     console.warn('[generateVideoForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
   }
@@ -470,7 +474,7 @@ export async function generateVideoForCanvas(
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (bearerToken) {
       headers['Authorization'] = `Bearer ${bearerToken}`;
       console.log('[generateVideoForCanvas] Using Bearer token authentication');
@@ -1700,10 +1704,10 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
             // Store it for future use
             try {
               localStorage.setItem('authToken', passedToken);
-            } catch {}
+            } catch { }
           }
         }
-      } catch {}
+      } catch { }
 
       // Try localStorage
       if (!bearerToken) {
@@ -1723,7 +1727,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
             if (token && token.startsWith('eyJ')) {
               bearerToken = token;
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -1746,7 +1750,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       if (bearerToken) {
         headers['Authorization'] = `Bearer ${bearerToken}`;
         console.log('[getCurrentUser] Using Bearer token authentication');
@@ -1765,8 +1769,8 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
           let errorData: any = null;
           try {
             errorData = JSON.parse(errorText);
-          } catch {}
-          
+          } catch { }
+
           const errorMessage = errorData?.message || errorText || 'Unauthorized';
           console.warn('[getCurrentUser] 401 Unauthorized', {
             hasBearerToken: !!bearerToken,
@@ -1794,13 +1798,13 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
           email: result.data.user.email,
           credits: result.data.credits,
         };
-        
+
         // Validate user object has required fields
         if (!user.uid || !user.username || !user.email) {
           console.warn('[getCurrentUser] User object missing required fields', user);
           return null;
         }
-        
+
         return user;
       }
 
@@ -1818,7 +1822,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
           resultKeys: Object.keys(result || {}),
         });
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error fetching user info:', error);
@@ -1828,7 +1832,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
 
   // Cache the request
   const cachedPromise = setCachedRequest(cacheKey, requestPromise);
-  
+
   // Validate the result before returning (don't cache invalid responses)
   return cachedPromise.then(result => {
     // If result is null or invalid, don't cache it
@@ -1837,7 +1841,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
       try {
         const { clearCache } = require('./apiCache');
         clearCache(cacheKey);
-      } catch {}
+      } catch { }
       return null;
     }
     return result;
@@ -1846,7 +1850,7 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
     try {
       const { clearCache } = require('./apiCache');
       clearCache(cacheKey);
-    } catch {}
+    } catch { }
     console.error('[getCurrentUser] Request failed:', error);
     return null;
   });

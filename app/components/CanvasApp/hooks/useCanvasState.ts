@@ -23,6 +23,7 @@ export function useCanvasState() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   const [compareGenerators, setCompareGenerators] = useState<CompareGenerator[]>([]);
+  const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
 
   const state: CanvasAppState = {
     images,
@@ -44,6 +45,7 @@ export function useCanvasState() {
     textGenerators,
     connectors,
     generationQueue,
+    showImageGenerationModal,
   };
 
   const setters: CanvasAppSetters = {
@@ -66,6 +68,7 @@ export function useCanvasState() {
     setTextGenerators,
     setConnectors,
     setGenerationQueue,
+    setShowImageGenerationModal,
   };
 
   return { state, setters };

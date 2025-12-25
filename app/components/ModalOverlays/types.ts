@@ -477,6 +477,7 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
+  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/app/components/Canvas/GenerationQueue').GenerationQueueItem[]>>;
 }
 
 export interface CompareModalState {

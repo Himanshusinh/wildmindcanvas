@@ -18,6 +18,7 @@ interface GroupContainerOverlayProps {
     onUngroup?: (groupId: string) => void;
     getItemBounds: (id: string) => { x: number; y: number; width: number; height: number } | null;
     images: any[]; // Pass full images array to render image children
+    onChildSelect?: (elementId: string, type: 'image' | 'text' | 'video') => void;
 }
 
 export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
@@ -33,6 +34,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
     onGroupDragStart,
     getItemBounds,
     images,
+    onChildSelect,
 }) => {
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState<string>('');
@@ -119,9 +121,18 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                             imageData={relativeData}
                                             index={-1} // Dummy index
                                             isDraggable={false}
-                                            // redirect selection to the group
+                                            // redirect selection: prefer child select, fallback to group select
                                             onSelect={(e) => {
-                                                if (onGroupSelect) onGroupSelect(group.id);
+                                                // Event is not a Konva event, it's custom data from CanvasImage.onSelect
+                                                // CanvasImage already handled cancelBubble
+                                                if (onChildSelect) {
+                                                    // Convert internal elementId to index or pass ID?
+                                                    // CanvasImage passed 'originalData' which has elementId matching child.id
+                                                    // onChildSelect expects elementId
+                                                    onChildSelect(child.id, 'image');
+                                                } else if (onGroupSelect) {
+                                                    onGroupSelect(group.id);
+                                                }
                                             }}
                                             // Disable interactions that might conflict
                                             isSelected={false}

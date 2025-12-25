@@ -68,7 +68,8 @@ interface ImageModalOverlaysProps {
     previousSceneImageUrl?: string,
     storyboardMetadata?: Record<string, string>,
     width?: number,
-    height?: number
+    height?: number,
+    options?: Record<string, any>
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
@@ -174,7 +175,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             if (sourceUrl.includes(',')) return undefined;
             return sourceUrl;
           })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height) => {
+          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height, options) => {
+            const selectedStyle = options?.style;
             console.log('[ImageModalOverlays] onGenerate called!', {
               modalId: modalState.id,
               hasOnImageGenerate: !!onImageGenerate,
@@ -182,7 +184,9 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             });
             if (onImageGenerate) {
               try {
-                const imageCount = modalState.imageCount || 1;
+                // Fix shadowing: usage of 'imageCount' argument (from onImageGenerate params)
+                // Use the passed argument if available, otherwise fall back to state
+                const countToUse = imageCount || modalState.imageCount || 1;
 
                 // CRITICAL: Prioritize sourceImageUrl passed from ImageUploadModal (for simple image-to-image)
                 // Fall back to modalState.sourceImageUrl only for scene-based generation
@@ -483,13 +487,14 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                   frame,
                   aspectRatio,
                   targetFrameId,
-                  imageCount,
+                  countToUse,
                   finalSourceImageUrl, // Reference images only (for Scene 1, this is all we need)
                   extractedSceneNumber, // Scene number
                   extractedPreviousSceneImageUrl, // Previous scene image (Scene 2+ only)
                   extractedStoryboardMetadata, // Storyboard metadata
                   width,
-                  height
+                  height,
+                  { style: selectedStyle } // Pass style as options
                 );
                 if (result) {
                   // Extract image URLs
