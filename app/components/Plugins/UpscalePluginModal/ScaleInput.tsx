@@ -7,12 +7,14 @@ interface ScaleInputProps {
   scaleValue: number;
   scale: number;
   onScaleChange: (newScale: number) => void;
+  maxScale?: number;
 }
 
 export const ScaleInput: React.FC<ScaleInputProps> = ({
   scaleValue,
   scale,
   onScaleChange,
+  maxScale = 6,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -49,7 +51,7 @@ export const ScaleInput: React.FC<ScaleInputProps> = ({
       </span>
       <button
         onClick={() => {
-          const newScale = Math.min(6, scaleValue + 1);
+          const newScale = Math.min(maxScale, scaleValue + 1);
           onScaleChange(newScale);
         }}
         style={{

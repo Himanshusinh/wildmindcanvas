@@ -72,6 +72,10 @@ export interface UpscaleGenerator {
   frameWidth?: number;
   frameHeight?: number;
   isUpscaling?: boolean;
+  faceEnhance?: boolean;
+  faceEnhanceStrength?: number;
+  topazModel?: string;
+  faceEnhanceCreativity?: number;
 }
 
 export interface MultiangleCameraGenerator {
@@ -172,9 +176,9 @@ export interface StoryboardGenerator {
   backgroundNamesMap?: Record<number, string>;
   // Direct name -> image URL mappings (auto-updated from names maps + connections)
   namedImages?: {
-    characters?: Record<string, string>; 
-    backgrounds?: Record<string, string>; 
-    props?: Record<string, string>; 
+    characters?: Record<string, string>;
+    backgrounds?: Record<string, string>;
+    props?: Record<string, string>;
   };
 }
 

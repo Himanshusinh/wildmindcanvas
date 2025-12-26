@@ -84,6 +84,10 @@ export interface UpscaleModalState {
   frameHeight?: number;
   isUpscaling?: boolean;
   isExpanded?: boolean;
+  faceEnhance?: boolean;
+  faceEnhanceStrength?: number;
+  topazModel?: string;
+  faceEnhanceCreativity?: number;
 }
 
 export interface MultiangleCameraModalState {
@@ -414,10 +418,10 @@ export interface ModalOverlaysProps {
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
-  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }>) => void | Promise<void>;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
-  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => Promise<string | null>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }>) => void | Promise<void>;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;

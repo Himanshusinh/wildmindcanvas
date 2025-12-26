@@ -17,7 +17,7 @@ interface UpscalePluginModalProps {
   isExpanded?: boolean;
   id?: string;
   onClose: () => void;
-  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => Promise<string | null>;
   upscaledImageUrl?: string | null;
   isUpscaling?: boolean;
   stageRef: React.RefObject<any>;
@@ -36,9 +36,13 @@ interface UpscalePluginModalProps {
   initialScale?: number;
   initialSourceImageUrl?: string | null;
   initialLocalUpscaledImageUrl?: string | null;
-  onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean }) => void;
-  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean }) => void | Promise<void>;
-  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; isExpanded?: boolean }) => void;
+  initialFaceEnhance?: boolean;
+  initialFaceEnhanceStrength?: number;
+  initialTopazModel?: string;
+  initialFaceEnhanceCreativity?: number;
+  onOptionsChange?: (opts: { model?: string; scale?: number; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; isUpscaling?: boolean; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
+  onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; isExpanded?: boolean; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
   onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
@@ -71,6 +75,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   initialScale,
   initialSourceImageUrl,
   initialLocalUpscaledImageUrl,
+  initialFaceEnhance,
+  initialFaceEnhanceStrength,
   onOptionsChange,
   onPersistUpscaleModalCreate,
   onUpdateModalState,
@@ -80,11 +86,17 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  initialTopazModel,
+  initialFaceEnhanceCreativity,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Crystal Upscaler');
   const [scaleValue, setScaleValue] = useState<number>(initialScale ?? 2);
+  const [faceEnhance, setFaceEnhance] = useState<boolean>(initialFaceEnhance ?? true);
+  const [faceEnhanceStrength, setFaceEnhanceStrength] = useState<number>(initialFaceEnhanceStrength ?? 0.8);
+  const [topazModel, setTopazModel] = useState<string>(initialTopazModel ?? 'Standard V2');
+  const [faceEnhanceCreativity, setFaceEnhanceCreativity] = useState<number>(initialFaceEnhanceCreativity ?? 0);
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [imageResolution, setImageResolution] = useState<{ width: number; height: number } | null>(null);
   const { isDimmed, setIsDimmed } = useCanvasFrameDim(id);
@@ -288,8 +300,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
     try {
       const imageUrl = sourceImageUrl;
-      console.log('[UpscalePluginModal] Calling onUpscale with:', { selectedModel, scaleValue, imageUrl });
-      const result = await onUpscale(selectedModel, scaleValue, imageUrl || undefined);
+      console.log('[UpscalePluginModal] Calling onUpscale with:', { selectedModel, scaleValue, imageUrl, faceEnhance, faceEnhanceStrength, topazModel, faceEnhanceCreativity });
+      const result = await onUpscale(selectedModel, scaleValue, imageUrl || undefined, faceEnhance, faceEnhanceStrength, topazModel, faceEnhanceCreativity);
       console.log('[UpscalePluginModal] onUpscale returned:', result);
 
       // Extract URL from result (result should be a string URL, but handle both string and object)
@@ -470,22 +482,49 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
                 scale={scale}
                 selectedModel={selectedModel}
                 scaleValue={scaleValue}
+                faceEnhance={faceEnhance}
+                faceEnhanceStrength={faceEnhanceStrength}
+                topazModel={topazModel}
+                faceEnhanceCreativity={faceEnhanceCreativity}
                 isUpscaling={isUpscaling}
                 externalIsUpscaling={externalIsUpscaling}
                 sourceImageUrl={sourceImageUrl}
                 frameBorderColor={frameBorderColor}
                 frameBorderWidth={frameBorderWidth}
-                extraTopPadding={popupOverlap + 16 * scale}
                 onModelChange={(model) => {
                   setSelectedModel(model);
-                  if (onOptionsChange) {
-                    onOptionsChange({ model, scale: scaleValue });
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { model });
                   }
                 }}
-                onScaleChange={(newScale) => {
-                  setScaleValue(newScale);
-                  if (onOptionsChange) {
-                    onOptionsChange({ model: selectedModel, scale: newScale });
+                onScaleChange={(val) => {
+                  setScaleValue(val);
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { scale: val });
+                  }
+                }}
+                onFaceEnhanceChange={(val) => {
+                  setFaceEnhance(val);
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { faceEnhance: val });
+                  }
+                }}
+                onFaceEnhanceStrengthChange={(val) => {
+                  setFaceEnhanceStrength(val);
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { faceEnhanceStrength: val });
+                  }
+                }}
+                onTopazModelChange={(val) => {
+                  setTopazModel(val);
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { topazModel: val });
+                  }
+                }}
+                onFaceEnhanceCreativityChange={(val) => {
+                  setFaceEnhanceCreativity(val);
+                  if (onUpdateModalState && id) {
+                    onUpdateModalState(id, { faceEnhanceCreativity: val });
                   }
                 }}
                 onUpscale={handleUpscale}

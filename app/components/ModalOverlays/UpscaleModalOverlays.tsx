@@ -14,9 +14,9 @@ interface UpscaleModalOverlaysProps {
   setUpscaleModalStates: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
   setSelectedUpscaleModalId: (id: string | null) => void;
   setSelectedUpscaleModalIds: (ids: string[]) => void;
-  onUpscale?: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
-  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
+  onUpscale?: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => Promise<string | null>;
+  onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
+  onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }>) => void | Promise<void>;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>) => void | Promise<void>;
@@ -66,9 +66,9 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
               Promise.resolve(onPersistUpscaleModalDelete(modalState.id)).catch(console.error);
             }
           }}
-          onUpscale={onUpscale ? async (model, scale, sourceImageUrl) => {
+          onUpscale={onUpscale ? async (model, scale, sourceImageUrl, faceEnhance, faceEnhanceStrength, topazModel, faceEnhanceCreativity) => {
             try {
-              return await onUpscale(model, scale, sourceImageUrl);
+              return await onUpscale(model, scale, sourceImageUrl, faceEnhance, faceEnhanceStrength, topazModel, faceEnhanceCreativity);
             } catch (err) {
               console.error('[ModalOverlays] upscale failed', err);
               throw err;
@@ -123,11 +123,15 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
               Promise.resolve(onPersistUpscaleModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedUpscaleModalId === modalState.id}
+          isSelected={selectedUpscaleModalId === modalState.id || (selectedUpscaleModalIds || []).includes(modalState.id)}
           initialModel={modalState.model}
           initialScale={modalState.scale}
           initialSourceImageUrl={modalState.sourceImageUrl}
           initialLocalUpscaledImageUrl={modalState.localUpscaledImageUrl}
+          initialFaceEnhance={modalState.faceEnhance}
+          initialFaceEnhanceStrength={modalState.faceEnhanceStrength}
+          initialTopazModel={modalState.topazModel}
+          initialFaceEnhanceCreativity={modalState.faceEnhanceCreativity}
           onOptionsChange={(opts) => {
             // Only update if values actually changed
             const hasChanges = Object.keys(opts).some(key => {

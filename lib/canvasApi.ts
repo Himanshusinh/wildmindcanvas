@@ -27,7 +27,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
             // Store it for future use
             try {
               localStorage.setItem('authToken', passedToken);
-            } catch {}
+            } catch { }
             return passedToken;
           }
         }
@@ -51,7 +51,7 @@ async function getFirebaseIdToken(): Promise<string | null> {
         if (token && token.startsWith('eyJ')) {
           return token;
         }
-      } catch {}
+      } catch { }
     }
 
     // Try idToken directly
@@ -74,12 +74,12 @@ async function buildAuthHeaders(): Promise<HeadersInit> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
+
   const bearerToken = await getFirebaseIdToken();
   if (bearerToken) {
     headers['Authorization'] = `Bearer ${bearerToken}`;
   }
-  
+
   return headers;
 }
 
@@ -97,6 +97,8 @@ export interface CanvasProject {
     height?: number;
     backgroundColor?: string;
   };
+  thumbnail?: string;
+  previewImages?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -301,7 +303,7 @@ export async function listProjects(limit: number = 20): Promise<CanvasProject[]>
             url: response.url,
             hostname: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
           });
-          
+
           // Try to get error message from response
           let errorMessage = 'Unauthorized';
           try {
@@ -311,11 +313,11 @@ export async function listProjects(limit: number = 20): Promise<CanvasProject[]>
             // If JSON parsing fails, use status text
             errorMessage = response.statusText || 'Unauthorized';
           }
-          
+
           // Throw a specific error that can be caught by callers
           throw new Error(`Authentication required: ${errorMessage}. Please log in again.`);
         }
-        
+
         // For other errors, log and return empty array (existing behavior)
         console.warn('[CanvasAPI] Failed to fetch projects:', {
           status: response.status,
@@ -332,7 +334,7 @@ export async function listProjects(limit: number = 20): Promise<CanvasProject[]>
       if (error instanceof Error && error.message.includes('Authentication required')) {
         throw error;
       }
-      
+
       // For other errors, log and return empty array
       console.error('[CanvasAPI] Error fetching projects:', error);
       return [];

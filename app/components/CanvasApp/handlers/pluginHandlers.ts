@@ -35,7 +35,7 @@ export interface PluginHandlers {
   onPersistVideoEditorModalCreate: (modal: VideoEditorGenerator) => Promise<void>;
   onPersistVideoEditorModalMove: (id: string, updates: Partial<VideoEditorGenerator>) => Promise<void>;
   onPersistVideoEditorModalDelete: (id: string) => Promise<void>;
-  onUpscale: (model: string, scale: number, sourceImageUrl?: string) => Promise<string | null>;
+  onUpscale: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number) => Promise<string | null>;
   onMultiangleCamera: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
@@ -75,6 +75,10 @@ export function createPluginHandlers(
         frameWidth: modal.frameWidth,
         frameHeight: modal.frameHeight,
         isUpscaling: modal.isUpscaling,
+        faceEnhance: modal.faceEnhance,
+        faceEnhanceStrength: modal.faceEnhanceStrength,
+        topazModel: modal.topazModel,
+        faceEnhanceCreativity: modal.faceEnhanceCreativity,
       });
     }
     // Always append op for undo/redo and persistence
@@ -97,6 +101,10 @@ export function createPluginHandlers(
               frameWidth: modal.frameWidth,
               frameHeight: modal.frameHeight,
               isUpscaling: modal.isUpscaling,
+              faceEnhance: modal.faceEnhance,
+              faceEnhanceStrength: modal.faceEnhanceStrength,
+              topazModel: modal.topazModel,
+              faceEnhanceCreativity: modal.faceEnhanceCreativity,
             },
           },
         },
@@ -133,6 +141,10 @@ export function createPluginHandlers(
         frameWidth: (prev as any).frameWidth ?? 400,
         frameHeight: (prev as any).frameHeight ?? 500,
         isUpscaling: (prev as any).isUpscaling ?? false,
+        faceEnhance: (prev as any).faceEnhance ?? false,
+        faceEnhanceStrength: (prev as any).faceEnhanceStrength ?? 0.8,
+        topazModel: (prev as any).topazModel ?? 'Standard V2',
+        faceEnhanceCreativity: (prev as any).faceEnhanceCreativity ?? 0,
       } : {
         upscaledImageUrl: null,
         sourceImageUrl: null,
@@ -142,6 +154,10 @@ export function createPluginHandlers(
         frameWidth: 400,
         frameHeight: 500,
         isUpscaling: false,
+        faceEnhance: false,
+        faceEnhanceStrength: 0.8,
+        topazModel: 'Standard V2',
+        faceEnhanceCreativity: 0,
       };
 
       // Merge updates into meta
@@ -149,7 +165,7 @@ export function createPluginHandlers(
       for (const k of Object.keys(updates || {})) {
         if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
           structuredUpdates[k] = (updates as any)[k];
-        } else if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight') {
+        } else if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
           metaUpdates[k] = (updates as any)[k];
         } else {
           structuredUpdates[k] = (updates as any)[k];
@@ -170,8 +186,8 @@ export function createPluginHandlers(
         // Inverse meta should restore previous meta
         const inverseMeta: any = {};
         for (const k of Object.keys(updates || {})) {
-          if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight') {
-            inverseMeta[k] = (prev as any)[k] ?? existingMeta[k];
+          if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
+            inverseMeta[k] = (prev as any)[k] ?? (existingMeta as any)[k];
           }
         }
         if (Object.keys(inverseMeta).length > 0) {
@@ -189,12 +205,20 @@ export function createPluginHandlers(
   };
 
   const onPersistUpscaleModalDelete = async (id: string) => {
-    console.log('[page.tsx] onPersistUpscaleModalDelete called', id);
+    console.log('[pluginHandlers] onPersistUpscaleModalDelete called with ID:', id);
     const prevItem = state.upscaleGenerators.find(m => m.id === id);
+    if (!prevItem) {
+      console.warn('[pluginHandlers] Warning: Attempted to delete upscale modal that does not exist in state:', id);
+    }
+
     // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
     setters.setUpscaleGenerators(prev => {
+      console.log('[pluginHandlers] Previous upscaleGenerators count:', prev.length);
       const filtered = prev.filter(m => m.id !== id);
-      console.log('[page.tsx] upscaleGenerators updated, remaining:', filtered.length);
+      console.log('[pluginHandlers] Updated upscaleGenerators count:', filtered.length);
+      if (prev.length - filtered.length > 1) {
+        console.error('[pluginHandlers] CRITICAL WARNING: Deleted more than one item! Prev:', prev.length, 'New:', filtered.length);
+      }
       return filtered;
     });
     // Then do async operations
@@ -228,6 +252,10 @@ export function createPluginHandlers(
                 frameWidth: (prevItem as any).frameWidth,
                 frameHeight: (prevItem as any).frameHeight,
                 isUpscaling: (prevItem as any).isUpscaling,
+                faceEnhance: (prevItem as any).faceEnhance,
+                faceEnhanceStrength: (prevItem as any).faceEnhanceStrength,
+                topazModel: (prevItem as any).topazModel,
+                faceEnhanceCreativity: (prevItem as any).faceEnhanceCreativity,
               },
             },
           },
@@ -238,7 +266,7 @@ export function createPluginHandlers(
     }
   };
 
-  const onUpscale = async (model: string, scale: number, sourceImageUrl?: string) => {
+  const onUpscale = async (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => {
     if (!sourceImageUrl || !projectId) {
       console.error('[onUpscale] Missing sourceImageUrl or projectId');
       return null;
@@ -257,13 +285,17 @@ export function createPluginHandlers(
     setters.setGenerationQueue((prev) => [...prev, queueItem]);
 
     try {
-      console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl });
+      console.log('[onUpscale] Starting upscale:', { model, scale, sourceImageUrl, faceEnhance, faceEnhanceStrength, topazModel, faceEnhanceCreativity });
       const { upscaleImageForCanvas } = await import('@/lib/api');
       const result = await upscaleImageForCanvas(
         sourceImageUrl,
         model || 'Crystal Upscaler',
         scale || 2,
-        projectId
+        projectId,
+        faceEnhance,
+        faceEnhanceStrength,
+        topazModel,
+        faceEnhanceCreativity
       );
 
       console.log('[onUpscale] Upscale completed:', result);

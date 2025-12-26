@@ -559,7 +559,11 @@ export async function upscaleImageForCanvas(
   image: string,
   model: string,
   scale: number,
-  projectId: string
+  projectId: string,
+  faceEnhance?: boolean,
+  faceEnhanceStrength?: number,
+  topazModel?: string,
+  faceEnhanceCreativity?: number
 ): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
@@ -576,6 +580,10 @@ export async function upscaleImageForCanvas(
         image,
         model,
         scale,
+        faceEnhance,
+        faceEnhanceStrength,
+        topazModel,
+        faceEnhanceCreativity,
         meta: {
           source: 'canvas',
           projectId,

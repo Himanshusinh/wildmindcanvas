@@ -5,6 +5,8 @@ import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 const UPSCALE_MODELS = [
   'Crystal Upscaler',
+  'Topaz Upscaler',
+  'Real-ESRGAN',
 ];
 
 interface ModelDropdownProps {
@@ -13,6 +15,7 @@ interface ModelDropdownProps {
   isOpen: boolean;
   onToggle: () => void;
   onSelect: (model: string) => void;
+  options?: string[];
 }
 
 export const ModelDropdown: React.FC<ModelDropdownProps> = ({
@@ -21,6 +24,7 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
   isOpen,
   onToggle,
   onSelect,
+  options = UPSCALE_MODELS,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -101,7 +105,7 @@ export const ModelDropdown: React.FC<ModelDropdownProps> = ({
             transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
-          {UPSCALE_MODELS.map((model) => (
+          {options.map((model) => (
             <div
               key={model}
               onClick={() => {
