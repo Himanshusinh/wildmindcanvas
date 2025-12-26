@@ -58,11 +58,24 @@ export const ExpandImageFrame: React.FC<ExpandImageFrameProps> = ({
   const wasDragRef = useRef<boolean>(false);
   const imageStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Load image
+  // Load image - use AVIF for preview display (performance)
   const previewImage = sourceImageUrl || localExpandedImageUrl || expandedImageUrl;
-  const imageUrl = (previewImage && (previewImage.includes('zata.ai') || previewImage.includes('zata')) && !previewImage.includes('/api/proxy/'))
-    ? buildProxyResourceUrl(previewImage)
-    : previewImage;
+  const imageUrl = (() => {
+    if (!previewImage) return previewImage;
+
+    // Check if it's a Zata URL (direct or proxy)
+    const isZataUrl = previewImage.includes('zata.ai') ||
+      previewImage.includes('zata') ||
+      previewImage.includes('/api/proxy/') ||
+      previewImage.includes('users%2F') ||
+      previewImage.includes('canvas%2F');
+
+    if (isZataUrl && !previewImage.includes('fmt=avif')) {
+      const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
+      return buildProxyThumbnailUrl(previewImage, 2048, 85, 'avif');
+    }
+    return previewImage;
+  })();
 
   const [img] = useImage(imageUrl || '', 'anonymous');
 

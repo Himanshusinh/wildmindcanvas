@@ -18,6 +18,7 @@ import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
 import { useOpManager } from '@/hooks/useOpManager';
 import { useProject } from '@/hooks/useProject';
 import { useUIVisibility } from '@/hooks/useUIVisibility';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl } from '@/lib/proxyUtils';
 import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
 import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
@@ -26,6 +27,7 @@ import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/plugin
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/app/components/CanvasApp/types';
 import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/app/components/ModalOverlays/types';
 import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
+import { MobileRestrictionScreen } from '@/app/components/MobileRestrictionScreen';
 
 interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
@@ -1724,7 +1726,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
             // We need to find the node by its ID and update it
             if (isImage) {
               setImageGenerators(prev => prev.map(g => g.id === modalId ? { ...g, generatedImageUrl: result.url } : g));
-              setImages(prev => prev.map(img => (img as any).elementId === elementId ? { ...img, url: result.url } : img));
+              setImages(prev => prev.map(img => (img as any).elementId === elementId ? {
+                ...img,
+                url: result.url,  // AVIF URL for display
+                originalUrl: result.originalUrl || result.url  // Original format URL for download/processing
+              } : img));
             } else {
               setVideoGenerators(prev => prev.map(g => g.id === modalId ? { ...g, generatedVideoUrl: result.url } : g));
             }
@@ -3700,6 +3706,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
 export default function Home() {
   const [user, setUser] = useState<{ uid: string; username: string; email: string; credits?: number } | null>(null);
+  const isMobile = useIsMobile();
+
+  // Show mobile restriction screen for mobile devices
+  if (isMobile) {
+    return <MobileRestrictionScreen />;
+  }
 
   return (
     <AuthGuard onUserLoaded={(loadedUser) => {

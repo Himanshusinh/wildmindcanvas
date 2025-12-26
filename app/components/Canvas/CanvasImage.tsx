@@ -96,9 +96,12 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
     if (originalUrl.startsWith('blob:')) {
       return originalUrl;
     }
-    // For Zata URLs, use proxy route
+    // For Zata URLs, use proxy route with AVIF conversion for canvas display
     if (originalUrl.includes('zata.ai') || originalUrl.includes('zata')) {
-      return buildProxyResourceUrl(originalUrl);
+      // Use thumbnail proxy with AVIF format for optimized display
+      const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
+      // Use high quality (85) and large width (2048) to maintain quality while getting AVIF benefits
+      return buildProxyThumbnailUrl(originalUrl, 2048, 85, 'avif');
     }
     // For other URLs, use directly
     return originalUrl;

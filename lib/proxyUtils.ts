@@ -13,19 +13,19 @@ export function extractZataPath(url: string): string | null {
   try {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
-    
+
     // Find bucket name (usually 'devstoragev1' or 'canvas')
-    const bucketIndex = pathParts.findIndex(p => 
-      p === 'devstoragev1' || 
+    const bucketIndex = pathParts.findIndex(p =>
+      p === 'devstoragev1' ||
       p === 'canvas' ||
       p.startsWith('canvas/')
     );
-    
+
     if (bucketIndex >= 0) {
       // Return path after bucket name
       return pathParts.slice(bucketIndex + 1).join('/');
     }
-    
+
     // If no bucket found, return path without first segment
     return pathParts.slice(1).join('/') || null;
   } catch {
@@ -46,7 +46,7 @@ export function buildProxyDownloadUrl(resourceUrl: string): string {
       return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(zataPath)}`;
     }
   }
-  
+
   // For external URLs, use the full URL as the path
   return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(resourceUrl)}`;
 }
@@ -64,7 +64,7 @@ export function buildProxyResourceUrl(resourceUrl: string): string {
       return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(zataPath)}`;
     }
   }
-  
+
   // For external URLs, use the full URL as the path
   return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(resourceUrl)}`;
 }
@@ -82,7 +82,7 @@ export function buildProxyMediaUrl(resourceUrl: string): string {
       return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(zataPath)}`;
     }
   }
-  
+
   // For external URLs, use the full URL as the path
   return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(resourceUrl)}`;
 }
@@ -101,18 +101,35 @@ export function buildProxyThumbnailUrl(
   quality: number = 60,
   format: 'webp' | 'avif' | 'auto' = 'auto'
 ): string {
-  const zataPath = extractZataPath(resourceUrl);
-  if (!zataPath) {
+  // If it's already a proxy URL, extract the original path
+  let pathToUse: string | null = null;
+
+  if (resourceUrl.includes('/api/proxy/')) {
+    // Extract path from proxy URL
+    // Format: /api/proxy/resource/ENCODED_PATH or /api/proxy/thumb/ENCODED_PATH
+    const match = resourceUrl.match(/\/api\/proxy\/(?:resource|thumb|media)\/([^?]+)/);
+    if (match && match[1]) {
+      // Decode the path
+      pathToUse = decodeURIComponent(match[1]);
+    }
+  }
+
+  // If not a proxy URL, try to extract Zata path
+  if (!pathToUse) {
+    pathToUse = extractZataPath(resourceUrl);
+  }
+
+  if (!pathToUse) {
     // For external URLs, can't generate thumbnails
     return resourceUrl;
   }
-  
+
   const params = new URLSearchParams({
     w: String(Math.max(16, Math.min(4096, width))),
     q: String(Math.max(10, Math.min(95, quality))),
     fmt: format,
   });
-  
-  return `${API_BASE_URL}/api/proxy/thumb/${encodeURIComponent(zataPath)}?${params.toString()}`;
+
+  return `${API_BASE_URL}/api/proxy/thumb/${encodeURIComponent(pathToUse)}?${params.toString()}`;
 }
 

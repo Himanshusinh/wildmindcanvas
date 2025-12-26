@@ -18,6 +18,7 @@ type CanvasImage = {
   elementId?: string;
   id?: string;
   url?: string | null;
+  originalUrl?: string | null;  // Original format URL for processing
 };
 
 export function useConnectedSourceImage(args: {
@@ -46,8 +47,10 @@ export function useConnectedSourceImage(args: {
       const imgId = img.elementId || (img as any).id;
       return imgId === conn.from;
     });
-    if (canvasImage?.url) {
-      return normalizeCanvasMediaUrl(canvasImage.url);
+    if (canvasImage?.url || canvasImage?.originalUrl) {
+      // Use originalUrl for processing (original format), fallback to url (AVIF)
+      const imageUrl = canvasImage.originalUrl || canvasImage.url;
+      return normalizeCanvasMediaUrl(imageUrl!);
     }
 
     return null;
@@ -78,8 +81,10 @@ export function useConnectedSourceImages(args: {
         const imgId = img.elementId || (img as any).id;
         return imgId === c.from;
       });
-      if (canvasImage?.url) {
-        const u = normalizeCanvasMediaUrl(canvasImage.url);
+      if (canvasImage?.url || canvasImage?.originalUrl) {
+        // Use originalUrl for processing (original format), fallback to url (AVIF)
+        const imageUrl = canvasImage.originalUrl || canvasImage.url;
+        const u = normalizeCanvasMediaUrl(imageUrl!);
         if (u) out.push(u);
       }
     }

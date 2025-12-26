@@ -1069,8 +1069,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             y={Math.min(selectionBox.startY, selectionBox.currentY)}
             width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
             height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-            fill="rgba(147, 197, 253, 0.12)"
-            stroke="#93C5FD"
+            fill="rgba(100,149,237,0.08)"
+            stroke="#6495ED"
             strokeWidth={3}
             dash={[8, 6]}
             listening={false}
@@ -1707,26 +1707,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             }
           }}
         >
-          {/* Group name is rendered by GroupLabel component, not here */}
-          {!isGroupSelected && (
-            <Rect
-              x={0}
-              y={0}
-              width={selectionTightRect.width}
-              height={selectionTightRect.height}
-              fill="rgba(96, 165, 250, 0.22)"
-              stroke="#2563EB"
-              strokeWidth={4}
-              dash={[6, 6]}
-              listening={true}
-              cornerRadius={0}
-            />
-          )}
+          {/* Smart selection rectangle is now rendered in Canvas.tsx as background layer */}
           {/* Toolbar buttons at top center, outside selection area */}
           <Group
             x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
             y={-40}
           >
+            {/* Group name is rendered by GroupLabel component, not here */}
             {/* Group/Ungroup button */}
             <Group
               x={0}

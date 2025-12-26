@@ -1,7 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/app/components/common/FrameSpinner';
-import { buildProxyResourceUrl } from '@/lib/proxyUtils';
 import { useIsDarkTheme } from '@/app/hooks/useIsDarkTheme';
 
 interface ImageModalFrameProps {
@@ -84,13 +83,20 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         position: 'relative',
         zIndex: 1,
         transition: 'border 0.18s ease, background-color 0.3s ease',
+        willChange: isDraggingContainer ? 'transform' : 'auto', // Optimize for movement
+        transform: 'translateZ(0)', // Force hardware acceleration
       }}
     >
       {generatedImageUrl ? (
         <img
-          src={generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')
-            ? buildProxyResourceUrl(generatedImageUrl)
-            : generatedImageUrl}
+          src={(() => {
+            // Use AVIF format for canvas display performance
+            if (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')) {
+              const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
+              return buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif');
+            }
+            return generatedImageUrl;
+          })()}
           alt="Generated"
           style={{
             width: '100%',

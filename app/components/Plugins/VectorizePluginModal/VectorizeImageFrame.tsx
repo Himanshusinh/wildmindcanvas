@@ -79,7 +79,23 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
     >
       {sourceImageUrl ? (
         <img
-          src={sourceImageUrl}
+          src={(() => {
+            // Use AVIF format for preview display (performance)
+            // Original URL is still used for processing via useConnectedSourceImage hook
+
+            // Check if it's a Zata URL (direct or proxy)
+            const isZataUrl = sourceImageUrl.includes('zata.ai') ||
+              sourceImageUrl.includes('zata') ||
+              sourceImageUrl.includes('/api/proxy/') ||
+              sourceImageUrl.includes('users%2F') ||
+              sourceImageUrl.includes('canvas%2F');
+
+            if (isZataUrl && !sourceImageUrl.includes('fmt=avif')) {
+              const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
+              return buildProxyThumbnailUrl(sourceImageUrl, 2048, 85, 'avif');
+            }
+            return sourceImageUrl;
+          })()}
           alt="Source"
           style={{
             width: '100%',

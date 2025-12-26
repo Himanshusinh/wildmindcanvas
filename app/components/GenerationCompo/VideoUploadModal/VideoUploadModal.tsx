@@ -392,6 +392,30 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       video.onloadedmetadata = () => {
         if (video.videoWidth > 0 && video.videoHeight > 0) {
           setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+
+          // For uploaded videos, automatically set aspect ratio from video dimensions
+          if (isUploadedVideo) {
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+            const divisor = gcd(width, height);
+            const aspectWidth = width / divisor;
+            const aspectHeight = height / divisor;
+            const calculatedAspectRatio = `${aspectWidth}:${aspectHeight}`;
+
+            // Update aspect ratio if it's different from current
+            if (calculatedAspectRatio !== selectedAspectRatio) {
+              setSelectedAspectRatio(calculatedAspectRatio);
+              onOptionsChange?.({
+                model: selectedModel,
+                aspectRatio: calculatedAspectRatio,
+                frame: selectedFrame,
+                prompt,
+                duration: selectedDuration,
+                resolution: selectedResolution
+              });
+            }
+          }
         }
       };
       video.onerror = () => {
@@ -401,7 +425,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     } else {
       setVideoResolution(null);
     }
-  }, [proxiedVideoUrl]);
+  }, [proxiedVideoUrl, isUploadedVideo, selectedAspectRatio, selectedModel, selectedFrame, prompt, selectedDuration, selectedResolution, onOptionsChange]);
+
 
   // Listen for frame dim events (when dragging connection near disallowed frame)
   useEffect(() => {

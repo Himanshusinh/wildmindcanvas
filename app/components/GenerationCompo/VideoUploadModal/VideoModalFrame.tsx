@@ -53,6 +53,35 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
     }
   }, [wasJustPlayed]);
 
+  // Pause video when dragging to improve performance
+  // (Still useful to keep local state in sync)
+  useEffect(() => {
+    if (isDraggingContainer && isPlaying) {
+      const videoEl = id ? (window as any).__CANVAS_VIDEOS_MAP?.[id] : null;
+      if (videoEl) {
+        videoEl.pause();
+      }
+      setIsPlaying(false);
+    }
+  }, [isDraggingContainer, isPlaying, id]);
+
+  // Sync play state with the actual video element (since it lives in CanvasVideoNode now)
+  useEffect(() => {
+    const checkState = () => {
+      const videoEl = id ? (window as any).__CANVAS_VIDEOS_MAP?.[id] : null;
+      if (videoEl) {
+        // If video state differs from our local state, update local state
+        if (!videoEl.paused !== isPlaying) {
+          setIsPlaying(!videoEl.paused);
+        }
+      }
+    };
+
+    // Check every 200ms
+    const interval = setInterval(checkState, 200);
+    return () => clearInterval(interval);
+  }, [id, isPlaying]);
+
   return (
     <div
       ref={imageAreaRef}
@@ -68,7 +97,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         maxWidth: '90vw',
         aspectRatio: getAspectRatio(selectedAspectRatio),
         minHeight: `${400 * scale}px`,
-        backgroundColor: frameBg,
+        backgroundColor: generatedVideoUrl ? 'transparent' : frameBg,
         borderRadius: (isHovered || isPinned) && !isUploadedVideo ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
@@ -83,38 +112,30 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         overflow: 'visible',
         position: 'relative',
         zIndex: 2,
+        willChange: isDraggingContainer ? 'transform' : 'auto', // Optimize for movement
+        transform: 'translateZ(0)', // Force hardware acceleration
       }}
     >
       {generatedVideoUrl ? (
         <>
-          <video
-            ref={videoRef}
-            src={generatedVideoUrl}
-            crossOrigin="anonymous"
-            playsInline
-            muted
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: (isHovered || isPinned) && !isUploadedVideo ? '0px' : `${16 * scale}px`,
-            }}
-            onEnded={() => {
-              setIsPlaying(false);
-            }}
-          />
+          {/* Video is now rendered by CanvasVideoNode in Konva Layer */}
+          {/* We only render the play button here */}
+
           {/* Center Play/Pause Button with fade logic */}
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (!videoRef.current) return;
+              const videoEl = id ? (window as any).__CANVAS_VIDEOS_MAP?.[id] : null;
+
               if (isPlaying) {
-                videoRef.current.pause();
+                if (videoEl) videoEl.pause();
                 setIsPlaying(false);
               } else {
-                videoRef.current.play().catch(() => { });
-                setIsPlaying(true);
-                setWasJustPlayed(true);
+                if (videoEl) {
+                  videoEl.play().catch(() => { });
+                  setIsPlaying(true);
+                  setWasJustPlayed(true);
+                }
               }
             }}
             title={isPlaying ? 'Pause' : 'Play'}
@@ -139,7 +160,8 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
               transition: 'opacity 0.35s ease, background-color 0.25s, transform 0.25s',
               zIndex: 5,
               opacity: !isPlaying || (isPlaying && !wasJustPlayed && isHovered) ? 1 : 0,
-              pointerEvents: !isPlaying || (isPlaying && !wasJustPlayed && isHovered) ? 'auto' : 'none'
+              pointerEvents: !isPlaying || (isPlaying && !wasJustPlayed && isHovered) ? 'auto' : 'none',
+              willChange: 'opacity, transform',
             }}
             onMouseEnter={(e) => {
               if (isPlaying) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.75)';

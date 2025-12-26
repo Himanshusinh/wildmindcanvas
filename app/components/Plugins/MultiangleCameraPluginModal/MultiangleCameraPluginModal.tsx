@@ -111,12 +111,12 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
     if (connectedImageSource) {
       // Connection exists: update source image if different
       if (connectedImageSource !== sourceImageUrl) {
-      setSourceImageUrl(connectedImageSource);
-      // Clear dimming when image is connected
-      setIsDimmed(false);
+        setSourceImageUrl(connectedImageSource);
+        // Clear dimming when image is connected
+        setIsDimmed(false);
         // Persist the source image URL
         if (onOptionsChangeRef.current) {
-        onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
+          onOptionsChangeRef.current({ sourceImageUrl: connectedImageSource });
         }
       }
     } else {
@@ -394,10 +394,11 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
               position: 'absolute',
               top: '100%',
               left: '50%',
-              transform: 'translateX(-50%)',
+              transform: `translateX(-50%) scale(${scale})`,
+              transformOrigin: 'top center',
               marginTop: `${-popupOverlap}px`,
               zIndex: 15,
-              width: controlsWidthPx,
+              width: '400px', // Fixed base width
               maxWidth: '90vw',
             }}
           >
@@ -410,7 +411,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
               }}
             >
               <MultiangleCameraControls
-                scale={scale}
+                scale={1} // Base scale as parent handles scaling
                 sourceImageUrl={sourceImageUrl}
                 frameBorderColor={frameBorderColor}
                 frameBorderWidth={frameBorderWidth}
@@ -435,7 +436,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
               />
               <MultiangleCameraImageFrame
                 id={id}
-                scale={scale}
+                scale={1} // Base scale as parent handles scaling
                 frameBorderColor={frameBorderColor}
                 frameBorderWidth={frameBorderWidth}
                 isDraggingContainer={isDraggingContainer}

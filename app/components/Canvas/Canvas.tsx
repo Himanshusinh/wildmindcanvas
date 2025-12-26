@@ -7,6 +7,7 @@ import { ImageUpload } from '@/types/canvas';
 import { Model3DOverlay } from './Model3DOverlay';
 import { ContextMenu } from '@/app/components/ContextMenu';
 import { CanvasImage } from './CanvasImage';
+import { CanvasVideoNode } from './CanvasVideoNode';
 import { TextElements } from './TextElements';
 import { ModalOverlays } from '@/app/components/ModalOverlays';
 import { GroupContainerOverlay } from './GroupContainerOverlay';
@@ -7760,6 +7761,58 @@ export const Canvas: React.FC<CanvasProps> = ({
               name="background-rect"
             />
           )}
+          {/* Smart selection rectangle (below all components) */}
+          {selectionTightRect && (
+            <Rect
+              x={selectionTightRect.x}
+              y={selectionTightRect.y}
+              width={selectionTightRect.width}
+              height={selectionTightRect.height}
+              fill="rgba(100,149,237,0.15)"
+              stroke="#6495ED"
+              strokeWidth={4}
+              dash={[6, 6]}
+              listening={false}
+              cornerRadius={0}
+            />
+          )}
+          {/* Videos (Native Konva) */}
+          {videoModalStates.map((videoState, index) => (
+            <CanvasVideoNode
+              key={videoState.id}
+              videoState={videoState}
+              index={index}
+              stageRef={stageRef}
+              position={position}
+              scale={scale}
+              isDraggable={isComponentDraggable(videoState.id)}
+              isSelected={selectedVideoModalIds.includes(videoState.id)}
+              onSelect={(e) => {
+                const isMultiSelect = e?.ctrlKey || e?.metaKey;
+                if (isMultiSelect) {
+                  setSelectedVideoModalIds(prev => {
+                    if (prev.includes(videoState.id)) {
+                      const newIds = prev.filter(id => id !== videoState.id);
+                      setSelectedVideoModalId(newIds.length > 0 ? newIds[0] : null);
+                      return newIds;
+                    } else {
+                      const newIds = [...prev, videoState.id];
+                      setSelectedVideoModalId(videoState.id);
+                      return newIds;
+                    }
+                  });
+                } else {
+                  clearAllSelections();
+                  setSelectedVideoModalIds([videoState.id]);
+                  setSelectedVideoModalId(videoState.id);
+                }
+              }}
+              onUpdate={(updates) => {
+                onPersistVideoModalMove(videoState.id, updates);
+              }}
+            />
+          ))}
+
           {/* Images and Videos */}
           {images
             .filter((img) => img.type !== 'model3d' && img.type !== 'text')
@@ -7995,7 +8048,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               y={Math.min(selectionRectCoords.y1, selectionRectCoords.y2)}
               width={Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1)}
               height={Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1)}
-              fill="rgba(59,130,246,0.15)"
+              fill="rgba(100,149,237,0.12)"
               visible={true}
               listening={false}
             />

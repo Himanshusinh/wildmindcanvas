@@ -8,9 +8,7 @@ interface FrameSpinnerProps {
 }
 
 export const FrameSpinner: React.FC<FrameSpinnerProps> = ({ scale = 1, label = 'Generating…' }) => {
-  const size = 32 * scale;
-  const thickness = 3 * scale;
-  const gap = 6 * scale;
+  const size = 64 * scale;
   const [isDark, setIsDark] = React.useState(false);
 
   React.useEffect(() => {
@@ -41,45 +39,16 @@ export const FrameSpinner: React.FC<FrameSpinnerProps> = ({ scale = 1, label = '
         borderRadius: 'inherit',
       }}
     >
-      <div
+      <img
+        src={isDark ? '/lodinglight.gif' : '/lodingblack.gif'}
+        alt="Loading"
         style={{
           width: size,
           height: size,
-          position: 'relative',
-          display: 'grid',
-          placeItems: 'center',
           marginBottom: 8 * scale,
+          objectFit: 'contain',
         }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            borderRadius: 12 * scale,
-            boxSizing: 'border-box',
-            borderTop: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.9)' : 'rgba(59,130,246,0.9)'}`,
-            borderRight: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.35)' : 'rgba(59,130,246,0.35)'}`,
-            borderBottom: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.2)' : 'rgba(59,130,246,0.2)'}`,
-            borderLeft: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.15)'}`,
-            animation: 'wmfs-rotate 1s linear infinite',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            width: `calc(100% - ${gap * 2}px)`,
-            height: `calc(100% - ${gap * 2}px)`,
-            borderRadius: 10 * scale,
-            boxSizing: 'border-box',
-            borderTop: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.5)' : 'rgba(59,130,246,0.5)'}`,
-            borderRight: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.25)' : 'rgba(59,130,246,0.25)'}`,
-            borderBottom: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.15)' : 'rgba(59,130,246,0.15)'}`,
-            borderLeft: `${thickness}px solid ${isDark ? 'rgba(96,165,250,0.1)' : 'rgba(59,130,246,0.1)'}`,
-            animation: 'wmfs-rotate-rev 0.75s linear infinite',
-          }}
-        />
-      </div>
+      />
       {label && (
         <div
           style={{
@@ -92,19 +61,6 @@ export const FrameSpinner: React.FC<FrameSpinnerProps> = ({ scale = 1, label = '
           {label}
         </div>
       )}
-
-      <style>
-        {`
-          @keyframes wmfs-rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-          @keyframes wmfs-rotate-rev {
-            0% { transform: rotate(360deg); }
-            100% { transform: rotate(0deg); }
-          }
-        `}
-      </style>
     </div>
   );
 };

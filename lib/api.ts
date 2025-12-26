@@ -271,7 +271,7 @@ export async function generateImageForCanvas(
   storyboardMetadata?: Record<string, string>,
   seed?: number,
   options?: Record<string, any>
-): Promise<{ mediaId: string; url: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; storagePath: string }> }> {
+): Promise<{ mediaId: string; url: string; originalUrl?: string; storagePath: string; generationId?: string; images?: Array<{ mediaId: string; url: string; originalUrl?: string; storagePath: string }> }> {
   // Create AbortController for timeout
   // Increased to 10 minutes for image-to-image generation which can take longer
   const controller = new AbortController();
@@ -564,7 +564,7 @@ export async function upscaleImageForCanvas(
   faceEnhanceStrength?: number,
   topazModel?: string,
   faceEnhanceCreativity?: number
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -648,7 +648,7 @@ export async function vectorizeImageForCanvas(
   image: string,
   projectId: string,
   mode?: string
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -700,7 +700,7 @@ export async function multiangleImageForCanvas(
   verticalTilt?: number,
   rotateDegrees?: number,
   useWideAngle?: boolean
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -788,7 +788,7 @@ export async function removeBgImageForCanvas(
   model?: string,
   backgroundType?: string,
   scaleValue?: number
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -871,7 +871,7 @@ export async function eraseImageForCanvas(
   model?: string,
   mask?: string,
   prompt?: string
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -1018,7 +1018,7 @@ export async function replaceImageForCanvas(
   model?: string,
   mask?: string,
   prompt?: string
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
 
@@ -1170,7 +1170,7 @@ export async function expandImageForCanvas(
   originalImageLocation: [number, number], // [x, y] position of original image in canvas
   prompt?: string,
   aspectRatio?: string
-): Promise<{ url: string; storagePath: string; mediaId?: string; generationId?: string }> {
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout for expand
 
@@ -1947,7 +1947,7 @@ export async function saveUploadedMedia(
   url: string,
   type: 'image' | 'video',
   projectId?: string
-): Promise<{ success: boolean; id?: string; url?: string; storagePath?: string; historyId?: string; error?: string }> {
+): Promise<{ success: boolean; id?: string; url?: string; originalUrl?: string; storagePath?: string; historyId?: string; error?: string }> {
   try {
     const response = await fetch(`${API_GATEWAY_URL}/canvas/media-library/upload`, {
       method: 'POST',
@@ -1976,6 +1976,7 @@ export async function saveUploadedMedia(
         success: true,
         id: result.data.id,
         url: result.data.url,
+        originalUrl: result.data.originalUrl,
         storagePath: result.data.storagePath,
         historyId: result.data.historyId,
       };

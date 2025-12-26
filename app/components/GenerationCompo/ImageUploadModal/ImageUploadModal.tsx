@@ -1197,8 +1197,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     if (generatedImageUrl) {
       const img = new Image();
       // Use the same URL handling as ImageModalFrame
+      // Use AVIF format for canvas display performance
+      const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
       const imageUrl = generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')
-        ? buildProxyResourceUrl(generatedImageUrl)
+        ? buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif')
         : generatedImageUrl;
       img.crossOrigin = 'anonymous'; // Allow CORS for external images
       img.onload = () => {
@@ -1561,8 +1563,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
             // Use proxy URL for consistency with CanvasImage and to avoid CORS issues
             // This ensures we hit the same cache key as the canvas elements
+            // Use AVIF format for canvas display performance
+            const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
             const urlToLoad = (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata'))
-              ? buildProxyResourceUrl(generatedImageUrl)
+              ? buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif')
               : generatedImageUrl;
 
             imageCache.load(urlToLoad)
@@ -1596,6 +1600,26 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                       } as any);
                     }
                   }
+                } else if (isUploadedImage && naturalWidth && naturalHeight) {
+                  // For uploaded images, automatically set aspect ratio from image dimensions
+                  const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+                  const divisor = gcd(naturalWidth, naturalHeight);
+                  const aspectWidth = naturalWidth / divisor;
+                  const aspectHeight = naturalHeight / divisor;
+                  const calculatedAspectRatio = `${aspectWidth}:${aspectHeight}`;
+
+                  // Update aspect ratio if it's different from current
+                  if (calculatedAspectRatio !== selectedAspectRatio) {
+                    setSelectedAspectRatio(calculatedAspectRatio);
+                    if (onOptionsChange) {
+                      onOptionsChange({
+                        aspectRatio: calculatedAspectRatio,
+                        model: selectedModel,
+                        frame: selectedFrame,
+                        prompt,
+                      } as any);
+                    }
+                  }
                 }
               })
               .catch(e => {
@@ -1603,7 +1627,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               });
           }
           return () => { mounted = false; };
-        }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange, frameWidth, frameHeight]);
+        }, [generatedImageUrl, isUploadedImage, selectedModel, onOptionsChange, frameWidth, frameHeight, selectedAspectRatio, selectedFrame, prompt]);
         return null;
       })()}
 
@@ -1643,7 +1667,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           getAspectRatio={getAspectRatio}
           // If an image already exists, use existing frame dimensions to prevent visual frame size change
           // If no image exists, calculate from selected aspect ratio
+          // For uploaded images, don't pass width/height so aspect ratio is used
           width={(() => {
+            // For uploaded images, let aspect ratio control the size
+            if (isUploadedImage) {
+              return undefined;
+            }
             // If image exists, keep existing frame width; otherwise calculate from aspect ratio
             if (generatedImageUrl && frameWidth) {
               return frameWidth; // Keep existing frame width when image is present
@@ -1651,6 +1680,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             return 600; // Fixed width for new frames
           })()}
           height={(() => {
+            // For uploaded images, let aspect ratio control the size
+            if (isUploadedImage) {
+              return undefined;
+            }
             // If image exists, keep existing frame height; otherwise calculate from aspect ratio
             if (generatedImageUrl && frameHeight) {
               return frameHeight; // Keep existing frame height when image is present

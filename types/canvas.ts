@@ -2,7 +2,8 @@ export type MediaType = 'image' | 'video' | 'model3d' | 'text';
 
 export interface ImageUpload {
   file?: File;
-  url?: string;
+  url?: string;              // AVIF URL for display (optimized)
+  originalUrl?: string;      // Original format URL (for download/processing)
   type: MediaType;
   x?: number;
   y?: number;

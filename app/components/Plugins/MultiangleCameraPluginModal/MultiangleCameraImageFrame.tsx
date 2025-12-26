@@ -51,16 +51,16 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
         }
       }}
       style={{
-        width: `${400 * scale}px`,
+        width: `400px`,
         maxWidth: '90vw',
-        minHeight: `${150 * scale}px`,
-        maxHeight: `${400 * scale}px`,
-        height: sourceImageUrl ? `${220 * scale}px` : 'auto',
+        minHeight: `150px`,
+        maxHeight: `400px`,
+        height: sourceImageUrl ? `220px` : 'auto',
         backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: `0 0 ${16 * scale}px ${16 * scale}px`,
-        border: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRadius: `0 0 16px 16px`,
+        border: `${frameBorderWidth}px solid ${frameBorderColor}`,
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -70,13 +70,29 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
         position: 'relative',
         zIndex: 1,
         transition: 'border 0.18s ease, background-color 0.3s ease',
-        padding: `${16 * scale}px`,
-        marginTop: `${-frameBorderWidth * scale}px`,
+        padding: `16px`,
+        marginTop: `${-frameBorderWidth}px`,
       }}
     >
       {sourceImageUrl ? (
         <img
-          src={sourceImageUrl}
+          src={(() => {
+            // Use AVIF format for preview display (performance)
+            // Original URL is still used for processing via useConnectedSourceImage hook
+
+            // Check if it's a Zata URL (direct or proxy)
+            const isZataUrl = sourceImageUrl.includes('zata.ai') ||
+              sourceImageUrl.includes('zata') ||
+              sourceImageUrl.includes('/api/proxy/') ||
+              sourceImageUrl.includes('users%2F') ||
+              sourceImageUrl.includes('canvas%2F');
+
+            if (isZataUrl && !sourceImageUrl.includes('fmt=avif')) {
+              const { buildProxyThumbnailUrl } = require('@/lib/proxyUtils');
+              return buildProxyThumbnailUrl(sourceImageUrl, 2048, 85, 'avif');
+            }
+            return sourceImageUrl;
+          })()}
           alt="Source"
           style={{
             width: '100%',
@@ -87,10 +103,10 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
           draggable={false}
         />
       ) : (
-        <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `${20 * scale}px`, transition: 'color 0.3s ease' }}>
+        <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `20px`, transition: 'color 0.3s ease' }}>
           <svg
-            width={48 * scale}
-            height={48 * scale}
+            width={48}
+            height={48}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -103,7 +119,7 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          <p style={{ fontSize: `${12 * scale}px`, margin: 0, opacity: 0.6 }}>Connect an image to preview</p>
+          <p style={{ fontSize: `12px`, margin: 0, opacity: 0.6 }}>Connect an image to preview</p>
         </div>
       )}
     </div>

@@ -55,8 +55,9 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
   onGenerate,
 }) => {
   const isDark = useIsDarkTheme();
-  const basePadding = 16 * scale;
-  const computedTopPadding = Math.max(basePadding, extraTopPadding ?? basePadding);
+  // Base values for fixed-width UI elements (parent handles scaling)
+  const basePadding = 16;
+  const computedTopPadding = Math.max(basePadding, (extraTopPadding ? extraTopPadding / scale : basePadding));
 
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const [isVerticalTiltDropdownOpen, setIsVerticalTiltDropdownOpen] = useState(false);
@@ -107,20 +108,20 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
       className="controls-overlay"
       style={{
         position: 'relative',
-        width: `${400 * scale}px`,
+        width: '400px', // Fixed width
         maxWidth: '90vw',
         backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: `${16 * scale}px ${16 * scale}px 0 0`,
+        borderRadius: '16px 16px 0 0',
         display: 'flex',
         flexDirection: 'column',
-        gap: `${12 * scale}px`,
+        gap: '12px',
         overflow: 'visible',
         zIndex: 10,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: `${frameBorderWidth}px solid ${frameBorderColor}`,
+        borderRight: `${frameBorderWidth}px solid ${frameBorderColor}`,
+        borderTop: `${frameBorderWidth}px solid ${frameBorderColor}`,
         padding: `${basePadding}px`,
         paddingTop: `${computedTopPadding}px`,
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
@@ -128,10 +129,10 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: `${10 * scale}px`, width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
         {/* Prompt Input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: `${4 * scale}px` }}>
-          <label style={{ fontSize: `${12 * scale}px`, fontWeight: 500, color: textColor }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: textColor }}>
             Prompt
           </label>
           <input
@@ -141,11 +142,11 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
             placeholder="Enter prompt (optional)"
             style={{
               width: '100%',
-              padding: `${8 * scale}px ${12 * scale}px`,
-              fontSize: `${13 * scale}px`,
+              padding: '8px 12px',
+              fontSize: '13px',
               backgroundColor: inputBg,
               border: `1px solid ${borderColor}`,
-              borderRadius: `${8 * scale}px`,
+              borderRadius: '8px',
               color: textColor,
               outline: 'none',
               transition: 'border-color 0.2s ease',
@@ -156,10 +157,10 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
         </div>
 
         {/* Row 1: Aspect Ratio + Lora Scale */}
-        <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Aspect Ratio Dropdown */}
-          <div style={{ flex: 1, minWidth: `${140 * scale}px` }}>
-            <label style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: textColor, marginBottom: `${4 * scale}px`, display: 'block' }}>
+          <div style={{ flex: 1, minWidth: `140px` }}>
+            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'block' }}>
               Aspect Ratio
             </label>
             <div ref={aspectRatioDropdownRef} style={{ position: 'relative' }}>
@@ -168,11 +169,11 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onClick={() => setIsAspectRatioDropdownOpen(!isAspectRatioDropdownOpen)}
                 style={{
                   width: '100%',
-                  padding: `${8 * scale}px ${12 * scale}px`,
-                  fontSize: `${12 * scale}px`,
+                  padding: `8px 12px`,
+                  fontSize: `12px`,
                   backgroundColor: inputBg,
                   border: `1px solid ${borderColor}`,
-                  borderRadius: `${8 * scale}px`,
+                  borderRadius: `8px`,
                   color: textColor,
                   cursor: 'pointer',
                   display: 'flex',
@@ -184,7 +185,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
               >
                 <span>{aspectRatioOptions.find(opt => opt.value === aspectRatio)?.label || aspectRatio}</span>
-                <span style={{ fontSize: `${10 * scale}px` }}>▼</span>
+                <span style={{ fontSize: `10px` }}>▼</span>
               </button>
               {isAspectRatioDropdownOpen && (
                 <div
@@ -193,13 +194,13 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                     top: '100%',
                     left: 0,
                     right: 0,
-                    marginTop: `${4 * scale}px`,
+                    marginTop: `4px`,
                     backgroundColor: inputBg,
                     border: `1px solid ${borderColor}`,
-                    borderRadius: `${8 * scale}px`,
+                    borderRadius: `8px`,
                     zIndex: 1000,
                     boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    maxHeight: `${200 * scale}px`,
+                    maxHeight: `200px`,
                     overflowY: 'auto',
                   }}
                 >
@@ -213,8 +214,8 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                       }}
                       style={{
                         width: '100%',
-                        padding: `${8 * scale}px ${12 * scale}px`,
-                        fontSize: `${12 * scale}px`,
+                        padding: `8px 12px`,
+                        fontSize: `12px`,
                         backgroundColor: aspectRatio === option.value ? (isDark ? '#437eb5' : '#3b82f6') : 'transparent',
                         color: aspectRatio === option.value ? '#ffffff' : textColor,
                         border: 'none',
@@ -242,59 +243,105 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
           </div>
 
           {/* Lora Scale Input */}
-          <div style={{ flex: 1, minWidth: `${120 * scale}px` }}>
-            <label style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: textColor, marginBottom: `${4 * scale}px`, display: 'block' }}>
-              Lora Scale
+          <div style={{ flex: 1, minWidth: `120px` }}>
+            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'flex', justifyContent: 'space-between' }}>
+              <span>LoRA Scale</span>
+              <span>{loraScale.toFixed(2)}</span>
             </label>
-            <input
-              type="number"
-              value={loraScale}
-              onChange={(e) => onLoraScaleChange(parseFloat(e.target.value) || 1.25)}
-              min="0"
-              max="10"
-              step="0.1"
-              style={{
-                width: '100%',
-                padding: `${8 * scale}px ${12 * scale}px`,
-                fontSize: `${12 * scale}px`,
-                backgroundColor: inputBg,
-                border: `1px solid ${borderColor}`,
-                borderRadius: `${8 * scale}px`,
-                color: textColor,
-                outline: 'none',
-                transition: 'border-color 0.2s ease',
-              }}
-              onFocus={(e) => e.target.style.borderColor = isDark ? '#5a8fc5' : '#3b82f6'}
-              onBlur={(e) => e.target.style.borderColor = borderColor}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
+              <input
+                type="range"
+                min="0"
+                max="4"
+                step="0.05"
+                value={loraScale}
+                onChange={(e) => onLoraScaleChange(parseFloat(e.target.value))}
+                style={{
+                  flex: 1,
+                  accentColor: '#437eb5',
+                }}
+              />
+              <input
+                type="number"
+                min="0"
+                max="4"
+                step="0.1"
+                value={loraScale}
+                onChange={(e) => {
+                  let val = parseFloat(e.target.value);
+                  if (isNaN(val)) val = 0;
+                  if (val > 4) val = 4;
+                  if (val < 0) val = 0;
+                  onLoraScaleChange(val);
+                }}
+                style={{
+                  width: `50px`,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                  color: isDark ? '#ffffff' : '#000000',
+                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                  borderRadius: `4px`,
+                  padding: `4px`,
+                  fontSize: `12px`,
+                  textAlign: 'center',
+                  outline: 'none'
+                }}
+              />
+            </div>
           </div>
         </div>
 
         {/* Row 2: Move Forward + Vertical Tilt */}
-        <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Move Forward Slider */}
-          <div style={{ flex: 1, minWidth: `${140 * scale}px` }}>
-            <label style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: textColor, marginBottom: `${4 * scale}px`, display: 'block' }}>
-              Move Forward: {moveForward.toFixed(1)}
+          <div style={{ flex: 1, minWidth: `140px` }}>
+            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'flex', justifyContent: 'space-between' }}>
+              <span>Move Forward</span>
+              <span>{moveForward.toFixed(1)}</span>
             </label>
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="0.1"
-              value={moveForward}
-              onChange={(e) => onMoveForwardChange(parseFloat(e.target.value))}
-              style={{
-                width: '100%',
-                height: `${6 * scale}px`,
-                cursor: 'pointer',
-              }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="0.1"
+                value={moveForward}
+                onChange={(e) => onMoveForwardChange(parseFloat(e.target.value))}
+                style={{
+                  flex: 1,
+                  accentColor: '#437eb5',
+                }}
+              />
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={moveForward}
+                onChange={(e) => {
+                  let val = parseFloat(e.target.value);
+                  if (isNaN(val)) val = 0;
+                  if (val > 10) val = 10;
+                  if (val < 0) val = 0;
+                  onMoveForwardChange(val);
+                }}
+                style={{
+                  width: `50px`,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                  color: isDark ? '#ffffff' : '#000000',
+                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                  borderRadius: `4px`,
+                  padding: `4px`,
+                  fontSize: `12px`,
+                  textAlign: 'center',
+                  outline: 'none'
+                }}
+              />
+            </div>
           </div>
 
           {/* Vertical Tilt Dropdown */}
-          <div style={{ flex: 1, minWidth: `${120 * scale}px` }}>
-            <label style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: textColor, marginBottom: `${4 * scale}px`, display: 'block' }}>
+          <div style={{ flex: 1, minWidth: `120px` }}>
+            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'block' }}>
               Vertical Tilt
             </label>
             <div ref={verticalTiltDropdownRef} style={{ position: 'relative' }}>
@@ -303,11 +350,11 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onClick={() => setIsVerticalTiltDropdownOpen(!isVerticalTiltDropdownOpen)}
                 style={{
                   width: '100%',
-                  padding: `${8 * scale}px ${12 * scale}px`,
-                  fontSize: `${12 * scale}px`,
+                  padding: `8px 12px`,
+                  fontSize: `12px`,
                   backgroundColor: inputBg,
                   border: `1px solid ${borderColor}`,
-                  borderRadius: `${8 * scale}px`,
+                  borderRadius: `8px`,
                   color: textColor,
                   cursor: 'pointer',
                   display: 'flex',
@@ -319,7 +366,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
               >
                 <span>{verticalTiltOptions.find(opt => opt.value === verticalTilt)?.label || verticalTilt}</span>
-                <span style={{ fontSize: `${10 * scale}px` }}>▼</span>
+                <span style={{ fontSize: `10px` }}>▼</span>
               </button>
               {isVerticalTiltDropdownOpen && (
                 <div
@@ -328,10 +375,10 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                     top: '100%',
                     left: 0,
                     right: 0,
-                    marginTop: `${4 * scale}px`,
+                    marginTop: `4px`,
                     backgroundColor: inputBg,
                     border: `1px solid ${borderColor}`,
-                    borderRadius: `${8 * scale}px`,
+                    borderRadius: `8px`,
                     zIndex: 1000,
                     boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
                   }}
@@ -346,8 +393,8 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                       }}
                       style={{
                         width: '100%',
-                        padding: `${8 * scale}px ${12 * scale}px`,
-                        fontSize: `${12 * scale}px`,
+                        padding: `8px 12px`,
+                        fontSize: `12px`,
                         backgroundColor: verticalTilt === option.value ? (isDark ? '#437eb5' : '#3b82f6') : 'transparent',
                         color: verticalTilt === option.value ? '#ffffff' : textColor,
                         border: 'none',
@@ -376,12 +423,12 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
         </div>
 
         {/* Row 3: Rotate Degrees Slider */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: `${4 * scale}px` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: `4px` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: textColor }}>
-              Rotate Degrees: {rotateDegrees}°
+            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor }}>
+              <span>Rotate Degrees</span>
             </label>
-            <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center', fontSize: `${10 * scale}px`, color: textColor, opacity: 0.7 }}>
+            <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', fontSize: `10px`, color: textColor, opacity: 0.7 }}>
               <span style={{ color: rotateDegrees < 0 ? (isDark ? '#5a8fc5' : '#3b82f6') : textColor, opacity: rotateDegrees < 0 ? 1 : 0.5 }}>
                 Right →
               </span>
@@ -393,20 +440,46 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
               </span>
             </div>
           </div>
-          <input
-            type="range"
-            min="-90"
-            max="90"
-            step="1"
-            value={rotateDegrees}
-            onChange={(e) => onRotateDegreesChange(parseInt(e.target.value))}
-            style={{
-              width: '100%',
-              height: `${6 * scale}px`,
-              cursor: 'pointer',
-            }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `${9 * scale}px`, color: textColor, opacity: 0.6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
+            <input
+              type="range"
+              min="-90"
+              max="90"
+              step="1"
+              value={rotateDegrees}
+              onChange={(e) => onRotateDegreesChange(parseInt(e.target.value))}
+              style={{
+                flex: 1,
+                accentColor: '#437eb5',
+              }}
+            />
+            <input
+              type="number"
+              min="-90"
+              max="90"
+              step="1"
+              value={rotateDegrees}
+              onChange={(e) => {
+                let val = parseInt(e.target.value);
+                if (isNaN(val)) val = 0;
+                if (val > 90) val = 90;
+                if (val < -90) val = -90;
+                onRotateDegreesChange(val);
+              }}
+              style={{
+                width: `60px`,
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                color: isDark ? '#ffffff' : '#000000',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                borderRadius: `4px`,
+                padding: `4px`,
+                fontSize: `12px`,
+                textAlign: 'center',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `9px`, color: textColor, opacity: 0.6 }}>
             <span>-90°</span>
             <span>0°</span>
             <span>+90°</span>
@@ -414,18 +487,18 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
         </div>
 
         {/* Row 4: Wide Angle Checkbox */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: `${8 * scale}px` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
           <input
             type="checkbox"
             checked={useWideAngle}
             onChange={(e) => onUseWideAngleChange(e.target.checked)}
             style={{
-              width: `${16 * scale}px`,
-              height: `${16 * scale}px`,
+              width: `16px`,
+              height: `16px`,
               cursor: 'pointer',
             }}
           />
-          <label style={{ fontSize: `${12 * scale}px`, color: textColor, cursor: 'pointer' }}>
+          <label style={{ fontSize: `12px`, color: textColor, cursor: 'pointer' }}>
             Use Wide Angle
           </label>
         </div>
@@ -437,13 +510,13 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
           disabled={!sourceImageUrl || isGenerating}
           style={{
             width: '100%',
-            padding: `${10 * scale}px ${16 * scale}px`,
-            fontSize: `${13 * scale}px`,
+            padding: `10px 16px`,
+            fontSize: `13px`,
             fontWeight: 600,
             backgroundColor: (!sourceImageUrl || isGenerating) ? buttonDisabledBg : buttonBg,
             color: '#ffffff',
             border: 'none',
-            borderRadius: `${8 * scale}px`,
+            borderRadius: `8px`,
             cursor: (!sourceImageUrl || isGenerating) ? 'not-allowed' : 'pointer',
             transition: 'background-color 0.2s ease',
             opacity: (!sourceImageUrl || isGenerating) ? 0.6 : 1,

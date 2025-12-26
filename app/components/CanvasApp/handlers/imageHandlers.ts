@@ -126,9 +126,9 @@ export const handleImageGenerate = async (
       if (results.length === 0) throw new Error('All generation requests failed.');
 
       const primaryResult = results[0];
-      const allImages = results.flatMap(r => r.images && r.images.length > 0 ? r.images : [{ url: r.url }]);
+      const allImages = results.flatMap(r => r.images && r.images.length > 0 ? r.images : [{ url: r.url, originalUrl: r.originalUrl }]);
 
-      result = { ...primaryResult, images: allImages, url: allImages[0]?.url || primaryResult.url };
+      result = { ...primaryResult, images: allImages, url: allImages[0]?.url || primaryResult.url, originalUrl: allImages[0]?.originalUrl || primaryResult.originalUrl };
     } else {
       result = await generateImageForCanvas(
         prompt, model, aspectRatio, projectId, width || genWidth, height || genHeight,
@@ -140,9 +140,9 @@ export const handleImageGenerate = async (
     setters.setGenerationQueue((prev: any) => prev.filter((job: any) => !jobIdSet.has(job.id)));
 
     if (result.images && Array.isArray(result.images) && result.images.length > 0) {
-      return { url: result.url, images: result.images, prompt: prompt };
+      return { url: result.url, originalUrl: result.originalUrl, images: result.images, prompt: prompt };
     }
-    return { url: result.url, prompt: prompt };
+    return { url: result.url, originalUrl: result.originalUrl, prompt: prompt };
 
   } catch (error: any) {
     console.error('Generation failed:', error);
@@ -285,10 +285,14 @@ export const createImageHandlers = (
 
   const handleImageDownload = (index: number | ImageUpload) => {
     const image = typeof index === 'number' ? canvasState.images[index] : index;
-    if (!image || !image.url) return;
+    if (!image) return;
+
+    // Use originalUrl for download (original format), fallback to url if not available
+    const downloadUrl = image.originalUrl || image.url;
+    if (!downloadUrl) return;
 
     const link = document.createElement('a');
-    link.href = image.url;
+    link.href = downloadUrl;
     link.download = `image-${Date.now()}.png`; // Simple download
     document.body.appendChild(link);
     link.click();
