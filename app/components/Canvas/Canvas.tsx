@@ -7808,7 +7808,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 }
               }}
               onUpdate={(updates) => {
-                onPersistVideoModalMove(videoState.id, updates);
+                onPersistVideoModalMove?.(videoState.id, updates);
               }}
             />
           ))}
