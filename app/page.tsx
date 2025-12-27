@@ -1,33 +1,33 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { CompareGenerator } from '@/app/components/CanvasApp/types';
-import { Canvas } from '@/app/components/Canvas';
-import GenerationQueue, { GenerationQueueItem } from '@/app/components/Canvas/GenerationQueue';
-import { ToolbarPanel } from '@/app/components/ToolbarPanel';
-import { Header } from '@/app/components/Header';
-import { AuthGuard } from '@/app/components/AuthGuard';
-import { Profile } from '@/app/components/Profile/Profile';
-import LibrarySidebar from '@/app/components/Canvas/LibrarySidebar';
-import PluginSidebar from '@/app/components/Canvas/PluginSidebar';
-import { ImageUpload } from '@/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/lib/api';
-import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/lib/canvasApi';
-import { ProjectSelector } from '@/app/components/ProjectSelector/ProjectSelector';
-import { CanvasProject, CanvasOp } from '@/lib/canvasApi';
-import { useOpManager } from '@/hooks/useOpManager';
-import { useProject } from '@/hooks/useProject';
-import { useUIVisibility } from '@/hooks/useUIVisibility';
-import { useIsMobile } from '@/hooks/useIsMobile';
-import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl } from '@/lib/proxyUtils';
-import { RealtimeClient, GeneratorOverlay } from '@/lib/realtime';
-import { buildSnapshotElements } from '@/app/components/CanvasApp/utils/buildSnapshotElements';
-import { createImageHandlers } from '@/app/components/CanvasApp/handlers/imageHandlers';
-import { createPluginHandlers } from '@/app/components/CanvasApp/handlers/pluginHandlers';
-import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/app/components/CanvasApp/types';
-import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/app/components/ModalOverlays/types';
-import VideoEditorPluginModal from '@/app/components/Plugins/VideoEditorPluginModal';
-import { MobileRestrictionScreen } from '@/app/components/MobileRestrictionScreen';
+import { CompareGenerator } from '@/modules/canvas-app/types';
+import { Canvas } from '@/modules/canvas';
+import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+import { ToolbarPanel } from '@/modules/ui-global/ToolbarPanel';
+import { Header } from '@/modules/ui-global/Header';
+import { AuthGuard } from '@/modules/ui-global/AuthGuard';
+import { Profile } from '@/modules/ui-global/Profile/Profile';
+import LibrarySidebar from '@/modules/canvas/LibrarySidebar';
+import PluginSidebar from '@/modules/canvas/PluginSidebar';
+import { ImageUpload } from '@/core/types/canvas';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/core/api/api';
+import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/core/api/canvasApi';
+import { ProjectSelector } from '@/modules/ui-global/ProjectSelector/ProjectSelector';
+import { CanvasProject, CanvasOp } from '@/core/api/canvasApi';
+import { useOpManager } from '@/core/hooks/useOpManager';
+import { useProject } from '@/core/hooks/useProject';
+import { useUIVisibility } from '@/core/hooks/useUIVisibility';
+import { useIsMobile } from '@/core/hooks/useIsMobile';
+import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl } from '@/core/api/proxyUtils';
+import { RealtimeClient, GeneratorOverlay } from '@/core/api/realtime';
+import { buildSnapshotElements } from '@/modules/utils/buildSnapshotElements';
+import { createImageHandlers } from '@/modules/handlers/imageHandlers';
+import { createPluginHandlers } from '@/modules/handlers/pluginHandlers';
+import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/modules/canvas-app/types';
+import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/modules/canvas-overlays/types';
+import VideoEditorPluginModal from '@/modules/plugins/VideoEditorPluginModal';
+import { MobileRestrictionScreen } from '@/modules/ui-global/MobileRestrictionScreen';
 
 interface CanvasAppProps {
   user: { uid: string; username: string; email: string; credits?: number } | null;
@@ -1189,7 +1189,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newCompareGenerators: CompareGenerator[] = [];
-          const newCanvasTextStates: Array<import('@/app/components/ModalOverlays/types').CanvasTextState> = [];
+          const newCanvasTextStates: Array<CanvasTextState> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
           // Track connector signatures to prevent duplicates: "from|to|toAnchor"
           const connectorSignatures = new Set<string>();
@@ -1718,7 +1718,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
         if (isImage || isVideoFile) {
           const dataUri = await convertFileToDataUri(file);
-          const { saveUploadedMedia } = await import('../lib/api');
+          const { saveUploadedMedia } = await import('@/core/api/api');
           const result = await saveUploadedMedia(dataUri, isImage ? 'image' : 'video', projectId);
 
           if (result.success && result.url) {
