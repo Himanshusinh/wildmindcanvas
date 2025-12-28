@@ -902,10 +902,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (!sanitizedScript) return;
 
     // Update the text input's value to show the generated story
-    setTextInputStates(prev => prev.map(t => 
+    setTextInputStates(prev => prev.map(t =>
       t.id === textModalId ? { ...t, value: sanitizedScript } : t
     ));
-    
+
     // Persist the text input update
     if (onPersistTextModalMove) {
       Promise.resolve(onPersistTextModalMove(textModalId, { value: sanitizedScript })).catch(console.error);
@@ -916,7 +916,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       .filter(conn => conn.from === textModalId)
       .map(conn => conn.to)
       .filter(Boolean);
-    
+
     if (!storyboardTargets.length) return;
 
     // Find target plugin IDs (only direct storyboard plugin connections, no script frames)
@@ -1285,7 +1285,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
     // Get script text from connected text input or from storyboard's scriptText
     let scriptText: string | null = null;
-    
+
     // Find connected text input
     const textInputConnection = (connections ?? []).find(conn => conn.to === storyboardId);
     if (textInputConnection) {
@@ -1295,7 +1295,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         console.log('[Canvas] ✅ Found script from connected text input:', scriptText.substring(0, 100) + '...');
       }
     }
-    
+
     // Fallback to storyboard's stored scriptText
     if (!scriptText && storyboard.scriptText) {
       scriptText = storyboard.scriptText;
@@ -3599,16 +3599,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           stage.draggable(false);
           setIsPanning(false);
         }
-        
+
         // Adjust position by wheel deltas (invert sign if needed based on UX)
         // Use requestAnimationFrame for smooth updates
         requestAnimationFrame(() => {
-        setPosition(prev => {
-          // Invert deltas so two-finger drag direction matches canvas movement
-          // (drag up → canvas moves up, drag left → canvas moves left)
-          const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-          setTimeout(() => updateViewportCenter(newPos, scale), 0);
-          return newPos;
+          setPosition(prev => {
+            // Invert deltas so two-finger drag direction matches canvas movement
+            // (drag up → canvas moves up, drag left → canvas moves left)
+            const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+            setTimeout(() => updateViewportCenter(newPos, scale), 0);
+            return newPos;
           });
         });
         return;
@@ -3683,7 +3683,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         // Always reset middle button state to prevent stuck selection
         setIsMiddleButtonPressed(false);
         setIsPanning(false);
-        
+
         // Disable stage dragging to ensure clean state
         const stage = stageRef.current;
         if (stage) {
@@ -3921,8 +3921,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (isSelecting || wasDrag) {
         mouseDownTarget = null;
         mouseDownPos = null;
-            return;
-          }
+        return;
+      }
 
       // Check if click is inside any modal component
       // Also check for contentEditable elements (canvas text components)
@@ -3999,7 +3999,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
-    
+
     // Store initial selection rectangle coordinates if not set
     if (!selectionRectCoords) {
       setSelectionRectCoords({
@@ -4050,7 +4050,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
-        
+
         // Also update selection rectangle coordinates (Konva pattern) - update immediately
         setSelectionRectCoords(prev => {
           if (!prev) {
@@ -4229,7 +4229,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedNextSceneModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4242,7 +4242,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedCompareModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4301,7 +4301,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
         // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
@@ -4387,7 +4387,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
           // Collect all selected component positions and dimensions
           selectedImageIndices.forEach(idx => {
-          const img = images[idx];
+            const img = images[idx];
             if (img && img.type !== 'model3d') {
               const dims = getComponentDimensions('image', idx);
               allSelectedComponents.push({
@@ -4400,7 +4400,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedImageModalIds.forEach(id => {
-          const m = imageModalStates.find(mm => mm.id === id);
+            const m = imageModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('imageModal', id);
               allSelectedComponents.push({
@@ -4413,7 +4413,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedVideoModalIds.forEach(id => {
-          const m = videoModalStates.find(mm => mm.id === id);
+            const m = videoModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('videoModal', id);
               allSelectedComponents.push({
@@ -4426,7 +4426,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           });
 
           selectedMusicModalIds.forEach(id => {
-          const m = musicModalStates.find(mm => mm.id === id);
+            const m = musicModalStates.find(mm => mm.id === id);
             if (m) {
               const dims = getComponentDimensions('musicModal', id);
               allSelectedComponents.push({
@@ -4438,8 +4438,8 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           });
 
-            selectedTextInputIds.forEach(id => {
-              const t = textInputStates.find(tt => tt.id === id);
+          selectedTextInputIds.forEach(id => {
+            const t = textInputStates.find(tt => tt.id === id);
             if (t) {
               const dims = getComponentDimensions('textInput', id);
               allSelectedComponents.push({
@@ -4628,15 +4628,15 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (selectionRectCoords) {
         setSelectionRectCoords(null);
       }
-        return;
-      }
+      return;
+    }
 
     // Use requestAnimationFrame to throttle updates for smooth performance
     let rafId: number | null = null;
     let pendingUpdate: { currentX: number; currentY: number } | null = null;
     // Use a ref to store the latest coordinates for immediate access on mouse up
     const latestCoordsRef = { currentX: selectionBox.currentX, currentY: selectionBox.currentY };
-    
+
     // Store initial selection rectangle coordinates if not set
     if (!selectionRectCoords) {
       setSelectionRectCoords({
@@ -4687,7 +4687,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         // Store pending update
         pendingUpdate = { currentX: canvasX, currentY: canvasY };
-        
+
         // Also update selection rectangle coordinates (Konva pattern) - update immediately
         setSelectionRectCoords(prev => {
           if (!prev) {
@@ -4866,7 +4866,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedNextSceneModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4843',message:'NextScene modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedNextSceneModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4843', message: 'NextScene modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedNextSceneModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4879,7 +4879,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               selectedCompareModalIdsList.push(modal.id);
             }
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4853',message:'Compare modal selected',data:{modalId:modal.id,modalX:modal.x,modalY:modal.y,dimsWidth:dims.width,dimsHeight:dims.height,listLengthAfter:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4853', message: 'Compare modal selected', data: { modalId: modal.id, modalX: modal.x, modalY: modal.y, dimsWidth: dims.width, dimsHeight: dims.height, listLengthAfter: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
             // #endregion
           }
         });
@@ -4938,7 +4938,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         setSelectedNextSceneModalIds(mergedNextSceneIds);
         setSelectedCompareModalIds?.(mergedCompareIds);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Canvas.tsx:4285',message:'Selection arrays set',data:{nextSceneIds:mergedNextSceneIds,compareIds:mergedCompareIds,existingNextScene:selectedNextSceneModalIds.length,existingCompare:selectedCompareModalIds?.length||0,newNextScene:selectedNextSceneModalIdsList.length,newCompare:selectedCompareModalIdsList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'Canvas.tsx:4285', message: 'Selection arrays set', data: { nextSceneIds: mergedNextSceneIds, compareIds: mergedCompareIds, existingNextScene: selectedNextSceneModalIds.length, existingCompare: selectedCompareModalIds?.length || 0, newNextScene: selectedNextSceneModalIdsList.length, newCompare: selectedCompareModalIdsList.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'A' }) }).catch(() => { });
         // #endregion
         setSelectedStoryboardModalIds(selectedStoryboardModalIdsList);
         setSelectedScriptFrameModalIds(selectedScriptFrameModalIdsList);
@@ -5573,8 +5573,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (!clickedOnEmpty) {
         return;
       }
-      
-        if (pointerPos) {
+
+      if (pointerPos) {
         // Initialize region selection rectangle (Konva pattern)
         const canvasX = (pointerPos.x - position.x) / scale;
         const canvasY = (pointerPos.y - position.y) / scale;
@@ -5584,18 +5584,18 @@ export const Canvas: React.FC<CanvasProps> = ({
           x2: canvasX,
           y2: canvasY,
         });
-        
-          setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
+
+        setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
         setPendingSelectionStartCanvas({ x: canvasX, y: canvasY });
-          setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
-          setSelectionBox(null);
-          // Don't clear selection box if it's a group - groups persist
-          {
-            setSelectionTightRect(null);
-            setIsDragSelection(false);
-          }
+        setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
+        setSelectionBox(null);
+        // Don't clear selection box if it's a group - groups persist
+        {
+          setSelectionTightRect(null);
+          setIsDragSelection(false);
         }
-        return;
+      }
+      return;
     }
 
     // Enable panning with move tool or pan keys (middle mouse, Ctrl/Cmd, Space key)
@@ -5720,7 +5720,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           currentY: pendingSelectionStartCanvas.y,
         });
         setIsSelecting(true);
-        
+
         // Update selection rectangle coordinates
         setSelectionRectCoords({
           x1: pendingSelectionStartCanvas.x,
@@ -5803,21 +5803,21 @@ export const Canvas: React.FC<CanvasProps> = ({
       // Always reset middle button state and panning state
       setIsMiddleButtonPressed(false);
       setIsPanning(false);
-      
+
       // Disable stage dragging to ensure clean state
       const stage = e.target.getStage();
       if (stage) {
         stage.draggable(false);
       }
-      
+
       // Prevent default browser behavior (navigation)
       e.evt.preventDefault();
       e.evt.stopPropagation();
-      
+
       // Return early to prevent any other mouse up handling
       return;
     }
-    
+
     const stage = e.target.getStage();
     const target = e.target;
 
@@ -5826,7 +5826,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (selectionRectCoords) {
       const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
       const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
-      
+
       // Only process selection if rectangle has meaningful size (at least 5px to avoid accidental clicks)
       if (rectWidth >= 5 && rectHeight >= 5) {
         const selectionRect = {
@@ -6027,16 +6027,16 @@ export const Canvas: React.FC<CanvasProps> = ({
         if (newSelectedCanvasTextIds.length > 0) {
           setSelectedCanvasTextId?.(newSelectedCanvasTextIds[0]);
         }
-        
+
         // Hide selection rectangle after processing (with timeout like in example)
         setTimeout(() => {
           setSelectionRectCoords(null);
         }, 0);
-        
+
         // Clear selectionBox to prevent double processing
         setSelectionBox(null);
         setIsSelecting(false);
-        
+
         // Return early to skip the existing selectionBox logic below
         return;
       } else {
@@ -6417,7 +6417,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       setPosition(newPos);
       updateViewportCenter(newPos, scale);
     }
-    
+
     // Reset panning state
     setIsPanning(false);
   };
