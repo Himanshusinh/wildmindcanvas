@@ -163,6 +163,12 @@ export interface CanvasProps {
     isUIHidden?: boolean;
     setGenerationQueue?: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
     stageRef?: React.RefObject<any>;
+    onGenerateStoryboard?: (storyboardId: string, inputs: {
+        characterInput?: string;
+        characterNames?: string;
+        backgroundDescription?: string;
+        specialRequest?: string;
+    }) => void;
 }
 
 export interface CanvasItemsData {

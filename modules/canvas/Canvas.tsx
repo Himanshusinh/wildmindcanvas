@@ -270,7 +270,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     scale,
     findAvailablePositionNearWrapper: (x, y) => findAvailablePositionNear(x, y, [
       ...images.map(i => ({ x: i.x || 0, y: i.y || 0, width: i.width || 400, height: i.height || 400 })),
-      ...imageModalStates.map(m => ({ x: m.x, y: m.y, width: m.frameWidth || 512, height: m.frameHeight || 512 })),
+      ...imageModalStates.map((m: any) => ({ x: m.x, y: m.y, width: m.frameWidth || 512, height: m.frameHeight || 512 })),
       // Add others as needed
     ]),
 

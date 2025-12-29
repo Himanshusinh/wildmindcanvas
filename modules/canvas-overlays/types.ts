@@ -450,6 +450,12 @@ export interface ModalOverlaysProps {
     backgroundDescription?: string;
     specialRequest?: string;
   }) => void;
+  onPersistScriptFrameModalCreate?: (modal: ScriptFrameModalState) => void | Promise<void>;
+  onPersistScriptFrameModalMove?: (id: string, updates: Partial<ScriptFrameModalState>) => void | Promise<void>;
+  onPersistScriptFrameModalDelete?: (id: string) => void | Promise<void>;
+  onPersistSceneFrameModalCreate?: (modal: SceneFrameModalState) => void | Promise<void>;
+  onPersistSceneFrameModalMove?: (id: string, updates: Partial<SceneFrameModalState>) => void | Promise<void>;
+  onPersistSceneFrameModalDelete?: (id: string) => void | Promise<void>;
   onDeleteScriptFrame?: (id: string) => void;
   onScriptFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onScriptFramePositionCommit?: (frameId: string, x: number, y: number) => void;
@@ -482,6 +488,7 @@ export interface ModalOverlaysProps {
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+  isUIHidden?: boolean;
 }
 
 export interface CompareModalState {

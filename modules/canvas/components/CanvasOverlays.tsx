@@ -289,7 +289,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onVideoSelect={props.onVideoSelect}
                 onMusicSelect={props.onMusicSelect}
                 onUpscale={props.onUpscale}
-                onMultiangleCamera={props.onMultiangleCamera}
+
                 onRemoveBg={props.onRemoveBg}
                 onErase={props.onErase}
                 onExpand={props.onExpand}
