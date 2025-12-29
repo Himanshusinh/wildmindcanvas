@@ -64,16 +64,16 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
       const ce = e as CustomEvent;
       const { index, hovered } = ce.detail || {};
       if (typeof index !== 'number') return;
-      
-          setHoveredIndices(prev => {
-            const next = new Set(prev);
+
+      setHoveredIndices(prev => {
+        const next = new Set(prev);
         if (hovered) {
           next.add(index);
         } else {
           next.delete(index);
         }
-            return next;
-          });
+        return next;
+      });
     };
 
     window.addEventListener('canvas-image-hover', handleImageHover as any);
@@ -94,17 +94,17 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
         .filter((img) => img.type !== 'model3d' && img.type !== 'text')
         .map((imageData, index) => {
           // Check if this is an uploaded image
-          const isUploaded = 
-            imageData.file || 
+          const isUploaded =
+            imageData.file ||
             (imageData.url && (
-              imageData.url.toLowerCase().startsWith('blob:') || 
+              imageData.url.toLowerCase().startsWith('blob:') ||
               imageData.url.toLowerCase().includes('/input/') ||
               (imageData.url.toLowerCase().includes('upload-') && imageData.url.toLowerCase().includes('zata.ai'))
             ));
 
           // Only show nodes for uploaded images (they should have connection nodes like generation frames)
           if (!isUploaded) return null;
-          
+
           // Debug: Log when nodes should be shown
           // console.log('[CanvasImageConnectionNodes] Rendering nodes for uploaded image:', {
           //   index,
@@ -116,10 +116,10 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
           const actualIndex = images.findIndex(img => img === imageData);
           const isSelected = selectedImageIndices.includes(actualIndex);
           const isHovered = hoveredIndices.has(actualIndex);
-          
+
           // Generate unique ID for connection nodes
           const nodeId = imageData.elementId || `canvas-image-${actualIndex}`;
-          
+
           // Calculate screen position
           const canvasX = imageData.x || 0;
           const canvasY = imageData.y || 0;
@@ -135,7 +135,7 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
           // Use the scale prop for node size (UI scaling)
           const nodeSize = 20 * scale;
           const nodeOffset = 12 * scale;
-          
+
           const shouldShowNodes = isSelected || globalDragActive || isHovered;
 
           return (
@@ -158,10 +158,10 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   try {
                     const active: any = (window as any).__canvas_active_capture;
                     if (active?.element && typeof active?.pid === 'number') {
-                      try { active.element.releasePointerCapture(active.pid); } catch (err) {}
+                      try { active.element.releasePointerCapture(active.pid); } catch (err) { }
                       delete (window as any).__canvas_active_capture;
                     }
-                  } catch (err) {}
+                  } catch (err) { }
                 }}
                 style={{
                   position: 'fixed',
@@ -189,8 +189,8 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                 onPointerDown={(e: React.PointerEvent) => {
                   const el = e.currentTarget as HTMLElement;
                   const pid = e.pointerId;
-                  try { el.setPointerCapture?.(pid); } catch (err) {}
-                  try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) {}
+                  try { el.setPointerCapture?.(pid); } catch (err) { }
+                  try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) { }
                   e.stopPropagation();
                   e.preventDefault();
                   const color = '#437eb5';
@@ -215,8 +215,8 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   };
 
                   const handlePointerUp = (pe: any) => {
-                    try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
-                    try { delete (window as any).__canvas_active_capture; } catch (err) {}
+                    try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) { }
+                    try { delete (window as any).__canvas_active_capture; } catch (err) { }
                     window.removeEventListener('canvas-node-complete', handleComplete as any);
                     window.removeEventListener('pointerup', handlePointerUp as any);
                     window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -224,8 +224,8 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   };
 
                   const handleComplete = () => {
-                    try { el.releasePointerCapture?.(pid); } catch (err) {}
-                    try { delete (window as any).__canvas_active_capture; } catch (err) {}
+                    try { el.releasePointerCapture?.(pid); } catch (err) { }
+                    try { delete (window as any).__canvas_active_capture; } catch (err) { }
                     window.removeEventListener('canvas-node-complete', handleComplete as any);
                     window.removeEventListener('pointerup', handlePointerUp as any);
                     window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -250,7 +250,7 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
                   cursor: 'grab',
                   border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
-                  zIndex: 10,
+                  zIndex: 5000,
                   opacity: shouldShowNodes ? 1 : 0,
                   transition: 'opacity 0.18s ease',
                   pointerEvents: 'auto',

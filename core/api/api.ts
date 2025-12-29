@@ -1870,13 +1870,14 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
 export interface MediaItem {
   id: string;
   url: string;
-  type: 'image' | 'video' | 'music' | 'uploaded';
+  type: 'image' | 'video' | 'music' | 'uploaded' | 'plugin';
   thumbnail?: string;
   prompt?: string;
   model?: string;
   createdAt?: string;
   storagePath?: string;
   mediaId?: string;
+  plugin?: { id: string; name: string; icon?: string };
 }
 
 export interface MediaLibraryResponse {

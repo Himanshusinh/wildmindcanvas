@@ -67,7 +67,7 @@ export const CanvasTextControls: React.FC<CanvasTextControlsProps> = ({
     const baseSelectMinWidth = 90;
     const baseBorderRadius = 8;
     const baseBorderWidth = 1;
-    
+
     // Apply DIRECT scaling: controls scale with canvas zoom
     // When zoomed out (scale < 1), controls get smaller
     // When zoomed in (scale > 1), controls get larger
@@ -78,14 +78,14 @@ export const CanvasTextControls: React.FC<CanvasTextControlsProps> = ({
     const iconSize = Math.max(10, Math.min(22, baseIconSize * scale));
     const inputWidth = Math.max(30, Math.min(65, baseInputWidth * scale));
     const selectMinWidth = Math.max(60, Math.min(130, baseSelectMinWidth * scale));
-    
+
     // Calculate top offset: fixed 4px spacing above text border, scaled with zoom
     // This creates a floating effect - controls appear 4px above the text border
     const baseSpacingFromText = 20; // Fixed 4px spacing from text border
     const spacingFromText = baseSpacingFromText * scale;
     const controlsHeight = (scaledPadding * 2) + (scaledFontSize * 1.5); // Approximate controls height
     const topOffset = controlsHeight + spacingFromText;
-    
+
     const borderRadius = Math.max(4, Math.min(14, baseBorderRadius * scale));
     const borderWidth = Math.max(0.5, Math.min(2, baseBorderWidth * scale));
 

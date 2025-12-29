@@ -24,6 +24,7 @@ import { CompareModalState } from './types';
 import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
 import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
 import { ComponentCreationMenu } from './ComponentCreationMenu';
+import { CanvasTextOverlays } from './CanvasTextOverlays';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   textInputStates,
@@ -278,6 +279,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         viewportUpdateKey={viewportUpdateKey}
       />
 
+      {/* TextInputOverlays restored for AI Text functionality */}
       <TextInputOverlays
         textInputStates={textInputStates}
         selectedTextInputId={selectedTextInputId}
@@ -584,6 +586,24 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scale={scale}
         position={position}
         clearAllSelections={clearAllSelections}
+      />
+
+      <CanvasTextOverlays
+        canvasTextStates={canvasTextStates ?? []}
+        selectedCanvasTextId={selectedCanvasTextId ?? null}
+        onSelect={(id) => {
+          clearAllSelections();
+          if (setSelectedCanvasTextId) setSelectedCanvasTextId(id);
+          if (setSelectedCanvasTextIds) setSelectedCanvasTextIds([id]);
+        }}
+        onUpdate={(id, updates) => {
+          if (onPersistCanvasTextMove) onPersistCanvasTextMove(id, updates);
+        }}
+        onDelete={(id) => {
+          if (onPersistCanvasTextDelete) onPersistCanvasTextDelete(id);
+        }}
+        scale={scale}
+        position={position}
       />
 
       <ComponentCreationMenu

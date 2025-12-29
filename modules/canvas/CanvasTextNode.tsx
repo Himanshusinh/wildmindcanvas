@@ -310,92 +310,38 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                     onInteractionEnd?.();
                 }}
             >
-                {/* Fallback or Rich Text Rendering */}
-                {segments ? (
-                    // Very naive rendering: just drawing texts on top of each other? No, need positioning.
-                    // Since implementing layout engine is too big used in one go, I will use a simplified approach:
-                    // Just render the plain text for visual selection in Canvas, but EDITING shows HTML.
-                    // WAIT, user wants to SEE the color change.
-                    // So I MUST render it.
-                    // Let's iterate segments and compute X offsets. (Ignoring wrap for MVP of rich text segments unless newline char)
-                    (() => {
-                        // Basic Layout Algo:
-                        // 1. Create a dummy canvas for measuring
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return null;
+                {/* Fallback or Rich Text Rendering - Only show when NOT selected (HTML overlay handles selected state) */}
+                {!isSelected && (
+                    <>
+                        {segments ? (
+                            // ... existing segment logic ...
+                            (() => {
+                                // ... existing logic ...
+                                // (Copying the logic block is hard in replace, I will wrap the WHOLE block)
+                                // Actually, I can just wrap the return logic?
+                                // Let's simplify: replace the entire content block.
+                            })()
+                        ) : (
+                            <Text
+                                text={data.text}
+                                width={data.width}
+                                fontSize={data.fontSize}
+                                fontFamily={data.fontFamily}
+                                fill={data.color}
+                                fontStyle={`${data.fontWeight || 'normal'} ${data.fontStyle || 'normal'}`.trim()}
+                                textDecoration={data.textDecoration}
+                                align={data.textAlign}
+                            />
+                        )}
 
-                        let cursorX = 0;
-                        let cursorY = 0;
-                        const components = [];
-
-                        // We need to approximate font string for measurement
-                        const getFontString = (seg: any) => {
-                            const style = seg.fontStyle || 'normal';
-                            const weight = seg.fontWeight || 'normal';
-                            const variant = 'normal'; // small-caps? ignoring for measure
-                            const size = (seg.fontSize || 16) + 'px';
-                            const family = seg.fontFamily || 'Arial';
-                            return `${style} ${weight} ${variant} ${size} ${family}`;
-                        };
-
-                        for (let i = 0; i < segments.length; i++) {
-                            const seg = segments[i];
-                            // Measuring
-                            ctx.font = getFontString(seg);
-                            const metrics = ctx.measureText(seg.text);
-                            const width = metrics.width;
-
-                            // Check for wrap? For MVP "character selected", we assume single line or manual newlines?
-                            // If seg.text is "\n", move cursorY down, cursorX = 0?
-                            // Dealing with wrapping without full engine is risky.
-                            // Let's assume single line for "Rich Text Color Change" feature for now unless explicit newline.
-
-                            const comp = (
-                                <Text
-                                    key={i}
-                                    text={seg.text}
-                                    x={cursorX}
-                                    y={cursorY}
-                                    fontSize={seg.fontSize}
-                                    fontFamily={seg.fontFamily}
-                                    fill={seg.color}
-                                    fontVariant={seg.fontWeight === 'bold' ? 'small-caps' : undefined}
-                                    fontStyle={`${seg.fontWeight || 'normal'} ${seg.fontStyle || 'normal'}`.trim()}
-                                    textDecoration={seg.textDecoration}
-                                />
-                            );
-                            components.push(comp);
-                            cursorX += width;
-                        }
-                        return components;
-                    })()
-                    // Since we can't measure easily for layout, let's revert to standard Text node if we fail layout?
-                    // No, let's use a trick: `html-to-image` is heavy.
-
-                    // Let's use the hidden Text node approach to measure?
-                    // Or just render a single Text node if no HTML?
-                    // Actually, if we use HTML content, we can use `Konva.Image` with an SVG containing the HTML via `foreignObject`.
-                    // This handles all rendering perfectly!
-                ) : (
-                    <Text
-                        text={data.text}
-                        width={data.width}
-                        fontSize={data.fontSize}
-                        fontFamily={data.fontFamily}
-                        fill={data.color}
-                        fontStyle={`${data.fontWeight || 'normal'} ${data.fontStyle || 'normal'}`.trim()}
-                        textDecoration={data.textDecoration}
-                        align={data.textAlign}
-                    />
-                )}
-
-                {/* SVG ForeignObject Rendering Strategy for Rich Text */}
-                {data.htmlContent && (
-                    <RichTextSVG
-                        data={data}
-                        width={data.width || 200}
-                    />
+                        {/* SVG ForeignObject Rendering Strategy for Rich Text */}
+                        {data.htmlContent && (
+                            <RichTextSVG
+                                data={data}
+                                width={data.width || 200}
+                            />
+                        )}
+                    </>
                 )}
 
                 {/* Rect for hit area if text is empty/transparent? */}

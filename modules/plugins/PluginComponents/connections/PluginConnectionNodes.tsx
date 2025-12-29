@@ -51,10 +51,10 @@ export function PluginConnectionNodes(props: {
           try {
             const active: any = (window as any).__canvas_active_capture;
             if (active?.element && typeof active?.pid === 'number') {
-              try { active.element.releasePointerCapture(active.pid); } catch {}
+              try { active.element.releasePointerCapture(active.pid); } catch { }
               delete (window as any).__canvas_active_capture;
             }
-          } catch {}
+          } catch { }
         }}
         style={{
           position: 'absolute',
@@ -84,8 +84,8 @@ export function PluginConnectionNodes(props: {
         onPointerDown={(e: React.PointerEvent) => {
           const el = e.currentTarget as HTMLElement;
           const pid = e.pointerId;
-          try { el.setPointerCapture?.(pid); } catch {}
-          try { (window as any).__canvas_active_capture = { element: el, pid }; } catch {}
+          try { el.setPointerCapture?.(pid); } catch { }
+          try { (window as any).__canvas_active_capture = { element: el, pid }; } catch { }
           if (!id) return;
           e.stopPropagation();
           e.preventDefault();
@@ -111,8 +111,8 @@ export function PluginConnectionNodes(props: {
           };
 
           const cleanup = (pe?: any) => {
-            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch {}
-            try { delete (window as any).__canvas_active_capture; } catch {}
+            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch { }
+            try { delete (window as any).__canvas_active_capture; } catch { }
             window.removeEventListener('canvas-node-complete', handleComplete as any);
             window.removeEventListener('pointerup', handlePointerUp as any);
             window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -138,7 +138,7 @@ export function PluginConnectionNodes(props: {
           backgroundColor: nodeColor,
           cursor: 'grab',
           border: `${2.5 * scale}px solid ${nodeBorder}`,
-          zIndex: 10,
+          zIndex: 5000,
           opacity: nodeOpacity,
           transition: 'opacity 0.18s ease',
           pointerEvents: 'auto',

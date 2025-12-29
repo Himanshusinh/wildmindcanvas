@@ -58,7 +58,7 @@ export function useConnectionManager({
   const [componentMenuSearch, setComponentMenuSearch] = useState('');
   const processingConnectionRef = useRef(false);
 
-  const effectiveConnections = connections ?? localConnections;
+  const effectiveConnections = (connections && connections.length > 0) || onConnectionsChange ? connections : localConnections;
 
   const checkConnectionValidity = useCallback((fromId: string, toId: string, toSide?: string): boolean => {
     if (fromId === toId) return false; // Can't connect to self
@@ -66,7 +66,12 @@ export function useConnectionManager({
     const fromType = getComponentType(fromId);
     const toType = getComponentType(toId);
 
-    if (!fromType || !toType) return false;
+    console.log('[useConnectionManager] checkConnectionValidity', { fromId, toId, fromType, toType, toSide });
+
+    if (!fromType || !toType) {
+      console.warn('[useConnectionManager] Missing component type', { fromType, toType });
+      return false;
+    }
 
     // Storyboard specific validation
     if (toType === 'storyboard') {
@@ -144,6 +149,7 @@ export function useConnectionManager({
     const handleStart = (e: Event) => {
       const ce = e as CustomEvent;
       const { id, side, color, startX, startY } = ce.detail || {};
+      console.log('[useConnectionManager] handleStart', { id, side, color, startX, startY });
       if (side !== 'send') return; // only start from send side
       setActiveDrag({ from: id, color, startX, startY, currentX: startX, currentY: startY });
       // Notify nodes that a drag has started so they can remain visible
@@ -156,11 +162,13 @@ export function useConnectionManager({
     const handleComplete = (e: Event) => {
       const ce = e as CustomEvent;
       const { id, side } = ce.detail || {};
+      console.log('[useConnectionManager] handleComplete', { id, side, activeDragFrom: activeDrag?.from });
       if (!activeDrag) {
-        // If activeDrag is null, connection might have been handled already
+        console.warn('[useConnectionManager] handleComplete: no activeDrag');
         return;
       }
       if (!side || !side.startsWith('receive')) {
+        console.warn('[useConnectionManager] handleComplete: invalid side', side);
         return;
       }
       if (id === activeDrag.from) { // ignore self
@@ -217,11 +225,13 @@ export function useConnectionManager({
       };
 
       if (!fromType || !toType || !allowedMap[fromType] || !allowedMap[fromType].includes(toType)) {
+        console.warn('[useConnectionManager] handleComplete: connection not allowed', { fromType, toType, allowed: fromType ? allowedMap[fromType] : 'none' });
         // Not an allowed connection — cancel drag and exit without creating it
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;
       }
+      console.log('[useConnectionManager] handleComplete: connection allowed', { fromType, toType });
 
       // Use the same logic as ImageUploadModal to determine if it's media
       const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
@@ -576,8 +586,10 @@ export function useConnectionManager({
 
       // If we found a nearby receive node, try to connect to it
       if (nearestNode && nearestNode.id !== activeDrag.from) {
+        console.log('[useConnectionManager] handleUp: found nearestNode', nearestNode);
         // Use the same validation logic as handleComplete
         const isValid = checkConnectionValidity(activeDrag.from, nearestNode.id, nearestNode.side);
+        console.log('[useConnectionManager] handleUp: validation', { isValid });
 
         if (isValid) {
           // Manually trigger the connection by dispatching canvas-node-complete

@@ -23,6 +23,7 @@ export interface CanvasHistoryState {
     vectorizeModalStates: any[];
     nextSceneModalStates: any[];
     videoEditorModalStates: any[];
+    storyWorldStates: any[];
 }
 
 export const useCanvasHistory = (

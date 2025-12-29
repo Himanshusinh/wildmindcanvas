@@ -90,12 +90,17 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
       {generatedImageUrl ? (
         <img
           src={(() => {
-            // Use AVIF format for canvas display performance
+            // Use proxy to ensure CORS success for all external images
+            const { buildProxyThumbnailUrl, buildProxyResourceUrl } = require('@/core/api/proxyUtils');
+            if (generatedImageUrl.startsWith('blob:') || generatedImageUrl.startsWith('data:') || generatedImageUrl.includes('/api/proxy/')) {
+              return generatedImageUrl;
+            }
+            // For Zata URLs, use thumbnail proxy with AVIF format for optimized display
             if (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')) {
-              const { buildProxyThumbnailUrl } = require('@/core/api/proxyUtils');
               return buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif');
             }
-            return generatedImageUrl;
+            // For other external URLs, use resource proxy to ensure CORS headers
+            return buildProxyResourceUrl(generatedImageUrl);
           })()}
           alt="Generated"
           style={{

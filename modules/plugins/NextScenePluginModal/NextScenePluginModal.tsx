@@ -125,20 +125,34 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   const [trueGuidanceScale, setTrueGuidanceScale] = useState<number>(0);
   const [resolution, setResolution] = useState<'1K' | '2K' | '4K'>('2K'); // Multi-angle resolution
   const [multiangleModel, setMultiangleModel] = useState<string>('Google nano banana pro'); // Multi-angle model
+  const [category, setCategory] = useState<string>('human'); // Category state for multiangle
 
   const onOptionsChangeRef = useLatestRef(onOptionsChange);
 
-  // Multi-angle shot prompts
-  const MULTIANGLE_SHOT_PROMPTS = [
-    { shot: 1, type: 'Establishing Shot', prompt: 'Wide angle, full body shot, showing the character in the environment, cinematic scale.' },
-    { shot: 2, type: 'Medium Shot', prompt: 'Waist-up framing, natural pose, eye-level camera, balanced composition.' },
-    { shot: 3, type: 'Close-up', prompt: 'Head and shoulders portrait, shallow depth of field, sharp focus on facial details.' },
-    { shot: 4, type: '180° Shift', prompt: 'View from behind the subject, looking away from camera, showing back of clothing and hair.' },
-    { shot: 5, type: 'Low Angle', prompt: 'Worm\'s-eye view looking up at the subject, making them appear heroic and powerful.' },
-    { shot: 6, type: 'High Angle', prompt: 'Bird\'s-eye view looking down from above, showing the subject and the floor/ground.' },
-    { shot: 7, type: '3/4 Profile', prompt: 'Subject turned at a 45-degree angle, highlighting facial contours and side profile.' },
-    { shot: 8, type: 'OTS Shot', prompt: 'Exact same character, standing in profile view from the side, clear silhouette, cinematic lighting, maintaining all clothing and facial details.' },
-    { shot: 9, type: 'Extreme Close-up', prompt: 'Extreme close-up of the subject\'s face, focusing on the eyes and skin texture, maintaining identical features and lighting from the original image, bokeh background.' },
+  // Multi-angle prompt templates for human and product
+  const HUMAN_BASE = `Maintain perfect consistency with the person in the input image — same face identity, hairstyle, clothing, skin tone, accessories, and body proportions. Do NOT modify or beautify the person. The only change should be camera angle. High-resolution photorealistic output.`;
+  const HUMAN_ANGLES = [
+    'Generate a straight front-facing portrait of the person, eye-level camera, full clarity of facial features.',
+    'Show the person from a 45° front-left angle, revealing face + left side slightly rotated.',
+    'Generate the person from a 45° front-right perspective, natural rotation with visibility of front and right side.',
+    'Produce a clean left-side profile (pure side angle), only left silhouette and features visible.',
+    'Generate a pure right-side profile view, showing full right body/face outline.',
+    'Show the person from 45° back-left angle, back visible with slight left side exposure.',
+    'Generate a 45° back-right perspective, showing back and partial right view.',
+    'Produce a direct back-facing view of the person, full back detail visible.',
+    'Generate a slightly top-down camera angle of the person, head/upper body visible, perspective from above.'
+  ];
+  const PRODUCT_BASE = `Maintain perfect consistency with the product in the input image — same shape, geometry, material, texture, branding, labels, colors, proportions, and design. Do NOT redesign or add new elements. Only the camera angle should change. High-quality product photography style.`;
+  const PRODUCT_ANGLES = [
+    'Generate a front-facing view of the product, centered, eye-level camera.',
+    'Show the product from a 45° front-left angle, revealing front and left surfaces.',
+    'Generate the product from a 45° front-right angle, showing both front and right sides naturally.',
+    'Produce a pure left-side view of the product with no front surface visible.',
+    'Generate a pure right-side profile of the product with only right surface visible.',
+    'Generate a 45° back-left angle view, rear surface visible along with a bit of left side.',
+    'Show a 45° back-right perspective, displaying back area and partial right surface.',
+    'Produce a direct rear-facing view, full backside of the product visible.',
+    'Generate a top-down camera angle, product visible from above with dimensional depth.'
   ];
 
   // Convert canvas coordinates to screen coordinates
@@ -264,6 +278,16 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
     if (onOptionsChange) {
       onOptionsChange({ isProcessing: true } as any);
     }
+
+    // Determine prompts based on category
+    const isHuman = category === 'human';
+    const basePrompt = isHuman ? HUMAN_BASE : PRODUCT_BASE;
+    const angles = isHuman ? HUMAN_ANGLES : PRODUCT_ANGLES;
+
+    const MULTIANGLE_SHOT_PROMPTS = angles.map((angleText, index) => ({
+      shot: `Angle ${index + 1}`,
+      prompt: `${basePrompt}\n\n${angleText}\n\nReference image attached.`
+    }));
 
     // Handle multi-angle mode - generate 9 different shots
     if (mode === 'multiangle') {
@@ -741,7 +765,6 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
                 trueGuidanceScale={trueGuidanceScale}
                 onTrueGuidanceScaleChange={(val) => {
                   setTrueGuidanceScale(val);
-                  // if (onOptionsChange) onOptionsChange({ trueGuidanceScale: val } as any); // If we add it to interface later
                 }}
                 resolution={resolution}
                 onResolutionChange={(val) => {
@@ -750,6 +773,11 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
                 model={multiangleModel}
                 onModelChange={(val) => {
                   setMultiangleModel(val);
+                }}
+                category={category}
+                onCategoryChange={(val) => {
+                  setCategory(val);
+                  if (onOptionsChange) onOptionsChange({ category: val } as any);
                 }}
               />
               <NextSceneImageFrame

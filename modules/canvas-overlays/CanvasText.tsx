@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CanvasTextState } from './types';
 import { CanvasTextControls } from '@/modules/generators/TextInput/CanvasTextControls';
+import { CanvasTextNodes } from './CanvasTextNodes';
 
 interface CanvasTextProps {
     data: CanvasTextState;
@@ -419,6 +420,8 @@ export const CanvasText: React.FC<CanvasTextProps> = ({
     return (
         <div
             data-canvas-text={data.id}
+            data-modal-component="text"
+            data-overlay-id={data.id}
             style={{
                 position: 'absolute',
                 top: `${top}px`,
@@ -434,33 +437,12 @@ export const CanvasText: React.FC<CanvasTextProps> = ({
             }}
             onMouseDown={handleMouseDown}
         >
-            {/* Controls when selected */}
-            {isSelected && (
+            {/* Controls removed as per request - no formatting toolbar */}
+            {/* {isSelected && (
                 <CanvasTextControls
-                    fontSize={data.fontSize}
-                    fontWeight={data.fontWeight}
-                    fontStyle={data.fontStyle || 'normal'}
-                    fontFamily={data.fontFamily || 'Inter, sans-serif'}
-                    onFontSizeChange={(v) => onUpdate(data.id, { fontSize: v })}
-                    onFontWeightChange={(v) => onUpdate(data.id, { fontWeight: v })}
-                    onFontStyleChange={(v) => onUpdate(data.id, { fontStyle: v })}
-                    onFontFamilyChange={(v) => onUpdate(data.id, { fontFamily: v })}
-                    onMoveStart={(e) => {
-                        // Start dragging when move button is clicked
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setIsDragging(true);
-                        dragStartRef.current = {
-                            x: e.clientX,
-                            y: e.clientY,
-                            initialX: data.x,
-                            initialY: data.y,
-                        };
-                    }}
-                    onDelete={() => onDelete(data.id)}
-                    scale={scale}
+                   ...
                 />
-            )}
+            )} */}
 
             {/* Editable text content */}
             <div
@@ -537,7 +519,7 @@ export const CanvasText: React.FC<CanvasTextProps> = ({
                     padding: '8px',
                     whiteSpace: 'pre-wrap',
                     cursor: 'text',
-                    border: isSelected ? '1px solid #437eb5' : 'none',
+                    border: 'none',
                     background: 'transparent',
                     borderRadius: '4px',
                     minHeight: '24px',
@@ -554,53 +536,17 @@ export const CanvasText: React.FC<CanvasTextProps> = ({
             {/* Resize handles - only show when selected */}
             {isSelected && (
                 <>
-                    {/* Side handles - box-only resizing (text wraps, no font size change) */}
-                    {/* Left handle */}
-                    <div
-                        className="resize-handle resize-handle-side"
-                        style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '-6px',
-                            transform: 'translateY(-50%)',
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: '#60a5fa',
-                            border: '2px solid #ffffff',
-                            borderRadius: '2px',
-                            cursor: 'ew-resize',
-                            zIndex: 10001,
-                            pointerEvents: 'auto',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                        }}
-                        onMouseDown={(e) => handleResizeStart(e, 'w')}
-                        title="Drag to adjust box width (text wraps)"
-                    />
-                    {/* Right handle */}
-                    <div
-                        className="resize-handle resize-handle-side"
-                        style={{
-                            position: 'absolute',
-                            top: '50%',
-                            right: '-6px',
-                            transform: 'translateY(-50%)',
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: '#60a5fa',
-                            border: '2px solid #ffffff',
-                            borderRadius: '2px',
-                            cursor: 'ew-resize',
-                            zIndex: 10001,
-                            pointerEvents: 'auto',
-                            userSelect: 'none',
-                            WebkitUserSelect: 'none',
-                        }}
-                        onMouseDown={(e) => handleResizeStart(e, 'e')}
-                        title="Drag to adjust box width (text wraps)"
-                    />
+                    {/* Side handles removed - only using corner squares from CanvasTextNodes */}
                 </>
             )}
+
+            {/* Connection Nodes removed as per request */}
+            {/* <CanvasTextNodes
+                id={data.id}
+                scale={scale}
+                isHovered={isSelected}
+                isSelected={isSelected}
+            /> */}
         </div>
     );
 };

@@ -93,7 +93,11 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   // Use proxy URL for Zata URLs to avoid CORS issues
   const getImageUrl = (originalUrl: string): string => {
     // For blob URLs, use directly
-    if (originalUrl.startsWith('blob:')) {
+    if (originalUrl.startsWith('blob:') || originalUrl.startsWith('data:')) {
+      return originalUrl;
+    }
+    // If already proxied, use directly
+    if (originalUrl.includes('/api/proxy/')) {
       return originalUrl;
     }
     // For Zata URLs, use proxy route with AVIF conversion for canvas display
@@ -103,8 +107,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       // Use high quality (85) and large width (2048) to maintain quality while getting AVIF benefits
       return buildProxyThumbnailUrl(originalUrl, 2048, 85, 'avif');
     }
-    // For other URLs, use directly
-    return originalUrl;
+    // For other external URLs, use resource proxy to ensure CORS headers
+    return buildProxyResourceUrl(originalUrl);
   };
 
   const url = getImageUrl(imageData.url); // Type narrowing

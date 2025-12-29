@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useProfile } from '@/modules/ui-global/Profile/useProfile';
 
 interface Props {
@@ -10,9 +10,27 @@ interface Props {
 }
 
 const AvatarButton: React.FC<Props> = ({ scale = 1, onClick, isHidden = false }) => {
-  const { userData, loading, avatarFailed, setAvatarFailed, handleAccountSettings } = useProfile() as any;
+  const { userData, loading, avatarFailed, setAvatarFailed } = useProfile() as any;
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const avatarUrl = !loading && userData?.photoURL && !avatarFailed ? userData.photoURL : null;
+
+  const s = Math.max(1, scale);
+  const size = 40 * s;
+  const bgColor = isDark ? 'rgba(18, 18, 18, 0.98)' : 'rgba(255,255,255,0.98)';
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(220,220,220,0.9)';
+  const shadowColor = isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.12)';
+  const textColor = isDark ? '#e5e7eb' : '#374151';
 
   return (
     <button
@@ -20,24 +38,25 @@ const AvatarButton: React.FC<Props> = ({ scale = 1, onClick, isHidden = false })
       aria-label="Open profile"
       style={{
         position: 'fixed',
-        left: '16px',
-        bottom: '16px',
+        left: `${16 * s}px`,
+        bottom: `${16 * s}px`,
         zIndex: 9999,
-        width: '40px',
-        height: '40px',
+        width: `${size}px`,
+        height: `${size}px`,
         borderRadius: '50%',
         overflow: 'hidden',
-        border: 'none',
+        border: `${2 * s}px solid ${borderColor}`,
         padding: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'transparent',
+        background: avatarUrl ? 'transparent' : bgColor,
         cursor: 'pointer',
         pointerEvents: isHidden ? 'none' : 'auto',
         opacity: isHidden ? 0 : 1,
         transform: isHidden ? 'translateY(100%)' : 'translateY(0)',
-        transition: 'opacity 0.3s ease, transform 0.3s ease',
+        transition: 'opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+        boxShadow: `0 6px 20px ${shadowColor}`,
       }}
     >
       {avatarUrl ? (
@@ -49,7 +68,9 @@ const AvatarButton: React.FC<Props> = ({ scale = 1, onClick, isHidden = false })
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       ) : (
-        <span style={{ color: '#e5e7eb', fontWeight: 700, fontSize: '16px' }}>{loading ? '…' : ((userData?.username || userData?.email || 'U').charAt(0).toUpperCase())}</span>
+        <span style={{ color: textColor, fontWeight: 700, fontSize: `${16 * s}px` }}>
+          {loading ? '…' : ((userData?.username || userData?.email || 'U').charAt(0).toUpperCase())}
+        </span>
       )}
     </button>
   );

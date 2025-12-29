@@ -1561,13 +1561,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               return;
             }
 
-            // Use proxy URL for consistency with CanvasImage and to avoid CORS issues
-            // This ensures we hit the same cache key as the canvas elements
-            // Use AVIF format for canvas display performance
-            const { buildProxyThumbnailUrl } = require('@/core/api/proxyUtils');
-            const urlToLoad = (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata'))
-              ? buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif')
-              : generatedImageUrl;
+            // Use proxy to ensure CORS success for all external images
+            const { buildProxyThumbnailUrl, buildProxyResourceUrl } = require('@/core/api/proxyUtils');
+
+            let urlToLoad = generatedImageUrl;
+            if (!generatedImageUrl.startsWith('blob:') && !generatedImageUrl.startsWith('data:') && !generatedImageUrl.includes('/api/proxy/')) {
+              if (generatedImageUrl.includes('zata.ai') || generatedImageUrl.includes('zata')) {
+                urlToLoad = buildProxyThumbnailUrl(generatedImageUrl, 2048, 85, 'avif');
+              } else {
+                urlToLoad = buildProxyResourceUrl(generatedImageUrl);
+              }
+            }
 
             imageCache.load(urlToLoad)
               .then((img) => {

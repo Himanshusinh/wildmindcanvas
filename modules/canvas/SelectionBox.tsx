@@ -3,7 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Rect, Group, Text, Transformer, Line } from 'react-konva';
 import Konva from 'konva';
+import { getClientRect } from '@/core/canvas/canvasHelpers';
 import { ImageUpload } from '@/core/types/canvas';
+import { ScriptFrameModalState, SceneFrameModalState } from '@/modules/canvas-overlays/types';
 
 const GRID_GAP = 10; // Minimal gap between components
 const GRID_PADDING = 8; // Minimal equal padding on all sides (left, right, top, bottom)
@@ -84,8 +86,8 @@ interface SelectionBoxProps {
   nextSceneModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   compareModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>;
   storyboardModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  scriptFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
-  sceneFrameModalStates: Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>;
+  scriptFrameModalStates: ScriptFrameModalState[];
+  sceneFrameModalStates: SceneFrameModalState[];
   setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
@@ -95,8 +97,8 @@ interface SelectionBoxProps {
   setNextSceneModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setCompareModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>>>;
   setStoryboardModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setScriptFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
-  setSceneFrameModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth: number; frameHeight: number }>>>;
+  setScriptFrameModalStates: React.Dispatch<React.SetStateAction<ScriptFrameModalState[]>>;
+  setSceneFrameModalStates: React.Dispatch<React.SetStateAction<SceneFrameModalState[]>>;
   setSelectedUpscaleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMultiangleCameraModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -902,10 +904,11 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     let maxY = -Infinity;
 
     targets.forEach((target) => {
-      minX = Math.min(minX, target.to.x);
-      minY = Math.min(minY, target.to.y);
-      maxX = Math.max(maxX, target.to.x + target.width);
-      maxY = Math.max(maxY, target.to.y + target.height);
+      const client = getClientRect({ x: target.to.x, y: target.to.y, width: target.width, height: target.height });
+      minX = Math.min(minX, client.x);
+      minY = Math.min(minY, client.y);
+      maxX = Math.max(maxX, client.x + client.width);
+      maxY = Math.max(maxY, client.y + client.height);
     });
 
     if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {

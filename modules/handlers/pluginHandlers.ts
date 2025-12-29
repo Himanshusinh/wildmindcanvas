@@ -889,13 +889,17 @@ export function createPluginHandlers(
         console.log('[onErase] Converting blob URL to data URI for API compatibility');
         imagePayload = await convertBlobUrlToDataUrl(imagePayload);
       }
+      // Use the prompt as provided by the user (or empty string)
+      // The backend will determine if this is an erase (empty) or replace (custom text) operation
+      const finalPrompt = prompt || '';
+
       // Pass composited image as image parameter, mask is optional (can be undefined)
       const result = await eraseImageForCanvas(
         imagePayload, // This is the composited image (original + white mask overlay)
         projectId,
         model,
         mask, // Optional - can be undefined since mask is composited into image
-        prompt
+        finalPrompt
       );
 
       console.log('[onErase] Erase completed:', result);

@@ -58,6 +58,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
+  const [initialViewportCenter, setInitialViewportCenter] = useState<{ x: number; y: number; scale: number } | undefined>(undefined);
   // Keep a local ref of group elements so autosave can include them even though Canvas manages them locally
   const groupsRef = useRef<Record<string, any>>({});
   const [initialGroupContainerStates, setInitialGroupContainerStates] = useState<any[]>([]);
@@ -68,8 +69,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const persistTimerRef = useRef<number | null>(null);
   const currentUser = user;
   const viewportCenterRef = useRef<{ x: number; y: number; scale: number }>({
-    x: 500000, // Center of 1,000,000 x 1,000,000 infinite canvas (where dots are visible)
-    y: 500000,
+    x: 25000, // Center of 50,000 x 50,000 infinite canvas
+    y: 25000,
     scale: 1,
   });
 
@@ -127,8 +128,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
       snapshotLoadedRef.current = false;
       // Reset viewport to center
       viewportCenterRef.current = {
-        x: 500000,
-        y: 500000,
+        x: 25000,
+        y: 25000,
         scale: 1,
       };
 
@@ -165,6 +166,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const elements = op.data as Record<string, any>;
         const metadata = (op.data as any).metadata || {};
         const isV1_1 = metadata.version === '1.1' || parseFloat(metadata.version) >= 1.1;
+
+        if (metadata.viewport) {
+          console.log('[Snapshot] Restoring viewport from metadata:', metadata.viewport);
+          setInitialViewportCenter(metadata.viewport);
+          viewportCenterRef.current = metadata.viewport;
+        }
 
         const newImages: ImageUpload[] = [];
         const newImageGenerators: ImageModalState[] = [];
@@ -831,7 +838,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           generationQueue,
           compareGenerators,
         });
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
       } catch (e) {
         console.warn('Failed to persist snapshot after connector removals', e);
       }
@@ -1073,7 +1080,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             elements[gid] = groupsRef.current[gid];
           });
         }
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
@@ -2065,8 +2072,165 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
   };
 
+  const handlePluginCreation = async (pluginId: string, x?: number, y?: number) => {
+    const viewportCenter = viewportCenterRef.current;
+    const modalX = x !== undefined ? x : viewportCenter.x;
+    const modalY = y !== undefined ? y : viewportCenter.y;
+
+    if (pluginId === 'video-editor') {
+      const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await pluginHandlers.onPersistVideoEditorModalCreate({ id: modalId, x: modalX, y: modalY });
+    } else if (pluginId === 'upscale') {
+      const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newUpscale = {
+        id: modalId, x: modalX, y: modalY,
+        upscaledImageUrl: null, sourceImageUrl: null, localUpscaledImageUrl: null,
+        model: 'Crystal Upscaler', scale: 2, frameWidth: 400, frameHeight: 500, isUpscaling: false,
+      };
+      setUpscaleGenerators(prev => [...prev.filter(m => m.id !== modalId), newUpscale]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newUpscale, type: 'upscale' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'upscale-plugin', x: modalX, y: modalY, meta: { ...newUpscale, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'multiangle-camera') {
+      const modalId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await pluginHandlers.onPersistMultiangleCameraModalCreate({ id: modalId, x: modalX, y: modalY, sourceImageUrl: null });
+    } else if (pluginId === 'compare') {
+      const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newCompare = { id: modalId, x: modalX, y: modalY, width: 600, height: 400, scale: 1 };
+      setCompareGenerators(prev => [...prev.filter(m => m.id !== modalId), newCompare]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newCompare, type: 'compare', prompt: '', model: 'base' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'compare-plugin', x: modalX, y: modalY, width: 600, height: 400, meta: { scale: 1, prompt: '', model: 'base' } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'vectorize') {
+      const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newVectorize = {
+        id: modalId, x: modalX, y: modalY,
+        vectorizedImageUrl: null, sourceImageUrl: null, localVectorizedImageUrl: null,
+        mode: 'Detailed', frameWidth: 400, frameHeight: 500, isVectorizing: false,
+      };
+      setVectorizeGenerators(prev => [...prev.filter(m => m.id !== modalId), newVectorize]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newVectorize, type: 'vectorize', mode: 'simple' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'vectorize-plugin', x: modalX, y: modalY, meta: { ...newVectorize, id: undefined, x: undefined, y: undefined, mode: 'simple' } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'storyboard') {
+      const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newStoryboard = { id: modalId, x: modalX, y: modalY, frameWidth: 400, frameHeight: 500, scriptText: null };
+      setStoryboardGenerators(prev => [...prev.filter(m => m.id !== modalId), newStoryboard]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newStoryboard, type: 'storyboard' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'storyboard-plugin', x: modalX, y: modalY, meta: { frameWidth: 400, frameHeight: 500, scriptText: null } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'removebg') {
+      const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newRemoveBg = {
+        id: modalId, x: modalX, y: modalY,
+        removedBgImageUrl: null, sourceImageUrl: null, localRemovedBgImageUrl: null,
+        model: '851-labs/background-remover', backgroundType: 'rgba (transparent)', scaleValue: 0.5,
+        frameWidth: 400, frameHeight: 500, isRemovingBg: false,
+      };
+      setRemoveBgGenerators(prev => [...prev.filter(m => m.id !== modalId), newRemoveBg]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newRemoveBg, type: 'removebg' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'removebg-plugin', x: modalX, y: modalY, meta: { ...newRemoveBg, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'erase') {
+      const modalId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newErase = {
+        id: modalId, x: modalX, y: modalY,
+        erasedImageUrl: null, sourceImageUrl: null, localErasedImageUrl: null,
+        model: 'bria/eraser', frameWidth: 400, frameHeight: 500, isErasing: false,
+      };
+      setEraseGenerators(prev => [...prev.filter(m => m.id !== modalId), newErase]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newErase, type: 'erase' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'erase-plugin', x: modalX, y: modalY, meta: { ...newErase, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'expand') {
+      const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newExpand = {
+        id: modalId, x: modalX, y: modalY,
+        expandedImageUrl: null, sourceImageUrl: null, localExpandedImageUrl: null,
+        model: 'expand/base', frameWidth: 400, frameHeight: 500, isExpanding: false,
+      };
+      setExpandGenerators(prev => [...prev.filter(m => m.id !== modalId), newExpand]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newExpand, type: 'expand' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'expand-plugin', x: modalX, y: modalY, meta: { ...newExpand, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+    } else if (pluginId === 'next-scene') {
+      const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newNextScene = {
+        id: modalId, x: modalX, y: modalY,
+        nextSceneImageUrl: null, sourceImageUrl: null, localNextSceneImageUrl: null,
+        mode: 'scene', frameWidth: 400, frameHeight: 500, isProcessing: false,
+      };
+      setNextSceneGenerators(prev => [...prev.filter(m => m.id !== modalId), newNextScene]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newNextScene, type: 'next-scene-plugin' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'next-scene-plugin', x: modalX, y: modalY, meta: { ...newNextScene, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
+      await pluginHandlers.onPersistNextSceneModalCreate(newNextScene);
+    }
+  };
+
   const addMediaToCanvas = (media: MediaItem, x?: number, y?: number) => {
     const mediaUrl = media.url || media.thumbnail || '';
+
+    if (media.type === 'plugin' && media.plugin) {
+      handlePluginCreation(media.plugin.id, x, y);
+      return;
+    }
 
     // Determine media type
     let mediaType: 'image' | 'video' | 'text' = 'image';
@@ -2078,8 +2242,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     // For images, create an ImageUploadModal frame instead of directly adding to canvas
     if (mediaType === 'image') {
-      // Use proxy URL if needed (for Zata URLs) - buildProxyResourceUrl is already imported
-      const imageUrl = (mediaUrl.includes('zata.ai') || mediaUrl.includes('zata'))
+      const imageUrl = (mediaUrl.startsWith('http') && !mediaUrl.includes('/api/proxy/'))
         ? buildProxyResourceUrl(mediaUrl)
         : mediaUrl;
 
@@ -2400,6 +2563,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               key={projectId}
               isUIHidden={isUIHidden}
               initialGroupContainerStates={initialGroupContainerStates}
+              initialCenter={initialViewportCenter ? { x: initialViewportCenter.x, y: initialViewportCenter.y } : undefined}
+              initialScale={initialViewportCenter?.scale}
               images={images}
               setImages={setImages}
               onViewportChange={handleViewportChange}
@@ -2504,7 +2669,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         generationQueue,
                         compareGenerators,
                       });
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Connector] apiSetCurrentSnapshot success', { projectId, ssRes });
                     } catch (e) {
                       console.warn('[Connector] Failed to persist snapshot after connector create', e);
@@ -2550,7 +2715,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         generationQueue,
                         compareGenerators,
                       });
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Connector] apiSetCurrentSnapshot success after delete', { projectId, ssRes });
                     } catch (e) { console.warn('[Connector] Failed to persist snapshot after connector delete', e); }
                   } catch (e) {
@@ -2603,7 +2768,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Inject the group element into the elements map
                       elements[group.id] = elementPayload;
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Group] apiSetCurrentSnapshot success (create)', { projectId, ssRes });
                       // Keep a local copy so autosave includes groups
                       groupsRef.current[group.id] = elementPayload;
@@ -2653,7 +2818,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Merge/replace the group element in the snapshot
                       elements[id] = { id, type: 'group', x: (updates as any).x ?? prev?.x, y: (updates as any).y ?? prev?.y, width: (updates as any).width ?? prev?.width, height: (updates as any).height ?? prev?.height, padding: (updates as any).padding ?? prev?.padding, children: (updates as any).children ?? prev?.children ?? [], meta: { name: (updates as any).meta?.name ?? prev?.meta?.name ?? 'Group', createdAt: (updates as any).meta?.createdAt ?? prev?.meta?.createdAt } };
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Group] apiSetCurrentSnapshot success (update)', { projectId, ssRes });
                       // Update local copy used for autosave
                       groupsRef.current[id] = elements[id];
@@ -2697,7 +2862,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       });
                       // Ensure group is not present in snapshot (don't inject it)
                       if (elements[group.id]) delete elements[group.id];
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1' } });
+                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Group] apiSetCurrentSnapshot success (delete)', { projectId, ssRes });
                       // Remove from local cache so autosave won't re-insert
                       if (groupsRef.current[group.id]) delete groupsRef.current[group.id];
@@ -3016,680 +3181,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         isOpen={isPluginSidebarOpen}
         onClose={() => setIsPluginSidebarOpen(false)}
         onSelectPlugin={(plugin, x, y) => {
-          if (plugin.id === 'video-editor') {
-            const viewportCenter = viewportCenterRef.current;
-            // Use viewport center or click position (converted)
-            const modalX = viewportCenter.x;
-            const modalY = viewportCenter.y;
-
-            const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newTrigger = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-            };
-
-            // Persist via callback
-            (async () => {
-              await pluginHandlers.onPersistVideoEditorModalCreate(newTrigger);
-            })().catch(console.error);
-            return;
-          }
-          if (plugin.id === 'upscale') {
-            const viewportCenter = viewportCenterRef.current;
-            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
-            // Otherwise use viewport center
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              // Convert screen coordinates to canvas coordinates
-              // We need to get the canvas container position to do this properly
-              // For now, use viewport center as fallback
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              // Use viewport center
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newUpscale = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              upscaledImageUrl: null,
-              sourceImageUrl: null,
-              localUpscaledImageUrl: null,
-              model: 'Crystal Upscaler',
-              scale: 2,
-              frameWidth: 400,
-              frameHeight: 500,
-              isUpscaling: false,
-            };
-            console.log('[Plugin] Creating upscale modal at viewport center:', newUpscale, 'viewportCenter:', viewportCenter);
-            // Persist via callback (this will trigger realtime + ops)
-            // Use the same callback pattern as Canvas component
-            (async () => {
-              // Optimistic update
-              setUpscaleGenerators(prev => {
-                // Check if modal already exists to avoid duplicates
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newUpscale];
-                console.log('[Plugin] Updated upscaleGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create upscale', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'upscale',
-                  x: modalX,
-                  y: modalY,
-                  upscaledImageUrl: null,
-                  sourceImageUrl: null,
-                  localUpscaledImageUrl: null,
-                  model: 'Crystal Upscaler',
-                  scale: 2,
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isUpscaling: false,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'upscale-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        upscaledImageUrl: null,
-                        sourceImageUrl: null,
-                        localUpscaledImageUrl: null,
-                        model: 'Crystal Upscaler',
-                        scale: 2,
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isUpscaling: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-
-          } else if (plugin.id === 'multiangle-camera') {
-            const viewportCenter = viewportCenterRef.current;
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newMultiangleCamera = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              sourceImageUrl: null,
-            };
-            console.log('[Plugin] Creating multiangle camera modal at viewport center:', newMultiangleCamera, 'viewportCenter:', viewportCenter);
-            // Use pluginHandlers for persistence
-            (async () => {
-              await pluginHandlers.onPersistMultiangleCameraModalCreate(newMultiangleCamera);
-            })().catch(console.error);
-
-          } else if (plugin.id === 'compare') {
-            const viewportCenter = viewportCenterRef.current;
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newCompare = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              width: 600,
-              height: 400,
-              scale: 1,
-            };
-            console.log('[Plugin] 1. Creating compare modal at viewport center:', newCompare);
-            (async () => {
-              setCompareGenerators(prev => {
-                const next = [...prev, newCompare];
-                console.log('[Plugin] 2. Setting compareGenerators', next);
-                return next;
-              });
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create compare', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'compare',
-                  x: modalX,
-                  y: modalY,
-                  width: 600,
-                  height: 400,
-                  scale: 1,
-                  prompt: '',
-                  model: 'base'
-                });
-              }
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'compare-plugin',
-                      x: modalX,
-                      y: modalY,
-                      width: 600,
-                      height: 400,
-                      meta: {
-                        scale: 1,
-                        prompt: '',
-                        model: 'base'
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'vectorize') {
-            const viewportCenter = viewportCenterRef.current;
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newVectorize = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              vectorizedImageUrl: null,
-              sourceImageUrl: null,
-              localVectorizedImageUrl: null,
-              mode: 'Detailed',
-              frameWidth: 400,
-              frameHeight: 500,
-              isVectorizing: false,
-            };
-            console.log('[Plugin] Creating vectorize modal at viewport center:', newVectorize, 'viewportCenter:', viewportCenter);
-            // Persist via callback (this will trigger realtime + ops)
-            (async () => {
-              // Optimistic update
-              setVectorizeGenerators(prev => {
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Vectorize modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newVectorize];
-                console.log('[Plugin] Updated vectorizeGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create vectorize', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'vectorize',
-                  x: modalX,
-                  y: modalY,
-                  vectorizedImageUrl: null,
-                  sourceImageUrl: null,
-                  localVectorizedImageUrl: null,
-                  mode: 'simple',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isVectorizing: false,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'vectorize-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        vectorizedImageUrl: null,
-                        sourceImageUrl: null,
-                        localVectorizedImageUrl: null,
-                        mode: 'simple',
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isVectorizing: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'storyboard') {
-            const viewportCenter = viewportCenterRef.current;
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newStoryboard = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              frameWidth: 400,
-              frameHeight: 500,
-              scriptText: null,
-            };
-            console.log('[Plugin] Creating storyboard modal at viewport center:', newStoryboard, 'viewportCenter:', viewportCenter);
-            (async () => {
-              // Optimistic update
-              setStoryboardGenerators(prev => {
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Storyboard modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newStoryboard];
-                console.log('[Plugin] Updated storyboardGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create storyboard', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'storyboard',
-                  x: modalX,
-                  y: modalY,
-                  frameWidth: 400,
-                  frameHeight: 500,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'storyboard-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        scriptText: null,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'removebg') {
-            const viewportCenter = viewportCenterRef.current;
-            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
-            // Otherwise use viewport center
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              // Convert screen coordinates to canvas coordinates
-              // We need to get the canvas container position to do this properly
-              // For now, use viewport center as fallback
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              // Use viewport center
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newRemoveBg = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              removedBgImageUrl: null,
-              sourceImageUrl: null,
-              localRemovedBgImageUrl: null,
-              model: '851-labs/background-remover',
-              backgroundType: 'rgba (transparent)',
-              scaleValue: 0.5,
-              frameWidth: 400,
-              frameHeight: 500,
-              isRemovingBg: false,
-            };
-            console.log('[Plugin] Creating removebg modal at viewport center:', newRemoveBg, 'viewportCenter:', viewportCenter);
-            // Persist via callback (this will trigger realtime + ops)
-            // Use the same callback pattern as Canvas component
-            (async () => {
-              // Optimistic update
-              setRemoveBgGenerators(prev => {
-                // Check if modal already exists to avoid duplicates
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newRemoveBg];
-                console.log('[Plugin] Updated removeBgGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create removebg', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'removebg',
-                  x: modalX,
-                  y: modalY,
-                  removedBgImageUrl: null,
-                  sourceImageUrl: null,
-                  localRemovedBgImageUrl: null,
-                  model: '851-labs/background-remover',
-                  backgroundType: 'rgba (transparent)',
-                  scaleValue: 0.5,
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isRemovingBg: false,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'removebg-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        removedBgImageUrl: null,
-                        sourceImageUrl: null,
-                        localRemovedBgImageUrl: null,
-                        model: '851-labs/background-remover',
-                        backgroundType: 'rgba (transparent)',
-                        scaleValue: 0.5,
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isRemovingBg: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'erase') {
-            const viewportCenter = viewportCenterRef.current;
-            // If x/y are provided (from click), convert screen coordinates to canvas coordinates
-            // Otherwise use viewport center
-            let modalX: number;
-            let modalY: number;
-
-            if (x !== undefined && y !== undefined && x !== 0 && y !== 0) {
-              // Convert screen coordinates to canvas coordinates
-              // We need to get the canvas container position to do this properly
-              // For now, use viewport center as fallback
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            } else {
-              // Use viewport center
-              modalX = viewportCenter.x;
-              modalY = viewportCenter.y;
-            }
-
-            const modalId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newErase = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              erasedImageUrl: null,
-              sourceImageUrl: null,
-              localErasedImageUrl: null,
-              model: 'bria/eraser',
-              frameWidth: 400,
-              frameHeight: 500,
-              isErasing: false,
-            };
-            console.log('[Plugin] Creating erase modal at viewport center:', newErase, 'viewportCenter:', viewportCenter);
-            // Persist via callback (this will trigger realtime + ops)
-            // Use the same callback pattern as Canvas component
-            (async () => {
-              // Optimistic update
-              setEraseGenerators(prev => {
-                // Check if modal already exists to avoid duplicates
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newErase];
-                console.log('[Plugin] Updated eraseGenerators, count:', updated.length);
-                return updated;
-              });
-              // Broadcast via realtime
-              if (realtimeActive) {
-                console.log('[Realtime] broadcast create erase', modalId);
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'erase',
-                  x: modalX,
-                  y: modalY,
-                  erasedImageUrl: null,
-                  sourceImageUrl: null,
-                  localErasedImageUrl: null,
-                  model: 'bria/eraser',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isErasing: false,
-                });
-              }
-              // Always append op for undo/redo and persistence
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'erase-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        erasedImageUrl: null,
-                        sourceImageUrl: null,
-                        localErasedImageUrl: null,
-                        model: 'bria/eraser',
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isErasing: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'expand') {
-            const viewportCenter = viewportCenterRef.current;
-            const modalX = viewportCenter.x;
-            const modalY = viewportCenter.y;
-            const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newExpand = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              expandedImageUrl: null,
-              sourceImageUrl: null,
-              localExpandedImageUrl: null,
-              model: 'expand/base',
-              frameWidth: 400,
-              frameHeight: 500,
-              isExpanding: false,
-            };
-            console.log('[Plugin] Creating expand modal at viewport center:', newExpand);
-            (async () => {
-              setExpandGenerators(prev => {
-                if (prev.some(m => m.id === modalId)) {
-                  console.log('[Plugin] Expand modal already exists, skipping');
-                  return prev;
-                }
-                const updated = [...prev, newExpand];
-                console.log('[Plugin] Updated expandGenerators, count:', updated.length);
-                return updated;
-              });
-              if (realtimeActive) {
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'expand',
-                  x: modalX,
-                  y: modalY,
-                  expandedImageUrl: null,
-                  sourceImageUrl: null,
-                  localExpandedImageUrl: null,
-                  model: 'expand/base',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isExpanding: false,
-                });
-              }
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'expand-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        expandedImageUrl: null,
-                        sourceImageUrl: null,
-                        localExpandedImageUrl: null,
-                        model: 'expand/base',
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isExpanding: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-            })().catch(console.error);
-          } else if (plugin.id === 'next-scene') {
-            const viewportCenter = viewportCenterRef.current;
-            const modalX = viewportCenter.x;
-            const modalY = viewportCenter.y;
-            const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const newNextScene = {
-              id: modalId,
-              x: modalX,
-              y: modalY,
-              nextSceneImageUrl: null,
-              sourceImageUrl: null,
-              localNextSceneImageUrl: null,
-              mode: 'scene',
-              frameWidth: 400,
-              frameHeight: 500,
-              isProcessing: false,
-            };
-            console.log('[Plugin] Creating next-scene modal at viewport center:', newNextScene);
-            (async () => {
-              setNextSceneGenerators(prev => {
-                if (prev.some(m => m.id === modalId)) return prev;
-                return [...prev, newNextScene];
-              });
-              if (realtimeActive) {
-                realtimeRef.current?.sendCreate({
-                  id: modalId,
-                  type: 'next-scene-plugin',
-                  x: modalX,
-                  y: modalY,
-                  nextSceneImageUrl: null,
-                  sourceImageUrl: null,
-                  localNextSceneImageUrl: null,
-                  mode: 'scene',
-                  frameWidth: 400,
-                  frameHeight: 500,
-                  isProcessing: false,
-                });
-              }
-              if (projectId && opManagerInitialized) {
-                await appendOp({
-                  type: 'create',
-                  elementId: modalId,
-                  data: {
-                    element: {
-                      id: modalId,
-                      type: 'next-scene-plugin',
-                      x: modalX,
-                      y: modalY,
-                      meta: {
-                        nextSceneImageUrl: null,
-                        sourceImageUrl: null,
-                        localNextSceneImageUrl: null,
-                        mode: 'scene',
-                        frameWidth: 400,
-                        frameHeight: 500,
-                        isProcessing: false,
-                      },
-                    },
-                  },
-                  inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
-                });
-              }
-              await pluginHandlers.onPersistNextSceneModalCreate(newNextScene);
-            })().catch(console.error);
-          }
+          handlePluginCreation(plugin.id, x, y);
           setIsPluginSidebarOpen(false);
         }}
         scale={1}

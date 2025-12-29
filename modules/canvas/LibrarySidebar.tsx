@@ -41,7 +41,17 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
 
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState<{
+    images: boolean;
+    videos: boolean;
+    music: boolean;
+    uploaded: boolean;
+  }>({
+    images: true,
+    videos: true,
+    music: true,
+    uploaded: true
+  });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -74,18 +84,28 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
         });
 
         // Update hasMore based on the active category
-        // Note: Ideally backend should return hasMore per category, but for now we check if we got a full page
-        // Or use the pagination metadata if available
         if (response.data.pagination) {
-          // We need to check hasMore based on the active category, but the API returns all categories paginated together
-          // This is a limitation of the current API design where all categories are fetched at once
-          // For now, we'll assume if any category has more, we can load more
           const p = response.data.pagination;
-          setHasMore(p.hasMoreImages || p.hasMoreVideos || p.hasMoreUploaded);
+          setHasMore({
+            images: p.hasMoreImages,
+            videos: p.hasMoreVideos,
+            music: false, // API doesn't seem to return hasMoreMusic based on types? Assuming false or need to check types.
+            uploaded: p.hasMoreUploaded
+          });
         } else {
           // Fallback: if we got less than limit items in the active category, we probably reached the end
-          // This is imperfect because we fetch all categories at once
-          setHasMore(true);
+          // We check the length of the *new* items only
+          const newImages = response.data?.images || [];
+          const newVideos = response.data?.videos || [];
+          const newMusic = response.data?.music || [];
+          const newUploaded = response.data?.uploaded || [];
+
+          setHasMore({
+            images: newImages.length >= 20,
+            videos: newVideos.length >= 20,
+            music: newMusic.length >= 20,
+            uploaded: newUploaded.length >= 20
+          });
         }
       }
     } catch (error) {
@@ -99,7 +119,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   useEffect(() => {
     if (isOpen) {
       setPage(1);
-      setHasMore(true);
+      setHasMore({ images: true, videos: true, music: true, uploaded: true });
       fetchMediaLibrary(1, true);
     }
   }, [isOpen, fetchMediaLibrary]);
@@ -109,7 +129,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     const handleRefresh = () => {
       if (isOpen) {
         setPage(1);
-        setHasMore(true);
+        setHasMore({ images: true, videos: true, music: true, uploaded: true });
         fetchMediaLibrary(1, true);
       }
     };
@@ -124,7 +144,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
       // Load more when user is 300px from bottom (earlier fetch)
-      if (scrollTop + clientHeight >= scrollHeight - 300 && !loading && hasMore) {
+      if (scrollTop + clientHeight >= scrollHeight - 300 && !loading && hasMore[activeCategory]) {
         const nextPage = page + 1;
         setPage(nextPage);
         fetchMediaLibrary(nextPage);
@@ -192,14 +212,14 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     return (
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
-          {items.map((item) => {
+          {items.map((item, idx) => {
             const mediaUrl = getMediaUrl(item);
             const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
             const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
 
             return (
               <div
-                key={item.id}
+                key={`${item.id}-${idx}`}
                 draggable
                 onClick={() => handleMediaClick(item)}
                 onDragStart={(e) => handleDragStart(e, item)}

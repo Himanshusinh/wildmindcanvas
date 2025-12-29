@@ -447,25 +447,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         (target?.closest && target.closest('[contenteditable="true"]') !== null);
       const isTyping = isInputElement || isContentEditable;
       if (!e.repeat && !isTyping) {
-        // Text input shortcut
-        if (e.key === 't') {
-          e.preventDefault();
-          const now = Date.now();
-          const last = lastCreateTimesRef.current.text || 0;
-          if (now - last >= 200) {
-            lastCreateTimesRef.current.text = now;
-            const canvasX = (viewportSize.width / 2 - position.x) / scale;
-            const canvasY = (viewportSize.height / 2 - position.y) / scale;
-            const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
-            const newId = `text-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: pos.x, y: pos.y, autoFocusInput: true };
-            setTextInputStates(prev => [...prev, newModal]);
-            if (onPersistTextModalCreate) {
-              Promise.resolve(onPersistTextModalCreate(newModal)).catch(console.error);
-            }
-          }
-          return;
-        }
+        // Removed 't' keyboard shortcut for TextInput - only using Konva-based CanvasText
 
         // Image modal shortcut
         if (e.key === 'i') {

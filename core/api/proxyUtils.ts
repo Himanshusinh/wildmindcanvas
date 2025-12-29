@@ -14,16 +14,22 @@ export function extractZataPath(url: string): string | null {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
 
-    // Find bucket name (usually 'devstoragev1' or 'canvas')
-    const bucketIndex = pathParts.findIndex(p =>
-      p === 'devstoragev1' ||
-      p === 'canvas' ||
-      p.startsWith('canvas/')
-    );
+    // Zata URLs usually follow: endpoint/devstoragev1/bucket/key...
+    // or endpoint/bucket/key...
+    // We need to extract only the 'key...' part because the proxy adds the bucket back.
+    let startIndex = 0;
 
-    if (bucketIndex >= 0) {
-      // Return path after bucket name
-      return pathParts.slice(bucketIndex + 1).join('/');
+    if (pathParts[0] === 'devstoragev1') {
+      startIndex = 1;
+    }
+
+    // Check if the next part is the known bucket name 'canvas'
+    if (pathParts[startIndex] && (pathParts[startIndex] === 'canvas' || pathParts[startIndex].startsWith('canvas/'))) {
+      startIndex++;
+    }
+
+    if (startIndex > 0) {
+      return pathParts.slice(startIndex).join('/');
     }
 
     // If no bucket found, return path without first segment
