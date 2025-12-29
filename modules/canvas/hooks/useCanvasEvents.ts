@@ -488,6 +488,14 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedVideoEditorModalIds = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
+                videoEditorModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('videoEditorModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedVideoEditorModalIds.includes(modal.id)) newSelectedVideoEditorModalIds.push(modal.id);
+                    }
+                });
+
                 const newSelectedMusicModalIds = isMultiSelect ? [...selectedMusicModalIds] : [];
                 musicModalStates.forEach((modal: any) => {
                     const dims = getComponentDimensions('musicModal', modal.id, canvasState as any);
@@ -496,11 +504,110 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedNextSceneModalIds = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+                nextSceneModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('nextSceneModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedNextSceneModalIds.includes(modal.id)) newSelectedNextSceneModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedMultiangleCameraModalIds = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
+                multiangleCameraModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('multiangleCameraModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedMultiangleCameraModalIds.includes(modal.id)) newSelectedMultiangleCameraModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedVectorizeModalIds = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+                vectorizeModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('vectorizeModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedRemoveBgModalIds = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
+                removeBgModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('removeBgModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedUpscaleModalIds = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+                upscaleModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('upscaleModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedEraseModalIds = isMultiSelect ? [...selectedEraseModalIds] : [];
+                eraseModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('eraseModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedExpandModalIds = isMultiSelect ? [...selectedExpandModalIds] : [];
+                expandModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('expandModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedCompareModalIds = isMultiSelect ? [...selectedCompareModalIds] : [];
+                compareModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('compareModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedCompareModalIds.includes(modal.id)) newSelectedCompareModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedStoryboardModalIds = isMultiSelect ? [...selectedStoryboardModalIds] : [];
+                storyboardModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('storyboardModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedScriptFrameModalIds = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
+                scriptFrameModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('scriptFrameModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
+                    }
+                });
+
+                const newSelectedSceneFrameModalIds = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
+                sceneFrameModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('sceneFrameModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
+                    }
+                });
+
                 // Update selections
                 setSelectedImageIndices(newSelectedIndices);
                 setSelectedImageModalIds(newSelectedImageModalIds);
                 setSelectedVideoModalIds(newSelectedVideoModalIds);
                 setSelectedMusicModalIds(newSelectedMusicModalIds);
+                setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
+                setSelectedMultiangleCameraModalIds(newSelectedMultiangleCameraModalIds);
+                setSelectedVectorizeModalIds(newSelectedVectorizeModalIds);
+                setSelectedRemoveBgModalIds(newSelectedRemoveBgModalIds);
+                setSelectedUpscaleModalIds(newSelectedUpscaleModalIds);
+                setSelectedEraseModalIds(newSelectedEraseModalIds);
+                setSelectedExpandModalIds(newSelectedExpandModalIds);
+                setSelectedCompareModalIds(newSelectedCompareModalIds);
+                setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
+                setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
+                setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
 
                 // Calculate tight bounding box for all selected items
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -546,7 +653,111 @@ export function useCanvasEvents(
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
-                // Add similar blocks for other modal types if needed...
+
+                newSelectedNextSceneModalIds.forEach(id => {
+                    const modal = nextSceneModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('nextSceneModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedMultiangleCameraModalIds.forEach(id => {
+                    const modal = multiangleCameraModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('multiangleCameraModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedVideoEditorModalIds.forEach(id => {
+                    const modal = videoEditorModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('videoEditorModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedVectorizeModalIds.forEach(id => {
+                    const modal = vectorizeModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('vectorizeModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedRemoveBgModalIds.forEach(id => {
+                    const modal = removeBgModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('removeBgModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedUpscaleModalIds.forEach(id => {
+                    const modal = upscaleModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('upscaleModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedEraseModalIds.forEach(id => {
+                    const modal = eraseModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('eraseModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedExpandModalIds.forEach(id => {
+                    const modal = expandModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('expandModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedCompareModalIds.forEach(id => {
+                    const modal = compareModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('compareModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedStoryboardModalIds.forEach(id => {
+                    const modal = storyboardModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('storyboardModal', id, canvasState as any);
+                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedScriptFrameModalIds.forEach(id => {
+                    const modal = scriptFrameModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('scriptFrameModal', id, canvasState as any);
+                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedSceneFrameModalIds.forEach(id => {
+                    const modal = sceneFrameModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('sceneFrameModal', id, canvasState as any);
+                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
 
                 setSelectionBox(null);
                 setSelectionRectCoords(null);
@@ -554,11 +765,12 @@ export function useCanvasEvents(
                 setIsSelecting(false);
 
                 if (hasSelection) {
+                    const padding = 20; // Add padding to avoid cutting off borders
                     setSelectionTightRect({
-                        x: minX,
-                        y: minY,
-                        width: maxX - minX,
-                        height: maxY - minY
+                        x: minX - padding,
+                        y: minY - padding,
+                        width: (maxX - minX) + (padding * 2),
+                        height: (maxY - minY) + (padding * 2)
                     });
                 } else {
                     setSelectionTightRect(null);

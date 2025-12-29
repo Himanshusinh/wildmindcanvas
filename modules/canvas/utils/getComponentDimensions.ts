@@ -57,77 +57,104 @@ export function getComponentDimensions(
             return { width: estimatedWidth, height: 50 }; // approx
         }
 
+        case 'imageModal':
         case 'image-modal': {
             const modal = imageModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
         }
 
+        case 'videoModal':
         case 'video-modal': {
             const modal = videoModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
         }
 
+        case 'videoEditorModal':
         case 'video-editor-modal': {
             const modal = videoEditorModalStates.find(m => m.id === id);
             // Video editor typically has a fixed or default size if not found
-            return modal ? { width: 1000, height: 600 } : { width: 0, height: 0 }; // Approx default size
+            if ((modal as any)?.isExpanded) return { width: 1000, height: 600 };
+            return { width: 100, height: 130 }; // Collapsed icon size
         }
 
+        case 'musicModal':
         case 'music-modal': {
             const modal = musicModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 340, height: modal.frameHeight || 480 } : { width: 0, height: 0 };
         }
 
+        case 'upscaleModal':
         case 'upscale-modal': {
             const modal = upscaleModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: modal?.frameWidth || 400, height: modal?.frameHeight || 350 };
+            return { width: 100, height: 130 };
         }
 
+        case 'multiangleCameraModal':
         case 'multiangle-camera-modal': {
             const modal = multiangleCameraModalStates.find(m => m.id === id);
-            return modal ? { width: 600, height: 500 } : { width: 0, height: 0 };
+            // Base circle is 100x100. If expanded, it has a 400px wide control panel below.
+            // Adjust height as needed, for now assuming a reasonable height for controls.
+            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            return { width: 100, height: 130 };
         }
 
+        case 'removeBgModal':
         case 'remove-bg-modal': {
             const modal = removeBgModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: 400, height: 400 };
+            return { width: 100, height: 130 };
         }
 
+        case 'eraseModal':
         case 'erase-modal': {
             const modal = eraseModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: 400, height: 400 };
+            return { width: 100, height: 130 };
         }
 
+        case 'expandModal':
         case 'expand-modal': {
             const modal = expandModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            return { width: 100, height: 130 };
         }
 
+        case 'vectorizeModal':
         case 'vectorize-modal': {
             const modal = vectorizeModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            return { width: 100, height: 130 };
         }
 
+        case 'nextSceneModal':
         case 'next-scene-modal': {
             const modal = nextSceneModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            // Default circle size is usually smaller than the full modal frameFrameWidth
+            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            return { width: 100, height: 130 };
         }
 
+        case 'compareModal':
         case 'compare-modal': {
             const modal = compareModalStates.find(m => m.id === id);
-            return modal ? { width: modal.width || 800, height: modal.height || 600 } : { width: 0, height: 0 };
+            if ((modal as any)?.isExpanded) return { width: modal?.width || 800, height: modal?.height || 600 };
+            return { width: 100, height: 130 };
         }
 
+        case 'storyboardModal':
         case 'storyboard-modal': {
             const modal = storyboardModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 1000, height: modal.frameHeight || 300 } : { width: 0, height: 0 };
+            return modal ? { width: modal.frameWidth || 1000, height: modal.frameHeight || 300 } : { width: 100, height: 130 };
         }
 
+        case 'scriptFrameModal':
         case 'script-frame-modal': {
             const modal = scriptFrameModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 360, height: modal.frameHeight || 260 } : { width: 0, height: 0 };
         }
 
+        case 'sceneFrameModal':
         case 'scene-frame-modal': {
             const modal = sceneFrameModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 300, height: modal.frameHeight || 400 } : { width: 0, height: 0 };

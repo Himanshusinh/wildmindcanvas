@@ -1710,6 +1710,23 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             }
           }}
         >
+          {/* Transparent hit area to allow dragging from anywhere in the selection */}
+          <Rect
+            name="selection-box-bg"
+            x={0}
+            y={0}
+            width={selectionTightRect.width}
+            height={selectionTightRect.height}
+            fill="transparent"
+            stroke="rgba(0,0,0,0.4)"
+            onClick={(e) => {
+              e.cancelBubble = true;
+            }}
+            onTap={(e) => {
+              e.cancelBubble = true;
+            }}
+          />
+
           {/* Smart selection rectangle is now rendered in Canvas.tsx as background layer */}
           {/* Toolbar buttons at top center, outside selection area */}
           <Group
