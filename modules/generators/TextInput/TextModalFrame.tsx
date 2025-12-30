@@ -58,10 +58,8 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   hasConnectedComponents = false,
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const isSettingHeightRef = useRef(false); // Flag to prevent ResizeObserver from firing during programmatic changes
-  const previousScaleRef = useRef(scale); // Track previous scale to detect scale changes
   const isDark = useIsDarkTheme();
-  const [textareaHeight, setTextareaHeight] = useState<number | null>(null); // Store height in canvas coordinates (will be scaled)
+  const [textareaHeight, setTextareaHeight] = useState<number>(80); // Canvas coordinates
 
   // Autocomplete state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -69,6 +67,42 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [mentionQuery, setMentionQuery] = useState('');
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef<{ y: number; height: number } | null>(null);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartRef.current = {
+      y: e.clientY,
+      height: textareaHeight || 80,
+    };
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return;
+      const deltaY = e.clientY - resizeStartRef.current.y;
+      const canvasDeltaY = deltaY / scale;
+      const newHeight = Math.max(80, resizeStartRef.current.height + canvasDeltaY);
+      setTextareaHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      resizeStartRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, scale, textareaHeight]);
 
   useEffect(() => {
     // Only autofocus the inner textarea when allowed. Default is to autofocus
@@ -80,83 +114,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     }
   }, [autoFocusInput]);
 
-  // Initialize textarea height on mount (in canvas coordinates, not scaled)
-  useEffect(() => {
-    const textarea = inputRef.current;
-    if (!textarea || textareaHeight !== null) return;
-
-    // Set initial height in canvas coordinates (80 canvas units, will be scaled)
-    const initialHeight = 80; // Canvas coordinates, not pixels
-    setTextareaHeight(initialHeight);
-    isSettingHeightRef.current = true;
-    textarea.style.height = `${initialHeight * scale}px`; // Scale for display
-    // Reset flag after a brief delay to allow ResizeObserver to settle
-    setTimeout(() => {
-      isSettingHeightRef.current = false;
-    }, 100);
-  }, []); // Only run once on mount
-
-  // Track textarea height changes (when user manually resizes)
-  useEffect(() => {
-    const textarea = inputRef.current;
-    if (!textarea) return;
-
-    // Use ResizeObserver to track when user manually resizes
-    const resizeObserver = new ResizeObserver((entries) => {
-      // Ignore if we're programmatically setting the height
-      if (isSettingHeightRef.current) return;
-
-      // Ignore if scale has changed (this is a scale change, not a user resize)
-      if (previousScaleRef.current !== scale) {
-        previousScaleRef.current = scale;
-        return;
-      }
-
-      for (const entry of entries) {
-        const height = entry.contentRect.height;
-        // Convert screen pixels to canvas coordinates by dividing by current scale
-        const canvasHeight = height / scale;
-        // Only update if height changed significantly (user manually resized)
-        // Use a larger threshold to avoid small fluctuations
-        if (canvasHeight > 0 && (textareaHeight === null || Math.abs(canvasHeight - textareaHeight) > 5 / scale)) {
-          setTextareaHeight(canvasHeight); // Store in canvas coordinates
-        }
-      }
-    });
-
-    resizeObserver.observe(textarea);
-
-    // Update previous scale ref
-    previousScaleRef.current = scale;
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [textareaHeight, scale]);
-
-  // Apply stored height when scale changes (scale the canvas height to screen pixels)
-  useEffect(() => {
-    const textarea = inputRef.current;
-    if (!textarea || textareaHeight === null) return;
-
-    // When scale changes, convert canvas height to screen pixels
-    // Set flag to prevent ResizeObserver from interfering
-    isSettingHeightRef.current = true;
-    const newHeight = textareaHeight * scale;
-    textarea.style.height = `${newHeight}px`; // Scale canvas height to screen
-    // Also ensure width is properly constrained
-    textarea.style.width = '100%';
-    textarea.style.maxWidth = '100%';
-    textarea.style.minWidth = '0';
-
-    // Update previous scale ref immediately
-    previousScaleRef.current = scale;
-
-    // Reset flag after a longer delay to ensure ResizeObserver doesn't interfere
-    setTimeout(() => {
-      isSettingHeightRef.current = false;
-    }, 150);
-  }, [scale, textareaHeight]);
 
   const inputBg = isDark ? '#121212' : '#ffffff';
   const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
@@ -308,9 +265,9 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             fontSize: `${16 * scale}px`,
             fontFamily: 'Arial, sans-serif',
             outline: 'none',
-            resize: 'vertical',
+            resize: 'none',
             minHeight: `${80 * scale}px`,
-            height: textareaHeight !== null ? `${textareaHeight * scale}px` : `${80 * scale}px`,
+            height: `${textareaHeight * scale}px`,
             width: '100%',
             minWidth: 0,
             maxWidth: '100%',
@@ -327,6 +284,32 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           }}
         />
 
+        {/* Custom Resize Handle (3 refined dots) */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          style={{
+            position: 'absolute',
+            bottom: `${8 * scale}px`,
+            right: `${8 * scale}px`,
+            width: `${16 * scale}px`,
+            height: `${16 * scale}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end',
+            alignItems: 'flex-end',
+            gap: `${2 * scale}px`,
+            cursor: 'ns-resize',
+            zIndex: 10,
+            opacity: isHovered || isResizing ? 0.8 : 0,
+            transition: 'opacity 0.2s ease',
+          }}
+        >
+          <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
+          <div style={{ display: 'flex', gap: `${2 * scale}px` }}>
+            <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
+            <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
+          </div>
+        </div>
       </div>
 
       {/* Suggestions Dropdown */}

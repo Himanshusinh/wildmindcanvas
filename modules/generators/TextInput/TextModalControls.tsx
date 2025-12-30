@@ -76,7 +76,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
       style={{
         position: 'absolute',
         top: '100%',
-        left: `${-2 * scale}px`,
+        left: `${-frameBorderWidth * scale}px`,
         width: `${400 * scale}px`,
         padding: `${12 * scale}px`,
         paddingTop: `${16 * scale}px`,
@@ -89,7 +89,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         boxShadow: 'none',
         transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
         opacity: (isHovered || isPinned) ? 1 : 0,
-        maxHeight: (isHovered || isPinned) ? '200px' : '0px',
+        maxHeight: (isHovered || isPinned) ? '400px' : '0px',
         display: 'flex',
         flexDirection: 'column',
         gap: `${12 * scale}px`,
@@ -99,7 +99,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
