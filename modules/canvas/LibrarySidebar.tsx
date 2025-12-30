@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getMediaLibrary, MediaItem } from '@/core/api/api';
-import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
+import { buildProxyResourceUrl, buildProxyThumbnailUrl } from '@/core/api/proxyUtils';
 
 interface LibrarySidebarProps {
   isOpen: boolean;
@@ -187,10 +187,14 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     }, 100);
   };
 
-  const getMediaUrl = (media: MediaItem) => {
+  const getMediaUrl = (media: MediaItem, useThumbnail = true) => {
     let url = media.url || media.thumbnail || '';
     if (url && (url.includes('zata.ai') || url.includes('zata'))) {
-      url = buildProxyResourceUrl(url);
+      if (useThumbnail) {
+        // Use optimized AVIF thumbnail for grid previews (512px width is plenty for sidebar)
+        return buildProxyThumbnailUrl(url, 512, 80, 'avif');
+      }
+      return buildProxyResourceUrl(url);
     }
     return url;
   };
@@ -244,7 +248,8 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
               >
                 {isVideo ? (
                   <video
-                    src={mediaUrl}
+                    src={getMediaUrl(item, false)} // Use full resource for playback on hover
+                    poster={getMediaUrl(item, true)} // Use optimized thumbnail as poster
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     muted
                     onMouseEnter={(e) => {

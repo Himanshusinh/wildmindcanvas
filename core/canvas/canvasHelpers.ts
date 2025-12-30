@@ -4,8 +4,8 @@ import Konva from 'konva';
 // Canvas constants
 export const INFINITE_CANVAS_SIZE = 100000; // 100,000 pixels
 export const DOT_SPACING = 30; // Distance between dots in pixels
-export const DOT_SIZE = 1.5; // Size of each dot in pixels
-export const DOT_OPACITY = 0.20; // Dot darkness (0.0 = invisible, 1.0 = fully black)
+export const DOT_SIZE = 2; // Size of each dot in pixels
+export const DOT_OPACITY = 0.50; // Dot darkness (0.0 = invisible, 1.0 = fully black)
 
 // Helper functions for calculating bounding boxes of rotated rectangles
 export const degToRad = (angle: number) => (angle / 180) * Math.PI;

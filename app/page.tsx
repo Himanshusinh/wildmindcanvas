@@ -19,7 +19,7 @@ import { useOpManager } from '@/core/hooks/useOpManager';
 import { useProject } from '@/core/hooks/useProject';
 import { useUIVisibility } from '@/core/hooks/useUIVisibility';
 import { useIsMobile } from '@/core/hooks/useIsMobile';
-import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl } from '@/core/api/proxyUtils';
+import { buildProxyDownloadUrl, buildProxyResourceUrl, buildProxyMediaUrl, buildProxyThumbnailUrl } from '@/core/api/proxyUtils';
 import { RealtimeClient, GeneratorOverlay } from '@/core/api/realtime';
 import { buildSnapshotElements } from '@/modules/utils/buildSnapshotElements';
 import { createImageHandlers } from '@/modules/handlers/imageHandlers';
@@ -2243,7 +2243,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
     // For images, create an ImageUploadModal frame instead of directly adding to canvas
     if (mediaType === 'image') {
       const imageUrl = (mediaUrl.startsWith('http') && !mediaUrl.includes('/api/proxy/'))
-        ? buildProxyResourceUrl(mediaUrl)
+        // Use thumbnail proxy with AVIF for dimension check (lightweight) instead of full resource
+        ? buildProxyThumbnailUrl(mediaUrl, 2048, 85, 'avif')
         : mediaUrl;
 
       const img = new Image();

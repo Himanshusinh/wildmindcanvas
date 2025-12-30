@@ -86,7 +86,7 @@ export function getComponentDimensions(
         case 'upscaleModal':
         case 'upscale-modal': {
             const modal = upscaleModalStates.find(m => m.id === id);
-            if ((modal as any)?.isExpanded) return { width: modal?.frameWidth || 400, height: modal?.frameHeight || 350 };
+            if ((modal as any)?.isExpanded) return { width: modal?.frameWidth || 400, height: modal?.frameHeight || 510 };
             return { width: 100, height: 130 };
         }
 
@@ -95,7 +95,7 @@ export function getComponentDimensions(
             const modal = multiangleCameraModalStates.find(m => m.id === id);
             // Base circle is 100x100. If expanded, it has a 400px wide control panel below.
             // Adjust height as needed, for now assuming a reasonable height for controls.
-            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            if ((modal as any)?.isExpanded) return { width: 380, height: 650 };
             return { width: 100, height: 130 };
         }
 
@@ -123,7 +123,7 @@ export function getComponentDimensions(
         case 'vectorizeModal':
         case 'vectorize-modal': {
             const modal = vectorizeModalStates.find(m => m.id === id);
-            if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
+            if ((modal as any)?.isExpanded) return { width: 400, height: 345 };
             return { width: 100, height: 130 };
         }
 
@@ -138,7 +138,7 @@ export function getComponentDimensions(
         case 'compareModal':
         case 'compare-modal': {
             const modal = compareModalStates.find(m => m.id === id);
-            if ((modal as any)?.isExpanded) return { width: modal?.width || 800, height: modal?.height || 600 };
+            if ((modal as any)?.isExpanded) return { width: 500, height: 650 };
             return { width: 100, height: 130 };
         }
 
