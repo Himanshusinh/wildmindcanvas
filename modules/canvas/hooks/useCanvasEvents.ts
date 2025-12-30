@@ -103,6 +103,7 @@ export function useCanvasEvents(
         selectedStoryboardModalIds, setSelectedStoryboardModalIds,
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
+        selectedGroupIds, setSelectedGroupIds,
         effectiveSelectedCanvasTextIds: selectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextIds: setSelectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextId: setSelectedCanvasTextId, // Alias
@@ -453,6 +454,7 @@ export function useCanvasEvents(
                 const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
                 // ... initialize all other arrays
                 const newSelectedImageModalIds = isMultiSelect ? [...selectedImageModalIds] : [];
+                const newSelectedTextInputIds = isMultiSelect ? [...selectedTextInputIds] : [];
                 // (Shortened for brevity, implement logic similarly for all)
 
                 // Helper to check intersection
@@ -501,6 +503,13 @@ export function useCanvasEvents(
                     const dims = getComponentDimensions('musicModal', modal.id, canvasState as any);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
+                    }
+                });
+
+                textInputStates.forEach((input: any) => {
+                    const dims = getComponentDimensions('input', input.id, canvasState as any);
+                    if (checkIntersection({ x: input.x, y: input.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedTextInputIds.includes(input.id)) newSelectedTextInputIds.push(input.id);
                     }
                 });
 
@@ -592,9 +601,17 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedGroupIds = isMultiSelect ? [...selectedGroupIds] : [];
+                canvasState.groupContainerStates.forEach((group: any) => {
+                    if (checkIntersection({ x: group.x, y: group.y, width: group.width, height: group.height })) {
+                        if (!newSelectedGroupIds.includes(group.id)) newSelectedGroupIds.push(group.id);
+                    }
+                });
+
                 // Update selections
                 setSelectedImageIndices(newSelectedIndices);
                 setSelectedImageModalIds(newSelectedImageModalIds);
+                setSelectedTextInputIds(newSelectedTextInputIds);
                 setSelectedVideoModalIds(newSelectedVideoModalIds);
                 setSelectedMusicModalIds(newSelectedMusicModalIds);
                 setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
@@ -608,6 +625,7 @@ export function useCanvasEvents(
                 setSelectedStoryboardModalIds(newSelectedStoryboardModalIds);
                 setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
                 setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
+                setSelectedGroupIds(newSelectedGroupIds);
 
                 // Calculate tight bounding box for all selected items
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -651,6 +669,14 @@ export function useCanvasEvents(
                     if (modal) {
                         const dims = getComponentDimensions('musicModal', id, canvasState as any);
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedTextInputIds.forEach(id => {
+                    const input = textInputStates.find((t: any) => t.id === id);
+                    if (input) {
+                        const dims = getComponentDimensions('input', id, canvasState as any);
+                        updateBounds({ x: input.x, y: input.y, width: dims.width, height: dims.height });
                     }
                 });
 
@@ -756,6 +782,13 @@ export function useCanvasEvents(
                     if (modal) {
                         const dims = getComponentDimensions('sceneFrameModal', id, canvasState as any);
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedGroupIds.forEach(id => {
+                    const group = canvasState.groupContainerStates.find((g: any) => g.id === id);
+                    if (group) {
+                        updateBounds({ x: group.x, y: group.y, width: group.width, height: group.height });
                     }
                 });
 

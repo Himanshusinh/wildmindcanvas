@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { MusicModalTooltip } from './MusicModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
@@ -33,6 +33,8 @@ interface MusicUploadModalProps {
   initialAspectRatio?: string;
   initialPrompt?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
 }
 
 export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
@@ -59,6 +61,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   initialAspectRatio,
   initialPrompt,
   onOptionsChange,
+  connections = [],
+  textInputStates = [],
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'MusicGen');
@@ -76,6 +80,41 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
 
+  // Detect connected text input
+  const connectedTextInput = useMemo(() => {
+    if (!id || !connections || connections.length === 0 || !textInputStates || textInputStates.length === 0) {
+      return null;
+    }
+    // Find connection where this modal is the target (to === id)
+    const connection = connections.find(c => c.to === id);
+    if (!connection) return null;
+
+    // Find the text input state that matches the connection source
+    const textInput = textInputStates.find(t => t.id === connection.from);
+    return textInput || null;
+  }, [id, connections, textInputStates]);
+
+  const onOptionsChangeRef = useRef(onOptionsChange);
+
+  // Update ref when onOptionsChange changes
+  useEffect(() => {
+    onOptionsChangeRef.current = onOptionsChange;
+  }, [onOptionsChange]);
+
+  // Update prompt when text input value changes (real-time sync)
+  useEffect(() => {
+    const currentTextValue = connectedTextInput?.value;
+    if (currentTextValue !== undefined && currentTextValue !== prompt) {
+      setPrompt(currentTextValue);
+      if (onOptionsChangeRef.current) {
+        onOptionsChangeRef.current({ prompt: currentTextValue });
+      }
+    }
+  }, [connectedTextInput?.value, prompt]);
+
+  // Use local prompt or connected prompt
+  const effectivePrompt = prompt;
+
   // Calculate aspect ratio from string (e.g., "16:9" -> 16/9)
   const getAspectRatio = (ratio: string): string => {
     const [width, height] = ratio.split(':').map(Number);
@@ -87,8 +126,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected 
-    ? '#437eb5' 
+  const frameBorderColor = isSelected
+    ? '#437eb5'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -98,10 +137,11 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   };
 
   const handleGenerate = async () => {
-    if (onGenerate && prompt.trim() && !isGenerating) {
+    const promptToUse = effectivePrompt;
+    if (onGenerate && promptToUse.trim() && !isGenerating) {
       setGeneratingState(true);
       try {
-        await onGenerate(prompt, selectedModel, selectedFrame, selectedAspectRatio);
+        await onGenerate(promptToUse, selectedModel, selectedFrame, selectedAspectRatio);
       } catch (err) {
         console.error('Error generating music:', err);
         alert('Failed to generate music. Please try again.');
@@ -127,9 +167,12 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   useEffect(() => {
     const handleTogglePin = (e: Event) => {
       const ce = e as CustomEvent;
-      const { selectedMusicModalIds } = ce.detail || {};
+      const { selectedMusicModalIds, selectedMusicModalId } = ce.detail || {};
       // Check if this modal is selected
-      if (selectedMusicModalIds && Array.isArray(selectedMusicModalIds) && selectedMusicModalIds.includes(id)) {
+      const isThisSelected = (selectedMusicModalIds && Array.isArray(selectedMusicModalIds) && selectedMusicModalIds.includes(id)) ||
+        (selectedMusicModalId === id);
+
+      if (isThisSelected) {
         setIsPinned(prev => !prev);
       }
     };
@@ -142,7 +185,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   // Listen for frame dim events (when dragging connection near disallowed frame)
   useEffect(() => {
     if (!id) return;
-    
+
     const handleFrameDim = (e: Event) => {
       const ce = e as CustomEvent;
       const { frameId, dimmed } = ce.detail || {};
@@ -150,7 +193,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         setIsDimmed(dimmed === true);
       }
     };
-    
+
     window.addEventListener('canvas-frame-dim', handleFrameDim as any);
     return () => {
       window.removeEventListener('canvas-frame-dim', handleFrameDim as any);
@@ -166,12 +209,12 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isAudio = target.tagName === 'AUDIO';
     const isControls = target.closest('.controls-overlay');
-    
+
     // Call onSelect when clicking on the modal (this will trigger context menu)
     if (onSelect && !isInput && !isButton && !isControls) {
       onSelect();
     }
-    
+
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isAudio && !isControls) {
       setIsDraggingContainer(true);
@@ -290,7 +333,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         isHovered={isHovered}
         isPinned={isPinned}
         isSelected={Boolean(isSelected)}
-        prompt={prompt}
+        prompt={effectivePrompt}
+        isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}
@@ -301,8 +345,10 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         frameBorderColor={frameBorderColor}
         frameBorderWidth={frameBorderWidth}
         onPromptChange={(val) => {
-          setPrompt(val);
-          onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame });
+          if (!connectedTextInput) {
+            setPrompt(val);
+            onOptionsChange?.({ prompt: val, model: selectedModel, aspectRatio: selectedAspectRatio, frame: selectedFrame });
+          }
         }}
         onModelChange={(model) => {
           setSelectedModel(model);

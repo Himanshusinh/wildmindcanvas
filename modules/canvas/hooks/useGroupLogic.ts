@@ -71,6 +71,8 @@ export function useGroupLogic(
         selectedCompareModalIds,
         selectedNextSceneModalIds,
         selectedVideoEditorModalIds,
+        setSelectedGroupIds,
+        setSelectionTightRect,
     } = canvasSelection;
 
     const {
@@ -118,6 +120,11 @@ export function useGroupLogic(
             ...selectedEraseModalIds,
             ...selectedExpandModalIds,
             ...selectedVectorizeModalIds,
+            ...selectedVideoEditorModalIds,
+            ...selectedMultiangleCameraModalIds,
+            ...selectedCompareModalIds,
+            ...selectedNextSceneModalIds,
+            ...(selectedCanvasTextIds || []),
         ] as string[];
 
         console.log('[Canvas] Creating group with', allSelectedIds.length, 'items:', allSelectedIds);
@@ -213,12 +220,38 @@ export function useGroupLogic(
         addModalChildren(selectedEraseModalIds, eraseModalStates, 'erase');
         addModalChildren(selectedExpandModalIds, expandModalStates, 'expand');
         addModalChildren(selectedVectorizeModalIds, vectorizeModalStates, 'vectorize');
-        // Note: Add other modals if needed...
+        addModalChildren(selectedVideoEditorModalIds, videoEditorModalStates, 'video-editor-modal');
+        addModalChildren(selectedMultiangleCameraModalIds, multiangleCameraModalStates, 'multiangle-camera');
+        addModalChildren(selectedCompareModalIds, compareModalStates, 'compare-modal');
+        addModalChildren(selectedNextSceneModalIds, nextSceneModalStates, 'next-scene');
+
+        // Canvas Text
+        if (selectedCanvasTextIds) {
+            selectedCanvasTextIds.forEach(id => {
+                const state = effectiveCanvasTextStates.find(s => s.id === id);
+                if (state) {
+                    newGroup.children.push({
+                        id: state.id,
+                        type: 'canvas-text',
+                        relativeTransform: {
+                            x: state.x - bounds!.x,
+                            y: state.y - bounds!.y,
+                            scaleX: 1,
+                            scaleY: 1,
+                            rotation: 0
+                        }
+                    });
+                }
+            });
+        }
 
         console.log('[Canvas] ✅ Group created:', newGroup);
 
         setGroupContainerStates(prev => [...prev, newGroup]);
         clearAllSelections(true);
+
+        // Select the new group (but don't set selectionTightRect - the group itself shows the boundary)
+        setSelectedGroupIds([newGroup.id]);
 
         if (onPersistGroupCreate) {
             Promise.resolve(onPersistGroupCreate(newGroup)).catch((e) => console.warn('[Canvas] Failed to persist group create', e));
@@ -226,11 +259,16 @@ export function useGroupLogic(
     }, [
         images, imageModalStates, videoModalStates, textInputStates, storyboardModalStates, scriptFrameModalStates,
         sceneFrameModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates,
-        expandModalStates, vectorizeModalStates, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds,
+        expandModalStates, vectorizeModalStates, videoEditorModalStates, multiangleCameraModalStates,
+        compareModalStates, nextSceneModalStates, effectiveCanvasTextStates,
+        selectedImageIndices, selectedImageModalIds, selectedVideoModalIds,
         selectedTextInputIds, selectedStoryboardModalIds, selectedScriptFrameModalIds, selectedSceneFrameModalIds,
         selectedMusicModalIds, selectedUpscaleModalIds, selectedRemoveBgModalIds, selectedEraseModalIds,
-        selectedExpandModalIds, selectedVectorizeModalIds, selectionTightRect, currentCanvasData,
-        setGroupContainerStates, clearAllSelections, onPersistGroupCreate
+        selectedExpandModalIds, selectedVectorizeModalIds, selectedVideoEditorModalIds,
+        selectedMultiangleCameraModalIds, selectedCompareModalIds, selectedNextSceneModalIds, selectedCanvasTextIds,
+        selectionTightRect, currentCanvasData,
+        setGroupContainerStates, clearAllSelections, onPersistGroupCreate,
+        setSelectedGroupIds, setSelectionTightRect
     ]);
 
     const handleUngroup = useCallback((selectedGroupIds: string[]) => {
@@ -318,6 +356,11 @@ export function useGroupLogic(
                     case 'compare-modal':
                         setCompareModalStates(prev => prev.map(s => s.id === child.id ? { ...s, x: absX, y: absY } : s));
                         if (onPersistCompareModalMove) onPersistCompareModalMove(child.id, { x: absX, y: absY });
+                        break;
+                    case 'canvas-text':
+                        if ((props as any).onPersistCanvasTextMove) {
+                            (props as any).onPersistCanvasTextMove(child.id, { x: absX, y: absY });
+                        }
                         break;
                 }
             });
@@ -449,7 +492,26 @@ export function useGroupLogic(
     const handleNextSceneModalMove = createMoveWrapper('next-scene', selectedNextSceneModalIds, nextSceneModalStates, props.onPersistNextSceneModalMove);
     const handleVideoEditorModalMove = createMoveWrapper('video-editor', selectedVideoEditorModalIds, videoEditorModalStates, props.onPersistVideoEditorModalMove);
 
-    const handleImageUpdateWithGroup = (index: number, updates: any) => {
+    const handleGroupMove = useCallback((id: string, x: number, y: number) => {
+        setGroupContainerStates(prev => {
+            const group = prev.find(g => g.id === id);
+            if (!group) return prev;
+            const updates = { x, y };
+            // Defer persistence to avoid setState during render
+            if (onPersistGroupUpdate) {
+                setTimeout(() => {
+                    onPersistGroupUpdate(id, updates, group);
+                }, 0);
+            }
+            return prev.map(g => g.id === id ? { ...g, ...updates } : g);
+        });
+    }, [setGroupContainerStates, onPersistGroupUpdate]);
+
+    const handleGroupDrag = useCallback((id: string, x: number, y: number) => {
+        setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, x, y } : g));
+    }, [setGroupContainerStates]);
+
+    const handleImageUpdateWithGroup = useCallback((index: number, updates: any) => {
         const isMoving = updates.x !== undefined || updates.y !== undefined;
         const isSelected = selectedImageIndices.includes(index);
 
@@ -468,10 +530,10 @@ export function useGroupLogic(
         if (props.onImageUpdate) {
             props.onImageUpdate(index, updates);
         }
-    };
+    }, [selectedImageIndices, images, moveSelectedItems, props.onImageUpdate]);
 
     // Helper to calculate effective positions for grouped items
-    const getEffectiveStates = useCallback(<T extends { id: string, x?: number, y?: number }>(states: T[], type: string): T[] => {
+    const getEffectiveStates = useCallback(<T extends { id?: string, elementId?: string, x?: number, y?: number }>(states: T[], type: string): T[] => {
         // Create a map of localized overrides
         const overrides = new Map<string, { x: number, y: number }>();
         groupContainerStates.forEach(group => {
@@ -490,7 +552,10 @@ export function useGroupLogic(
         if (overrides.size === 0) return states;
 
         return states.map(state => {
-            const override = overrides.get(state.id);
+            const id = state.id || state.elementId;
+            if (!id) return state;
+
+            const override = overrides.get(id);
             if (override) {
                 return { ...state, x: override.x, y: override.y };
             }
@@ -519,6 +584,8 @@ export function useGroupLogic(
         handleCompareModalMove,
         handleNextSceneModalMove,
         handleVideoEditorModalMove,
-        getEffectiveStates
+        getEffectiveStates,
+        handleGroupMove,
+        handleGroupDrag
     };
 }

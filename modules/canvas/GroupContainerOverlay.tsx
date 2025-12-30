@@ -18,7 +18,24 @@ interface GroupContainerOverlayProps {
     onUngroup?: (groupId: string) => void;
     getItemBounds: (id: string) => { x: number; y: number; width: number; height: number } | null;
     images: any[]; // Pass full images array to render image children
-    onChildSelect?: (elementId: string, type: 'image' | 'text' | 'video') => void;
+    videoModalStates?: any[];
+    textInputStates?: any[];
+    musicModalStates?: any[];
+    upscaleModalStates?: any[];
+    multiangleCameraModalStates?: any[];
+    removeBgModalStates?: any[];
+    eraseModalStates?: any[];
+    expandModalStates?: any[];
+    vectorizeModalStates?: any[];
+    nextSceneModalStates?: any[];
+    compareModalStates?: any[];
+    storyboardModalStates?: any[];
+    scriptFrameModalStates?: any[];
+    sceneFrameModalStates?: any[];
+    canvasTextStates?: any[];
+    onChildSelect?: (elementId: string, type: string) => void;
+    stageRef?: React.RefObject<any>;
+    onPersistMove?: (type: string, id: string, updates: any) => void;
 }
 
 export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
@@ -34,7 +51,24 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
     onGroupDragStart,
     getItemBounds,
     images,
+    videoModalStates = [],
+    textInputStates = [],
+    musicModalStates = [],
+    upscaleModalStates = [],
+    multiangleCameraModalStates = [],
+    removeBgModalStates = [],
+    eraseModalStates = [],
+    expandModalStates = [],
+    vectorizeModalStates = [],
+    nextSceneModalStates = [],
+    compareModalStates = [],
+    storyboardModalStates = [],
+    scriptFrameModalStates = [],
+    sceneFrameModalStates = [],
+    canvasTextStates = [],
     onChildSelect,
+    stageRef,
+    onPersistMove,
 }) => {
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState<string>('');
@@ -97,52 +131,6 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                             }
                         }}
                     >
-                        {/* Render Group Children (Images) using Relative Coordinates */}
-                        {group.children?.map(child => {
-                            if (child.type === 'image') {
-                                const originalData = images.find((img: any) => img.elementId === child.id);
-                                if (originalData) {
-                                    // Construct relative data for rendering
-                                    // We override x/y to be the relative coordinates
-                                    const relativeData = {
-                                        ...originalData,
-                                        x: child.relativeTransform.x,
-                                        y: child.relativeTransform.y,
-                                        rotation: child.relativeTransform.rotation || 0,
-                                        // Let CanvasImage handle internal scaling logic if needed, 
-                                        // OR we might need to apply scale here if CanvasImage doesn't use it directly from data.
-                                        // CanvasImage uses 'scale' prop for stage scale, but 'imageData.width/height' for dimensions.
-                                        // Assuming width/height are already correct in originalData.
-                                    };
-
-                                    return (
-                                        <CanvasImage
-                                            key={child.id}
-                                            imageData={relativeData}
-                                            index={-1} // Dummy index
-                                            isDraggable={false}
-                                            // redirect selection: prefer child select, fallback to group select
-                                            onSelect={(e) => {
-                                                // Event is not a Konva event, it's custom data from CanvasImage.onSelect
-                                                // CanvasImage already handled cancelBubble
-                                                if (onChildSelect) {
-                                                    // Convert internal elementId to index or pass ID?
-                                                    // CanvasImage passed 'originalData' which has elementId matching child.id
-                                                    // onChildSelect expects elementId
-                                                    onChildSelect(child.id, 'image');
-                                                } else if (onGroupSelect) {
-                                                    onGroupSelect(group.id);
-                                                }
-                                            }}
-                                            // Disable interactions that might conflict
-                                            isSelected={false}
-                                        />
-                                    );
-                                }
-                            }
-                            // Text elements and other logic can be added here
-                            return null;
-                        })}
 
                         {/* Container box with SOLID border matching selection style */}
                         <Rect
@@ -204,22 +192,42 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                         e.cancelBubble = true;
                                         onUngroup(group.id);
                                     }}
+                                    onMouseEnter={(e) => {
+                                        const stage = e.target.getStage();
+                                        if (stage) stage.container().style.cursor = 'pointer';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        const stage = e.target.getStage();
+                                        if (stage) stage.container().style.cursor = 'default';
+                                    }}
                                 >
+                                    <Rect
+                                        x={-controlSize / 2}
+                                        y={-controlSize / 2}
+                                        width={controlSize}
+                                        height={controlSize}
+                                        fill="#ef4444"
+                                        cornerRadius={controlSize / 2}
+                                        shadowColor="rgba(0,0,0,0.2)"
+                                        shadowBlur={4}
+                                        shadowOffset={{ x: 0, y: 2 }}
+                                    />
                                     {ungroupImg ? (
                                         <KonvaImage
                                             image={ungroupImg}
-                                            x={- (controlSize - 8) / 2}
-                                            y={- (controlSize - 8) / 2}
-                                            width={controlSize - 8}
-                                            height={controlSize - 8}
+                                            x={- (controlSize - 10) / 2}
+                                            y={- (controlSize - 10) / 2}
+                                            width={controlSize - 10}
+                                            height={controlSize - 10}
                                         />
                                     ) : (
                                         <Text
                                             x={-6}
                                             y={-8}
                                             text={`×`}
-                                            fontSize={14}
+                                            fontSize={18}
                                             fill="#ffffff"
+                                            fontStyle="bold"
                                             listening={false}
                                         />
                                     )}

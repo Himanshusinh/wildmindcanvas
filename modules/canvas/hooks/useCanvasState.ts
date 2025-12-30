@@ -31,6 +31,7 @@ export function useCanvasState(props: CanvasProps) {
         externalScriptFrameModals,
         externalSceneFrameModals,
         externalTextModals,
+        initialGroupContainerStates,
     } = props;
 
     // Local state for canvas text (fallback if props not provided)
@@ -69,7 +70,7 @@ export function useCanvasState(props: CanvasProps) {
     const [storyWorldStates, setStoryWorldStates] = useState<Array<{ storyboardId: string; storyWorld: StoryWorld }>>([]);
 
     // Group Container state - stores groups of canvas items
-    const [groupContainerStates, setGroupContainerStates] = useState<GroupContainerState[]>([]);
+    const [groupContainerStates, setGroupContainerStates] = useState<GroupContainerState[]>(initialGroupContainerStates || []);
 
     // Compare Plugin
     const [compareModalStates, setCompareModalStates] = useState<CompareModalState[]>([]);
@@ -91,6 +92,7 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalScriptFrameModals) setScriptFrameModalStates(externalScriptFrameModals); }, [externalScriptFrameModals]);
     useEffect(() => { if (externalSceneFrameModals) setSceneFrameModalStates(externalSceneFrameModals as any); }, [externalSceneFrameModals]);
     useEffect(() => { if (externalTextModals) setTextInputStates(externalTextModals as any); }, [externalTextModals]);
+    useEffect(() => { if (initialGroupContainerStates) setGroupContainerStates(initialGroupContainerStates); }, [initialGroupContainerStates]);
 
     // --- EFFECTIVE STATES (No longer needed to mask, but we'll use local state as source of truth now) ---
 

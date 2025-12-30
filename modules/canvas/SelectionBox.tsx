@@ -6,6 +6,8 @@ import Konva from 'konva';
 import { getClientRect } from '@/core/canvas/canvasHelpers';
 import { ImageUpload } from '@/core/types/canvas';
 import { ScriptFrameModalState, SceneFrameModalState } from '@/modules/canvas-overlays/types';
+import { getComponentDimensions } from './utils/getComponentDimensions';
+import { CanvasItemsData } from './types';
 
 const GRID_GAP = 10; // Minimal gap between components
 const GRID_PADDING = 8; // Minimal equal padding on all sides (left, right, top, bottom)
@@ -124,6 +126,9 @@ interface SelectionBoxProps {
   onCreateGroup?: () => void;
   isGroupSelected?: boolean;
   onUngroup?: () => void;
+  selectedCanvasTextIds?: string[];
+  effectiveCanvasTextStates?: any[];
+  selectedGroupIds?: string[];
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -222,6 +227,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   onCreateGroup,
   isGroupSelected,
   onUngroup,
+  effectiveCanvasTextStates = [],
+  selectedCanvasTextIds = [],
+  selectedGroupIds = [],
 }) => {
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
@@ -269,16 +277,22 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   const totalSelected = selectedImageIndices.length +
     selectedImageModalIds.length +
     selectedVideoModalIds.length +
+    selectedVideoEditorModalIds.length +
     selectedMusicModalIds.length +
     selectedTextInputIds.length +
     selectedUpscaleModalIds.length +
+    selectedMultiangleCameraModalIds.length +
     selectedRemoveBgModalIds.length +
     selectedEraseModalIds.length +
     selectedExpandModalIds.length +
     selectedVectorizeModalIds.length +
+    selectedNextSceneModalIds.length +
+    selectedCompareModalIds.length +
     selectedStoryboardModalIds.length +
     selectedScriptFrameModalIds.length +
-    selectedSceneFrameModalIds.length;
+    selectedSceneFrameModalIds.length +
+    selectedCanvasTextIds.length +
+    selectedGroupIds.length;
 
 
   // Keyboard handler for "G" key to trigger arrange
@@ -328,20 +342,45 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       `text:${serializeStrings(selectedTextInputIds)}`,
       `imgModal:${serializeStrings(selectedImageModalIds)}`,
       `vidModal:${serializeStrings(selectedVideoModalIds)}`,
+      `vidEditorModal:${serializeStrings(selectedVideoEditorModalIds)}`,
       `musicModal:${serializeStrings(selectedMusicModalIds)}`,
       `upscaleModal:${serializeStrings(selectedUpscaleModalIds)}`,
+      `multiangleModal:${serializeStrings(selectedMultiangleCameraModalIds)}`,
       `removeBgModal:${serializeStrings(selectedRemoveBgModalIds)}`,
       `eraseModal:${serializeStrings(selectedEraseModalIds)}`,
       `expandModal:${serializeStrings(selectedExpandModalIds)}`,
       `vectorizeModal:${serializeStrings(selectedVectorizeModalIds)}`,
+      `nextSceneModal:${serializeStrings(selectedNextSceneModalIds)}`,
+      `compareModal:${serializeStrings(selectedCompareModalIds)}`,
       `storyboardModal:${serializeStrings(selectedStoryboardModalIds)}`,
       `scriptFrameModal:${serializeStrings(selectedScriptFrameModalIds)}`,
       `sceneFrameModal:${serializeStrings(selectedSceneFrameModalIds)}`,
+      `canvasText:${serializeStrings(selectedCanvasTextIds)}`,
     ].join('|');
   };
 
   const collectSelectedComponents = (): SelectedComponent[] => {
     const components: SelectedComponent[] = [];
+    const canvasData: CanvasItemsData = {
+      images,
+      canvasTextStates: effectiveCanvasTextStates,
+      textInputStates,
+      imageModalStates,
+      videoModalStates,
+      musicModalStates,
+      upscaleModalStates,
+      multiangleCameraModalStates,
+      removeBgModalStates,
+      eraseModalStates,
+      expandModalStates,
+      vectorizeModalStates,
+      nextSceneModalStates,
+      compareModalStates,
+      storyboardModalStates,
+      scriptFrameModalStates,
+      sceneFrameModalStates,
+      videoEditorModalStates,
+    } as any;
 
     selectedImageIndices.forEach((idx) => {
       const img = images[idx];
@@ -364,8 +403,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         type: 'text',
         id,
         key: `text-${id}`,
-        width: 600,
-        height: 400,
+        width: 400,
+        height: 140,
         x: text.x || 0,
         y: text.y || 0,
       });
@@ -374,12 +413,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedImageModalIds.forEach((id) => {
       const modal = imageModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('imageModal', id, canvasData);
       components.push({
         type: 'imageModal',
         id,
         key: `imgModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -388,12 +428,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedVideoModalIds.forEach((id) => {
       const modal = videoModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('videoModal', id, canvasData);
       components.push({
         type: 'videoModal',
         id,
         key: `videoModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -418,12 +459,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedMusicModalIds.forEach((id) => {
       const modal = musicModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('musicModal', id, canvasData);
       components.push({
         type: 'musicModal',
         id,
         key: `musicModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 300,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -583,6 +625,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         height: modal.frameHeight || 300,
         x: modal.x || 0,
         y: modal.y || 0,
+      });
+    });
+
+    selectedCanvasTextIds.forEach((id) => {
+      const text = effectiveCanvasTextStates.find((t: any) => t.id === id);
+      if (!text) return;
+      components.push({
+        type: 'text' as any, // Reusing 'text'
+        id,
+        key: `canvasText-${id}`,
+        width: text.width || 200,
+        height: text.height || 100,
+        x: text.x || 0,
+        y: text.y || 0,
       });
     });
 
@@ -1734,64 +1790,49 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             y={-40}
           >
             {/* Group name is rendered by GroupLabel component, not here */}
-            {/* Group/Ungroup button */}
-            <Group
-              x={0}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                if (isGroupSelected) {
-                  onUngroup?.();
-                } else {
-                  onCreateGroup?.();
-                }
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
+            {/* Group button - ONLY SHOW IF NO GROUP SELECTED */}
+            {!isGroupSelected && (
+              <Group
                 x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#ffffff"
-                stroke="rgba(15,23,42,0.12)"
-                strokeWidth={1}
-                cornerRadius={10}
-                shadowColor="rgba(15,23,42,0.18)"
-                shadowBlur={6}
-                shadowOffset={{ x: 0, y: 3 }}
-              />
-              <Group x={9} y={9}>
-                {isGroupSelected ? (
-                  // Ungroup Icon: 4 squares with a red slash
-                  <>
-                    <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
-                    <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
-                    <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
-                    <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" opacity={0.6} />
-                    <Line points={[0, 18, 18, 0]} stroke="#ef4444" strokeWidth={2.5} lineCap="round" />
-                  </>
-                ) : (
-                  // Group Icon: 4 squares
-                  <>
-                    <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                    <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                    <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                    <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  </>
-                )}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  onCreateGroup?.();
+                }}
+                onMouseEnter={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) {
+                    stage.container().style.cursor = 'pointer';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) {
+                    stage.container().style.cursor = 'default';
+                  }
+                }}
+              >
+                <Rect
+                  x={0}
+                  y={0}
+                  width={36}
+                  height={36}
+                  fill="#ffffff"
+                  stroke="rgba(15,23,42,0.12)"
+                  strokeWidth={1}
+                  cornerRadius={10}
+                  shadowColor="rgba(15,23,42,0.18)"
+                  shadowBlur={6}
+                  shadowOffset={{ x: 0, y: 3 }}
+                />
+                <Group x={9} y={9}>
+                  {/* Group Icon: 4 squares */}
+                  <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                </Group>
               </Group>
-            </Group>
+            )}
             {/* Arrange button */}
             <Group
               x={48}
@@ -1896,47 +1937,49 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 18}
             y={-40}
           >
-            {/* Group button */}
-            <Group
-              x={0}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                onCreateGroup?.();
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
+            {/* Group button - ONLY SHOW IF NO GROUP SELECTED */}
+            {!isGroupSelected && (
+              <Group
                 x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#ffffff"
-                stroke="rgba(15,23,42,0.12)"
-                strokeWidth={1}
-                cornerRadius={10}
-                shadowColor="rgba(15,23,42,0.18)"
-                shadowBlur={6}
-                shadowOffset={{ x: 0, y: 3 }}
-              />
-              <Group x={9} y={9}>
-                {/* 4 small squares in 2x2 grid */}
-                <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  onCreateGroup?.();
+                }}
+                onMouseEnter={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) {
+                    stage.container().style.cursor = 'pointer';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const stage = e.target.getStage();
+                  if (stage) {
+                    stage.container().style.cursor = 'default';
+                  }
+                }}
+              >
+                <Rect
+                  x={0}
+                  y={0}
+                  width={36}
+                  height={36}
+                  fill="#ffffff"
+                  stroke="rgba(15,23,42,0.12)"
+                  strokeWidth={1}
+                  cornerRadius={10}
+                  shadowColor="rgba(15,23,42,0.18)"
+                  shadowBlur={6}
+                  shadowOffset={{ x: 0, y: 3 }}
+                />
+                <Group x={9} y={9}>
+                  {/* 4 small squares in 2x2 grid */}
+                  <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                  <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
+                </Group>
               </Group>
-            </Group>
+            )}
             {/* Arrange button */}
             <Group
               x={48}

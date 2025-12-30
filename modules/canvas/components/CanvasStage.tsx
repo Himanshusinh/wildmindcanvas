@@ -29,6 +29,7 @@ interface CanvasStageProps {
     viewportSize: { width: number; height: number };
     position: { x: number; y: number };
     scale: number;
+    selectedGroupIds?: string[];
 }
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
@@ -40,7 +41,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     refs,
     viewportSize,
     position,
-    scale
+    scale,
+    selectedGroupIds = []
 }) => {
     const {
         images,
@@ -96,6 +98,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         selectedStoryboardModalIds, setSelectedStoryboardModalIds,
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
+        effectiveSelectedCanvasTextIds,
     } = canvasSelection;
 
     const {
@@ -117,6 +120,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         // Basic check, or pass logical function
         return true;
     };
+
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -246,7 +250,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
                 {images
                     .filter((img) => img.type !== 'model3d' && img.type !== 'text')
-                    //.filter((img) => !groupedComponentIds.has(img.elementId || '')) // Logic needed from somewhere
                     .map((imageData: any, index: number) => (
                         <CanvasImage
                             key={`${imageData.url}-${index}`}
@@ -291,30 +294,45 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 />
 
                 <SelectionBox
-                    isGroupSelected={false} // selectedGroupIds not available yet
+                    isGroupSelected={selectedGroupIds.length > 0}
                     isSelecting={isSelecting}
                     {...canvasSelection}
                     {...canvasState}
+                    selectedCanvasTextIds={effectiveSelectedCanvasTextIds}
                     handleImageUpdateWithGroup={groupLogic.handleImageUpdateWithGroup}
                     selectionDragOriginRef={React.useRef<{ x: number, y: number } | null>(null)}
+                    onCreateGroup={groupLogic.handleCreateGroup}
                 />
 
                 <GroupContainerOverlay
                     groups={groupContainerStates}
                     scale={scale}
                     position={position}
-                    selectedGroupIds={[]}
-                    onGroupMove={(id, x, y) => {
-                        // Simple update for now, ideally persist
-                        setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, x, y } : g));
-                    }}
+                    selectedGroupIds={selectedGroupIds}
+                    onUngroup={(id) => groupLogic.handleUngroup([id])}
+                    onGroupMove={groupLogic.handleGroupMove}
+                    onGroupDrag={groupLogic.handleGroupDrag}
                     onGroupNameChange={(id, name) => {
                         setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, meta: { ...g.meta, name } } : g));
                     }}
-                    getItemBounds={() => null} // TODO: implement
+                    getItemBounds={() => null}
                     images={images}
-                // needs handlers
-                // handleUngroup, etc.
+                    videoModalStates={videoModalStates}
+                    textInputStates={textInputStates}
+                    musicModalStates={musicModalStates}
+                    upscaleModalStates={upscaleModalStates}
+                    multiangleCameraModalStates={multiangleCameraModalStates}
+                    removeBgModalStates={removeBgModalStates}
+                    eraseModalStates={eraseModalStates}
+                    expandModalStates={expandModalStates}
+                    vectorizeModalStates={vectorizeModalStates}
+                    nextSceneModalStates={nextSceneModalStates}
+                    compareModalStates={compareModalStates}
+                    storyboardModalStates={storyboardModalStates}
+                    scriptFrameModalStates={scriptFrameModalStates}
+                    sceneFrameModalStates={sceneFrameModalStates}
+                    canvasTextStates={effectiveCanvasTextStates}
+                    stageRef={stageRef}
                 />
             </Layer>
         </Stage>

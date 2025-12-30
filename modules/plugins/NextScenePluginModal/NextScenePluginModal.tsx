@@ -305,9 +305,10 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         // Create 9 image modals in a 3x3 grid
         const modalIds: string[] = [];
         const gridCols = 3;
-        const gridGap = 650; // Gap between modals
+        const horizontalGap = frameWidth + 20; // Tight gap
+        const verticalGap = frameHeight + 20;   // Tight gap
         const startX = x + (400 * scale + 50) / scale; // Start to the right of plugin
-        const startY = y - (gridGap * 1.5) / scale; // Center vertically
+        const startY = y - (verticalGap * 1.5) / scale; // Center vertically
 
         // Create all 9 modals first (optimistic UI)
         for (let i = 0; i < 9; i++) {
@@ -316,8 +317,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           const modalId = `image-multiangle-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
           modalIds.push(modalId);
 
-          const targetX = startX + (col * gridGap) / scale;
-          const targetY = startY + (row * gridGap) / scale;
+          const targetX = startX + (col * horizontalGap) / scale;
+          const targetY = startY + (row * verticalGap) / scale;
 
           if (onPersistImageModalCreate) {
             onPersistImageModalCreate({

@@ -85,9 +85,12 @@ export const TextInput: React.FC<TextInputProps> = ({
   useEffect(() => {
     const handleTogglePin = (e: Event) => {
       const ce = e as CustomEvent;
-      const { selectedTextInputIds } = ce.detail || {};
+      const { selectedTextInputIds, selectedTextInputId } = ce.detail || {};
       // Check if this text input is selected
-      if (selectedTextInputIds && Array.isArray(selectedTextInputIds) && selectedTextInputIds.includes(id)) {
+      const isThisSelected = (selectedTextInputIds && Array.isArray(selectedTextInputIds) && selectedTextInputIds.includes(id)) ||
+        (selectedTextInputId === id);
+
+      if (isThisSelected) {
         setIsPinned(prev => !prev);
       }
     };

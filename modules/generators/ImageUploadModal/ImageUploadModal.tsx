@@ -229,26 +229,19 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
+  // Update prompt when value changes (real-time sync)
   useEffect(() => {
-    const currentSentValue = connectedTextInput?.sentValue;
-    // Only update if the sentValue actually changed
-    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentSentValue;
-      lastReceivedSentValueRef.current = currentSentValue;
-      // Always update the prompt, replacing any existing value
-      setPrompt(currentSentValue);
+    const currentTextValue = connectedTextInput?.value;
+    // Only update if the value actually changed
+    if (currentTextValue !== undefined && currentTextValue !== prompt) {
+      setPrompt(currentTextValue);
       // Always call onOptionsChange to persist the change
       if (onOptionsChangeRef.current) {
-        const opts: any = { prompt: currentSentValue };
+        const opts: any = { prompt: currentTextValue };
         onOptionsChangeRef.current(opts);
       }
-    } else if (currentSentValue === undefined && connectedTextInput === null) {
-      // Reset refs when disconnected
-      prevConnectedTextValueRef.current = undefined;
-      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+  }, [connectedTextInput?.value, prompt]); // Watch value, not sentValue
 
   // Use local prompt for display - user can edit independently after receiving sentValue
   // sentValue is only used to initially populate the prompt when arrow is clicked
@@ -1084,9 +1077,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   useEffect(() => {
     const handleTogglePin = (e: Event) => {
       const ce = e as CustomEvent;
-      const { selectedImageModalIds } = ce.detail || {};
+      const { selectedImageModalIds, selectedImageModalId } = ce.detail || {};
       // Check if this modal is selected
-      if (selectedImageModalIds && Array.isArray(selectedImageModalIds) && selectedImageModalIds.includes(id)) {
+      const isThisSelected = (selectedImageModalIds && Array.isArray(selectedImageModalIds) && selectedImageModalIds.includes(id)) ||
+        (selectedImageModalId === id);
+
+      if (isThisSelected) {
         setIsPinned(prev => !prev);
       }
     };
@@ -1716,7 +1712,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             isUploadedImage={Boolean(isUploadedImage)}
             isSelected={Boolean(isSelected)}
             prompt={effectivePrompt}
-            isPromptDisabled={false}
+            isPromptDisabled={!!connectedTextInput}
             selectedModel={selectedModel}
             selectedAspectRatio={selectedAspectRatio}
             selectedFrame={selectedFrame}

@@ -6,6 +6,14 @@ export function getComponentDimensions(
     id: string | number,
     data: CanvasItemsData
 ): { width: number; height: number } {
+    const calculateHeightFromAspectRatio = (width: number, aspectRatio: string | undefined, minHeight: number): number => {
+        if (!aspectRatio) return minHeight;
+        const [wRatio, hRatio] = aspectRatio.split(':').map(Number);
+        if (!wRatio || !hRatio) return minHeight;
+        const calculatedHeight = (width / wRatio) * hRatio;
+        return Math.max(calculatedHeight, minHeight);
+    };
+
     const {
         images,
         canvasTextStates,
@@ -52,21 +60,25 @@ export function getComponentDimensions(
             // Find within textInputStates
             const input = textInputStates.find(t => t.id === id);
             if (!input) return { width: 0, height: 0 };
-            // Estimate width based on content
-            const estimatedWidth = input.value ? Math.max(200, input.value.length * 10) : 200;
-            return { width: estimatedWidth, height: 50 }; // approx
+            return { width: 400, height: 140 }; // Standard TextInput size
         }
 
         case 'imageModal':
         case 'image-modal': {
             const modal = imageModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if (!modal) return { width: 0, height: 0 };
+            const width = modal.frameWidth || 600;
+            const height = calculateHeightFromAspectRatio(width, (modal as any).aspectRatio || '1:1', 400);
+            return { width, height };
         }
 
         case 'videoModal':
         case 'video-modal': {
             const modal = videoModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 512, height: modal.frameHeight || 512 } : { width: 0, height: 0 };
+            if (!modal) return { width: 0, height: 0 };
+            const width = modal.frameWidth || 600;
+            const height = calculateHeightFromAspectRatio(width, (modal as any).aspectRatio || 'getModelDefaultAspectRatio', 600);
+            return { width, height };
         }
 
         case 'videoEditorModal':
@@ -80,7 +92,10 @@ export function getComponentDimensions(
         case 'musicModal':
         case 'music-modal': {
             const modal = musicModalStates.find(m => m.id === id);
-            return modal ? { width: modal.frameWidth || 340, height: modal.frameHeight || 480 } : { width: 0, height: 0 };
+            if (!modal) return { width: 0, height: 0 };
+            const width = modal.frameWidth || 600;
+            const height = 300; // Fixed as per MusicModalFrame.tsx
+            return { width, height };
         }
 
         case 'upscaleModal':

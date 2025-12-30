@@ -71,6 +71,8 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const [selectedSceneFrameModalId, setSelectedSceneFrameModalId] = useState<string | null>(null);
     const [selectedSceneFrameModalIds, setSelectedSceneFrameModalIds] = useState<string[]>([]);
 
+    const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+
     // Selection Box State
     const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
     const [selectionTightRect, setSelectionTightRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -119,6 +121,7 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         setSelectedScriptFrameModalIds([]);
         setSelectedSceneFrameModalId(null);
         setSelectedSceneFrameModalIds([]);
+        setSelectedGroupIds([]);
 
         // Clear canvas text selection
         effectiveSetSelectedCanvasTextId(null);
@@ -182,6 +185,7 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalId, setSelectedSceneFrameModalId,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
+        selectedGroupIds, setSelectedGroupIds,
 
         // Effective Canvas Text Selection
         effectiveSelectedCanvasTextId,

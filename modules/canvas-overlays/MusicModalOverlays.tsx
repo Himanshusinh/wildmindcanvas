@@ -11,10 +11,10 @@ import { downloadAudio, generateDownloadFilename } from '@/core/api/downloadUtil
  */
 function calculateAspectRatioFromDimensions(width?: number, height?: number): string {
   if (!width || !height || width <= 0 || height <= 0) return '1:1';
-  
+
   const ratio = width / height;
   const tolerance = 0.01;
-  
+
   const commonRatios: Array<{ ratio: number; label: string }> = [
     { ratio: 1.0, label: '1:1' },
     { ratio: 4 / 3, label: '4:3' },
@@ -30,13 +30,13 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
     { ratio: 5 / 4, label: '5:4' },
     { ratio: 4 / 5, label: '4:5' },
   ];
-  
+
   for (const common of commonRatios) {
     if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
       return common.label;
     }
   }
-  
+
   // Calculate GCD for custom ratios
   const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
   const divisor = gcd(width, height);
@@ -62,6 +62,8 @@ interface MusicModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  connections?: any[];
+  textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
 }
 
 export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
@@ -80,6 +82,8 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  connections = [],
+  textInputStates = [],
 }) => {
   return (
     <>
@@ -149,7 +153,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
               // If it returns a promise, handle it
               if (result && typeof result.then === 'function') {
                 Promise.resolve(result).catch(console.error);
-            }
+              }
             }
             // DO NOT update local state here - let parent state flow down through props
             // The useEffect in Canvas will sync musicModalStates with externalMusicModals
@@ -192,6 +196,8 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           stageRef={stageRef}
           scale={scale}
           position={position}
+          connections={connections}
+          textInputStates={textInputStates}
         />
       ))}
     </>

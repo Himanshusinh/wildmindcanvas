@@ -105,7 +105,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     const resizeObserver = new ResizeObserver((entries) => {
       // Ignore if we're programmatically setting the height
       if (isSettingHeightRef.current) return;
-      
+
       // Ignore if scale has changed (this is a scale change, not a user resize)
       if (previousScaleRef.current !== scale) {
         previousScaleRef.current = scale;
@@ -125,7 +125,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     });
 
     resizeObserver.observe(textarea);
-    
+
     // Update previous scale ref
     previousScaleRef.current = scale;
 
@@ -148,10 +148,10 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     textarea.style.width = '100%';
     textarea.style.maxWidth = '100%';
     textarea.style.minWidth = '0';
-    
+
     // Update previous scale ref immediately
     previousScaleRef.current = scale;
-    
+
     // Reset flag after a longer delay to ensure ResizeObserver doesn't interfere
     setTimeout(() => {
       isSettingHeightRef.current = false;
@@ -304,7 +304,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             border: `${1 * scale}px solid ${inputBorder}`,
             borderRadius: `${8 * scale}px`,
             padding: `${10 * scale}px`,
-            paddingRight: onSendPrompt ? `${40 * scale}px` : `${10 * scale}px`,
             color: inputText,
             fontSize: `${16 * scale}px`,
             fontFamily: 'Arial, sans-serif',
@@ -327,56 +326,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             e.currentTarget.style.borderColor = inputBorder;
           }}
         />
-        
-        {/* Right-facing arrow icon for sending prompt to connected components */}
-        {onSendPrompt && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (!text.trim() || !hasConnectedComponents) return;
-              onSendPrompt();
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            title={hasConnectedComponents ? "Send prompt to connected components" : "No connected components"}
-            style={{
-              position: 'absolute',
-              right: `${8 * scale}px`,
-              top: `${8 * scale}px`,
-              width: `${24 * scale}px`,
-              height: `${24 * scale}px`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: `${6 * scale}px`,
-              color: isDark ? '#9ca3af' : '#6b7280',
-              cursor: (!text.trim() || !hasConnectedComponents) ? 'not-allowed' : 'pointer',
-              padding: 0,
-              opacity: (!text.trim() || !hasConnectedComponents) ? 0.4 : 1,
-              transition: 'color 0.2s ease, opacity 0.2s ease',
-              zIndex: 10,
-            }}
-            disabled={!text.trim() || !hasConnectedComponents}
-            onMouseEnter={(e) => {
-              if (text.trim() && hasConnectedComponents) {
-                (e.currentTarget as HTMLElement).style.color = isDark ? '#ffffff' : '#1f2937';
-              }
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.color = isDark ? '#9ca3af' : '#6b7280';
-            }}
-          >
-            <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" />
-              <path d="M12 5l7 7-7 7" />
-            </svg>
-          </button>
-        )}
+
       </div>
 
       {/* Suggestions Dropdown */}

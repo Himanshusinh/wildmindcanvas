@@ -411,10 +411,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         // Check if there are any selected components
         const hasSelection = selectedImageIndices.length > 0 ||
           selectedImageModalIds.length > 0 ||
+          selectedImageModalId !== null ||
           selectedVideoModalIds.length > 0 ||
+          selectedVideoModalId !== null ||
           selectedMusicModalIds.length > 0 ||
+          selectedMusicModalId !== null ||
           selectedTextInputIds.length > 0 ||
-          (selectedCanvasTextIds && selectedCanvasTextIds.length > 0);
+          selectedTextInputId !== null ||
+          (selectedCanvasTextIds && selectedCanvasTextIds.length > 0) ||
+          selectedCanvasTextId !== null;
 
         if (hasSelection) {
           // Dispatch custom event to toggle pin for selected components
@@ -423,10 +428,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             detail: {
               selectedImageIndices,
               selectedImageModalIds,
+              selectedImageModalId,
               selectedVideoModalIds,
+              selectedVideoModalId,
               selectedMusicModalIds,
+              selectedMusicModalId,
               selectedTextInputIds,
+              selectedTextInputId,
               selectedCanvasTextIds: selectedCanvasTextIds || [],
+              selectedCanvasTextId,
             }
           }));
         }

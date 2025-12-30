@@ -8,6 +8,7 @@ interface MusicModalControlsProps {
   isPinned: boolean;
   isSelected?: boolean;
   prompt: string;
+  isPromptDisabled?: boolean;
   selectedModel: string;
   selectedAspectRatio: string;
   selectedFrame: string;
@@ -34,6 +35,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   isPinned,
   isSelected = false,
   prompt,
+  isPromptDisabled = false,
   selectedModel,
   selectedAspectRatio,
   selectedFrame,
@@ -61,8 +63,8 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   const controlFontSize = `${13 * scale}px`;
   const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
-  const inputBg = isDark ? '#121212' : '#ffffff';
-  const inputText = isDark ? '#ffffff' : '#1f2937';
+  const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
+  const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
   const dropdownBg = isDark ? '#121212' : '#ffffff';
   const dropdownText = isDark ? '#ffffff' : '#1f2937';
   const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
@@ -134,6 +136,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
             }
           }}
           placeholder="Enter music prompt here..."
+          disabled={isPromptDisabled}
           style={{
             flex: 1,
             padding: `${10 * scale}px ${14 * scale}px`,
@@ -143,6 +146,8 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
             fontSize: controlFontSize,
             color: inputText,
             outline: 'none',
+            cursor: isPromptDisabled ? 'not-allowed' : 'text',
+            opacity: isPromptDisabled ? 0.7 : 1,
             transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
           onFocus={(e) => {
@@ -236,7 +241,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isModelDropdownOpen && (
             <div
               style={{
@@ -334,7 +339,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
               <path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          
+
           {isAspectRatioDropdownOpen && (
             <div
               style={{

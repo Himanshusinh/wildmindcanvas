@@ -381,6 +381,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        connections={externalConnections ?? []}
+        textInputStates={textInputStates}
       />
 
       <UpscaleModalOverlays

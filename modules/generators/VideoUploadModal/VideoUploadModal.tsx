@@ -156,25 +156,18 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     onOptionsChangeRef.current = onOptionsChange;
   }, [onOptionsChange]);
 
-  // Update prompt when sentValue changes (only when arrow is clicked, not while typing)
+  // Update prompt when value changes (real-time sync)
   useEffect(() => {
-    const currentSentValue = connectedTextInput?.sentValue;
-    // Only update if the sentValue actually changed
-    if (currentSentValue !== undefined && currentSentValue !== prevConnectedTextValueRef.current) {
-      prevConnectedTextValueRef.current = currentSentValue;
-      lastReceivedSentValueRef.current = currentSentValue;
-      // Always update the prompt, replacing any existing value
-      setPrompt(currentSentValue);
+    const currentTextValue = connectedTextInput?.value;
+    // Only update if the value actually changed
+    if (currentTextValue !== undefined && currentTextValue !== prompt) {
+      setPrompt(currentTextValue);
       // Always call onOptionsChange to persist the change
       if (onOptionsChangeRef.current) {
-        onOptionsChangeRef.current({ prompt: currentSentValue });
+        onOptionsChangeRef.current({ prompt: currentTextValue });
       }
-    } else if (currentSentValue === undefined && connectedTextInput === null) {
-      // Reset refs when disconnected
-      prevConnectedTextValueRef.current = undefined;
-      lastReceivedSentValueRef.current = undefined;
     }
-  }, [connectedTextInput?.sentValue, connectedTextInput]); // Watch sentValue, not value
+  }, [connectedTextInput?.value, prompt]); // Watch value, not sentValue
 
   // Use local prompt for display - user can edit independently after receiving sentValue
   // sentValue is only used to initially populate the prompt when arrow is clicked
@@ -369,9 +362,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => {
     const handleTogglePin = (e: Event) => {
       const ce = e as CustomEvent;
-      const { selectedVideoModalIds } = ce.detail || {};
+      const { selectedVideoModalIds, selectedVideoModalId } = ce.detail || {};
       // Check if this modal is selected
-      if (selectedVideoModalIds && Array.isArray(selectedVideoModalIds) && selectedVideoModalIds.includes(id)) {
+      const isThisSelected = (selectedVideoModalIds && Array.isArray(selectedVideoModalIds) && selectedVideoModalIds.includes(id)) ||
+        (selectedVideoModalId === id);
+
+      if (isThisSelected) {
         setIsPinned(prev => !prev);
       }
     };
@@ -609,7 +605,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isUploadedVideo={!!isUploadedVideo}
         isSelected={Boolean(isSelected)}
         prompt={effectivePrompt}
-        isPromptDisabled={false}
+        isPromptDisabled={!!connectedTextInput}
         selectedModel={selectedModel}
         selectedAspectRatio={selectedAspectRatio}
         selectedFrame={selectedFrame}

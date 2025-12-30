@@ -148,6 +148,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     groupContainerStates,
     setGroupContainerStates,
     compareModalStates,
+    textInputStates,
   } = canvasState;
 
   // --- VIEW STATE ---
@@ -167,7 +168,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     }
     return { x: 0, y: 0 };
   });
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  // No local state for selectedGroupIds, it's in useCanvasSelection
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const isDarkTheme = true;
 
@@ -232,6 +233,48 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       navigationMode: 'trackpad'
     }
   );
+
+  // --- EFFECTIVE DATA (Group Displacements) ---
+  const effectiveImages = groupLogic.getEffectiveStates(images, 'image');
+  const effectiveImageModalStates = groupLogic.getEffectiveStates(imageModalStates, 'image-modal');
+  const effectiveVideoModalStates = groupLogic.getEffectiveStates(videoModalStates, 'video-modal');
+  const effectiveMusicModalStates = groupLogic.getEffectiveStates(musicModalStates, 'music-modal');
+  const effectiveTextInputStates = groupLogic.getEffectiveStates(textInputStates, 'text-input');
+  const effectiveUpscaleModalStates = groupLogic.getEffectiveStates(upscaleModalStates, 'upscale');
+  const effectiveMultiangleCameraModalStates = groupLogic.getEffectiveStates(multiangleCameraModalStates, 'multiangle-camera');
+  const effectiveRemoveBgModalStates = groupLogic.getEffectiveStates(removeBgModalStates, 'removebg');
+  const effectiveEraseModalStates = groupLogic.getEffectiveStates(eraseModalStates, 'erase');
+  const effectiveExpandModalStates = groupLogic.getEffectiveStates(expandModalStates, 'expand');
+  const effectiveVectorizeModalStates = groupLogic.getEffectiveStates(vectorizeModalStates, 'vectorize');
+  const effectiveNextSceneModalStates = groupLogic.getEffectiveStates(nextSceneModalStates, 'next-scene');
+  const effectiveStoryboardModalStates = groupLogic.getEffectiveStates(storyboardModalStates, 'storyboard');
+  const effectiveScriptFrameModalStates = groupLogic.getEffectiveStates(scriptFrameModalStates, 'script-frame');
+  const effectiveSceneFrameModalStates = groupLogic.getEffectiveStates(sceneFrameModalStates, 'scene-frame');
+  const effectiveVideoEditorModalStates = groupLogic.getEffectiveStates(videoEditorModalStates, 'video-editor-modal');
+  const effectiveCompareModalStates = groupLogic.getEffectiveStates(compareModalStates, 'compare-modal');
+  const effectiveCanvasTextStates = groupLogic.getEffectiveStates(canvasState.effectiveCanvasTextStates, 'canvas-text');
+
+  const effectiveCanvasState = {
+    ...canvasState,
+    images: effectiveImages,
+    imageModalStates: effectiveImageModalStates,
+    videoModalStates: effectiveVideoModalStates,
+    musicModalStates: effectiveMusicModalStates,
+    textInputStates: effectiveTextInputStates,
+    upscaleModalStates: effectiveUpscaleModalStates,
+    multiangleCameraModalStates: effectiveMultiangleCameraModalStates,
+    removeBgModalStates: effectiveRemoveBgModalStates,
+    eraseModalStates: effectiveEraseModalStates,
+    expandModalStates: effectiveExpandModalStates,
+    vectorizeModalStates: effectiveVectorizeModalStates,
+    nextSceneModalStates: effectiveNextSceneModalStates,
+    storyboardModalStates: effectiveStoryboardModalStates,
+    scriptFrameModalStates: effectiveScriptFrameModalStates,
+    sceneFrameModalStates: effectiveSceneFrameModalStates,
+    videoEditorModalStates: effectiveVideoEditorModalStates,
+    compareModalStates: effectiveCompareModalStates,
+    effectiveCanvasTextStates,
+  };
 
   // --- SHORTCUTS ---
   useKeyboardShortcuts({
@@ -429,10 +472,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistCompareModalDelete: props.onPersistCompareModalDelete,
 
     // Group Deletion
-    selectedGroupIds,
+    selectedGroupIds: canvasSelection.selectedGroupIds,
     groupContainerStates,
     setGroupContainerStates,
-    setSelectedGroupIds,
+    setSelectedGroupIds: canvasSelection.setSelectedGroupIds,
     onPersistGroupDelete: props.onPersistGroupDelete,
 
     images,
@@ -506,7 +549,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       onDrop={handleDrop}
     >
       <CanvasStage
-        canvasState={canvasState}
+        canvasState={effectiveCanvasState as any}
         canvasSelection={canvasSelection}
         canvasEvents={events}
         groupLogic={groupLogic}
@@ -518,10 +561,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         viewportSize={viewportSize}
         position={position}
         scale={scale}
+        selectedGroupIds={canvasSelection.selectedGroupIds}
       />
 
       <CanvasOverlays
-        canvasState={canvasState}
+        canvasState={effectiveCanvasState as any}
         canvasSelection={canvasSelection}
         props={props}
         stageRef={stageRef as any}
