@@ -74,6 +74,15 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     connections = [],
     onConnectionsChange,
     isUIHidden = false,
+    richTextStates,
+    setRichTextStates,
+    selectedRichTextId,
+    selectedRichTextIds,
+    setSelectedRichTextId,
+    setSelectedRichTextIds,
+    onPersistRichTextCreate,
+    onPersistRichTextMove,
+    onPersistRichTextDelete,
   } = props;
 
   // Refs
@@ -112,6 +121,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistGroupUpdate,
     onPersistGroupDelete,
     connections,
+    richTextStates,
+    setRichTextStates,
+    selectedRichTextId,
+    setSelectedRichTextId,
   });
 
   // --- INITIAL CENTERING (Effect for async/late props) ---
@@ -170,7 +183,15 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   });
   // No local state for selectedGroupIds, it's in useCanvasSelection
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const isDarkTheme = true;
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const checkTheme = () => setIsDarkTheme(document.documentElement.classList.contains('dark'));
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // --- DATA AGGREGATION ---
   const canvasItemsData = {
@@ -510,6 +531,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     e.dataTransfer.dropEffect = 'copy';
   };
 
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const json = e.dataTransfer.getData('application/json');
@@ -562,6 +584,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         position={position}
         scale={scale}
         selectedGroupIds={canvasSelection.selectedGroupIds}
+        isDarkTheme={isDarkTheme}
       />
 
       <CanvasOverlays

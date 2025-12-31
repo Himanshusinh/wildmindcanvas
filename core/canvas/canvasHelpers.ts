@@ -93,7 +93,7 @@ export function findAvailablePositionNear(
 export function applyStageCursor(
   stage: Konva.Stage | null,
   style: string,
-  selectedTool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | undefined,
+  selectedTool: 'image' | 'video' | 'music' | 'cursor' | 'move' | 'text' | 'library' | 'plugin' | 'canvas-text' | 'rich-text' | undefined,
   force = false
 ): void {
   if (!stage) return;
@@ -121,7 +121,7 @@ export function applyStageCursor(
 
     if (selectedTool === 'cursor' || selectedTool === 'move') {
       stage.container().style.cursor = style;
-    } else if ((selectedTool === 'text' || selectedTool === 'canvas-text') && style === 'text') {
+    } else if ((selectedTool === 'text' || selectedTool === 'canvas-text' || selectedTool === 'rich-text') && style === 'text') {
       stage.container().style.cursor = 'text';
     } else {
       stage.container().style.cursor = 'default';

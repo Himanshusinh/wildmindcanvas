@@ -24,6 +24,7 @@ export interface CanvasHistoryState {
     nextSceneModalStates: any[];
     videoEditorModalStates: any[];
     storyWorldStates: any[];
+    richTextStates?: any[];
 }
 
 export const useCanvasHistory = (

@@ -649,6 +649,8 @@ export function buildSnapshotElements(
         styleType: text.styleType || 'paragraph',
         textAlign: text.textAlign || 'left',
         color: text.color || '#ffffff',
+        backgroundColor: text.backgroundColor || 'transparent',
+        textDecoration: text.textDecoration || 'none',
         width: text.width || 300,
         height: text.height || 100,
         ...(connections ? { connections } : {})
@@ -656,6 +658,36 @@ export function buildSnapshotElements(
       elements[text.id] = {
         id: text.id,
         type: 'canvas-text',
+        x: text.x,
+        y: text.y,
+        bounds: { width: text.width || 300, height: text.height || 100 },
+        meta: metaObj,
+      };
+    });
+  }
+
+  // Rich text elements
+  if (state.richTextStates) {
+    state.richTextStates.forEach((text) => {
+      const connections = connectionsBySource[text.id]?.length ? connectionsBySource[text.id] : undefined;
+      const metaObj = {
+        text: text.text || '',
+        fontSize: text.fontSize || 24,
+        fontWeight: text.fontWeight || 'normal',
+        fontStyle: text.fontStyle || 'normal',
+        fontFamily: text.fontFamily || 'Inter, sans-serif',
+        styleType: text.styleType || 'paragraph',
+        textAlign: text.textAlign || 'left',
+        color: text.color || '#ffffff',
+        backgroundColor: text.backgroundColor || 'transparent',
+        textDecoration: text.textDecoration || 'none',
+        width: text.width || 300,
+        height: text.height || 100,
+        ...(connections ? { connections } : {})
+      };
+      elements[text.id] = {
+        id: text.id,
+        type: 'rich-text',
         x: text.x,
         y: text.y,
         bounds: { width: text.width || 300, height: text.height || 100 },

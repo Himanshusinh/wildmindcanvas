@@ -46,9 +46,18 @@ export function useCanvasState(props: CanvasProps) {
     const effectiveSelectedCanvasTextId = selectedCanvasTextId;
     const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId;
 
+    // Local state for rich text
+    const [localRichTextStates, setLocalRichTextStates] = useState<CanvasTextState[]>([]);
+    const effectiveRichTextStates = props.richTextStates ?? localRichTextStates;
+    const effectiveSetRichTextStates = props.setRichTextStates ?? setLocalRichTextStates;
+
     const handleCanvasTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
         effectiveSetCanvasTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetCanvasTextStates]);
+
+    const handleRichTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
+        effectiveSetRichTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    }, [effectiveSetRichTextStates]);
 
     const [patternImage, setPatternImage] = useState<HTMLImageElement | null>(null);
     const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
@@ -92,6 +101,7 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalScriptFrameModals) setScriptFrameModalStates(externalScriptFrameModals); }, [externalScriptFrameModals]);
     useEffect(() => { if (externalSceneFrameModals) setSceneFrameModalStates(externalSceneFrameModals as any); }, [externalSceneFrameModals]);
     useEffect(() => { if (externalTextModals) setTextInputStates(externalTextModals as any); }, [externalTextModals]);
+    useEffect(() => { if (props.richTextStates) setLocalRichTextStates(props.richTextStates); }, [props.richTextStates]);
     useEffect(() => { if (initialGroupContainerStates) setGroupContainerStates(initialGroupContainerStates); }, [initialGroupContainerStates]);
 
     // --- EFFECTIVE STATES (No longer needed to mask, but we'll use local state as source of truth now) ---
@@ -102,6 +112,7 @@ export function useCanvasState(props: CanvasProps) {
     const getCurrentState = useCallback((): CanvasHistoryState => ({
         images: images || [],
         canvasTextStates: effectiveCanvasTextStates,
+        richTextStates: effectiveRichTextStates,
         textInputStates: textInputStates as any,
         imageModalStates: imageModalStates as any,
         videoModalStates: videoModalStates as any,
@@ -121,7 +132,7 @@ export function useCanvasState(props: CanvasProps) {
         videoEditorModalStates,
         storyWorldStates,
     }), [
-        images, effectiveCanvasTextStates, textInputStates, imageModalStates,
+        images, effectiveCanvasTextStates, effectiveRichTextStates, textInputStates, imageModalStates,
         videoModalStates, musicModalStates, storyboardModalStates,
         scriptFrameModalStates, sceneFrameModalStates, groupContainerStates, connections,
         upscaleModalStates, multiangleCameraModalStates, removeBgModalStates,
@@ -134,6 +145,7 @@ export function useCanvasState(props: CanvasProps) {
 
         // Restore local states
         effectiveSetCanvasTextStates(state.canvasTextStates || []);
+        effectiveSetRichTextStates((state as any).richTextStates || []);
         setImageModalStates(state.imageModalStates || []);
         setVideoModalStates(state.videoModalStates || []);
         setMusicModalStates(state.musicModalStates || []);
@@ -168,6 +180,7 @@ export function useCanvasState(props: CanvasProps) {
         {
             images: images || [],
             canvasTextStates: effectiveCanvasTextStates,
+            richTextStates: effectiveRichTextStates,
             textInputStates,
             imageModalStates,
             videoModalStates,
@@ -201,7 +214,7 @@ export function useCanvasState(props: CanvasProps) {
             return () => clearTimeout(timer);
         }
     }, [
-        images, effectiveCanvasTextStates, textInputStates, imageModalStates,
+        images, effectiveCanvasTextStates, effectiveRichTextStates, textInputStates, imageModalStates,
         videoModalStates, musicModalStates, storyboardModalStates,
         scriptFrameModalStates, sceneFrameModalStates, connections,
         upscaleModalStates, removeBgModalStates, eraseModalStates,
@@ -246,6 +259,11 @@ export function useCanvasState(props: CanvasProps) {
         handleCanvasTextUpdate,
         isTextInteracting,
         setIsTextInteracting,
+
+        // Rich Text
+        effectiveRichTextStates,
+        effectiveSetRichTextStates,
+        handleRichTextUpdate,
 
         // History
         record, undo, redo, canUndo, canRedo, getCurrentState

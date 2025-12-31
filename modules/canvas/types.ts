@@ -20,8 +20,8 @@ export interface CanvasProps {
     initialScale?: number;
     onImagesDrop?: (files: File[]) => void;
     onLibraryMediaDrop?: (media: { id: string; url: string; type: 'image' | 'video' | 'music' | 'uploaded'; thumbnail?: string; prompt?: string; model?: string; createdAt?: string; storagePath?: string; mediaId?: string }, x: number, y: number) => void;
-    selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text';
-    onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text') => void;
+    selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text';
+    onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text') => void;
     onTextCreate?: (text: string, x: number, y: number) => void;
     toolClickCounter?: number;
     isImageModalOpen?: boolean;
@@ -154,9 +154,21 @@ export interface CanvasProps {
     selectedCanvasTextIds?: string[];
     setSelectedCanvasTextId?: (id: string | null) => void;
     setSelectedCanvasTextIds?: (ids: string[]) => void;
+    effectiveSelectedCanvasTextIds?: string[];
     onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
     onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
     onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
+
+    richTextStates?: CanvasTextState[];
+    setRichTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
+    selectedRichTextId?: string | null;
+    selectedRichTextIds?: string[];
+    setSelectedRichTextId?: (id: string | null) => void;
+    setSelectedRichTextIds?: (ids: string[]) => void;
+    onPersistRichTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
+    onPersistRichTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
+    onPersistRichTextDelete?: (id: string) => void | Promise<void>;
+
     connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>;
     onConnectionsChange?: (connections: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>) => void;
     onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
@@ -176,6 +188,7 @@ export interface CanvasProps {
 export interface CanvasItemsData {
     images: ImageUpload[];
     canvasTextStates: CanvasTextState[];
+    richTextStates: CanvasTextState[];
     textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
     imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>;
     videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;

@@ -52,6 +52,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
   const [canvasTextStates, setCanvasTextStates] = useState<CanvasTextState[]>([]);
   const [selectedCanvasTextId, setSelectedCanvasTextId] = useState<string | null>(null);
+  const [richTextStates, setRichTextStates] = useState<CanvasTextState[]>([]);
+  const [selectedRichTextId, setSelectedRichTextId] = useState<string | null>(null);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<TextModalState[]>([]);
@@ -187,6 +189,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }> = [];
         const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
         const newCompareGenerators: CompareGenerator[] = [];
+        const newRichTextStates: CanvasTextState[] = [];
 
         Object.values(elements).forEach((element: any) => {
           console.log('[Hydration] Processing element:', element.type, element.id);
@@ -333,6 +336,24 @@ export function CanvasApp({ user }: CanvasAppProps) {
               newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
             } else if (element.type === 'compare-plugin') {
               newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: width, height: height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
+            } else if (element.type === 'rich-text') {
+              newRichTextStates.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                text: element.meta?.text || '',
+                fontSize: element.meta?.fontSize || 24,
+                fontWeight: element.meta?.fontWeight || 'normal',
+                fontStyle: element.meta?.fontStyle || 'normal',
+                fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                width: width,
+                height: height,
+                color: element.meta?.color || element.meta?.fill || '#ffffff',
+                backgroundColor: element.meta?.backgroundColor || 'transparent',
+                textAlign: element.meta?.textAlign || 'left',
+                textDecoration: element.meta?.textDecoration || 'none',
+                styleType: element.meta?.styleType || 'paragraph',
+              });
             }
           }
         });
@@ -347,6 +368,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setUpscaleGenerators(newUpscaleGenerators);
           setMultiangleCameraGenerators(newMultiangleCameraGenerators || []);
           setCompareGenerators(newCompareGenerators);
+          setRichTextStates(newRichTextStates);
         }
         snapshotLoadedRef.current = true;
       } else if (op.type === 'create' && op.data.element) {
@@ -618,6 +640,27 @@ export function CanvasApp({ user }: CanvasAppProps) {
               mood: element.meta?.mood
             }];
           });
+        } else if (element.type === 'rich-text') {
+          setRichTextStates((prev) => {
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              text: element.meta?.text || '',
+              fontSize: element.meta?.fontSize || 24,
+              fontWeight: element.meta?.fontWeight || 'normal',
+              fontStyle: element.meta?.fontStyle || 'normal',
+              fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+              textAlign: element.meta?.textAlign || 'left',
+              width: element.bounds?.width || 300,
+              height: element.bounds?.height || 100,
+              color: element.meta?.color || element.meta?.fill || '#ffffff',
+              backgroundColor: element.meta?.backgroundColor || 'transparent',
+              textDecoration: element.meta?.textDecoration || 'none',
+              styleType: element.meta?.styleType || 'paragraph',
+            }];
+          });
         }
       } else if (op.type === 'delete' && op.elementId) {
         // Delete element - directly remove from state (don't call handleImageDelete to avoid sending another delete op)
@@ -650,6 +693,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
         setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
+        setRichTextStates((prev) => prev.filter(t => t.id !== op.elementId));
         // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
         setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
       } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
@@ -745,6 +789,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setStoryboardGenerators(updatePluginPosition);
         setScriptFrameGenerators(updatePluginPosition);
         setSceneFrameGenerators(updatePluginPosition);
+        setRichTextStates((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        });
+        setRichTextStates((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        });
       } else if (op.type === 'update' && op.elementId && op.data.updates) {
         // Also handle regular element updates
         setImages((prev) => {
@@ -846,6 +910,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setRemoveBgGenerators(updatePluginState);
         setEraseGenerators(updatePluginState);
         setExpandGenerators(updatePluginState);
+        setRichTextStates((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            const updates = { ...op.data.updates };
+            // Flatten meta updates if present
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates };
+            return next;
+          }
+          return prev;
+        });
         setVectorizeGenerators(updatePluginState);
         setNextSceneGenerators(updatePluginState);
         setStoryboardGenerators(updatePluginState);
@@ -1150,6 +1229,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           sceneFrameGenerators,
           textGenerators,
           canvasTextStates,
+          richTextStates,
           connectors,
           generationQueue,
           compareGenerators,
@@ -1171,7 +1251,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, richTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -1277,6 +1357,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
           const newCompareGenerators: CompareGenerator[] = [];
           const newCanvasTextStates: Array<CanvasTextState> = [];
+          const newRichTextStates: Array<CanvasTextState> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
           const connectorSignatures = new Set<string>();
 
@@ -1407,6 +1488,28 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   color: element.meta?.color || '#ffffff',
                   width: element.meta?.width || 300,
                   height: element.meta?.height || 100,
+                });
+                // Skip restoring connections from element.meta.connections
+                // Top-level connector elements are the source of truth and are already processed in the first pass.
+                // Restoring from meta.connections would create duplicates.
+              } else if (element.type === 'rich-text') {
+                newRichTextStates.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  text: element.meta?.text || 'double click to edit',
+                  fontSize: element.meta?.fontSize || 24,
+                  fontWeight: element.meta?.fontWeight || 'normal',
+                  fontStyle: element.meta?.fontStyle || 'normal',
+                  fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                  styleType: element.meta?.styleType || 'paragraph',
+                  textAlign: element.meta?.textAlign || 'left',
+                  color: element.meta?.color || element.meta?.fill || '#ffffff',
+                  backgroundColor: element.meta?.backgroundColor || 'transparent',
+                  textDecoration: element.meta?.textDecoration || 'none',
+                  width: element.meta?.width || 200,
+                  height: element.meta?.height || 50,
+                  rotation: element.rotation || 0,
                 });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
@@ -1582,6 +1685,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setNextSceneGenerators(newNextSceneGenerators);
           setTextGenerators(newTextGenerators);
           setCanvasTextStates(newCanvasTextStates);
+          setRichTextStates(newRichTextStates);
           setConnectors(newConnectors);
           setCompareGenerators(newCompareGenerators);
 
@@ -1628,9 +1732,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
   }, [canUndo, canRedo, undo, redo]);
 
   // State definitions moved up to be available for canvasSetters
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text'>('cursor');
   const [toolClickCounter, setToolClickCounter] = useState(0);
-  const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text'>('cursor');
+  const previousToolRef = useRef<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text'>('cursor');
   const isSpacePressedRef = useRef(false);
   const selectedToolRef = useRef(selectedTool);
 
@@ -1688,6 +1792,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setScriptFrameGenerators,
     setSceneFrameGenerators,
     setTextGenerators,
+    setRichTextStates,
     setCompareGenerators,
     setConnectors,
     setGenerationQueue,
@@ -2046,7 +2151,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
 
 
-  const handleToolSelect = (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text') => {
+  const handleToolSelect = async (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text') => {
     // Always update to trigger effect, even if tool is the same
     // Use counter to force re-render when clicking same tool again
     if (tool === selectedTool) {
@@ -2087,6 +2192,38 @@ export function CanvasApp({ user }: CanvasAppProps) {
     // Open plugin sidebar when plugin tool is selected
     if (tool === 'plugin') {
       setIsPluginSidebarOpen(true);
+    }
+
+    if (tool === 'rich-text') {
+      const modalId = `rich-text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const viewportCenter = viewportCenterRef.current;
+      const newRichText = {
+        id: modalId,
+        x: viewportCenter.x,
+        y: viewportCenter.y,
+        text: 'double click to edit',
+        fontSize: 24,
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        fontFamily: 'Inter, sans-serif',
+        styleType: 'paragraph',
+        textAlign: 'left',
+        color: '#FFFFFF',
+        backgroundColor: 'transparent',
+        width: 200,
+        height: 50,
+      };
+      setRichTextStates(prev => [...prev.filter(m => m.id !== modalId), newRichText as any]);
+      if (realtimeActive) {
+        realtimeRef.current?.sendCreate({ ...newRichText, type: 'rich-text' });
+      }
+      if (projectId && opManagerInitialized) {
+        await appendOp({
+          type: 'create', elementId: modalId,
+          data: { element: { id: modalId, type: 'rich-text', x: viewportCenter.x, y: viewportCenter.y, meta: { ...newRichText, id: undefined, x: undefined, y: undefined } } },
+          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+        });
+      }
     }
   };
 
@@ -2720,6 +2857,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalScriptFrameModals={scriptFrameGenerators}
               externalSceneFrameModals={sceneFrameGenerators}
               externalTextModals={textGenerators}
+              canvasTextStates={canvasTextStates}
+              setCanvasTextStates={setCanvasTextStates}
+              richTextStates={richTextStates}
+              setRichTextStates={setRichTextStates}
               connections={connectors}
               onConnectionsChange={(connections) => {
                 setConnectors(connections.map((conn) => ({
@@ -3386,9 +3527,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
               setGenerationQueue={setGenerationQueue}
-              onToolSelect={handleToolSelect}
-              canvasTextStates={canvasTextStates}
-              setCanvasTextStates={setCanvasTextStates}
               selectedCanvasTextId={selectedCanvasTextId}
               setSelectedCanvasTextId={setSelectedCanvasTextId}
               onPersistCanvasTextCreate={(text) => {

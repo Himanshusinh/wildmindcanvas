@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 interface ToolbarPanelProps {
-  onToolSelect?: (tool: 'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => void;
+  onToolSelect?: (tool: 'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'rich-text') => void;
   onUpload?: (files: File[]) => void;
   isHidden?: boolean;
 }
@@ -31,7 +31,7 @@ const ensureThemeTransitionStyles = () => {
 };
 
 export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUpload, isHidden = false }) => {
-  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin'>('cursor');
+  const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'rich-text'>('cursor');
   const [isDark, setIsDark] = useState(false);
   const [hoveredTool, setHoveredTool] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
@@ -48,7 +48,7 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
     return () => observer.disconnect();
   }, []);
 
-  const handleToolClick = (tool: 'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin') => {
+  const handleToolClick = (tool: 'cursor' | 'move' | 'canvas-text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'rich-text') => {
     // Debounce guard: ignore repeated clicks on same tool within 400ms
     const now = Date.now();
     if (lastToolClick.current.tool === tool && now - lastToolClick.current.time < 400) {
@@ -141,6 +141,17 @@ export const ToolbarPanel: React.FC<ToolbarPanelProps> = ({ onToolSelect, onUplo
         </svg>
       ),
       label: 'AI Text',
+    },
+    {
+      id: 'rich-text' as const,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7" />
+          <line x1="9" y1="20" x2="15" y2="20" />
+          <line x1="12" y1="4" x2="12" y2="20" />
+        </svg>
+      ),
+      label: 'Rich Text',
     },
     {
       id: 'image' as const,

@@ -11,6 +11,7 @@ import { usePatternImage } from '../hooks/usePatternImage';
 import { CanvasImage } from '../CanvasImage';
 import { CanvasVideoNode } from '../CanvasVideoNode';
 import { CanvasTextNode } from '../CanvasTextNode';
+import { RichText } from '../RichText';
 import { TextElements } from '../TextElements';
 import { SelectionBox } from '../SelectionBox';
 import { GroupContainerOverlay } from '../GroupContainerOverlay';
@@ -30,6 +31,7 @@ interface CanvasStageProps {
     position: { x: number; y: number };
     scale: number;
     selectedGroupIds?: string[];
+    isDarkTheme?: boolean;
 }
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
@@ -42,7 +44,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     viewportSize,
     position,
     scale,
-    selectedGroupIds = []
+    selectedGroupIds = [],
+    isDarkTheme = true
 }) => {
     const {
         images,
@@ -50,6 +53,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         effectiveSetSelectedCanvasTextId,
         effectiveSelectedCanvasTextId,
         handleCanvasTextUpdate,
+        effectiveRichTextStates,
+        handleRichTextUpdate,
         videoModalStates,
         groupContainerStates, setGroupContainerStates,
         setIsTextInteracting,
@@ -99,6 +104,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         effectiveSelectedCanvasTextIds,
+        selectedRichTextId, setSelectedRichTextId,
     } = canvasSelection;
 
     const {
@@ -245,6 +251,19 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         isSelected={selectedVideoModalIds.includes(videoState.id)}
                         onSelect={() => { /* logic passing logic? */ }}
                         onUpdate={(updates) => props.onPersistVideoModalMove?.(videoState.id, updates)}
+                    />
+                ))}
+
+                {effectiveRichTextStates.map((richText: any) => (
+                    <RichText
+                        key={richText.id}
+                        data={richText}
+                        isSelected={selectedRichTextId === richText.id}
+                        onSelect={setSelectedRichTextId}
+                        onChange={handleRichTextUpdate}
+                        onInteractionStart={() => setIsTextInteracting(true)}
+                        onInteractionEnd={() => setIsTextInteracting(false)}
+                        isDarkTheme={isDarkTheme}
                     />
                 ))}
 

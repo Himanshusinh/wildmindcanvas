@@ -1,6 +1,6 @@
 export type GeneratorOverlay = {
   id: string;
-  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'multiangle-camera' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'next-scene-plugin' | 'compare';
+  type: 'image' | 'video' | 'music' | 'text' | 'upscale' | 'multiangle-camera' | 'removebg' | 'erase' | 'replace' | 'expand' | 'vectorize' | 'storyboard' | 'next-scene-plugin' | 'compare' | 'rich-text';
   x: number;
   y: number;
   width?: number;
@@ -42,6 +42,15 @@ export type GeneratorOverlay = {
   isProcessing?: boolean;
   // text generator current value
   value?: string;
+  // rich-text properties
+  fontSize?: number;
+  color?: string;
+  backgroundColor?: string;
+  fontFamily?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  textAlign?: string;
+  textDecoration?: string;
 };
 
 export type MediaElement = {
