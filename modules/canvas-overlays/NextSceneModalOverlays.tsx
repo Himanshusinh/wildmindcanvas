@@ -4,6 +4,7 @@ import React from 'react';
 import { NextScenePluginModal } from '@/modules/plugins/NextScenePluginModal/NextScenePluginModal';
 import Konva from 'konva';
 import { Connection, ImageModalState, NextSceneModalState } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 
 interface NextSceneModalOverlaysProps {
@@ -49,14 +50,54 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
     scale,
     position,
 }) => {
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
     return (
         <>
+            {contextMenu && (
+                <PluginContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    onDuplicate={() => {
+                        const modalState = nextSceneModalStates?.find(m => m.id === contextMenu.modalId);
+                        if (modalState) {
+                            const duplicated = {
+                                ...modalState,
+                                id: `nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                x: modalState.x + 50,
+                                y: modalState.y + 50,
+                            };
+                            setNextSceneModalStates(prev => [...prev, duplicated]);
+                            if (onPersistNextSceneModalCreate) {
+                                Promise.resolve(onPersistNextSceneModalCreate(duplicated)).catch(console.error);
+                            }
+                        }
+                    }}
+                    onDelete={() => {
+                        if (onPersistNextSceneModalDelete) {
+                            const modalId = contextMenu.modalId;
+                            setSelectedNextSceneModalId(null);
+                            setSelectedNextSceneModalIds([]);
+                            const result = onPersistNextSceneModalDelete(modalId);
+                            if (result && typeof result.then === 'function') {
+                                Promise.resolve(result).catch(console.error);
+                            }
+                        }
+                    }}
+                />
+            )}
             {(nextSceneModalStates || []).map((modalState) => (
                 <NextScenePluginModal
                     key={modalState.id}
                     isOpen={true}
                     isExpanded={modalState.isExpanded}
                     id={modalState.id}
+                    onContextMenu={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+                    }}
                     onClose={() => {
                         setNextSceneModalStates(prev => prev.filter(m => m.id !== modalState.id));
                         setSelectedNextSceneModalId(null);

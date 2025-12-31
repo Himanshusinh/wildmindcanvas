@@ -41,6 +41,7 @@ interface ErasePluginModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
@@ -75,6 +76,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  onContextMenu,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -700,6 +702,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={onContextMenu}
     >
       {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
       {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}

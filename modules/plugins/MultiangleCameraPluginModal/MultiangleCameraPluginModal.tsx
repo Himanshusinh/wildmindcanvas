@@ -39,6 +39,7 @@ interface MultiangleCameraPluginModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalProps> = ({
@@ -69,6 +70,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
   imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  onContextMenu,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -305,6 +307,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={onContextMenu}
     >
       {/* Plugin node design with icon and label */}
       <div

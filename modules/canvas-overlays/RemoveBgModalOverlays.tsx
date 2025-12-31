@@ -5,6 +5,7 @@ import { RemoveBgPluginModal } from '@/modules/plugins/RemoveBgPluginModal/Remov
 import Konva from 'konva';
 import { Connection, ImageModalState, RemoveBgModalState } from './types';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 
 interface RemoveBgModalOverlaysProps {
   removeBgModalStates: RemoveBgModalState[] | undefined;
@@ -51,14 +52,54 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
   scale,
   position,
 }) => {
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
   return (
     <>
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onDuplicate={() => {
+            const modalState = removeBgModalStates?.find(m => m.id === contextMenu.modalId);
+            if (modalState) {
+              const duplicated = {
+                ...modalState,
+                id: `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: modalState.x + 50,
+                y: modalState.y + 50,
+              };
+              setRemoveBgModalStates(prev => [...prev, duplicated]);
+              if (onPersistRemoveBgModalCreate) {
+                Promise.resolve(onPersistRemoveBgModalCreate(duplicated)).catch(console.error);
+              }
+            }
+          }}
+          onDelete={() => {
+            if (onPersistRemoveBgModalDelete) {
+              const modalId = contextMenu.modalId;
+              setSelectedRemoveBgModalId(null);
+              setSelectedRemoveBgModalIds([]);
+              const result = onPersistRemoveBgModalDelete(modalId);
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
+              }
+            }
+          }}
+        />
+      )}
       {(removeBgModalStates || []).map((modalState) => (
         <RemoveBgPluginModal
           key={modalState.id}
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          onContextMenu={(e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+          }}
           onClose={() => {
             setRemoveBgModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedRemoveBgModalId(null);

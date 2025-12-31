@@ -2030,3 +2030,218 @@ export async function fetchCredits(): Promise<{ planCode: string; creditBalance:
     throw err;
   }
 }
+
+/**
+ * Generate music for Canvas using MiniMax Music 2
+ */
+export async function generateMusicForCanvas(
+  prompt: string,
+  model: string,
+  lyrics: string,
+  audioSetting: {
+    sample_rate?: number;
+    bitrate?: number;
+    format?: string;
+    voiceId?: string;
+    stability?: number;
+    similarityBoost?: number;
+    style?: number;
+    speed?: number;
+    exaggeration?: number;
+    temperature?: number;
+    cfgScale?: number;
+    voicePrompt?: string;
+    topP?: number;
+    maxTokens?: number;
+    repetitionPenalty?: number;
+    dialogueInputs?: any[];
+    useSpeakerBoost?: boolean;
+    fileName?: string;
+    duration_seconds?: number;
+    prompt_influence?: number;
+    loop?: boolean;
+  },
+
+  projectId?: string
+): Promise<{ mediaId?: string; url?: string; storagePath?: string; generationId?: string; taskId?: string; provider?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minute timeout
+
+  // Get Bearer token for authentication (fallback when cookies don't work)
+  const bearerToken = await getBearerTokenForCanvas();
+
+  if (!bearerToken) {
+    console.warn('[generateMusicForCanvas] ⚠️ No Bearer token found in localStorage - request will rely on cookies only');
+  }
+
+  try {
+    // Build headers with Bearer token if available
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (bearerToken) {
+      headers['Authorization'] = `Bearer ${bearerToken}`;
+    }
+
+    let url = `${API_GATEWAY_URL}/minimax/music`;
+    let body: any = {
+      prompt,
+      model,
+      lyrics,
+      audio_setting: audioSetting,
+      meta: {
+        source: 'canvas',
+        projectId,
+      },
+    };
+
+    // Priority: Specific models first
+    if (model === 'ElevenLabs Sound Effects') {
+      url = `${API_GATEWAY_URL}/fal/eleven/sfx`;
+      body = {
+        prompt,
+        lyrics: lyrics || prompt,
+        text: prompt,
+        duration_seconds: audioSetting.duration_seconds,
+        prompt_influence: audioSetting.prompt_influence,
+        output_format: audioSetting.format,
+        loop: audioSetting.loop,
+        model: 'elevenlabs-sfx',
+        generationType: 'sfx',
+        fileName: audioSetting.fileName,
+      };
+    } else if (model === 'ElevenLabs Dialogue' || model === 'ElevenLabs Dialogue V3') {
+      url = `${API_GATEWAY_URL}/fal/eleven/dialogue`;
+
+      // Ensure we have at least one valid input if the list is empty or first item is empty
+      const dialogueInputs = audioSetting.dialogueInputs || [];
+      const finalInputs = (dialogueInputs.length === 0 || !dialogueInputs[0].text.trim())
+        ? [{ text: prompt || 'Hello', voice: dialogueInputs[0]?.voice || 'Rachel' }]
+        : dialogueInputs.map((input: any) => ({
+          text: input.text || prompt || 'Hello',
+          voice: input.voice,
+        }));
+
+      body = {
+        prompt,
+        lyrics,
+        inputs: finalInputs,
+        stability: audioSetting.stability,
+        use_speaker_boost: audioSetting.useSpeakerBoost,
+        model: 'elevenlabs-dialogue',
+        generationType: 'text-to-dialogue',
+        fileName: audioSetting.fileName,
+      };
+    } else if (model === 'Chatterbox Multilingual') {
+      url = `${API_GATEWAY_URL}/fal/chatterbox/multilingual`;
+
+      const chatterboxLanguages = ['english', 'arabic', 'danish', 'german', 'greek', 'spanish', 'finnish', 'french', 'hebrew', 'hindi', 'italian', 'japanese', 'korean', 'malay', 'dutch', 'norwegian', 'polish', 'portuguese', 'russian', 'swedish', 'swahili', 'turkish', 'chinese'];
+      const isLanguage = audioSetting.voiceId && chatterboxLanguages.includes(audioSetting.voiceId.toLowerCase());
+
+      body = {
+        prompt,
+        lyrics,
+        text: prompt || 'Hello', // Fallback
+        voice: isLanguage ? undefined : (audioSetting.voiceId || undefined),
+        custom_audio_language: isLanguage ? (audioSetting.voiceId?.toLowerCase() || undefined) : undefined,
+        model: 'chatterbox-multilingual-tts',
+        generationType: 'text-to-speech',
+        fileName: audioSetting.fileName,
+        exaggeration: audioSetting.exaggeration,
+        temperature: audioSetting.temperature,
+        cfg_scale: audioSetting.cfgScale,
+      };
+    } else if (model === 'Maya TTS') {
+      url = `${API_GATEWAY_URL}/fal/maya/tts`;
+      body = {
+        prompt: audioSetting.voicePrompt, // Voice description in Maya
+        lyrics,
+        text: prompt, // Content to speak
+        temperature: audioSetting.temperature,
+        top_p: audioSetting.topP,
+        max_tokens: audioSetting.maxTokens,
+        repetition_penalty: audioSetting.repetitionPenalty,
+        model: 'maya-tts',
+        generationType: 'text-to-speech',
+        fileName: audioSetting.fileName,
+      };
+    } else if (audioSetting.voiceId) {
+      // Default ElevenLabs TTS if voiceId is present and no specific model matched above
+      url = `${API_GATEWAY_URL}/fal/eleven/tts`;
+      body = {
+        prompt,
+        lyrics,
+        text: prompt || 'Hello', // Fallback to prompt or default if empty
+        voice: audioSetting.voiceId,
+        model: 'elevenlabs-tts-v3', // Required for backend to route to ElevenLabs
+        generationType: 'text-to-speech',
+        fileName: audioSetting.fileName,
+        stability: audioSetting.stability,
+        similarity_boost: audioSetting.similarityBoost,
+        style: audioSetting.style,
+        speed: audioSetting.speed,
+      };
+    }
+
+
+
+    const response = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify(body),
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response || response.status === 0) {
+      throw new Error('Empty response from server. Please check if the API Gateway is running.');
+    }
+
+    let result;
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+
+    if (!text || text.trim() === '') {
+      throw new Error('Empty response body from server');
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate music');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate music');
+    }
+
+    return result.data || result;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Music generation is taking too long. Please try again.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to generate music. Please check your connection and try again.');
+  }
+}

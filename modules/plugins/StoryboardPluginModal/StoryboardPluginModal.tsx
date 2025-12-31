@@ -48,6 +48,7 @@ interface StoryboardPluginModalProps {
     backgroundDescription?: string;
     specialRequest?: string;
   }) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
@@ -83,6 +84,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   sceneFrameModalStates = [],
   images = [],
   onGenerate,
+  onContextMenu,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -249,6 +251,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       onPointerDown={handlePointerDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={onContextMenu}
       style={{ touchAction: 'none' }}
     >
       {/* Plugin node design with icon and label */}

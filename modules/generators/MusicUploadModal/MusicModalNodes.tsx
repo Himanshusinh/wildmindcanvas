@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { MusicCategory } from './MusicModalTabs';
 
 interface MusicModalNodesProps {
   id?: string;
@@ -7,6 +8,7 @@ interface MusicModalNodesProps {
   isHovered: boolean;
   isSelected: boolean;
   globalDragActive: boolean;
+  activeCategory: MusicCategory;
 }
 
 export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
@@ -15,6 +17,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
   isHovered,
   isSelected,
   globalDragActive,
+  activeCategory,
 }) => {
   return (
     <>
@@ -38,15 +41,15 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           try {
             const active: any = (window as any).__canvas_active_capture;
             if (active?.element && typeof active?.pid === 'number') {
-              try { active.element.releasePointerCapture(active.pid); } catch (err) {}
+              try { active.element.releasePointerCapture(active.pid); } catch (err) { }
               delete (window as any).__canvas_active_capture;
             }
-          } catch (err) {}
+          } catch (err) { }
         }}
         style={{
           position: 'absolute',
           left: `${-12 * scale}px`,
-          top: `${150 * scale}px`,
+          top: `${200 * scale}px`,
           transform: 'translateY(-50%)',
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
@@ -55,8 +58,9 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           cursor: 'pointer',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
-          opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
-          transition: 'opacity 0.18s ease, transform 0.12s ease',
+          opacity: (activeCategory && (isHovered || isSelected || globalDragActive)) ? 1 : 0,
+          visibility: activeCategory ? 'visible' : 'hidden',
+
           pointerEvents: 'auto',
         }}
       />
@@ -67,7 +71,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
         onPointerDown={(e: React.PointerEvent) => {
           const el = e.currentTarget as HTMLElement;
           const pid = e.pointerId;
-          try { el.setPointerCapture?.(pid); } catch (err) {}
+          try { el.setPointerCapture?.(pid); } catch (err) { }
           if (!id) return;
           e.stopPropagation();
           e.preventDefault();
@@ -93,7 +97,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           };
 
           const handlePointerUp = (pe: any) => {
-            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
+            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) { }
             window.removeEventListener('canvas-node-complete', handleComplete as any);
             window.removeEventListener('pointerup', handlePointerUp as any);
             window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -101,7 +105,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           };
 
           const handleComplete = () => {
-            try { el.releasePointerCapture?.(pid); } catch (err) {}
+            try { el.releasePointerCapture?.(pid); } catch (err) { }
             window.removeEventListener('canvas-node-complete', handleComplete as any);
             window.removeEventListener('pointerup', handlePointerUp as any);
             window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -117,7 +121,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
         style={{
           position: 'absolute',
           right: `${-12 * scale}px`,
-          top: `${150 * scale}px`,
+          top: `${200 * scale}px`,
           transform: 'translateY(-50%)',
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
@@ -126,8 +130,8 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           cursor: 'grab',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
-          opacity: (isHovered || isSelected || globalDragActive) ? 1 : 0,
-          transition: 'opacity 0.18s ease, transform 0.12s ease',
+          opacity: (activeCategory && (isHovered || isSelected || globalDragActive)) ? 1 : 0,
+          visibility: activeCategory ? 'visible' : 'hidden',
           pointerEvents: 'auto',
         }}
       />

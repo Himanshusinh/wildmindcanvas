@@ -1,6 +1,7 @@
 import React from 'react';
 import { ComparePluginModal } from '@/modules/plugins/ComparePluginModal/ComparePluginModal';
 import { CompareModalState } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 
 interface CompareModalOverlaysProps {
     compareModalStates: CompareModalState[];
@@ -41,8 +42,43 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
     onUpdateImageModalState,
     onPersistConnectorCreate,
 }) => {
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
     return (
         <>
+            {contextMenu && (
+                <PluginContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    onDuplicate={() => {
+                        const modalState = compareModalStates.find(m => m.id === contextMenu.modalId);
+                        if (modalState) {
+                            const duplicated = {
+                                ...modalState,
+                                id: `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                x: modalState.x + 50,
+                                y: modalState.y + 50,
+                            };
+                            setCompareModalStates(prev => [...prev, duplicated]);
+                            if (onPersistCompareModalCreate) {
+                                Promise.resolve(onPersistCompareModalCreate(duplicated)).catch(console.error);
+                            }
+                        }
+                    }}
+                    onDelete={() => {
+                        if (onPersistCompareModalDelete) {
+                            const modalId = contextMenu.modalId;
+                            setSelectedCompareModalId(null);
+                            setSelectedCompareModalIds([]);
+                            const result = onPersistCompareModalDelete(modalId);
+                            if (result && typeof result.then === 'function') {
+                                Promise.resolve(result).catch(console.error);
+                            }
+                        }
+                    }}
+                />
+            )}
             {compareModalStates.map((modalState) => (
                 <ComparePluginModal
                     key={modalState.id}
@@ -57,6 +93,11 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     stageRef={stageRef}
                     scale={scale}
                     position={position}
+                    onContextMenu={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+                    }}
                     onClose={() => {
                         setCompareModalStates(prev => prev.filter(m => m.id !== modalState.id));
                         if (onPersistCompareModalDelete) {

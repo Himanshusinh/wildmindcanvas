@@ -59,7 +59,30 @@ export interface MusicGenerator {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  activeCategory?: string | null;
+  lyrics?: string;
+  sampleRate?: string;
+  bitrate?: string;
+  audioFormat?: string;
   isGenerating?: boolean;
+
+  // Voice (TTS) specific fields
+  voiceId?: string;
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  speed?: number;
+  exaggeration?: number;
+  temperature?: number;
+  cfgScale?: number;
+  voicePrompt?: string;
+  topP?: number;
+  maxTokens?: number;
+  repetitionPenalty?: number;
+
+  // Dialogue specific fields
+  dialogueInputs?: import('@/modules/canvas-overlays/types').DialogueInput[];
+  useSpeakerBoost?: boolean;
 }
 
 export interface UpscaleGenerator {

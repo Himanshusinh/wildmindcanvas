@@ -30,6 +30,10 @@ interface TextInputProps {
   onScriptGenerationStart?: (textModalId: string) => void;
   connections?: Array<{ from: string; to: string }>;
   storyboardModalStates?: Array<{ id: string; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onDownload?: () => void;
 }
 
 export const TextInput: React.FC<TextInputProps> = ({
@@ -53,12 +57,16 @@ export const TextInput: React.FC<TextInputProps> = ({
   onScriptGenerationStart,
   connections = [],
   storyboardModalStates = [],
+  onContextMenu,
+  isPinned = false,
+  onTogglePin,
+  onDownload,
 }) => {
   const [text, setText] = useState('');
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
+  // Removed local isPinned state
   const [isModelHovered, setIsModelHovered] = useState(false);
   const [isTextFocused, setIsTextFocused] = useState(false);
   const [globalDragActive, setGlobalDragActive] = useState(false);
@@ -91,7 +99,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         (selectedTextInputId === id);
 
       if (isThisSelected) {
-        setIsPinned(prev => !prev);
+        onTogglePin?.();
       }
     };
     window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
@@ -359,6 +367,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       ref={containerRef}
       data-modal-component="text"
       data-overlay-id={id}
+      onContextMenu={onContextMenu}
       onMouseDown={handleMouseDown}
       onMouseEnter={() => requestHoverState(true, true)}
       onMouseLeave={() => requestHoverState(false)}
@@ -395,15 +404,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         scale={scale}
       />
 
-      <ModalActionIcons
-        isSelected={!!isSelected}
-        scale={scale}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
-        variant="default"
-        isPinned={isPinned}
-        onTogglePin={() => setIsPinned(!isPinned)}
-      />
+
 
       <div style={{ position: 'relative' }}>
         <TextModalFrame
@@ -427,7 +428,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           onKeyDown={handleKeyDown}
           onConfirm={handleConfirm}
           selectedModel={selectedModel}
-          onSetIsPinned={setIsPinned}
+          onSetIsPinned={(val) => onTogglePin?.()}
           onMouseDown={handleMouseDown}
           onScriptGenerated={(script) => {
             if (onScriptGenerated) {
@@ -466,7 +467,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           setSelectedModel(model);
         }}
         onSetIsHovered={requestHoverState}
-        onSetIsPinned={setIsPinned}
+        onSetIsPinned={(val) => onTogglePin?.()}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsModelHovered={setIsModelHovered}
         onEnhance={handleEnhance}

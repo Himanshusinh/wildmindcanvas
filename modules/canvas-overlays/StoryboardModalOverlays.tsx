@@ -3,6 +3,7 @@
 import React from 'react';
 import { StoryboardPluginModal } from '@/modules/plugins/StoryboardPluginModal/StoryboardPluginModal';
 import { buildNamedImagesMap } from '@/modules/plugins/StoryboardPluginModal/mentionUtils';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import Konva from 'konva';
 import { ImageModalState } from './types';
 import { ImageUpload } from '@/core/types/canvas';
@@ -74,6 +75,8 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
   images = [],
   onGenerateStoryboard,
 }) => {
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
   // Helper to get connected images for a storyboard
   const getConnectedImages = (storyboardId: string, anchor: string): string[] => {
     if (!storyboardId || !connections) return [];
@@ -99,6 +102,39 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
 
   return (
     <>
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onDuplicate={() => {
+            const modalState = storyboardModalStates?.find(m => m.id === contextMenu.modalId);
+            if (modalState) {
+              const duplicated = {
+                ...modalState,
+                id: `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: modalState.x + 50,
+                y: modalState.y + 50,
+              };
+              setStoryboardModalStates(prev => [...prev, duplicated]);
+              if (onPersistStoryboardModalCreate) {
+                Promise.resolve(onPersistStoryboardModalCreate(duplicated)).catch(console.error);
+              }
+            }
+          }}
+          onDelete={() => {
+            if (onPersistStoryboardModalDelete) {
+              const modalId = contextMenu.modalId;
+              setSelectedStoryboardModalId(null);
+              setSelectedStoryboardModalIds([]);
+              const result = onPersistStoryboardModalDelete(modalId);
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
+              }
+            }
+          }}
+        />
+      )}
       {(storyboardModalStates || []).map((modalState) => {
         // Get connected images for this storyboard
         const connectedCharacterImages = getConnectedImages(modalState.id, 'receive-character');
@@ -110,6 +146,11 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
             key={modalState.id}
             isOpen={true}
             id={modalState.id}
+            onContextMenu={(e: React.MouseEvent) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+            }}
             onClose={() => {
               setStoryboardModalStates(prev => prev.filter(m => m.id !== modalState.id));
               setSelectedStoryboardModalId(null);

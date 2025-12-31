@@ -94,6 +94,29 @@ export function buildSnapshotElements(
       frame: g.frame,
       aspectRatio: g.aspectRatio,
       prompt: g.prompt,
+      activeCategory: g.activeCategory || null,
+      lyrics: g.lyrics || null,
+      sampleRate: g.sampleRate || null,
+      bitrate: g.bitrate || null,
+      audioFormat: g.audioFormat || null,
+
+      // Voice (TTS) specific fields
+      voiceId: g.voiceId,
+      stability: g.stability,
+      similarityBoost: g.similarityBoost,
+      style: g.style,
+      speed: g.speed,
+      exaggeration: g.exaggeration,
+      temperature: g.temperature,
+      cfgScale: g.cfgScale,
+      voicePrompt: g.voicePrompt,
+      topP: g.topP,
+      maxTokens: g.maxTokens,
+      repetitionPenalty: g.repetitionPenalty,
+
+      // Dialogue specific fields
+      dialogueInputs: g.dialogueInputs || [],
+      useSpeakerBoost: g.useSpeakerBoost,
       ...(connections ? { connections } : {})
     };
     elements[g.id] = { id: g.id, type: 'music-generator', x: g.x, y: g.y, bounds: { width: g.frameWidth || 400, height: g.frameHeight || 400 }, meta: metaObj };

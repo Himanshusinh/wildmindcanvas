@@ -34,6 +34,7 @@ interface ComparePluginModalProps {
     initialPrompt?: string;
     initialModel?: string;
     projectId?: string | null;
+    onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
@@ -57,6 +58,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     initialPrompt,
     initialModel,
     projectId,
+    onContextMenu,
 }) => {
     const isDark = useIsDarkTheme();
     const [isHovered, setIsHovered] = useState(false);
@@ -296,6 +298,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
             onPointerDown={handlePointerDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onContextMenu={onContextMenu}
             className="flex flex-col items-center"
             style={{
                 zIndex: isSelected || isPopupOpen ? 100 : 10,

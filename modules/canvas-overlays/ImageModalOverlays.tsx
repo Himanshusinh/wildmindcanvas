@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ImageUploadModal } from '@/modules/generators/ImageUploadModal/ImageUploadModal';
 import Konva from 'konva';
 import { ImageModalState, Connection } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { ImageUpload } from '@/core/types/canvas';
 import { getReferenceImagesForText } from '@/modules/plugins/StoryboardPluginModal/mentionUtils';
@@ -73,7 +74,7 @@ interface ImageModalOverlaysProps {
   ) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean; isPinned?: boolean }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
   connections: Connection[];
@@ -115,6 +116,14 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   storyboardModalStates = [],
   isComponentDraggable,
 }) => {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, modalId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, modalId });
+  };
+
   return (
     <>
       {imageModalStates.map((modalState) => (
@@ -123,6 +132,13 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           isOpen={true}
           id={modalState.id}
           draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
+          onContextMenu={(e) => handleContextMenu(e, modalState.id)}
+          isPinned={modalState.isPinned}
+          onTogglePin={() => {
+            if (onPersistImageModalMove) {
+              onPersistImageModalMove(modalState.id, { isPinned: !modalState.isPinned });
+            }
+          }}
           onClose={() => {
             setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedImageModalId(null);
@@ -647,6 +663,58 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           onPersistConnectorCreate={onPersistConnectorCreate}
         />
       ))}
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          isPinned={imageModalStates.find((m) => m.id === contextMenu.modalId)?.isPinned}
+          onDownload={imageModalStates.find((m) => m.id === contextMenu.modalId)?.generatedImageUrl ? async () => {
+            const modal = imageModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal?.generatedImageUrl) {
+              const filename = generateDownloadFilename('generated-image', modal.id, 'png');
+              await downloadImage(modal.generatedImageUrl, filename);
+            }
+          } : undefined}
+          onPin={() => {
+            const modal = imageModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal && onPersistImageModalMove) {
+              onPersistImageModalMove(modal.id, { isPinned: !modal.isPinned });
+            }
+          }}
+          onDuplicate={() => {
+            const modal = imageModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal && onPersistImageModalCreate) {
+              const duplicated = {
+                id: `image-modal-${Date.now()}`,
+                x: modal.x + 600 + 50,
+                y: modal.y,
+                generatedImageUrl: modal.generatedImageUrl,
+                model: modal.model,
+                frame: modal.frame,
+                aspectRatio: modal.aspectRatio,
+                prompt: modal.prompt,
+                frameWidth: modal.frameWidth,
+                frameHeight: modal.frameHeight,
+              };
+              // Optimistic update
+              setImageModalStates((prev) => [...prev, duplicated]);
+              Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
+            }
+          }}
+          onDelete={() => {
+            const modalId = contextMenu.modalId;
+            setSelectedImageModalId(null);
+            if (onPersistImageModalDelete) {
+              // Update parent state
+              Promise.resolve(onPersistImageModalDelete(modalId)).catch(console.error);
+              // Local state might be updated by parent sync, but we can do optimistic removal if needed
+              // Actually existing onDelete handler removed it locally. Let's trust parent sync or update local too to be snappy
+              setImageModalStates(prev => prev.filter(m => m.id !== modalId));
+            }
+          }}
+        />
+      )}
     </>
   );
 };

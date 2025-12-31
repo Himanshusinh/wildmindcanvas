@@ -2,8 +2,9 @@
 
 import React from 'react';
 import { VideoEditorTrigger } from '@/modules/plugins/VideoEditorPluginModal/VideoEditorTrigger';
-import Konva from 'konva';
 import { VideoEditorModalState } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import Konva from 'konva';
 
 interface VideoEditorModalOverlaysProps {
     videoEditorModalStates: VideoEditorModalState[] | undefined;
@@ -36,8 +37,43 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
     scale,
     position,
 }) => {
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
     return (
         <>
+            {contextMenu && (
+                <PluginContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    onDuplicate={() => {
+                        const modalState = videoEditorModalStates?.find(m => m.id === contextMenu.modalId);
+                        if (modalState) {
+                            const duplicated = {
+                                ...modalState,
+                                id: `videoeditor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                x: modalState.x + 50,
+                                y: modalState.y + 50,
+                            };
+                            setVideoEditorModalStates(prev => [...prev, duplicated]);
+                            if (onPersistVideoEditorModalCreate) {
+                                Promise.resolve(onPersistVideoEditorModalCreate(duplicated)).catch(console.error);
+                            }
+                        }
+                    }}
+                    onDelete={() => {
+                        if (onPersistVideoEditorModalDelete) {
+                            const modalId = contextMenu.modalId;
+                            setSelectedVideoEditorModalId(null);
+                            setSelectedVideoEditorModalIds([]);
+                            const result = onPersistVideoEditorModalDelete(modalId);
+                            if (result && typeof result.then === 'function') {
+                                Promise.resolve(result).catch(console.error);
+                            }
+                        }
+                    }}
+                />
+            )}
             {(videoEditorModalStates || []).map((modalState) => (
                 <VideoEditorTrigger
                     key={modalState.id}
@@ -47,6 +83,11 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     scale={scale}
                     position={position}
                     isSelected={selectedVideoEditorModalId === modalState.id}
+                    onContextMenu={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+                    }}
                     onSelect={() => {
                         clearAllSelections();
                         setSelectedVideoEditorModalId(modalState.id);

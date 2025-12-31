@@ -56,6 +56,9 @@ interface ImageUploadModalProps {
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
   draggable?: boolean;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -103,11 +106,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   frameWidth,
   frameHeight,
   draggable = true,
+  onContextMenu,
+  isPinned = false,
+  onTogglePin,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const processedImageRef = useRef<string | null>(null);
-  const [isPinned, setIsPinned] = useState(false);
+  // Removed local isPinned state to use prop
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -1083,7 +1089,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         (selectedImageModalId === id);
 
       if (isThisSelected) {
-        setIsPinned(prev => !prev);
+        // Toggle pin when custom event received for this selected modal
+        onTogglePin?.();
       }
     };
     window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
@@ -1504,6 +1511,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       data-modal-component="image"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
+      onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -1639,16 +1647,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         title={isCompareResult ? selectedModel : (PLUGIN_MODELS.includes(selectedModel || '') || PLUGIN_MODELS.includes(initialModel || '') ? (selectedModel || initialModel) : undefined)}
       />
 
-      <ModalActionIcons
-        isSelected={Boolean(isSelected)}
-        scale={scale}
-        generatedUrl={generatedImageUrl}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        isPinned={isPinned}
-        onTogglePin={!isUploadedImage ? () => setIsPinned(!isPinned) : undefined}
-      />
+
 
       <div style={{ position: 'relative' }}>
         <ImageModalFrame
@@ -1951,7 +1950,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onGenerate={handleGenerate}
             getAvailableAspectRatios={getAvailableAspectRatios}
             onSetIsHovered={setIsHovered}
-            onSetIsPinned={setIsPinned}
+            onSetIsPinned={(val) => onTogglePin?.()}
             onSetIsModelDropdownOpen={setIsModelDropdownOpen}
             onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
             onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}

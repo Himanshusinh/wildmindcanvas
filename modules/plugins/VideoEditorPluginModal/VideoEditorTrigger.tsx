@@ -16,6 +16,7 @@ interface VideoEditorTriggerProps {
     onPositionChange?: (x: number, y: number) => void;
     onPositionCommit?: (x: number, y: number) => void;
     onDelete?: () => void;
+    onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
@@ -30,6 +31,7 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
     onPositionChange,
     onPositionCommit,
     onDelete,
+    onContextMenu,
 }) => {
     const [isHovered, setIsHovered] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -67,6 +69,7 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
             onMouseDown={handleMouseDown}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onContextMenu={onContextMenu}
         >
             <div
                 style={{

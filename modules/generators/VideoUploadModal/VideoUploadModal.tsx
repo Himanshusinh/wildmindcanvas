@@ -70,6 +70,9 @@ interface VideoUploadModalProps {
   images?: ImageUpload[];
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
   draggable?: boolean;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -104,10 +107,13 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   images = [],
   textInputStates = [],
   draggable = true,
+  onContextMenu,
+  isPinned = false,
+  onTogglePin,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
+  // Removed local isPinned state
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -368,7 +374,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         (selectedVideoModalId === id);
 
       if (isThisSelected) {
-        setIsPinned(prev => !prev);
+        onTogglePin?.();
       }
     };
     window.addEventListener('canvas-toggle-pin', handleTogglePin as any);
@@ -541,6 +547,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       data-modal-component="video"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
+      onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
@@ -558,17 +565,6 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         isUploadedVideo={!!isUploadedVideo}
         videoResolution={videoResolution}
         scale={scale}
-      />
-
-      <ModalActionIcons
-        isSelected={!!isSelected}
-        scale={scale}
-        generatedUrl={generatedVideoUrl}
-        onDelete={onDelete}
-        onDownload={onDownload}
-        onDuplicate={onDuplicate}
-        isPinned={isPinned}
-        onTogglePin={!isUploadedVideo ? () => setIsPinned(!isPinned) : undefined}
       />
 
       <div style={{ position: 'relative' }}>
@@ -647,7 +643,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         }}
         onGenerate={handleGenerate}
         onSetIsHovered={setIsHovered}
-        onSetIsPinned={setIsPinned}
+        onSetIsPinned={(val) => onTogglePin?.()}
         onSetIsModelDropdownOpen={setIsModelDropdownOpen}
         onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
         onSetIsDurationDropdownOpen={setIsDurationDropdownOpen}

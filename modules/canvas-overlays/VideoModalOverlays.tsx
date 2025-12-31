@@ -5,6 +5,7 @@ import { VideoUploadModal } from '@/modules/generators/VideoUploadModal';
 import { getReplicateQueueStatus, getReplicateQueueResult, getFalQueueStatus, getFalQueueResult, getMiniMaxVideoStatus, getMiniMaxVideoFile } from '@/core/api/api';
 import Konva from 'konva';
 import { VideoModalState, Connection, ImageModalState, TextModalState } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { ImageUpload } from '@/core/types/canvas';
 
 /**
@@ -57,7 +58,7 @@ interface VideoModalOverlaysProps {
   setSelectedVideoModalIds: (ids: string[]) => void;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
-  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }>) => void | Promise<void>;
+  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; isPinned?: boolean }>) => void | Promise<void>;
   onPersistVideoModalDelete?: (id: string) => void | Promise<void>;
   connections: Connection[];
   imageModalStates: ImageModalState[];
@@ -92,6 +93,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   isComponentDraggable,
   setGenerationQueue,
 }) => {
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
   return (
     <>
       {videoModalStates.map((modalState) => (
@@ -100,6 +103,17 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           isOpen={true}
           id={modalState.id}
           draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
+          isPinned={modalState.isPinned}
+          onTogglePin={() => {
+            if (onPersistVideoModalMove) {
+              onPersistVideoModalMove(modalState.id, { isPinned: !modalState.isPinned });
+            }
+          }}
+          onContextMenu={(e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+          }}
           onClose={() => {
             setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedVideoModalId(null);
@@ -367,6 +381,56 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           textInputStates={textInputStates}
         />
       ))}
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          isPinned={videoModalStates.find((m) => m.id === contextMenu.modalId)?.isPinned}
+          onDownload={videoModalStates.find((m) => m.id === contextMenu.modalId)?.generatedVideoUrl ? async () => {
+            const modal = videoModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal?.generatedVideoUrl) {
+              const { downloadVideo, generateDownloadFilename } = await import('@/core/api/downloadUtils');
+              const filename = generateDownloadFilename('generated-video', modal.id, 'mp4');
+              await downloadVideo(modal.generatedVideoUrl, filename);
+            }
+          } : undefined}
+          onPin={() => {
+            const modal = videoModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal && onPersistVideoModalMove) {
+              onPersistVideoModalMove(modal.id, { isPinned: !modal.isPinned });
+            }
+          }}
+          onDuplicate={() => {
+            const modal = videoModalStates.find((m) => m.id === contextMenu.modalId);
+            if (modal && onPersistVideoModalCreate) {
+              const duplicated = {
+                id: `video-modal-${Date.now()}`,
+                x: modal.x + 600 + 50,
+                y: modal.y,
+                generatedVideoUrl: modal.generatedVideoUrl,
+                model: modal.model,
+                frame: modal.frame,
+                aspectRatio: modal.aspectRatio,
+                prompt: modal.prompt,
+                duration: modal.duration,
+                frameWidth: modal.frameWidth,
+                frameHeight: modal.frameHeight,
+              };
+              setVideoModalStates((prev) => [...prev, duplicated]);
+              Promise.resolve(onPersistVideoModalCreate(duplicated)).catch(console.error);
+            }
+          }}
+          onDelete={() => {
+            const modalId = contextMenu.modalId;
+            setSelectedVideoModalId(null);
+            if (onPersistVideoModalDelete) {
+              Promise.resolve(onPersistVideoModalDelete(modalId)).catch(console.error);
+              setVideoModalStates(prev => prev.filter(m => m.id !== modalId));
+            }
+          }}
+        />
+      )}
     </>
   );
 };

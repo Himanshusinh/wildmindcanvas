@@ -4,6 +4,7 @@ import React from 'react';
 import { VectorizePluginModal } from '@/modules/plugins/VectorizePluginModal/VectorizePluginModal';
 import Konva from 'konva';
 import { Connection, ImageModalState, VectorizeModalState } from './types';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 
 interface VectorizeModalOverlaysProps {
@@ -51,14 +52,54 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
   scale,
   position,
 }) => {
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
   return (
     <>
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onDuplicate={() => {
+            const modalState = vectorizeModalStates?.find(m => m.id === contextMenu.modalId);
+            if (modalState) {
+              const duplicated = {
+                ...modalState,
+                id: `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: modalState.x + 50,
+                y: modalState.y + 50,
+              };
+              setVectorizeModalStates(prev => [...prev, duplicated]);
+              if (onPersistVectorizeModalCreate) {
+                Promise.resolve(onPersistVectorizeModalCreate(duplicated)).catch(console.error);
+              }
+            }
+          }}
+          onDelete={() => {
+            if (onPersistVectorizeModalDelete) {
+              const modalId = contextMenu.modalId;
+              setSelectedVectorizeModalId(null);
+              setSelectedVectorizeModalIds([]);
+              const result = onPersistVectorizeModalDelete(modalId);
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
+              }
+            }
+          }}
+        />
+      )}
       {(vectorizeModalStates || []).map((modalState) => (
         <VectorizePluginModal
           key={modalState.id}
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          onContextMenu={(e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+          }}
           onClose={() => {
             setVectorizeModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedVectorizeModalId(null);

@@ -8,6 +8,7 @@ export interface TextModalState {
   value?: string;
   sentValue?: string; // Value sent to connected components (only updated when arrow is clicked)
   autoFocusInput?: boolean;
+  isPinned?: boolean;
 }
 
 export interface ImageModalState {
@@ -25,6 +26,7 @@ export interface ImageModalState {
   prompt?: string;
   imageCount?: number;
   isGenerating?: boolean;
+  isPinned?: boolean;
 }
 
 export interface VideoModalState {
@@ -45,6 +47,7 @@ export interface VideoModalState {
   status?: string;
   provider?: string;
   isExpanded?: boolean;
+  isPinned?: boolean;
 }
 
 export interface VideoEditorModalState {
@@ -54,6 +57,11 @@ export interface VideoEditorModalState {
   width?: number;
   height?: number;
   color?: string;
+}
+
+export interface DialogueInput {
+  text: string;
+  voice: string;
 }
 
 export interface MusicModalState {
@@ -67,8 +75,37 @@ export interface MusicModalState {
   frame?: string;
   aspectRatio?: string;
   prompt?: string;
+  activeCategory?: string | null;
+  lyrics?: string;
+  sampleRate?: string;
+  bitrate?: string;
+  audioFormat?: string;
+
   isGenerating?: boolean;
   isExpanded?: boolean;
+  isPinned?: boolean;
+  // Voice (TTS) specific fields
+  voiceId?: string;
+  stability?: number; // 0-1
+  similarityBoost?: number; // 0-1
+  style?: number; // 0-1
+  speed?: number; // 0.25-2.5 usually, but user asked for 0-1.2 limit. Default 1.
+  exaggeration?: number;
+  temperature?: number;
+  cfgScale?: number;
+  // Maya TTS specific fields
+  voicePrompt?: string;
+  topP?: number;
+  maxTokens?: number;
+  repetitionPenalty?: number;
+  // Dialogue specific fields
+  dialogueInputs?: DialogueInput[];
+  useSpeakerBoost?: boolean;
+  filename?: string;
+  // SFX specific fields
+  duration?: number;
+  promptInfluence?: number;
+  loop?: boolean;
 }
 
 export interface UpscaleModalState {
@@ -406,17 +443,17 @@ export interface ModalOverlaysProps {
   position: { x: number; y: number };
   onAddImageToCanvas?: (url: string) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
-  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>) => void | Promise<void>;
+  onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean; isPinned?: boolean }>) => void | Promise<void>;
   onPersistImageModalDelete?: (id: string) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
-  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }>) => void | Promise<void>;
+  onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; isPinned?: boolean }>) => void | Promise<void>;
   onPersistVideoModalDelete?: (id: string) => void | Promise<void>;
   onPersistVideoEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
   onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
   onOpenVideoEditor?: () => void;
-  onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
-  onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>) => void | Promise<void>;
+  onPersistMusicModalCreate?: (modal: MusicModalState) => void | Promise<void>;
+  onPersistMusicModalMove?: (id: string, updates: Partial<MusicModalState>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }>) => void | Promise<void>;
@@ -467,7 +504,7 @@ export interface ModalOverlaysProps {
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   connections?: Connection[];
   onConnectionsChange?: (connections: Connection[]) => void;

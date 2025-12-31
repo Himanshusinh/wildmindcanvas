@@ -71,6 +71,7 @@ interface NextScenePluginModalProps {
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
@@ -107,6 +108,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  onContextMenu,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -563,6 +565,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={onContextMenu}
     >
       {/* Plugin node design with icon and label */}
       <div
@@ -595,69 +598,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         >
           Next Scene
 
-          {/* Delete button - always visible */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (onDelete) {
-                onDelete();
-              }
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-              e.currentTarget.style.color = '#ef4444';
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              const defaultBg = isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-              const defaultColor = isDark ? '#cccccc' : '#4b5563';
-              e.currentTarget.style.backgroundColor = defaultBg;
-              e.currentTarget.style.color = defaultColor;
-              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-            }}
-            style={{
-              position: 'absolute',
-              top: `${-36 * scale}px`,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: `${28 * scale}px`,
-              height: `${28 * scale}px`,
-              padding: 0,
-              backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)'}`,
-              borderRadius: `${8 * scale}px`,
-              color: isDark ? '#cccccc' : '#4b5563',
-              cursor: 'pointer',
-              boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'}`,
-              zIndex: 3001,
-              pointerEvents: 'auto',
-            }}
-            title="Delete plugin"
-          >
-            <svg
-              width={`${16 * scale}px`}
-              height={`${16 * scale}px`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-          </button>
+          {/* Delete button removed in favor of context menu */}
         </div>
 
         {/* Main plugin container - Circular */}

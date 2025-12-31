@@ -40,7 +40,7 @@ export const MusicModalTooltip: React.FC<MusicModalTooltipProps> = ({
         boxShadow: 'none',
         transform: 'translateY(0)',
         opacity: 1,
-        transition: 'background-color 0.3s ease, color 0.3s ease',
+        transition: 'background-color 0s ease, color 0s ease',
       }}
     >
       Music Generator

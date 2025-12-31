@@ -58,6 +58,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
+  const musicGeneratorsRef = useRef<MusicModalState[]>([]);
+  useEffect(() => { musicGeneratorsRef.current = musicGenerators; }, [musicGenerators]);
+  const videoGeneratorsRef = useRef<VideoModalState[]>([]);
+  useEffect(() => { videoGeneratorsRef.current = videoGenerators; }, [videoGenerators]);
+  const imageGeneratorsRef = useRef<ImageModalState[]>([]);
+  useEffect(() => { imageGeneratorsRef.current = imageGenerators; }, [imageGenerators]);
   const [initialViewportCenter, setInitialViewportCenter] = useState<{ x: number; y: number; scale: number } | undefined>(undefined);
   // Keep a local ref of group elements so autosave can include them even though Canvas manages them locally
   const groupsRef = useRef<Record<string, any>>({});
@@ -183,6 +189,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const newCompareGenerators: CompareGenerator[] = [];
 
         Object.values(elements).forEach((element: any) => {
+          console.log('[Hydration] Processing element:', element.type, element.id);
           if (element && element.type) {
             // Use proxy URL for Zata URLs to avoid CORS
             let imageUrl = element.meta?.url || element.meta?.mediaId || '';
@@ -300,6 +307,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 frame: element.meta?.frame,
                 aspectRatio: element.meta?.aspectRatio,
                 prompt: element.meta?.prompt,
+                activeCategory: element.meta?.activeCategory,
+                lyrics: element.meta?.lyrics,
+                sampleRate: element.meta?.sampleRate,
+                bitrate: element.meta?.bitrate,
+                audioFormat: element.meta?.audioFormat,
+                voiceId: element.meta?.voiceId,
+                stability: element.meta?.stability,
+                similarityBoost: element.meta?.similarityBoost,
+                style: element.meta?.style,
+                speed: element.meta?.speed,
+                exaggeration: element.meta?.exaggeration,
+                temperature: element.meta?.temperature,
+                cfgScale: element.meta?.cfgScale,
+                voicePrompt: element.meta?.voicePrompt,
+                topP: element.meta?.topP,
+                maxTokens: element.meta?.maxTokens,
+                repetitionPenalty: element.meta?.repetitionPenalty,
+                dialogueInputs: element.meta?.dialogueInputs,
+                useSpeakerBoost: element.meta?.useSpeakerBoost,
               });
             } else if (element.type === 'upscale-plugin') {
               newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale, frameWidth: width, frameHeight: height });
@@ -405,6 +431,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           });
         } else if (element.type === 'music-generator') {
           setMusicGenerators((prev) => {
+            console.log('[Hydration] Loading music generator:', element.id, element.meta); // Debug logging
             if (prev.some(m => m.id === element.id)) return prev;
             let genMusicUrl = element.meta?.generatedMusicUrl || null;
             if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
@@ -421,6 +448,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
               prompt: element.meta?.prompt,
               frameWidth: element.bounds?.width || 400,
               frameHeight: element.bounds?.height || 500,
+              activeCategory: element.meta?.activeCategory,
+              lyrics: element.meta?.lyrics,
+              sampleRate: element.meta?.sampleRate,
+              bitrate: element.meta?.bitrate,
+              audioFormat: element.meta?.audioFormat,
+              voiceId: element.meta?.voiceId,
+              stability: element.meta?.stability,
+              similarityBoost: element.meta?.similarityBoost,
+              style: element.meta?.style,
+              speed: element.meta?.speed,
+              exaggeration: element.meta?.exaggeration,
+              temperature: element.meta?.temperature,
+              cfgScale: element.meta?.cfgScale,
+              voicePrompt: element.meta?.voicePrompt,
+              topP: element.meta?.topP,
+              maxTokens: element.meta?.maxTokens,
+              repetitionPenalty: element.meta?.repetitionPenalty,
+              dialogueInputs: element.meta?.dialogueInputs,
+              useSpeakerBoost: element.meta?.useSpeakerBoost,
             }];
           });
         } else if (element.type === 'connector') {
@@ -716,7 +762,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const idx = prev.findIndex(m => m.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            const updates = { ...op.data.updates };
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates } as any;
             return next;
           }
           return prev;
@@ -725,7 +776,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const idx = prev.findIndex(m => m.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            const updates = { ...op.data.updates };
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates } as any;
             return next;
           }
           return prev;
@@ -734,7 +790,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const idx = prev.findIndex(m => m.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates } as any;
+            const updates = { ...op.data.updates };
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates } as any;
             return next;
           }
           return prev;
@@ -743,7 +804,26 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const idx = prev.findIndex(t => t.id === op.elementId);
           if (idx >= 0 && op.data.updates) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...op.data.updates };
+            const updates = { ...op.data.updates };
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates };
+            return next;
+          }
+          return prev;
+        });
+        setUpscaleGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0 && op.data.updates) {
+            const next = [...prev];
+            const updates = { ...op.data.updates };
+            if (updates.meta) {
+              Object.assign(updates, updates.meta);
+              delete updates.meta;
+            }
+            next[idx] = { ...next[idx], ...updates } as any;
             return next;
           }
           return prev;
@@ -1183,7 +1263,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newImages: ImageUpload[] = [];
           const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
           const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
-          const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
+          const newMusicGenerators: MusicModalState[] = [];
           const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
           const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
           const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
@@ -1198,7 +1278,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const newCompareGenerators: CompareGenerator[] = [];
           const newCanvasTextStates: Array<CanvasTextState> = [];
           const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
-          // Track connector signatures to prevent duplicates: "from|to|toAnchor"
           const connectorSignatures = new Set<string>();
 
           // FIRST PASS: Process connector elements first (they are the source of truth)
@@ -1274,7 +1353,37 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
               } else if (element.type === 'music-generator') {
-                newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt });
+                newMusicGenerators.push({
+                  id: element.id,
+                  x: element.x || 0,
+                  y: element.y || 0,
+                  generatedMusicUrl: element.meta?.generatedMusicUrl || null,
+                  frameWidth: element.meta?.frameWidth,
+                  frameHeight: element.meta?.frameHeight,
+                  model: element.meta?.model,
+                  frame: element.meta?.frame,
+                  aspectRatio: element.meta?.aspectRatio,
+                  prompt: element.meta?.prompt,
+                  activeCategory: element.meta?.activeCategory,
+                  lyrics: element.meta?.lyrics,
+                  sampleRate: element.meta?.sampleRate,
+                  bitrate: element.meta?.bitrate,
+                  audioFormat: element.meta?.audioFormat,
+                  voiceId: element.meta?.voiceId,
+                  stability: element.meta?.stability,
+                  similarityBoost: element.meta?.similarityBoost,
+                  style: element.meta?.style,
+                  speed: element.meta?.speed,
+                  exaggeration: element.meta?.exaggeration,
+                  temperature: element.meta?.temperature,
+                  cfgScale: element.meta?.cfgScale,
+                  voicePrompt: element.meta?.voicePrompt,
+                  topP: element.meta?.topP,
+                  maxTokens: element.meta?.maxTokens,
+                  repetitionPenalty: element.meta?.repetitionPenalty,
+                  dialogueInputs: element.meta?.dialogueInputs,
+                  useSpeakerBoost: element.meta?.useSpeakerBoost,
+                });
                 // Skip restoring connections from element.meta.connections
                 // Top-level connector elements are the source of truth and are already processed in the first pass.
                 // Restoring from meta.connections would create duplicates.
@@ -2920,7 +3029,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 }
                 // Append op for undo/redo step
                 if (projectId && opManagerInitialized) {
-                  const prev = imageGenerators.find(m => m.id === id);
+                  const prev = imageGeneratorsRef.current.find(m => m.id === id);
                   const inverseUpdates: any = {};
                   if (prev) {
                     for (const k of Object.keys(updates || {})) {
@@ -2932,7 +3041,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistImageModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistImageModalDelete called', id);
-                const prevItem = imageGenerators.find(m => m.id === id);
+                const prevItem = imageGeneratorsRef.current.find(m => m.id === id);
                 // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
                 setImageGenerators(prev => {
                   const filtered = prev.filter(m => m.id !== id);
@@ -2968,7 +3077,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
                 if (projectId && opManagerInitialized) {
-                  const prev = videoGenerators.find(m => m.id === id);
+                  const prev = videoGeneratorsRef.current.find(m => m.id === id);
                   const inverseUpdates: any = {};
                   if (prev) {
                     for (const k of Object.keys(updates || {})) {
@@ -2980,7 +3089,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistVideoModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistVideoModalDelete called', id);
-                const prevItem = videoGenerators.find(m => m.id === id);
+                const prevItem = videoGeneratorsRef.current.find(m => m.id === id);
                 // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
                 setVideoGenerators(prev => {
                   const filtered = prev.filter(m => m.id !== id);
@@ -3002,10 +3111,77 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 setMusicGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
                 if (realtimeActive) {
                   console.log('[Realtime] broadcast create music', modal.id);
-                  realtimeRef.current?.sendCreate({ id: modal.id, type: 'music', x: modal.x, y: modal.y, generatedMusicUrl: modal.generatedMusicUrl || null });
+                  realtimeRef.current?.sendCreate({
+                    id: modal.id,
+                    type: 'music',
+                    x: modal.x,
+                    y: modal.y,
+                    generatedMusicUrl: modal.generatedMusicUrl || null,
+                    activeCategory: (modal as any).activeCategory || null,
+                    lyrics: (modal as any).lyrics || null,
+                    sampleRate: (modal as any).sampleRate || null,
+                    bitrate: (modal as any).bitrate || null,
+                    audioFormat: (modal as any).audioFormat || null,
+                    prompt: modal.prompt || null,
+                    model: modal.model || null,
+                    frame: modal.frame || null,
+                    aspectRatio: modal.aspectRatio || null,
+                    voiceId: (modal as any).voiceId,
+                    stability: (modal as any).stability,
+                    similarityBoost: (modal as any).similarityBoost,
+                    style: (modal as any).style,
+                    speed: (modal as any).speed,
+                    exaggeration: (modal as any).exaggeration,
+                    temperature: (modal as any).temperature,
+                    cfgScale: (modal as any).cfgScale,
+                    voicePrompt: (modal as any).voicePrompt,
+                    topP: (modal as any).topP,
+                    maxTokens: (modal as any).maxTokens,
+                    repetitionPenalty: (modal as any).repetitionPenalty,
+                    dialogueInputs: (modal as any).dialogueInputs || [],
+                    useSpeakerBoost: (modal as any).useSpeakerBoost
+                  } as any);
                 }
                 if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'create', elementId: modal.id, data: { element: { id: modal.id, type: 'music-generator', x: modal.x, y: modal.y, meta: { generatedMusicUrl: modal.generatedMusicUrl || null } } }, inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any });
+                  await appendOp({
+                    type: 'create',
+                    elementId: modal.id,
+                    data: {
+                      element: {
+                        id: modal.id,
+                        type: 'music-generator',
+                        x: modal.x,
+                        y: modal.y,
+                        meta: {
+                          generatedMusicUrl: modal.generatedMusicUrl || null,
+                          activeCategory: (modal as any).activeCategory || null,
+                          lyrics: (modal as any).lyrics || null,
+                          sampleRate: (modal as any).sampleRate || null,
+                          bitrate: (modal as any).bitrate || null,
+                          audioFormat: (modal as any).audioFormat || null,
+                          prompt: modal.prompt || null,
+                          model: modal.model || null,
+                          frame: modal.frame || null,
+                          aspectRatio: modal.aspectRatio || null,
+                          voiceId: (modal as any).voiceId,
+                          stability: (modal as any).stability,
+                          similarityBoost: (modal as any).similarityBoost,
+                          style: (modal as any).style,
+                          speed: (modal as any).speed,
+                          exaggeration: (modal as any).exaggeration,
+                          temperature: (modal as any).temperature,
+                          cfgScale: (modal as any).cfgScale,
+                          voicePrompt: (modal as any).voicePrompt,
+                          topP: (modal as any).topP,
+                          maxTokens: (modal as any).maxTokens,
+                          repetitionPenalty: (modal as any).repetitionPenalty,
+                          dialogueInputs: (modal as any).dialogueInputs || [],
+                          useSpeakerBoost: (modal as any).useSpeakerBoost
+                        }
+                      }
+                    },
+                    inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 }
+                  } as any);
                 }
               }}
               onPersistMusicModalMove={async (id, updates) => {
@@ -3015,19 +3191,58 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   realtimeRef.current?.sendUpdate(id, updates as any);
                 }
                 if (projectId && opManagerInitialized) {
-                  const prev = musicGenerators.find(m => m.id === id);
+                  const prev = musicGeneratorsRef.current.find(m => m.id === id);
                   const inverseUpdates: any = {};
                   if (prev) {
                     for (const k of Object.keys(updates || {})) {
                       (inverseUpdates as any)[k] = (prev as any)[k];
                     }
                   }
-                  await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+
+                  // Construct complete meta object from merged state to ensure no data loss
+                  // (Backend might overwrite meta if we send partial, so we send full)
+                  const nextState = { ...(prev || {}), ...updates } as any;
+
+                  const meta: any = {
+                    generatedMusicUrl: nextState.generatedMusicUrl || null,
+                    activeCategory: nextState.activeCategory || null,
+                    lyrics: nextState.lyrics || null,
+                    sampleRate: nextState.sampleRate || null,
+                    bitrate: nextState.bitrate || null,
+                    audioFormat: nextState.audioFormat || null,
+                    prompt: nextState.prompt || null,
+                    model: nextState.model || null,
+                    frame: nextState.frame || null,
+                    aspectRatio: nextState.aspectRatio || null,
+                    frameWidth: nextState.frameWidth || null,
+                    frameHeight: nextState.frameHeight || null,
+                    voiceId: nextState.voiceId,
+                    stability: nextState.stability,
+                    similarityBoost: nextState.similarityBoost,
+                    style: nextState.style,
+                    speed: nextState.speed,
+                    exaggeration: nextState.exaggeration,
+                    temperature: nextState.temperature,
+                    cfgScale: nextState.cfgScale,
+                    voicePrompt: nextState.voicePrompt,
+                    topP: nextState.topP,
+                    maxTokens: nextState.maxTokens,
+                    repetitionPenalty: nextState.repetitionPenalty,
+                    dialogueInputs: nextState.dialogueInputs || [],
+                    useSpeakerBoost: nextState.useSpeakerBoost,
+                  };
+
+                  console.log('[Persistence] Saving music meta (full):', id, meta);
+
+                  // We only need to send 'meta' in the persistence update
+                  const persistenceUpdates = { meta };
+
+                  await appendOp({ type: 'update', elementId: id, data: { updates: persistenceUpdates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
                 }
               }}
               onPersistMusicModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistMusicModalDelete called', id);
-                const prevItem = musicGenerators.find(m => m.id === id);
+                const prevItem = musicGeneratorsRef.current.find(m => m.id === id);
                 // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
                 setMusicGenerators(prev => {
                   const filtered = prev.filter(m => m.id !== id);
@@ -3042,15 +3257,43 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // Also remove any connectors that referenced this element
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
                 if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'music-generator', x: prevItem.x, y: prevItem.y, meta: { generatedMusicUrl: (prevItem as any).generatedMusicUrl || null } } }, requestId: '', clientTs: 0 } as any : undefined as any });
+                  await appendOp({
+                    type: 'delete',
+                    elementId: id,
+                    data: {},
+                    inverse: prevItem ? {
+                      type: 'create',
+                      elementId: id,
+                      data: {
+                        element: {
+                          id,
+                          type: 'music-generator',
+                          x: prevItem.x,
+                          y: prevItem.y,
+                          meta: {
+                            generatedMusicUrl: (prevItem as any).generatedMusicUrl || null,
+                            activeCategory: (prevItem as any).activeCategory || null,
+                            lyrics: (prevItem as any).lyrics || null,
+                            sampleRate: (prevItem as any).sampleRate || null,
+                            bitrate: (prevItem as any).bitrate || null,
+                            audioFormat: (prevItem as any).audioFormat || null,
+                            prompt: (prevItem as any).prompt || null,
+                            model: (prevItem as any).model || null,
+                            frameWidth: (prevItem as any).frameWidth || 512,
+                            frameHeight: (prevItem as any).frameHeight || 350
+                          }
+                        }
+                      },
+                      requestId: '',
+                      clientTs: 0
+                    } as any : undefined as any
+                  });
                 }
               }}
               onPersistUpscaleModalCreate={pluginHandlers.onPersistUpscaleModalCreate}
               onPersistUpscaleModalMove={pluginHandlers.onPersistUpscaleModalMove}
               onPersistUpscaleModalDelete={pluginHandlers.onPersistUpscaleModalDelete}
               onUpscale={pluginHandlers.onUpscale}
-              onPersistMultiangleCameraModalCreate={pluginHandlers.onPersistMultiangleCameraModalCreate}
-              onPersistMultiangleCameraModalMove={pluginHandlers.onPersistMultiangleCameraModalMove}
               onPersistMultiangleCameraModalDelete={pluginHandlers.onPersistMultiangleCameraModalDelete}
               onMultiangleCamera={pluginHandlers.onMultiangleCamera}
               onPersistCompareModalCreate={pluginHandlers.onPersistCompareModalCreate}

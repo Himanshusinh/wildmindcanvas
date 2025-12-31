@@ -5,6 +5,7 @@ import { UpscalePluginModal } from '@/modules/plugins/UpscalePluginModal/Upscale
 import Konva from 'konva';
 import { UpscaleModalState, Connection, ImageModalState } from './types';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 
 interface UpscaleModalOverlaysProps {
   upscaleModalStates: UpscaleModalState[] | undefined;
@@ -51,14 +52,54 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
   scale,
   position,
 }) => {
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
   return (
     <>
+      {contextMenu && (
+        <PluginContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onDuplicate={() => {
+            const modalState = upscaleModalStates?.find(m => m.id === contextMenu.modalId);
+            if (modalState) {
+              const duplicated = {
+                ...modalState,
+                id: `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                x: modalState.x + 50,
+                y: modalState.y + 50,
+              };
+              setUpscaleModalStates(prev => [...prev, duplicated]);
+              if (onPersistUpscaleModalCreate) {
+                Promise.resolve(onPersistUpscaleModalCreate(duplicated)).catch(console.error);
+              }
+            }
+          }}
+          onDelete={() => {
+            if (onPersistUpscaleModalDelete) {
+              const modalId = contextMenu.modalId;
+              setSelectedUpscaleModalId(null);
+              setSelectedUpscaleModalIds([]);
+              const result = onPersistUpscaleModalDelete(modalId);
+              if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch(console.error);
+              }
+            }
+          }}
+        />
+      )}
       {(upscaleModalStates || []).map((modalState) => (
         <UpscalePluginModal
           key={modalState.id}
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          onContextMenu={(e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
+          }}
           onClose={() => {
             setUpscaleModalStates(prev => prev.filter(m => m.id !== modalState.id));
             setSelectedUpscaleModalId(null);

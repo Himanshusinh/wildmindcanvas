@@ -19,6 +19,7 @@ interface ImageModalFrameProps {
   getAspectRatio: (ratio: string) => string;
   width?: number;
   height?: number;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
@@ -37,6 +38,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   getAspectRatio,
   width,
   height,
+  onContextMenu,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -55,6 +57,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   return (
     <div
       data-frame-id={id ? `${id}-frame` : undefined}
+      onContextMenu={onContextMenu}
       onClick={(e) => {
         // Ensure selection works when clicking on frame
         if (onSelect && !e.defaultPrevented) {

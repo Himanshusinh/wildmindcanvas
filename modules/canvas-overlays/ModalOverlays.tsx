@@ -383,6 +383,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
         connections={externalConnections ?? []}
         textInputStates={textInputStates}
+        projectId={projectId ?? undefined}
       />
 
       <UpscaleModalOverlays

@@ -13,6 +13,7 @@ export function PluginNodeShell(props: {
   isDimmed?: boolean;
   onMouseDown?: (e: React.MouseEvent) => void;
   onPointerDown?: (e: React.PointerEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   className?: string;
@@ -30,6 +31,7 @@ export function PluginNodeShell(props: {
     isDimmed = false,
     onMouseDown,
     onPointerDown,
+    onContextMenu,
     onMouseEnter,
     onMouseLeave,
     className,
@@ -44,6 +46,7 @@ export function PluginNodeShell(props: {
       data-overlay-id={id}
       onMouseDown={onMouseDown}
       onPointerDown={onPointerDown}
+      onContextMenu={onContextMenu}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={className}
