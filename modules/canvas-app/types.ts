@@ -300,7 +300,9 @@ export interface CanvasAppSetters {
   setScriptFrameGenerators: React.Dispatch<React.SetStateAction<ScriptFrameGenerator[]>>;
   setSceneFrameGenerators: React.Dispatch<React.SetStateAction<SceneFrameGenerator[]>>;
   setTextGenerators: React.Dispatch<React.SetStateAction<TextGenerator[]>>;
+  setCanvasTextStates: React.Dispatch<React.SetStateAction<import('@/modules/canvas-overlays/types').CanvasTextState[]>>;
   setRichTextStates: React.Dispatch<React.SetStateAction<import('@/modules/canvas-overlays/types').CanvasTextState[]>>;
+  setGroupContainerStates: React.Dispatch<React.SetStateAction<import('@/core/types/groupContainer').GroupContainerState[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;
   setGenerationQueue: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
   setShowImageGenerationModal: React.Dispatch<React.SetStateAction<boolean>>;

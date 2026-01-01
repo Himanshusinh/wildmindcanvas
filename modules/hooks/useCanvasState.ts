@@ -23,6 +23,9 @@ export function useCanvasState() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   const [compareGenerators, setCompareGenerators] = useState<CompareGenerator[]>([]);
+  const [canvasTextStates, setCanvasTextStates] = useState<import('@/modules/canvas-overlays/types').CanvasTextState[]>([]);
+  const [richTextStates, setRichTextStates] = useState<import('@/modules/canvas-overlays/types').CanvasTextState[]>([]);
+  const [groupContainerStates, setGroupContainerStates] = useState<import('@/core/types/groupContainer').GroupContainerState[]>([]);
   const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
 
   const state: CanvasAppState = {
@@ -33,7 +36,7 @@ export function useCanvasState() {
     musicGenerators,
     upscaleGenerators,
     multiangleCameraGenerators,
-    compareGenerators, // Added
+    compareGenerators,
     removeBgGenerators,
     eraseGenerators,
     expandGenerators,
@@ -43,6 +46,9 @@ export function useCanvasState() {
     scriptFrameGenerators,
     sceneFrameGenerators,
     textGenerators,
+    canvasTextStates,
+    richTextStates,
+    groupContainerStates,
     connectors,
     generationQueue,
     showImageGenerationModal,
@@ -66,6 +72,9 @@ export function useCanvasState() {
     setScriptFrameGenerators,
     setSceneFrameGenerators,
     setTextGenerators,
+    setCanvasTextStates,
+    setRichTextStates,
+    setGroupContainerStates,
     setConnectors,
     setGenerationQueue,
     setShowImageGenerationModal,

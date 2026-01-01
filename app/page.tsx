@@ -57,6 +57,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<TextModalState[]>([]);
+  const [groupContainerStates, setGroupContainerStates] = useState<any[]>([]);
   const [refImages, setRefImages] = useState<Record<string, string>>({});
 
   const [connectors, setConnectors] = useState<Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }>>([]);
@@ -1821,6 +1822,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     scriptFrameGenerators,
     sceneFrameGenerators,
     textGenerators,
+    canvasTextStates,
+    richTextStates,
+    groupContainerStates,
     connectors,
     generationQueue,
     compareGenerators,
@@ -1843,7 +1847,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setScriptFrameGenerators,
     setSceneFrameGenerators,
     setTextGenerators,
+    setCanvasTextStates,
     setRichTextStates,
+    setGroupContainerStates,
     setCompareGenerators,
     setConnectors,
     setGenerationQueue,
@@ -1851,8 +1857,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setShowImageGenerationModal: setIsImageModalOpen,
     setGeneratedImage: setGeneratedImageUrl,
     setGeneratedImages: () => { }, // No-op as not used but destructured
-
-
   };
 
   // Create handlers using factory functions
