@@ -51,6 +51,10 @@ export function useCanvasState(props: CanvasProps) {
     const effectiveRichTextStates = props.richTextStates ?? localRichTextStates;
     const effectiveSetRichTextStates = props.setRichTextStates ?? setLocalRichTextStates;
 
+    const [localSelectedRichTextId, setLocalSelectedRichTextId] = useState<string | null>(null);
+    const effectiveSelectedRichTextId = props.selectedRichTextId !== undefined ? props.selectedRichTextId : localSelectedRichTextId;
+    const effectiveSetSelectedRichTextId = props.setSelectedRichTextId ?? setLocalSelectedRichTextId;
+
     const handleCanvasTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
         effectiveSetCanvasTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetCanvasTextStates]);
@@ -263,6 +267,8 @@ export function useCanvasState(props: CanvasProps) {
         // Rich Text
         effectiveRichTextStates,
         effectiveSetRichTextStates,
+        selectedRichTextId: effectiveSelectedRichTextId,
+        setSelectedRichTextId: effectiveSetSelectedRichTextId,
         handleRichTextUpdate,
 
         // History

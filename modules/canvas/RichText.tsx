@@ -217,6 +217,7 @@ export const RichText: React.FC<RichTextProps> = ({
                         width={data.width || 200}
                         height={textRef.current?.height() || data.height || 50}
                         fill={data.backgroundColor}
+                        cornerRadius={12}
                     />
                 )}
 
@@ -233,6 +234,7 @@ export const RichText: React.FC<RichTextProps> = ({
                     textDecoration={data.textDecoration || 'none'}
                     align={data.textAlign || 'left'}
                     lineHeight={1.2}
+                    padding={12}
                     visible={!isEditing}
                 />
             </Group>
@@ -391,13 +393,15 @@ export const RichText: React.FC<RichTextProps> = ({
                                 border: none !important;
                                 outline: none !important;
                                 box-shadow: none !important;
-                                padding: 0 !important;
+                                padding: 12px !important;
                                 margin: 0 !important;
+                                border-radius: 12px !important;
                                 -webkit-appearance: none !important;
                                 appearance: none !important;
                                 color: ${data.color || '#FFFFFF'} !important;
                                 line-height: 1.2 !important;
                                 letter-spacing: normal !important;
+                                box-sizing: border-box !important;
                             }
                             `}
                         </style>

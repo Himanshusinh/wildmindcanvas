@@ -6,6 +6,7 @@ import { useCanvasSelection } from '../hooks/useCanvasSelection';
 import { ModalOverlays } from '@/modules/canvas-overlays';
 import { CanvasImageConnectionNodes } from '../CanvasImageConnectionNodes';
 import { ContextMenu } from '@/modules/ui-global/ContextMenu';
+import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { SettingsPopup } from '@/modules/ui-global/Settings';
 // import { ComponentCreationMenu } from '../../canvas-overlays/components/ComponentCreationMenu';
 // import { UnifiedCanvasOverlay } from '@/modules/canvas-overlays/UnifiedCanvasOverlay';
@@ -26,6 +27,7 @@ interface CanvasOverlaysProps {
     isSettingsOpen: boolean;
     setIsSettingsOpen: (isOpen: boolean) => void;
     activeGenerationCount: number;
+    onFitView: () => void;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -41,7 +43,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     isLoading,
     isSettingsOpen,
     setIsSettingsOpen,
-    activeGenerationCount
+    activeGenerationCount,
+    onFitView
 }) => {
     const {
         images,
@@ -82,6 +85,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedStoryboardModalIds, setSelectedStoryboardModalIds, setSelectedStoryboardModalId, selectedStoryboardModalId,
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
+        contextMenuPosition, contextMenuModalType, contextMenuOpen, setContextMenuOpen,
     } = canvasSelection;
 
     const {
@@ -329,6 +333,21 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 showDownload={true}
                 showDuplicate={true}
             />
+
+            {/* Clear Studio Context Menu (Right Click on Empty Canvas) */}
+            {contextMenuOpen && contextMenuModalType === 'canvas' && (
+                <PluginContextMenu
+                    x={contextMenuPosition.x}
+                    y={contextMenuPosition.y}
+                    onClose={() => setContextMenuOpen(false)}
+                    onClearStudio={() => {
+                        if (props.onClearStudio) {
+                            props.onClearStudio();
+                        }
+                    }}
+                    onFitView={onFitView}
+                />
+            )}
 
             {/* <UnifiedCanvasOverlay
                 imageModalStates={imageModalStates}

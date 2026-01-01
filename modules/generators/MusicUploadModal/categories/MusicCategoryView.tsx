@@ -20,6 +20,8 @@ interface MusicCategoryProps {
     modelDropdownRef: React.RefObject<HTMLDivElement | null>;
     isModelDropdownOpen: boolean;
     onSetIsModelDropdownOpen: (open: boolean) => void;
+    isPromptDisabled?: boolean;
+    isLyricsDisabled?: boolean;
 }
 
 export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
@@ -41,6 +43,8 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
     modelDropdownRef,
     isModelDropdownOpen,
     onSetIsModelDropdownOpen,
+    isPromptDisabled = false,
+    isLyricsDisabled = false,
 }) => {
     const [showPromptTip, setShowPromptTip] = useState(false);
     const [showLyricsTip, setShowLyricsTip] = useState(false);
@@ -62,6 +66,11 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const disabledInputBg = isDark ? '#1a1a1a' : '#f3f4f6';
+    const disabledText = isDark ? '#666666' : '#6b7280';
+    const enabledInputBg = '#000000';
+    const enabledText = '#ffffff';
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: `${16 * scale}px`, width: '100%', height: '100%', overflowY: 'auto' }}>
@@ -154,10 +163,22 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
                         type="text"
                         value={prompt}
                         onChange={(e) => onPromptChange(e.target.value)}
-                        placeholder="Describe your music..."
-                        style={{ width: '100%', height: `${36 * scale}px`, backgroundColor: '#000000', border: `1px solid rgba(255, 255, 255, 0.1)`, borderRadius: `${8 * scale}px`, padding: `0 ${12 * scale}px`, fontSize: controlFontSize, color: '#ffffff', outline: 'none' }}
-                        onFocus={(e) => e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.3)'}
-                        onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'}
+                        placeholder={isPromptDisabled ? 'Controlled by input node' : "Describe your music..."}
+                        disabled={isPromptDisabled}
+                        style={{
+                            width: '100%',
+                            height: `${36 * scale}px`,
+                            backgroundColor: isPromptDisabled ? disabledInputBg : enabledInputBg,
+                            border: `1px solid rgba(255, 255, 255, 0.1)`,
+                            borderRadius: `${8 * scale}px`,
+                            padding: `0 ${12 * scale}px`,
+                            fontSize: controlFontSize,
+                            color: isPromptDisabled ? disabledText : enabledText,
+                            outline: 'none',
+                            cursor: isPromptDisabled ? 'not-allowed' : 'text'
+                        }}
+                        onFocus={(e) => { if (!isPromptDisabled) e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.3)'; }}
+                        onBlur={(e) => { if (!isPromptDisabled) e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'; }}
                     />
                 </div>
 
@@ -185,10 +206,23 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
                     <textarea
                         value={lyricsPrompt}
                         onChange={(e) => onLyricsPromptChange(e.target.value)}
-                        placeholder="Enter lyrics"
-                        style={{ width: '100%', height: `${60 * scale}px`, backgroundColor: '#000000', border: `1px solid rgba(255, 255, 255, 0.1)`, borderRadius: `${8 * scale}px`, padding: `${8 * scale}px ${12 * scale}px`, fontSize: controlFontSize, color: '#ffffff', outline: 'none', resize: 'none' }}
-                        onFocus={(e) => e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.3)'}
-                        onBlur={(e) => e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'}
+                        placeholder={isLyricsDisabled ? 'Controlled by input node' : "Enter lyrics"}
+                        disabled={isLyricsDisabled}
+                        style={{
+                            width: '100%',
+                            height: `${60 * scale}px`,
+                            backgroundColor: isLyricsDisabled ? disabledInputBg : enabledInputBg,
+                            border: `1px solid rgba(255, 255, 255, 0.1)`,
+                            borderRadius: `${8 * scale}px`,
+                            padding: `${8 * scale}px ${12 * scale}px`,
+                            fontSize: controlFontSize,
+                            color: isLyricsDisabled ? disabledText : enabledText,
+                            outline: 'none',
+                            resize: 'none',
+                            cursor: isLyricsDisabled ? 'not-allowed' : 'text'
+                        }}
+                        onFocus={(e) => { if (!isLyricsDisabled) e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.3)'; }}
+                        onBlur={(e) => { if (!isLyricsDisabled) e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'; }}
                     />
                 </div>
             </div>

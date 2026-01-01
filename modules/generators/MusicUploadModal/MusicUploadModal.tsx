@@ -278,6 +278,25 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     return textInput || null;
   }, [id, connections, textInputStates]);
 
+  // Detect connected lyrics input
+  const connectedLyricsInput = useMemo(() => {
+    if (!id || !connections || connections.length === 0 || !textInputStates || textInputStates.length === 0) {
+      return null;
+    }
+    // Find connection where this modal is the target (to === id-lyrics)
+    const connection = connections.find(c => c.to === `${id}-lyrics`);
+    if (!connection) return null;
+
+    // Find the text input state that matches the connection source
+    const textInput = textInputStates.find(t => t.id === connection.from);
+    return textInput || null;
+  }, [id, connections, textInputStates]);
+
+  // Options should remain open (auto-pinned) if any input is connected
+  const isAutoPinned = useMemo(() => {
+    return !!connectedTextInput || !!connectedLyricsInput;
+  }, [connectedTextInput, connectedLyricsInput]);
+
   const onOptionsChangeRef = useRef(onOptionsChange);
 
   // Update ref when onOptionsChange changes
@@ -292,6 +311,28 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       setPrompt(currentTextValue);
     }
   }, [connectedTextInput?.value, prompt]);
+
+  // Update lyrics when text input value changes (real-time sync)
+  useEffect(() => {
+    const currentLyricsValue = connectedLyricsInput?.value;
+    if (currentLyricsValue !== undefined && currentLyricsValue !== lyricsPrompt) {
+      setLyricsPrompt(currentLyricsValue);
+    }
+  }, [connectedLyricsInput?.value, lyricsPrompt]);
+
+  // Update dialogue inputs when text input value changes and category is dialogue
+  useEffect(() => {
+    if (activeCategory === 'dialogue' && connectedTextInput?.value !== undefined) {
+      const val = connectedTextInput.value;
+      if (dialogueInputs[0]?.text !== val) {
+        const newInputs = [...dialogueInputs];
+        if (newInputs.length > 0) {
+          newInputs[0] = { ...newInputs[0], text: val };
+          setDialogueInputs(newInputs);
+        }
+      }
+    }
+  }, [connectedTextInput?.value, activeCategory, dialogueInputs]);
 
   // Use local prompt or connected prompt
   const effectivePrompt = prompt;
@@ -826,6 +867,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       <MusicModalTooltip
         isHovered={isHovered}
         scale={scale}
+        activeCategory={effectiveCategory}
       />
 
       <div style={{ position: 'relative' }}>
@@ -834,7 +876,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           scale={scale}
           selectedAspectRatio={selectedAspectRatio}
           isHovered={isHovered}
-          isPinned={isPinned}
+          isPinned={isPinned || isAutoPinned}
           isSelected={!!isSelected}
           isDraggingContainer={isDraggingContainer}
           generatedMusicUrl={generatedMusicUrl}
@@ -843,7 +885,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           frameBorderWidth={frameBorderWidth}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
-          activeCategory={activeCategory}
+          activeCategory={effectiveCategory}
           onCategoryChange={setActiveCategory}
         />
 
@@ -853,7 +895,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           isHovered={isHovered}
           isSelected={!!isSelected}
           globalDragActive={globalDragActive}
-          activeCategory={activeCategory}
+          activeCategory={effectiveCategory}
         />
       </div>
 
@@ -861,10 +903,11 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         <MusicModalControls
           scale={scale}
           isHovered={isHovered}
-          isPinned={isPinned}
+          isPinned={isPinned || isAutoPinned}
           isSelected={Boolean(isSelected)}
           prompt={effectivePrompt}
           isPromptDisabled={!!connectedTextInput}
+          isLyricsDisabled={!!connectedLyricsInput}
           selectedModel={selectedModel}
           selectedAspectRatio={selectedAspectRatio}
           selectedFrame={selectedFrame}

@@ -183,6 +183,9 @@ export interface CanvasProps {
         backgroundDescription?: string;
         specialRequest?: string;
     }) => void;
+
+    // Clear Studio
+    onClearStudio?: () => void;
 }
 
 export interface CanvasItemsData {

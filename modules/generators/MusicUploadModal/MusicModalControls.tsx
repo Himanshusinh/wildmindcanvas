@@ -16,6 +16,7 @@ interface MusicModalControlsProps {
   isSelected?: boolean;
   prompt: string;
   isPromptDisabled?: boolean;
+  isLyricsDisabled?: boolean;
   selectedModel: string;
   selectedAspectRatio: string;
   selectedFrame: string;
@@ -115,6 +116,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   isSelected = false,
   prompt,
   isPromptDisabled = false,
+  isLyricsDisabled = false,
   selectedModel,
   selectedAspectRatio,
   selectedFrame,
@@ -246,10 +248,11 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
     iconColor,
     selectedModel,
     onModelChange,
-    prompt,
+    prompt: prompt ?? '',
     onPromptChange,
     onGenerate,
     isGenerating,
+    isPromptDisabled,
     models: currentConfig.models,
     modelDropdownRef,
     isModelDropdownOpen,
@@ -264,6 +267,8 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
             {...baseProps}
             lyricsPrompt={lyricsPrompt}
             onLyricsPromptChange={onLyricsPromptChange}
+            isLyricsDisabled={isLyricsDisabled}
+            isPromptDisabled={isPromptDisabled}
           />
         );
       case 'voice':

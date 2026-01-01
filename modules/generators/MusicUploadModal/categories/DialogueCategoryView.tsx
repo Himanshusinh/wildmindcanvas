@@ -18,6 +18,7 @@ interface DialogueCategoryViewProps {
     isGenerating: boolean;
     filename: string;
     onFilenameChange: (val: string) => void;
+    isPromptDisabled?: boolean;
 }
 
 export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
@@ -35,6 +36,7 @@ export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
     isGenerating,
     filename,
     onFilenameChange,
+    isPromptDisabled = false,
 }) => {
     const voices = [
         { id: 'Aria', name: 'Aria' },
@@ -188,8 +190,9 @@ export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
                                         border: 'none',
                                         color: '#ef4444',
                                         fontSize: `${11 * scale}px`,
-                                        cursor: 'pointer',
-                                        padding: 0
+                                        cursor: isPromptDisabled ? 'not-allowed' : 'pointer',
+                                        padding: 0,
+                                        opacity: isPromptDisabled ? 0.5 : 1
                                     }}
                                 >
                                     Remove
@@ -204,19 +207,21 @@ export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
                                 onChange={(e) => handleInputChange(index, 'text', e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                placeholder="Enter dialogue text... You can use emotion tags like [applause], [excited], etc."
+                                placeholder={isPromptDisabled ? 'Controlled by input node' : "Enter dialogue text... You can use emotion tags like [applause], [excited], etc."}
+                                disabled={isPromptDisabled}
                                 style={{
                                     width: '100%',
                                     height: `${60 * scale}px`,
                                     padding: `${10 * scale}px`,
-                                    backgroundColor: inputBg,
+                                    backgroundColor: isPromptDisabled ? (isDark ? '#1a1a1a' : '#f3f4f6') : inputBg,
                                     border: `1px solid ${borderColor}`,
                                     borderRadius: `${8 * scale}px`,
-                                    color: textColor,
+                                    color: isPromptDisabled ? (isDark ? '#666666' : '#6b7280') : textColor,
                                     fontSize: inputFontSize,
                                     resize: 'none',
                                     outline: 'none',
-                                    fontFamily: 'inherit'
+                                    fontFamily: 'inherit',
+                                    cursor: isPromptDisabled ? 'not-allowed' : 'text'
                                 }}
                             />
                         </div>
@@ -228,16 +233,17 @@ export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
                                 onChange={(e) => handleInputChange(index, 'voice', e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 onMouseDown={(e) => e.stopPropagation()}
+                                disabled={isPromptDisabled}
                                 style={{
                                     width: '100%',
                                     padding: `${8 * scale}px`,
-                                    backgroundColor: inputBg,
+                                    backgroundColor: isPromptDisabled ? (isDark ? '#1a1a1a' : '#f3f4f6') : inputBg,
                                     border: `1px solid ${borderColor}`,
                                     borderRadius: `${8 * scale}px`,
-                                    color: textColor,
+                                    color: isPromptDisabled ? (isDark ? '#666666' : '#6b7280') : textColor,
                                     fontSize: inputFontSize,
                                     outline: 'none',
-                                    cursor: 'pointer'
+                                    cursor: isPromptDisabled ? 'not-allowed' : 'pointer'
                                 }}
                             >
                                 {voices.map(v => (
@@ -254,22 +260,24 @@ export const DialogueCategoryView: React.FC<DialogueCategoryViewProps> = ({
                 onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    handleAddInput();
+                    if (!isPromptDisabled) handleAddInput();
                 }}
+                disabled={isPromptDisabled}
                 style={{
                     width: '100%',
                     padding: `${12 * scale}px`,
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
                     border: `1px dashed ${borderColor}`,
                     borderRadius: `${12 * scale}px`,
-                    color: textColor,
+                    color: isPromptDisabled ? (isDark ? '#444' : '#ccc') : textColor,
                     fontSize: controlFontSize,
-                    cursor: 'pointer',
+                    cursor: isPromptDisabled ? 'not-allowed' : 'pointer',
                     fontWeight: '500',
-                    transition: 'background-color 0.2s'
+                    transition: 'background-color 0.2s',
+                    opacity: isPromptDisabled ? 0.5 : 1
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}
+                onMouseEnter={(e) => { if (!isPromptDisabled) e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'; }}
+                onMouseLeave={(e) => { if (!isPromptDisabled) e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'; }}
             >
                 + Add Dialogue Input
             </button>

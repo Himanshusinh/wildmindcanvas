@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { CompareGenerator } from '@/modules/canvas-app/types';
 import { Canvas } from '@/modules/canvas';
 import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
@@ -1725,11 +1725,56 @@ export function CanvasApp({ user }: CanvasAppProps) {
           redo();
         }
       }
+      // Delete/Backspace for Rich Text
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+        if (selectedRichTextId && !isInput) {
+          e.preventDefault();
+          const id = selectedRichTextId;
+          const prevItem = richTextStatesRef.current.find(t => t.id === id);
+
+          if (prevItem) {
+            // Optimistic update
+            setRichTextStates(prev => prev.filter(t => t.id !== id));
+            setSelectedRichTextId(null);
+
+            // Realtime
+            if (realtimeActive) {
+              realtimeRef.current?.sendDelete(id);
+            }
+
+            // Persistence/Undo
+            if (projectId && opManagerInitialized) {
+              appendOp({
+                type: 'delete',
+                elementId: id,
+                data: {},
+                inverse: {
+                  type: 'create',
+                  elementId: id,
+                  data: {
+                    element: {
+                      id: prevItem.id,
+                      type: 'rich-text',
+                      x: prevItem.x,
+                      y: prevItem.y,
+                      meta: { ...prevItem }
+                    }
+                  },
+                  requestId: '',
+                  clientTs: 0
+                } as any
+              });
+            }
+          }
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
-  }, [canUndo, canRedo, undo, redo]);
+  }, [canUndo, canRedo, undo, redo, selectedRichTextId, realtimeActive, projectId, opManagerInitialized]);
 
   // State definitions moved up to be available for canvasSetters
   const [selectedTool, setSelectedTool] = useState<'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text'>('cursor');
@@ -1742,6 +1787,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
   useEffect(() => {
     selectedToolRef.current = selectedTool;
   }, [selectedTool]);
+
+  const richTextStatesRef = useRef(richTextStates);
+  useEffect(() => {
+    richTextStatesRef.current = richTextStates;
+  }, [richTextStates]);
+
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
@@ -2771,6 +2822,36 @@ export function CanvasApp({ user }: CanvasAppProps) {
     return null;
   };
 
+  const handleClearStudio = useCallback(() => {
+    // Clear all media and text states
+    setImages([]);
+    setImageGenerators([]);
+    setVideoGenerators([]);
+    setVideoEditorGenerators([]);
+    setMusicGenerators([]);
+    setUpscaleGenerators([]);
+    setMultiangleCameraGenerators([]);
+    setRemoveBgGenerators([]);
+    setEraseGenerators([]);
+    setExpandGenerators([]);
+    setVectorizeGenerators([]);
+    setNextSceneGenerators([]);
+    setCompareGenerators([]);
+    setStoryboardGenerators([]);
+    setScriptFrameGenerators([]);
+    setSceneFrameGenerators([]);
+    setTextGenerators([]);
+    setCanvasTextStates([]);
+    setRichTextStates([]);
+    setInitialGroupContainerStates([]);
+
+    // Clear Connections
+    setConnectors([]);
+
+    // Clear Selection is handled implicitly by clearing data, 
+    // but clearAllSelections in Canvas will handle fine-grained reset if needed.
+  }, []);
+
   if (isInitializing) {
     return (
       <div className="w-screen h-screen flex items-center justify-center bg-gray-100">
@@ -2814,6 +2895,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               initialScale={initialViewportCenter?.scale}
               images={images}
               setImages={setImages}
+              onClearStudio={handleClearStudio}
               onViewportChange={handleViewportChange}
               onImageUpdate={handleImageUpdate}
               onImageDelete={handleImageDelete}
@@ -2861,6 +2943,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
               setCanvasTextStates={setCanvasTextStates}
               richTextStates={richTextStates}
               setRichTextStates={setRichTextStates}
+              selectedRichTextId={selectedRichTextId}
+              setSelectedRichTextId={setSelectedRichTextId}
               connections={connectors}
               onConnectionsChange={(connections) => {
                 setConnectors(connections.map((conn) => ({

@@ -21,6 +21,7 @@ interface SfxCategoryViewProps {
     onFilenameChange: (val: string) => void;
     onGenerate: () => void;
     isGenerating: boolean;
+    isPromptDisabled?: boolean;
 }
 
 export const SfxCategoryView: React.FC<SfxCategoryViewProps> = ({
@@ -42,6 +43,7 @@ export const SfxCategoryView: React.FC<SfxCategoryViewProps> = ({
     onFilenameChange,
     onGenerate,
     isGenerating,
+    isPromptDisabled = false,
 }) => {
     const outputFormats = [
         { id: 'mp3_22050_32', label: 'mp3_22050_32' },
@@ -138,19 +140,21 @@ export const SfxCategoryView: React.FC<SfxCategoryViewProps> = ({
                         onChange={(e) => onPromptChange(e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
-                        placeholder="Describe the sound effect you want to generate. e.g., 'Spacious braam suitable for high-impact movie trailer moments'..."
+                        placeholder={isPromptDisabled ? 'Controlled by input node' : "Describe the sound effect you want to generate. e.g., 'Spacious braam suitable for high-impact movie trailer moments'..."}
+                        disabled={isPromptDisabled}
                         style={{
                             width: '100%',
                             height: `${100 * scale}px`,
                             backgroundColor: 'transparent',
                             border: 'none',
-                            color: textColor,
+                            color: isPromptDisabled ? (isDark ? '#666666' : '#6b7280') : textColor,
                             fontSize: inputFontSize,
                             resize: 'none',
                             outline: 'none',
                             fontFamily: 'inherit',
                             padding: 0,
-                            lineHeight: '1.5'
+                            lineHeight: '1.5',
+                            cursor: isPromptDisabled ? 'not-allowed' : 'text'
                         }}
                     />
                     <div style={{

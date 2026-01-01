@@ -112,6 +112,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         handleStageMouseMove,
         handleStageMouseUp,
         handleStageClick,
+        handleStageContextMenu,
         handleStageDragMove,
         handleStageDragEnd,
         isPanning,
@@ -162,6 +163,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
             onDragEnd={handleStageDragEnd}
             onClick={handleStageClick}
             onTap={handleStageClick}
+            onContextMenu={handleStageContextMenu}
             // onDragMove/onDragEnd handled in event hook or passed here?
             // Canvas.tsx had handleStageDragMove.
             // I should add them if they are in event hook.

@@ -22,6 +22,8 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
   return (
     <>
       {/* Receive Node (Left) */}
+      {/* Receive Node (Left) */}
+      {/* Primary Prompt Node */}
       <div
         data-node-id={id}
         data-node-side="receive"
@@ -49,7 +51,12 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
         style={{
           position: 'absolute',
           left: `${-12 * scale}px`,
-          top: `${200 * scale}px`,
+          top: `${activeCategory === 'music' ? 340 * scale :
+            activeCategory === 'voice' ? 410 * scale :
+              activeCategory === 'sfx' ? 360 * scale :
+                activeCategory === 'dialogue' ? 420 * scale :
+                  200 * scale
+            }px`,
           transform: 'translateY(-50%)',
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
@@ -58,12 +65,55 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           cursor: 'pointer',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
-          opacity: (activeCategory && (isHovered || isSelected || globalDragActive)) ? 1 : 0,
-          visibility: activeCategory ? 'visible' : 'hidden',
-
+          opacity: (isHovered || globalDragActive) ? 1 : 0,
+          visibility: 'visible',
           pointerEvents: 'auto',
         }}
       />
+      {/* Lyrics Node (Only for Music Category) */}
+      {activeCategory === 'music' && (
+        <div
+          data-node-id={`${id}-lyrics`}
+          data-node-side="receive"
+          onPointerEnter={(e) => {
+            if (!id) return;
+            window.dispatchEvent(new CustomEvent('canvas-node-hover', { detail: { nodeId: `${id}-lyrics` } }));
+          }}
+          onPointerLeave={(e) => {
+            if (!id) return;
+            window.dispatchEvent(new CustomEvent('canvas-node-leave', { detail: { nodeId: `${id}-lyrics` } }));
+          }}
+          onPointerUp={(e) => {
+            if (!id) return;
+            e.stopPropagation();
+            e.preventDefault();
+            window.dispatchEvent(new CustomEvent('canvas-node-complete', { detail: { id: `${id}-lyrics`, side: 'receive' } }));
+            try {
+              const active: any = (window as any).__canvas_active_capture;
+              if (active?.element && typeof active?.pid === 'number') {
+                try { active.element.releasePointerCapture(active.pid); } catch (err) { }
+                delete (window as any).__canvas_active_capture;
+              }
+            } catch (err) { }
+          }}
+          style={{
+            position: 'absolute',
+            left: `${-12 * scale}px`,
+            top: `${430 * scale}px`,
+            transform: 'translateY(-50%)',
+            width: `${20 * scale}px`,
+            height: `${20 * scale}px`,
+            borderRadius: '50%',
+            backgroundColor: '#437eb5',
+            cursor: 'pointer',
+            border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
+            zIndex: 5000,
+            opacity: (isHovered || globalDragActive) ? 1 : 0,
+            visibility: 'visible',
+            pointerEvents: 'auto',
+          }}
+        />
+      )}
       {/* Send Node (Right) */}
       <div
         data-node-id={id}
@@ -130,7 +180,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           cursor: 'grab',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
-          opacity: (activeCategory && (isHovered || isSelected || globalDragActive)) ? 1 : 0,
+          opacity: (activeCategory && (isHovered || globalDragActive)) ? 1 : 0,
           visibility: activeCategory ? 'visible' : 'hidden',
           pointerEvents: 'auto',
         }}

@@ -297,8 +297,177 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     effectiveCanvasTextStates,
   };
 
+  const handleFitView = useCallback(() => {
+    // Helper: compute bounding rect from selection or all components
+    const computeSelectionBounds = (): { x: number; y: number; width: number; height: number } | null => {
+      // If explicit selected ids exist, compute bounds across selected items
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let found = false;
+
+      // Check selections first
+      // Selected canvas images
+      if (canvasSelection.selectedImageIndices.length > 0) {
+        canvasSelection.selectedImageIndices.forEach(idx => {
+          const img = images[idx];
+          if (!img) return;
+          const ix = img.x || 0;
+          const iy = img.y || 0;
+          const iw = img.width || 0;
+          const ih = img.height || 0;
+          minX = Math.min(minX, ix);
+          minY = Math.min(minY, iy);
+          maxX = Math.max(maxX, ix + iw);
+          maxY = Math.max(maxY, iy + ih);
+          found = true;
+        });
+      }
+
+      // Selected text inputs
+      if (canvasSelection.selectedTextInputIds.length > 0) {
+        canvasSelection.selectedTextInputIds.forEach(id => {
+          const t = textInputStates.find((tt: any) => tt.id === id);
+          if (!t) return;
+          minX = Math.min(minX, t.x);
+          minY = Math.min(minY, t.y);
+          maxX = Math.max(maxX, t.x + 300);
+          maxY = Math.max(maxY, t.y + 100);
+          found = true;
+        });
+      }
+
+      // Check Modals
+      const checkSelectionModals = (selectedIds: string[], modals: any[], width: number = 600, height: number = 400) => {
+        if (selectedIds.length > 0) {
+          selectedIds.forEach(id => {
+            const m = modals.find(mm => mm.id === id);
+            if (!m) return;
+            minX = Math.min(minX, m.x);
+            minY = Math.min(minY, m.y);
+            maxX = Math.max(maxX, m.x + (m.frameWidth ?? width));
+            maxY = Math.max(maxY, m.y + (m.frameHeight ?? height));
+            found = true;
+          });
+        }
+      };
+
+      checkSelectionModals(canvasSelection.selectedImageModalIds, imageModalStates);
+      checkSelectionModals(canvasSelection.selectedVideoModalIds, videoModalStates);
+      checkSelectionModals(canvasSelection.selectedMusicModalIds, musicModalStates, 600, 300);
+      checkSelectionModals(canvasSelection.selectedUpscaleModalIds, upscaleModalStates);
+      checkSelectionModals(canvasSelection.selectedMultiangleCameraModalIds, multiangleCameraModalStates);
+      checkSelectionModals(canvasSelection.selectedRemoveBgModalIds, removeBgModalStates);
+      checkSelectionModals(canvasSelection.selectedEraseModalIds, eraseModalStates);
+      checkSelectionModals(canvasSelection.selectedExpandModalIds, expandModalStates);
+      checkSelectionModals(canvasSelection.selectedVectorizeModalIds, vectorizeModalStates);
+      checkSelectionModals(canvasSelection.selectedNextSceneModalIds, nextSceneModalStates);
+      checkSelectionModals(canvasSelection.selectedStoryboardModalIds, storyboardModalStates);
+      checkSelectionModals(canvasSelection.selectedScriptFrameModalIds, scriptFrameModalStates);
+      checkSelectionModals(canvasSelection.selectedSceneFrameModalIds, sceneFrameModalStates);
+      checkSelectionModals(canvasSelection.selectedVideoEditorModalIds, videoEditorModalStates);
+      checkSelectionModals(canvasSelection.selectedCompareModalIds, compareModalStates);
+
+      // If selection found, return logic
+      if (found) {
+        return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+      }
+
+      // If no selection, check ALL components
+      // Images
+      images.forEach(img => {
+        if (!img) return;
+        const ix = img.x || 0;
+        const iy = img.y || 0;
+        const iw = img.width || 0;
+        const ih = img.height || 0;
+        minX = Math.min(minX, ix);
+        minY = Math.min(minY, iy);
+        maxX = Math.max(maxX, ix + iw);
+        maxY = Math.max(maxY, iy + ih);
+        found = true;
+      });
+
+      // Text Inputs
+      textInputStates.forEach((t: any) => {
+        minX = Math.min(minX, t.x);
+        minY = Math.min(minY, t.y);
+        maxX = Math.max(maxX, t.x + 300);
+        maxY = Math.max(maxY, t.y + 100);
+        found = true;
+      });
+
+      // Modals
+      const checkModals = (modals: any[], width: number = 600, height: number = 400) => {
+        modals.forEach(m => {
+          minX = Math.min(minX, m.x);
+          minY = Math.min(minY, m.y);
+          maxX = Math.max(maxX, m.x + (m.frameWidth ?? width));
+          maxY = Math.max(maxY, m.y + (m.frameHeight ?? height));
+          found = true;
+        });
+      };
+
+      checkModals(effectiveImageModalStates);
+      checkModals(effectiveVideoModalStates);
+      checkModals(effectiveMusicModalStates, 600, 300);
+      checkModals(effectiveUpscaleModalStates);
+      checkModals(effectiveMultiangleCameraModalStates);
+      checkModals(effectiveRemoveBgModalStates);
+      checkModals(effectiveEraseModalStates);
+      checkModals(effectiveExpandModalStates);
+      checkModals(effectiveVectorizeModalStates);
+      checkModals(effectiveNextSceneModalStates);
+      checkModals(effectiveStoryboardModalStates);
+      checkModals(effectiveScriptFrameModalStates);
+      checkModals(effectiveSceneFrameModalStates);
+      checkModals(effectiveVideoEditorModalStates);
+      checkModals(effectiveCompareModalStates);
+
+      if (found) {
+        return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+      }
+      return null;
+    };
+
+    const rect = computeSelectionBounds();
+    if (!rect) return;
+
+    // Add small padding around rect
+    const padding = Math.max(50, Math.min(rect.width, rect.height) * 0.1);
+    const targetWidth = rect.width + padding * 2;
+    const targetHeight = rect.height + padding * 2;
+
+    // Compute scale to fit target into viewport
+    const scaleX = viewportSize.width / targetWidth;
+    const scaleY = viewportSize.height / targetHeight;
+    // Use a tiny margin multiplier
+    const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY) * 0.95));
+
+    // Center rect in viewport
+    const rectCenterX = rect.x + rect.width / 2;
+    const rectCenterY = rect.y + rect.height / 2;
+    const newPos = {
+      x: viewportSize.width / 2 - rectCenterX * newScale,
+      y: viewportSize.height / 2 - rectCenterY * newScale,
+    };
+
+    updateViewportCenter(newPos, newScale);
+  }, [
+    images, canvasSelection, updateViewportCenter, viewportSize,
+    textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    upscaleModalStates, multiangleCameraModalStates, removeBgModalStates,
+    eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates,
+    storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates,
+    videoEditorModalStates, compareModalStates,
+    effectiveImageModalStates, effectiveVideoModalStates, effectiveMusicModalStates,
+    effectiveUpscaleModalStates, effectiveMultiangleCameraModalStates, effectiveRemoveBgModalStates,
+    effectiveEraseModalStates, effectiveExpandModalStates, effectiveVectorizeModalStates,
+    effectiveNextSceneModalStates, effectiveStoryboardModalStates, effectiveScriptFrameModalStates,
+    effectiveSceneFrameModalStates, effectiveVideoEditorModalStates, effectiveCompareModalStates
+  ]);
+
   // --- SHORTCUTS ---
   useKeyboardShortcuts({
+    onFitView: handleFitView,
     // Undo/Redo
     canUndo: canvasState.canUndo,
     canRedo: canvasState.canRedo,
@@ -601,6 +770,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
         activeGenerationCount={0}
+        onFitView={handleFitView}
       />
 
       {!isUIHidden && (

@@ -305,8 +305,8 @@ export function useCanvasEvents(
         }
 
         const isEditingGroup = document.querySelector('input[data-editing-group="true"]') !== null;
-
-        if (clickedOnEmpty && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
+        // Modified: only clear on LEFT CLICK (button 0)
+        if (clickedOnEmpty && e.evt.button === 0 && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
             clearAllSelections(true);
             try {
                 applyStageCursorWrapper('pointer');
@@ -851,8 +851,23 @@ export function useCanvasEvents(
         const stage = target.getStage();
         const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.name() === 'background-rect';
 
-        if (clickedOnEmpty) {
+        // Modified: only clear on LEFT CLICK (button 0)
+        if (clickedOnEmpty && e.evt.button === 0) {
             clearAllSelections();
+        }
+    };
+
+    const handleStageContextMenu = (e: KonvaEventObject<PointerEvent>) => {
+        const target = e.target;
+        const stage = target.getStage();
+        const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.name() === 'background-rect';
+
+        if (clickedOnEmpty) {
+            e.evt.preventDefault();
+            clearAllSelections();
+            canvasSelection.setContextMenuOpen(true);
+            canvasSelection.setContextMenuModalType('canvas');
+            canvasSelection.setContextMenuPosition({ x: e.evt.clientX, y: e.evt.clientY });
         }
     };
 
@@ -968,6 +983,7 @@ export function useCanvasEvents(
         handleStageMouseMove,
         handleStageMouseUp,
         handleStageClick,
+        handleStageContextMenu,
         handleStageDragMove,
         handleStageDragEnd,
         isPanning,

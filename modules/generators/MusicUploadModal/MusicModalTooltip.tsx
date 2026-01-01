@@ -2,14 +2,18 @@
 
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
+import { MusicCategory } from './MusicModalTabs';
+
 interface MusicModalTooltipProps {
   isHovered: boolean;
   scale: number;
+  activeCategory?: MusicCategory;
 }
 
 export const MusicModalTooltip: React.FC<MusicModalTooltipProps> = ({
   isHovered,
   scale,
+  activeCategory,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -17,6 +21,16 @@ export const MusicModalTooltip: React.FC<MusicModalTooltipProps> = ({
 
   const tooltipBg = isDark ? '#1a1a1a' : '#ffffff';
   const tooltipText = isDark ? '#ffffff' : '#1f2937';
+
+  const categoryLabels: Record<string, string> = {
+    music: 'Music',
+    voice: 'Voice (TTS)',
+    dialogue: 'Dialogue',
+    sfx: 'SFX',
+    'voice-cloning': 'Voice Cloning',
+  };
+
+  const categoryLabel = activeCategory ? categoryLabels[activeCategory] : null;
 
   return (
     <div
@@ -43,7 +57,7 @@ export const MusicModalTooltip: React.FC<MusicModalTooltipProps> = ({
         transition: 'background-color 0s ease, color 0s ease',
       }}
     >
-      Music Generator
+      Music Generation{categoryLabel ? ` > ${categoryLabel}` : ''}
     </div>
   );
 };

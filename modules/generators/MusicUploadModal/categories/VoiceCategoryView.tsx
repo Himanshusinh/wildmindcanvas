@@ -46,6 +46,7 @@ interface VoiceCategoryProps {
     onSetIsModelDropdownOpen: (open: boolean) => void;
     filename: string;
     onFilenameChange: (val: string) => void;
+    isPromptDisabled?: boolean;
 }
 
 export const VoiceCategoryView: React.FC<VoiceCategoryProps> = ({
@@ -91,6 +92,7 @@ export const VoiceCategoryView: React.FC<VoiceCategoryProps> = ({
     onSetIsModelDropdownOpen,
     filename,
     onFilenameChange,
+    isPromptDisabled = false,
 }) => {
     const [isVoiceDropdownOpen, setIsVoiceDropdownOpen] = useState(false);
     const [showLanguageTip, setShowLanguageTip] = useState(false);
@@ -274,12 +276,16 @@ export const VoiceCategoryView: React.FC<VoiceCategoryProps> = ({
                 <textarea
                     value={prompt}
                     onChange={(e) => onPromptChange(e.target.value)}
-                    placeholder={isMaya ? "Enter the text you want to convert to speech..." : "Enter text to convert to speech..."}
+                    placeholder={isPromptDisabled ? 'Controlled by input node' : (isMaya ? "Enter the text you want to convert to speech..." : "Enter text to convert to speech...")}
+                    disabled={isPromptDisabled}
                     style={{
-                        width: '100%', height: `${80 * scale}px`, backgroundColor: '#121212',
+                        width: '100%', height: `${80 * scale}px`,
+                        backgroundColor: isPromptDisabled ? (isDark ? '#1a1a1a' : '#f3f4f6') : '#121212',
                         border: `1px solid rgba(255, 255, 255, 0.1)`, borderRadius: `${8 * scale}px`,
-                        padding: `${10 * scale}px`, fontSize: controlFontSize, color: '#ffffff',
-                        outline: 'none', resize: 'none', fontFamily: 'inherit'
+                        padding: `${10 * scale}px`, fontSize: controlFontSize,
+                        color: isPromptDisabled ? (isDark ? '#666666' : '#6b7280') : '#ffffff',
+                        outline: 'none', resize: 'none', fontFamily: 'inherit',
+                        cursor: isPromptDisabled ? 'not-allowed' : 'text'
                     }}
                 />
                 {(isChatterbox || isMaya) && (

@@ -202,6 +202,7 @@ interface UseKeyboardShortcutsProps {
   isPanning: boolean;
   stageRef: React.RefObject<any>;
   selectedTool: string | undefined;
+  onFitView?: () => void;
 }
 
 export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
@@ -362,6 +363,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     isPanning,
     stageRef,
     selectedTool,
+    onFitView,
   } = props;
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -896,196 +898,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
 
-        // Helper: compute bounding rect from selection or all components
-        const computeSelectionBounds = (): { x: number; y: number; width: number; height: number } | null => {
-          // If there's a tight selection rect (computed from marquee), use it
-          if (selectionTightRect) return selectionTightRect;
-
-          // If explicit selected ids exist, compute bounds across selected items
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          let found = false;
-
-          // Selected canvas images
-          if (selectedImageIndices.length > 0) {
-            selectedImageIndices.forEach(idx => {
-              const img = images[idx];
-              if (!img) return;
-              const ix = img.x || 0;
-              const iy = img.y || 0;
-              const iw = img.width || 0;
-              const ih = img.height || 0;
-              minX = Math.min(minX, ix);
-              minY = Math.min(minY, iy);
-              maxX = Math.max(maxX, ix + iw);
-              maxY = Math.max(maxY, iy + ih);
-              found = true;
-            });
-          }
-
-          // Selected text inputs
-          if (selectedTextInputIds.length > 0) {
-            selectedTextInputIds.forEach(id => {
-              const t = textInputStates.find(tt => tt.id === id);
-              if (!t) return;
-              minX = Math.min(minX, t.x);
-              minY = Math.min(minY, t.y);
-              maxX = Math.max(maxX, t.x + 300);
-              maxY = Math.max(maxY, t.y + 100);
-              found = true;
-            });
-          }
-
-          // Selected image modals
-          if (selectedImageModalIds.length > 0) {
-            selectedImageModalIds.forEach(id => {
-              const m = imageModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 400;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          // Selected video modals
-          if (selectedVideoModalIds.length > 0) {
-            selectedVideoModalIds.forEach(id => {
-              const m = videoModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 400;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          // Selected music modals
-          if (selectedMusicModalIds.length > 0) {
-            selectedMusicModalIds.forEach(id => {
-              const m = musicModalStates.find(mm => mm.id === id);
-              if (!m) return;
-              const width = m.frameWidth ?? 600;
-              const height = m.frameHeight ?? 300;
-              minX = Math.min(minX, m.x);
-              minY = Math.min(minY, m.y);
-              maxX = Math.max(maxX, m.x + width);
-              maxY = Math.max(maxY, m.y + height);
-              found = true;
-            });
-          }
-
-          if (found) {
-            const width = maxX - minX;
-            const height = maxY - minY;
-            return {
-              x: minX,
-              y: minY,
-              width: Math.max(1, width),
-              height: Math.max(1, height)
-            };
-          }
-
-          // Nothing selected
-          return null;
-        };
-
-        const zoomToRect = (rect: { x: number; y: number; width: number; height: number } | null) => {
-          if (!rect) return;
-          // Add small padding around rect (in canvas space) so components are not flush to edges
-          const padding = Math.max(20, Math.min(rect.width, rect.height) * 0.04);
-          const targetWidth = rect.width + padding * 2;
-          const targetHeight = rect.height + padding * 2;
-
-          // Compute scale to fit target into viewport
-          const scaleX = viewportSize.width / targetWidth;
-          const scaleY = viewportSize.height / targetHeight;
-          // Use a tiny margin multiplier to ensure fit but keep components large on screen
-          const newScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY) * 0.995));
-
-          // Center rect in viewport
-          const rectCenterX = rect.x + rect.width / 2;
-          const rectCenterY = rect.y + rect.height / 2;
-          const newPos = {
-            x: viewportSize.width / 2 - rectCenterX * newScale,
-            y: viewportSize.height / 2 - rectCenterY * newScale,
-          };
-
-          setScale(newScale);
-          setPosition(newPos);
-          // Update callback after state settles
-          setTimeout(() => updateViewportCenter(newPos, newScale), 0);
-        };
-
-        // First try selection bounds
-        const selBounds = computeSelectionBounds();
-        if (selBounds) {
-          zoomToRect(selBounds);
-          return;
-        }
-
-        // No selection: compute bounding box for all components present
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        let any = false;
-
-        // Canvas images
-        images.forEach(img => {
-          if (!img) return;
-          const ix = img.x || 0;
-          const iy = img.y || 0;
-          const iw = img.width || 0;
-          const ih = img.height || 0;
-          minX = Math.min(minX, ix);
-          minY = Math.min(minY, iy);
-          maxX = Math.max(maxX, ix + iw);
-          maxY = Math.max(maxY, iy + ih);
-          any = true;
-        });
-
-        // Text inputs
-        textInputStates.forEach(t => {
-          minX = Math.min(minX, t.x);
-          minY = Math.min(minY, t.y);
-          maxX = Math.max(maxX, t.x + 300);
-          maxY = Math.max(maxY, t.y + 100);
-          any = true;
-        });
-
-        // Image modals
-        imageModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 400);
-          any = true;
-        });
-
-        // Video modals
-        videoModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 400);
-          any = true;
-        });
-
-        // Music modals
-        musicModalStates.forEach(m => {
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + 600);
-          maxY = Math.max(maxY, m.y + 300);
-          any = true;
-        });
-
-        if (any) {
-          const allRect = { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
-          zoomToRect(allRect);
+        if (onFitView) {
+          onFitView();
         }
       }
     } catch (err) {

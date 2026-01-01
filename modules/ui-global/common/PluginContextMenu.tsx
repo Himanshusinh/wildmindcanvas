@@ -9,6 +9,8 @@ interface PluginContextMenuProps {
     onDownload?: () => void;
     onPin?: () => void;
     isPinned?: boolean;
+    onClearStudio?: () => void;
+    onFitView?: () => void;
     onClose: () => void;
 }
 
@@ -20,6 +22,8 @@ export const PluginContextMenu: React.FC<PluginContextMenuProps> = ({
     onDownload,
     onPin,
     isPinned,
+    onClearStudio,
+    onFitView,
     onClose,
 }) => {
     const isDark = useIsDarkTheme();
@@ -182,6 +186,65 @@ export const PluginContextMenu: React.FC<PluginContextMenuProps> = ({
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                     Delete
+                </button>
+            )}
+            {onClearStudio && (
+                <button
+                    style={{ ...buttonStyle, color: '#ef4444' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#374151' : '#fee2e2'}
+                    onMouseLeave={unhoverStyle}
+                    onClick={() => {
+                        onClearStudio();
+                        onClose();
+                    }}
+                >
+                    <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ marginRight: '8px' }}
+                    >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                    Clear Studio
+                </button>
+            )}
+            {onFitView && (
+                <button
+                    style={buttonStyle}
+                    onMouseEnter={hoverStyle}
+                    onMouseLeave={unhoverStyle}
+                    onClick={() => {
+                        onFitView();
+                        onClose();
+                    }}
+                >
+                    <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ marginRight: '8px' }}
+                    >
+                        <polyline points="15 3 21 3 21 9" />
+                        <polyline points="9 21 3 21 3 15" />
+                        <line x1="21" y1="3" x2="14" y2="10" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                    </svg>
+                    Fit (Z)
                 </button>
             )}
         </div>
