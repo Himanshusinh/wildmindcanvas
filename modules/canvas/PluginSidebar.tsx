@@ -107,12 +107,33 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
   ]);
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; pluginId: string } | null>(null);
+  const sidebarRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Handle click outside to close
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   const handleContextMenu = (e: React.MouseEvent, pluginId: string) => {
     e.preventDefault();
@@ -278,6 +299,7 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
 
   return (
     <div
+      ref={sidebarRef}
       style={{
         position: 'fixed',
         left: '76px',

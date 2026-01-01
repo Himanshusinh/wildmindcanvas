@@ -3631,6 +3631,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 console.log('Persist canvas text delete:', id);
                 setCanvasTextStates(prev => prev.filter(t => t.id !== id));
               }}
+              onBackgroundClick={() => {
+                setIsLibraryOpen(false);
+                setIsPluginSidebarOpen(false);
+              }}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />
           </>

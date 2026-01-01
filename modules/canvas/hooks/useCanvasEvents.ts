@@ -308,6 +308,7 @@ export function useCanvasEvents(
         // Modified: only clear on LEFT CLICK (button 0)
         if (clickedOnEmpty && e.evt.button === 0 && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
             clearAllSelections(true);
+            props.onBackgroundClick?.();
             try {
                 applyStageCursorWrapper('pointer');
             } catch (err) { }

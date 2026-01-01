@@ -254,13 +254,13 @@ export const RichText: React.FC<RichTextProps> = ({
                                 position: absolute;
                                 display: flex;
                                 align-items: center;
-                                gap: 8px;
+                                gap: 6px;
                                 background: rgba(26, 26, 26, 0.95);
                                 backdrop-filter: blur(10px);
                                 -webkit-backdrop-filter: blur(10px);
                                 border: 1px solid rgba(255, 255, 255, 0.1);
-                                border-radius: 12px;
-                                padding: 8px 12px;
+                                border-radius: 10px;
+                                padding: 6px 10px;
                                 z-index: 1000;
                                 box-shadow: 
                                     0 4px 6px -1px rgba(0, 0, 0, 0.1),
@@ -281,9 +281,9 @@ export const RichText: React.FC<RichTextProps> = ({
                                 display: flex;
                                 align-items: center;
                                 justify-content: center;
-                                width: 34px;
-                                height: 34px;
-                                border-radius: 8px;
+                                width: 30px;
+                                height: 30px;
+                                border-radius: 6px;
                                 border: 1px solid transparent;
                                 background: transparent;
                                 color: #a1a1aa;
@@ -302,23 +302,29 @@ export const RichText: React.FC<RichTextProps> = ({
                             }
                             .toolbar-divider {
                                 width: 1px;
-                                height: 24px;
+                                height: 20px;
                                 background: rgba(255, 255, 255, 0.15);
-                                margin: 0 4px;
+                                margin: 0 2px;
                             }
                             .font-size-input {
-                                width: 44px;
-                                height: 34px;
+                                width: 36px;
+                                height: 30px;
                                 background: rgba(0, 0, 0, 0.2);
                                 border: 1px solid rgba(255, 255, 255, 0.1);
                                 color: #fff;
-                                border-radius: 6px;
-                                padding: 0 8px;
-                                font-size: 14px;
+                                border-radius: 5px;
+                                padding: 0 4px;
+                                font-size: 13px;
                                 font-weight: 500;
                                 text-align: center;
                                 outline: none;
                                 transition: all 0.2s;
+                                -moz-appearance: textfield;
+                            }
+                            .font-size-input::-webkit-outer-spin-button,
+                            .font-size-input::-webkit-inner-spin-button {
+                                -webkit-appearance: none;
+                                margin: 0;
                             }
                             .font-size-input:focus {
                                 border-color: #3b82f6;
@@ -328,17 +334,17 @@ export const RichText: React.FC<RichTextProps> = ({
                                 position: relative;
                                 display: flex;
                                 align-items: center;
-                                gap: 8px;
+                                gap: 6px;
                                 background: rgba(0, 0, 0, 0.2);
                                 border: 1px solid rgba(255, 255, 255, 0.1);
-                                border-radius: 8px;
-                                padding: 0 12px;
-                                height: 34px;
+                                border-radius: 6px;
+                                padding: 0 10px;
+                                height: 30px;
                                 cursor: pointer;
                                 color: #e4e4e7;
-                                font-size: 14px;
+                                font-size: 13px;
                                 font-weight: 500;
-                                min-width: 140px;
+                                min-width: 110px;
                                 transition: all 0.2s;
                             }
                             .font-select:hover {
@@ -410,7 +416,7 @@ export const RichText: React.FC<RichTextProps> = ({
                             {/* Font Family */}
                             <div className="font-select" onClick={() => setShowFontDropdown(!showFontDropdown)}>
                                 <span style={{ fontFamily: data.fontFamily }}>{data.fontFamily?.split(',')[0]}</span>
-                                <ChevronDown size={14} />
+                                <ChevronDown size={12} />
                                 {showFontDropdown && (
                                     <div className="font-dropdown">
                                         {FONTS.map(font => (
@@ -434,7 +440,7 @@ export const RichText: React.FC<RichTextProps> = ({
                             <div className="toolbar-divider" />
 
                             {/* Font Size */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <button className="toolbar-btn" onClick={() => onChange(data.id, { fontSize: Math.max(8, (data.fontSize || 20) - 2) })}>-</button>
                                 <input
                                     type="number"
@@ -452,19 +458,19 @@ export const RichText: React.FC<RichTextProps> = ({
                                 className={`toolbar-btn ${data.fontWeight === 'bold' ? 'active' : ''}`}
                                 onClick={() => toggleStyle('fontWeight', 'bold', 'normal')}
                             >
-                                <Bold size={18} />
+                                <Bold size={16} />
                             </button>
                             <button
                                 className={`toolbar-btn ${data.fontStyle === 'italic' ? 'active' : ''}`}
                                 onClick={() => toggleStyle('fontStyle', 'italic', 'normal')}
                             >
-                                <Italic size={18} />
+                                <Italic size={16} />
                             </button>
                             <button
                                 className={`toolbar-btn ${data.textDecoration === 'underline' ? 'active' : ''}`}
                                 onClick={() => toggleStyle('textDecoration', 'underline', 'none')}
                             >
-                                <Underline size={18} />
+                                <Underline size={16} />
                             </button>
 
                             <div className="toolbar-divider" />
@@ -474,19 +480,19 @@ export const RichText: React.FC<RichTextProps> = ({
                                 className={`toolbar-btn ${data.textAlign === 'left' ? 'active' : ''}`}
                                 onClick={() => onChange(data.id, { textAlign: 'left' })}
                             >
-                                <AlignLeft size={18} />
+                                <AlignLeft size={16} />
                             </button>
                             <button
                                 className={`toolbar-btn ${data.textAlign === 'center' ? 'active' : ''}`}
                                 onClick={() => onChange(data.id, { textAlign: 'center' })}
                             >
-                                <AlignCenter size={18} />
+                                <AlignCenter size={16} />
                             </button>
                             <button
                                 className={`toolbar-btn ${data.textAlign === 'right' ? 'active' : ''}`}
                                 onClick={() => onChange(data.id, { textAlign: 'right' })}
                             >
-                                <AlignRight size={18} />
+                                <AlignRight size={16} />
                             </button>
 
                             <div className="toolbar-divider" />
@@ -494,7 +500,7 @@ export const RichText: React.FC<RichTextProps> = ({
                             {/* Colors */}
                             <div className="color-picker-wrapper">
                                 <button className="toolbar-btn" title="Text Color">
-                                    <Palette size={18} style={{ color: data.color }} />
+                                    <Palette size={16} style={{ color: data.color }} />
                                     <input
                                         type="color"
                                         className="color-picker-input"
@@ -505,7 +511,7 @@ export const RichText: React.FC<RichTextProps> = ({
                             </div>
                             <div className="color-picker-wrapper">
                                 <button className="toolbar-btn" title="Background Color">
-                                    <Highlighter size={18} style={{ color: data.backgroundColor === 'transparent' ? '#ccc' : data.backgroundColor }} />
+                                    <Highlighter size={16} style={{ color: data.backgroundColor === 'transparent' ? '#ccc' : data.backgroundColor }} />
                                     <input
                                         type="color"
                                         className="color-picker-input"
@@ -516,7 +522,7 @@ export const RichText: React.FC<RichTextProps> = ({
                                 {data.backgroundColor && data.backgroundColor !== 'transparent' && (
                                     <button
                                         className="toolbar-btn"
-                                        style={{ fontSize: '14px', marginLeft: '-8px', width: '20px' }}
+                                        style={{ fontSize: '13px', marginLeft: '-6px', width: '18px' }}
                                         onClick={() => onChange(data.id, { backgroundColor: 'transparent' })}
                                         title="Remove Background"
                                     >

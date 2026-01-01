@@ -140,6 +140,28 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     };
   }, [isOpen, fetchMediaLibrary]);
 
+  // Handle click outside to close
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Use a small timeout to avoid closing immediately if the click that opened the sidebar
+    // is also caught by this listener (in case of event bubbling)
+    const timeoutId = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;

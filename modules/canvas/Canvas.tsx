@@ -83,6 +83,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRichTextCreate,
     onPersistRichTextMove,
     onPersistRichTextDelete,
+    onBackgroundClick,
   } = props;
 
   // Refs

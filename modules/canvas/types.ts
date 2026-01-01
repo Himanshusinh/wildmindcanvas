@@ -16,6 +16,7 @@ export interface CanvasProps {
     onImageDelete?: (index: number) => void;
     onImageDownload?: (index: number) => void;
     onImageDuplicate?: (index: number) => void;
+    onBackgroundClick?: () => void;
     initialCenter?: { x: number; y: number };
     initialScale?: number;
     onImagesDrop?: (files: File[]) => void;
