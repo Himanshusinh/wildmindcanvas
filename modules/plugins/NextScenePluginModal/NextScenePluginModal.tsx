@@ -307,10 +307,17 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         // Create 9 image modals in a 3x3 grid
         const modalIds: string[] = [];
         const gridCols = 3;
-        const horizontalGap = frameWidth + 20; // Tight gap
-        const verticalGap = frameHeight + 20;   // Tight gap
-        const startX = x + (400 * scale + 50) / scale; // Start to the right of plugin
-        const startY = y - (verticalGap * 1.5) / scale; // Center vertically
+        const gap = 12; // Small equal gap (12px)
+        const horizontalGap = frameWidth + gap;
+        const verticalGap = frameHeight + gap;
+
+        // Start to the right of the plugin node
+        const startX = x + (150 * scale) / scale;
+
+        // Center the 3x3 grid vertically relative to the center of the plugin node (y + 50)
+        // Grid height is 3 frames + 2 gaps
+        const gridHeight = (3 * frameHeight + 2 * gap);
+        const startY = y + 50 - (gridHeight / 2);
 
         // Create all 9 modals first (optimistic UI)
         for (let i = 0; i < 9; i++) {

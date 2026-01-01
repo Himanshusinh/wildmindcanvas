@@ -2543,10 +2543,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     // For images, create an ImageUploadModal frame instead of directly adding to canvas
     if (mediaType === 'image') {
-      const imageUrl = (mediaUrl.startsWith('http') && !mediaUrl.includes('/api/proxy/'))
-        // Use thumbnail proxy with AVIF for dimension check (lightweight) instead of full resource
-        ? buildProxyThumbnailUrl(mediaUrl, 2048, 85, 'avif')
-        : mediaUrl;
+      // Use AVIF only for dimension check to speed up loading if it failed on original,
+      // or if it was provided via drag-and-drop (avifUrl)
+      const imageUrlForDimensions = (media as any).avifUrl ||
+        ((mediaUrl.startsWith('http') && !mediaUrl.includes('/api/proxy/'))
+          ? buildProxyThumbnailUrl(mediaUrl, 2048, 85, 'avif')
+          : mediaUrl);
 
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -2607,7 +2609,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       };
 
       // Try loading the image
-      img.src = imageUrl;
+      img.src = imageUrlForDimensions;
     } else if (mediaType === 'video') {
       // For videos, create a VideoUploadModal frame instead of directly adding to canvas
       const video = document.createElement('video');

@@ -190,7 +190,16 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     isDraggingRef.current = true;
     // Store media data in drag event
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/json', JSON.stringify(media));
+
+    // Add AVIF preview URL for the drag process if it's an image
+    const dragData = {
+      ...media,
+      avifUrl: (media.url && (media.url.includes('zata.ai') || media.url.includes('zata')))
+        ? buildProxyThumbnailUrl(media.url, 512, 80, 'avif')
+        : undefined
+    };
+
+    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
     e.dataTransfer.setData('text/plain', media.url || '');
     // Add a visual indicator
     if (e.currentTarget instanceof HTMLElement) {
@@ -239,7 +248,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
           {items.map((item, idx) => {
-            const mediaUrl = getMediaUrl(item);
+            const mediaUrl = getMediaUrl(item, false); // Use original URL for grid display as requested
             const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
             const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
 
