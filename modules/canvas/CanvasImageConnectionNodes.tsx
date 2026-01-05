@@ -176,7 +176,6 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
                   zIndex: 5000,
                   opacity: shouldShowNodes ? 1 : 0,
-                  transition: 'opacity 0.18s ease, transform 0.12s ease',
                   pointerEvents: 'auto',
                   boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
                 }}
@@ -252,7 +251,6 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
                   zIndex: 5000,
                   opacity: shouldShowNodes ? 1 : 0,
-                  transition: 'opacity 0.18s ease',
                   pointerEvents: 'auto',
                 }}
               />

@@ -137,8 +137,8 @@ export interface CanvasProps {
     onPersistTextModalDelete?: (id: string) => void | Promise<void>;
     // Group persistence callbacks
     onPersistGroupCreate?: (group: GroupContainerState) => void | Promise<void>;
-    onPersistGroupUpdate?: (id: string, updates: Partial<GroupContainerState>, prev?: GroupContainerState) => void | Promise<void>;
-    onPersistGroupDelete?: (group: GroupContainerState) => void | Promise<void>;
+    onPersistGroupDelete?: (groupId: string) => void | Promise<void>;
+    onPersistGroupUpdate?: (groupId: string, updates: Partial<GroupContainerState> | { meta: Record<string, any> }, group?: GroupContainerState) => void | Promise<void>;
     // Allow initial groups to be provided from parent snapshot hydration
     initialGroupContainerStates?: GroupContainerState[];
     // Compare plugin persistence callbacks

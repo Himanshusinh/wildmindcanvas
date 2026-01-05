@@ -3011,7 +3011,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       height: group.height,
                       padding: group.padding,
                       children: group.children || [],
-                      meta: { name: group.meta?.name ?? 'Group', createdAt: group.meta?.createdAt },
+                      meta: {
+                        name: group.meta?.name ?? 'Group',
+                        color: group.meta?.color, // Persist color
+                        createdAt: group.meta?.createdAt
+                      },
                     } as any;
                     const inverse = { type: 'delete', elementId: group.id, data: {}, requestId: '', clientTs: 0 } as any;
                     console.log('[Group] appending create op for group', group.id, elementPayload);
@@ -3039,6 +3043,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         connectors,
                         generationQueue,
                         compareGenerators,
+                        richTextStates,
                       });
                       // Inject the group element into the elements map
                       elements[group.id] = elementPayload;
@@ -3089,13 +3094,37 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         connectors,
                         generationQueue,
                         compareGenerators,
+                        richTextStates,
                       });
                       // Merge/replace the group element in the snapshot
-                      elements[id] = { id, type: 'group', x: (updates as any).x ?? prev?.x, y: (updates as any).y ?? prev?.y, width: (updates as any).width ?? prev?.width, height: (updates as any).height ?? prev?.height, padding: (updates as any).padding ?? prev?.padding, children: (updates as any).children ?? prev?.children ?? [], meta: { name: (updates as any).meta?.name ?? prev?.meta?.name ?? 'Group', createdAt: (updates as any).meta?.createdAt ?? prev?.meta?.createdAt } };
+                      // CAREFUL: updates.meta might be partial.
+                      // prev is the full previous state of the group.
+                      // We need to merge meta correctly.
+                      const currentMeta = prev?.meta || {};
+                      const updatedMeta = (updates as any).meta || {};
+                      const mergedMeta = { ...currentMeta, ...updatedMeta };
+
+                      const newElementState = {
+                        id,
+                        type: 'group',
+                        x: (updates as any).x ?? prev?.x,
+                        y: (updates as any).y ?? prev?.y,
+                        width: (updates as any).width ?? prev?.width,
+                        height: (updates as any).height ?? prev?.height,
+                        padding: (updates as any).padding ?? prev?.padding,
+                        children: (updates as any).children ?? prev?.children ?? [],
+                        meta: {
+                          name: mergedMeta.name ?? 'Group',
+                          color: mergedMeta.color, // Persist color
+                          createdAt: mergedMeta.createdAt
+                        }
+                      };
+
+                      elements[id] = newElementState;
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Group] apiSetCurrentSnapshot success (update)', { projectId, ssRes });
                       // Update local copy used for autosave
-                      groupsRef.current[id] = elements[id];
+                      groupsRef.current[id] = newElementState as any;
                     } catch (e) {
                       console.warn('[Group] Failed to persist snapshot after update', e);
                     }
@@ -3104,13 +3133,16 @@ export function CanvasApp({ user }: CanvasAppProps) {
                   }
                 }
               }}
-              onPersistGroupDelete={async (group) => {
-                if (!group || !group.id) return;
+              onPersistGroupDelete={async (groupId) => {
+                if (!groupId) return;
+                // Look up group in ref to get data for inverse op
+                const group = groupsRef.current[groupId];
+
                 if (projectId && opManagerInitialized) {
                   try {
-                    const inverse = { type: 'create', elementId: group.id, data: { element: { id: group.id, type: 'group', x: group.x, y: group.y, width: group.width, height: group.height, padding: group.padding, children: group.children || [], meta: { name: group.meta?.name ?? 'Group', createdAt: group.meta?.createdAt } } }, requestId: '', clientTs: 0 } as any;
-                    console.log('[Group] appending delete op for group', group.id);
-                    await appendOp({ type: 'delete', elementId: group.id, data: {}, inverse } as any);
+                    const inverse = { type: 'create', elementId: groupId, data: { element: group || { id: groupId, type: 'group', x: 0, y: 0, width: 100, height: 100, padding: 0, children: [], meta: { name: 'Group' } } }, requestId: '', clientTs: 0 } as any;
+                    console.log('[Group] appending delete op for group', groupId);
+                    await appendOp({ type: 'delete', elementId: groupId, data: {}, inverse } as any);
                     // Force snapshot persist so deleted group is removed immediately
                     try {
                       const elements = buildSnapshotElements({
@@ -3133,13 +3165,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         connectors,
                         generationQueue,
                         compareGenerators,
+                        richTextStates,
                       });
                       // Ensure group is not present in snapshot (don't inject it)
-                      if (elements[group.id]) delete elements[group.id];
+                      if (elements[groupId]) delete elements[groupId];
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Group] apiSetCurrentSnapshot success (delete)', { projectId, ssRes });
                       // Remove from local cache so autosave won't re-insert
-                      if (groupsRef.current[group.id]) delete groupsRef.current[group.id];
+                      if (groupsRef.current[groupId]) delete groupsRef.current[groupId];
                     } catch (e) {
                       console.warn('[Group] Failed to persist snapshot after delete', e);
                     }

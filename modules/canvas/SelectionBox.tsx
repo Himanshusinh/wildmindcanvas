@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Rect, Group, Text, Transformer, Line } from 'react-konva';
+import { Rect, Group } from 'react-konva';
+import { Html } from 'react-konva-utils';
+import { Group as GroupIcon, LayoutGrid } from 'lucide-react';
 import Konva from 'konva';
 import { getClientRect } from '@/core/canvas/canvasHelpers';
 import { ImageUpload } from '@/core/types/canvas';
@@ -129,6 +131,8 @@ interface SelectionBoxProps {
   selectedCanvasTextIds?: string[];
   effectiveCanvasTextStates?: any[];
   selectedGroupIds?: string[];
+  // Canvas scale for UI scaling
+  scale?: number;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -230,7 +234,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   effectiveCanvasTextStates = [],
   selectedCanvasTextIds = [],
   selectedGroupIds = [],
+  scale = 1,
 }) => {
+  // Calculate UI scale based on canvas scale (inverse scaling)
+  const MAX_UI_SCALE = 3;
+  const inverseScale = 1 / Math.max(scale, 0.001);
+  const uiScale = Math.min(inverseScale, MAX_UI_SCALE);
+  // Remove htmlScale calculation, use uiScale directly for CSS transform to counteract zoom
+
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
     images: Map<number, { x: number; y: number }>;
@@ -1264,33 +1275,18 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             });
 
             // Store original next scene modal positions
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1201', message: 'onDragStart: NextScene/Compare check', data: { selectedNextSceneCount: selectedNextSceneModalIds.length, selectedCompareCount: selectedCompareModalIds.length, nextSceneStatesCount: nextSceneModalStates.length, compareStatesCount: compareModalStates.length, selectedNextSceneIds: selectedNextSceneModalIds, selectedCompareIds: selectedCompareModalIds }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
-            // #endregion
             selectedNextSceneModalIds.forEach(modalId => {
               const modalState = nextSceneModalStates.find(m => m.id === modalId);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1203', message: 'onDragStart: Finding NextScene modal', data: { modalId, found: !!modalState, modalX: modalState?.x, modalY: modalState?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-              // #endregion
               if (modalState) {
                 originalPositions.nextSceneModals.set(modalId, { x: modalState.x, y: modalState.y });
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1205', message: 'onDragStart: Stored NextScene original pos', data: { modalId, x: modalState.x, y: modalState.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-                // #endregion
               }
             });
 
             // Store original compare modal positions
             selectedCompareModalIds.forEach(modalId => {
               const modalState = compareModalStates.find(m => m.id === modalId);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1211', message: 'onDragStart: Finding Compare modal', data: { modalId, found: !!modalState, modalX: modalState?.x, modalY: modalState?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-              // #endregion
               if (modalState) {
                 originalPositions.compareModals.set(modalId, { x: modalState.x, y: modalState.y });
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1213', message: 'onDragStart: Stored Compare original pos', data: { modalId, x: modalState.x, y: modalState.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'C' }) }).catch(() => { });
-                // #endregion
               }
             });
 
@@ -1494,14 +1490,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             });
 
             // Move all selected next scene modals by delta in real-time (from original positions)
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1417', message: 'onDragMove: NextScene/Compare check', data: { selectedNextSceneCount: selectedNextSceneModalIds.length, selectedCompareCount: selectedCompareModalIds.length, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
-            // #endregion
             selectedNextSceneModalIds.forEach(modalId => {
               const originalPos = originalPositions.nextSceneModals.get(modalId);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1418', message: 'onDragMove: Getting NextScene original pos', data: { modalId, hasOriginalPos: !!originalPos, originalX: originalPos?.x, originalY: originalPos?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
-              // #endregion
               if (originalPos) {
                 const newX = originalPos.x + deltaX;
                 const newY = originalPos.y + deltaY;
@@ -1512,18 +1502,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       : modalState
                   )
                 );
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1426', message: 'onDragMove: Updated NextScene state', data: { modalId, newX, newY, originalX: originalPos.x, originalY: originalPos.y, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
-                // #endregion
               }
             });
 
             // Move all selected compare modals by delta in real-time (from original positions)
             selectedCompareModalIds.forEach(modalId => {
               const originalPos = originalPositions.compareModals.get(modalId);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1432', message: 'onDragMove: Getting Compare original pos', data: { modalId, hasOriginalPos: !!originalPos, originalX: originalPos?.x, originalY: originalPos?.y }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
-              // #endregion
               if (originalPos) {
                 const newX = originalPos.x + deltaX;
                 const newY = originalPos.y + deltaY;
@@ -1534,9 +1518,6 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       : modalState
                   )
                 );
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/37074ef6-a72e-4d0f-943a-9614ea133597', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'SelectionBox.tsx:1440', message: 'onDragMove: Updated Compare state', data: { modalId, newX, newY, originalX: originalPos.x, originalY: originalPos.y, deltaX, deltaY }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'D' }) }).catch(() => { });
-                // #endregion
               }
             });
 
@@ -1613,16 +1594,14 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               selectionDragOriginRef.current = { x: selectionTightRect.x, y: selectionTightRect.y };
             }
 
-            // Clear original positions
-            originalPositionsRef.current = null;
-            originalTightRectRef.current = null;
-
-            // Persist final positions for image generator modals once at drag end
+            // Persist final positions using ORIGINAL POSITIONS + DELTA to ensure accuracy
+            // Do not rely on React state which might be stale or not yet updated
+            // Persist final positions for image generator modals
             if (onPersistImageModalMove) {
               selectedImageModalIds.forEach((modalId) => {
-                const modalState = imageModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistImageModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.imageModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistImageModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
@@ -1630,9 +1609,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             // Persist final positions for video generator modals
             if (onPersistVideoModalMove) {
               selectedVideoModalIds.forEach((modalId) => {
-                const modalState = videoModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistVideoModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.videoModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistVideoModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
@@ -1640,9 +1619,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             // Persist final positions for video editor modals
             if (onPersistVideoEditorModalMove) {
               selectedVideoEditorModalIds.forEach((modalId) => {
-                const modalState = videoEditorModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistVideoEditorModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.videoEditorModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistVideoEditorModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
@@ -1650,120 +1629,134 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             // Persist final positions for music generator modals
             if (onPersistMusicModalMove) {
               selectedMusicModalIds.forEach((modalId) => {
-                const modalState = musicModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistMusicModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.musicModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistMusicModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for upscale modals
             if (onPersistUpscaleModalMove) {
               selectedUpscaleModalIds.forEach((modalId) => {
-                const modalState = upscaleModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistUpscaleModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.upscaleModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistUpscaleModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for multiangle camera modals
             if (onPersistMultiangleCameraModalMove) {
               selectedMultiangleCameraModalIds.forEach((modalId) => {
-                const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistMultiangleCameraModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.multiangleCameraModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistMultiangleCameraModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for remove bg modals
             if (onPersistRemoveBgModalMove) {
               selectedRemoveBgModalIds.forEach((modalId) => {
-                const modalState = removeBgModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistRemoveBgModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.removeBgModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistRemoveBgModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for erase modals
             if (onPersistEraseModalMove) {
               selectedEraseModalIds.forEach((modalId) => {
-                const modalState = eraseModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistEraseModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.eraseModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistEraseModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for expand modals
             if (onPersistExpandModalMove) {
               selectedExpandModalIds.forEach((modalId) => {
-                const modalState = expandModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistExpandModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.expandModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistExpandModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for vectorize modals
             if (onPersistVectorizeModalMove) {
               selectedVectorizeModalIds.forEach((modalId) => {
-                const modalState = vectorizeModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistVectorizeModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.vectorizeModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistVectorizeModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for next scene modals
             if (onPersistNextSceneModalMove) {
               selectedNextSceneModalIds.forEach((modalId) => {
-                const modalState = nextSceneModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistNextSceneModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.nextSceneModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistNextSceneModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for compare modals
             if (onPersistCompareModalMove) {
               selectedCompareModalIds.forEach((modalId) => {
-                const modalState = compareModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistCompareModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.compareModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistCompareModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for storyboard modals
             if (onPersistStoryboardModalMove) {
               selectedStoryboardModalIds.forEach((modalId) => {
-                const modalState = storyboardModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistStoryboardModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.storyboardModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistStoryboardModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for script frame modals
             if (onPersistScriptFrameModalMove) {
               selectedScriptFrameModalIds.forEach((modalId) => {
-                const modalState = scriptFrameModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistScriptFrameModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.scriptFrameModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistScriptFrameModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for scene frame modals
             if (onPersistSceneFrameModalMove) {
               selectedSceneFrameModalIds.forEach((modalId) => {
-                const modalState = sceneFrameModalStates.find(m => m.id === modalId);
-                if (modalState) {
-                  Promise.resolve(onPersistSceneFrameModalMove(modalId, { x: modalState.x, y: modalState.y })).catch(console.error);
+                const originalPos = originalPositions.sceneFrameModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistSceneFrameModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
             // Persist final positions for text inputs
             if (onPersistTextModalMove) {
               selectedTextInputIds.forEach((textId) => {
-                const textState = textInputStates.find(t => t.id === textId);
-                if (textState) {
-                  Promise.resolve(onPersistTextModalMove(textId, { x: textState.x, y: textState.y })).catch(console.error);
+                const originalPos = originalPositions.textInputs.get(textId);
+                if (originalPos) {
+                  Promise.resolve(onPersistTextModalMove(textId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
+
+            // Persist final positions for images
+            if (onImageUpdate) {
+              selectedImageIndices.forEach((idx) => {
+                const originalPos = originalPositions.images.get(idx);
+                if (originalPos) {
+                  onImageUpdate(idx, { x: originalPos.x + deltaX, y: originalPos.y + deltaY });
+                }
+              });
+            }
+
+            // Clear original positions
+            originalPositionsRef.current = null;
+            originalTightRectRef.current = null;
           }}
         >
           {/* Transparent hit area to allow dragging from anywhere in the selection */}
@@ -1784,108 +1777,105 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           />
 
           {/* Smart selection rectangle is now rendered in Canvas.tsx as background layer */}
-          {/* Toolbar buttons at top center, outside selection area */}
-          <Group
-            x={selectionTightRect.width / 2 - 42} // Center the buttons (total width is 84px: 36 + 12 + 36)
-            y={-40}
-          >
-            {/* Group name is rendered by GroupLabel component, not here */}
-            {/* Group button - ONLY SHOW IF NO GROUP SELECTED */}
-            {!isGroupSelected && (
-              <Group
-                x={0}
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  onCreateGroup?.();
-                }}
-                onMouseEnter={(e) => {
-                  const stage = e.target.getStage();
-                  if (stage) {
-                    stage.container().style.cursor = 'pointer';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const stage = e.target.getStage();
-                  if (stage) {
-                    stage.container().style.cursor = 'default';
-                  }
-                }}
-              >
-                <Rect
-                  x={0}
-                  y={0}
-                  width={36}
-                  height={36}
-                  fill="#ffffff"
-                  stroke="rgba(15,23,42,0.12)"
-                  strokeWidth={1}
-                  cornerRadius={10}
-                  shadowColor="rgba(15,23,42,0.18)"
-                  shadowBlur={6}
-                  shadowOffset={{ x: 0, y: 3 }}
-                />
-                <Group x={9} y={9}>
-                  {/* Group Icon: 4 squares */}
-                  <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                </Group>
-              </Group>
-            )}
-            {/* Arrange button */}
-            <Group
-              x={48}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                if (selectionTightRect) {
-                  triggerArrange(selectionTightRect);
-                }
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
+          {/* Floating Toolbar for Selection Actions using Html overlay */}
+          {(totalSelected >= 2 || !isGroupSelected) && (
+            <Html
+              divProps={{
+                style: {
+                  pointerEvents: 'none',
                 }
               }}
             >
-              <Rect
-                x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#ffffff"
-                stroke="rgba(15,23,42,0.12)"
-                strokeWidth={1}
-                cornerRadius={10}
-                shadowColor="rgba(15,23,42,0.18)"
-                shadowBlur={6}
-                shadowOffset={{ x: 0, y: 3 }}
-              />
-              <Group x={9} y={9}>
-                {[0, 1, 2].map((row) => (
-                  [0, 1, 2].map((col) => (
-                    <Rect
-                      key={`tight-arrange-${row}-${col}`}
-                      x={col * 8}
-                      y={row * 8}
-                      width={6}
-                      height={6}
-                      cornerRadius={2}
-                      fill={row === col ? '#2563eb' : '#cbd5e5'}
-                      opacity={row === col ? 0.95 : 1}
-                    />
-                  ))
-                ))}
-              </Group>
-            </Group>
-          </Group>
+              <div style={{ pointerEvents: 'auto' }}>
+                <style>
+                  {`
+                  .selection-toolbar {
+                      position: absolute;
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      background: rgba(26, 26, 26, 0.95);
+                      backdrop-filter: blur(10px);
+                      -webkit-backdrop-filter: blur(10px);
+                      border: 1px solid rgba(255, 255, 255, 0.1);
+                      border-radius: 10px;
+                      padding: 8px 12px;
+                      z-index: 1000;
+                      box-shadow: 
+                          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                      transform: translate(-50%, -100%) scale(${uiScale});
+                      transform-origin: bottom center;
+                      left: ${selectionTightRect.width / 2}px;
+                      top: -45px;
+                      min-width: max-content;
+                      animation: fadeIn 0.15s ease-out;
+                  }
+                  @keyframes fadeIn {
+                      from { opacity: 0; transform: translate(-50%, -90%) scale(${uiScale}); }
+                      to { opacity: 1; transform: translate(-50%, -100%) scale(${uiScale}); }
+                  }
+                  .toolbar-btn {
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      width: 36px;
+                      height: 36px;
+                      border-radius: 8px;
+                      border: 1px solid transparent;
+                      background: transparent;
+                      color: #a1a1aa;
+                      cursor: pointer;
+                      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                  }
+                  .toolbar-btn:hover {
+                      background: rgba(255, 255, 255, 0.1);
+                      color: #fff;
+                      border-color: rgba(255, 255, 255, 0.1);
+                  }
+                  .toolbar-divider {
+                      width: 1px;
+                      height: 20px;
+                      background: rgba(255, 255, 255, 0.15);
+                      margin: 0 4px;
+                  }
+                  `}
+                </style>
+
+                <div className="selection-toolbar" onMouseDown={(e) => e.stopPropagation()}>
+                  {/* Group Button - Only if not already a group */}
+                  {!isGroupSelected && (
+                    <button
+                      className="toolbar-btn"
+                      onClick={() => onCreateGroup?.()}
+                      title="Group Selection"
+                    >
+                      <GroupIcon size={20} />
+                    </button>
+                  )}
+
+                  {/* Divider if we have multiple buttons */}
+                  {!isGroupSelected && totalSelected >= 2 && <div className="toolbar-divider" />}
+
+                  {/* Arrange Button - Only if 2+ items selected */}
+                  {totalSelected >= 2 && (
+                    <button
+                      className="toolbar-btn"
+                      onClick={() => {
+                        if (selectionTightRect) {
+                          triggerArrange(selectionTightRect);
+                        }
+                      }}
+                      title="Arrange Grid"
+                    >
+                      <LayoutGrid size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Html>
+          )}
+
           {/* Transformer removed - using 4 corner dots for resize instead */}
         </Group>
       </>
@@ -1913,16 +1903,21 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
   if (selectionBox && !isSelecting) {
     // After drag completes but before tight rect is calculated, show the selection box with buttons
+    const boxWidth = Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX));
+    const boxHeight = Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY));
+    const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
+    const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
+
     return (
       <Group
-        x={Math.min(selectionBox.startX, selectionBox.currentX)}
-        y={Math.min(selectionBox.startY, selectionBox.currentY)}
+        x={boxX}
+        y={boxY}
       >
         <Rect
           x={0}
           y={0}
-          width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-          height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
+          width={boxWidth}
+          height={boxHeight}
           fill="rgba(59, 130, 246, 0.2)"
           stroke="#2563EB"
           strokeWidth={2}
@@ -1931,110 +1926,105 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
           globalCompositeOperation="source-over"
           cornerRadius={0}
         />
-        {/* Toolbar buttons at top center, outside selection area - only show if 2+ items selected */}
-        {totalSelected >= 2 && (
-          <Group
-            x={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX)) / 2 - 18}
-            y={-40}
+
+        {/* Toolbar for initial selection box */}
+        {(totalSelected >= 2 || !isGroupSelected) && (
+          <Html
+            divProps={{
+              style: {
+                pointerEvents: 'none',
+              }
+            }}
           >
-            {/* Group button - ONLY SHOW IF NO GROUP SELECTED */}
-            {!isGroupSelected && (
-              <Group
-                x={0}
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  onCreateGroup?.();
-                }}
-                onMouseEnter={(e) => {
-                  const stage = e.target.getStage();
-                  if (stage) {
-                    stage.container().style.cursor = 'pointer';
+            <div style={{ pointerEvents: 'auto' }}>
+              {/* Reusing styles defined above would be tricky with scoped Html, but since this is conditionally rendered separately, we need style block here too or globally. 
+                  Ideally we'd duplicate the style block or verify if they can conflict. They are scoped to the portal usually? 
+                  react-konva-utils Html creates a div. <style> inside it applies to document. 
+                  So we should scope the class names or rely on the previous style block if it persists? 
+                  Better to include style block here to be safe and autonomous.
+              */}
+              <style>
+                {`
+                  .selection-toolbar-initial {
+                      position: absolute;
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                      background: rgba(26, 26, 26, 0.95);
+                      backdrop-filter: blur(10px);
+                      -webkit-backdrop-filter: blur(10px);
+                      border: 1px solid rgba(255, 255, 255, 0.1);
+                      border-radius: 10px;
+                      padding: 8px 12px;
+                      z-index: 1000;
+                      box-shadow: 
+                          0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                      transform: translate(-50%, -100%) scale(${uiScale});
+                      transform-origin: bottom center;
+                      left: ${boxWidth / 2}px;
+                      top: -45px;
+                      min-width: max-content;
+                      animation: fadeIn 0.15s ease-out;
                   }
-                }}
-                onMouseLeave={(e) => {
-                  const stage = e.target.getStage();
-                  if (stage) {
-                    stage.container().style.cursor = 'default';
+                  /* Reuse keyframes if possible or redefine */
+                  @keyframes fadeIn {
+                      from { opacity: 0; transform: translate(-50%, -90%) scale(${uiScale}); }
+                      to { opacity: 1; transform: translate(-50%, -100%) scale(${uiScale}); }
                   }
-                }}
-              >
-                <Rect
-                  x={0}
-                  y={0}
-                  width={36}
-                  height={36}
-                  fill="#ffffff"
-                  stroke="rgba(15,23,42,0.12)"
-                  strokeWidth={1}
-                  cornerRadius={10}
-                  shadowColor="rgba(15,23,42,0.18)"
-                  shadowBlur={6}
-                  shadowOffset={{ x: 0, y: 3 }}
-                />
-                <Group x={9} y={9}>
-                  {/* 4 small squares in 2x2 grid */}
-                  <Rect x={0} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={11} y={0} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={0} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                  <Rect x={11} y={11} width={7} height={7} cornerRadius={2} fill="#9333ea" />
-                </Group>
-              </Group>
-            )}
-            {/* Arrange button */}
-            <Group
-              x={48}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                const boxWidth = Math.abs(selectionBox.currentX - selectionBox.startX);
-                const boxHeight = Math.abs(selectionBox.currentY - selectionBox.startY);
-                const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
-                const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
-                triggerArrange({ x: boxX, y: boxY, width: boxWidth, height: boxHeight });
-              }}
-              onMouseEnter={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'pointer';
-                }
-              }}
-              onMouseLeave={(e) => {
-                const stage = e.target.getStage();
-                if (stage) {
-                  stage.container().style.cursor = 'default';
-                }
-              }}
-            >
-              <Rect
-                x={0}
-                y={0}
-                width={36}
-                height={36}
-                fill="#ffffff"
-                stroke="rgba(15,23,42,0.12)"
-                strokeWidth={1}
-                cornerRadius={10}
-                shadowColor="rgba(15,23,42,0.18)"
-                shadowBlur={6}
-                shadowOffset={{ x: 0, y: 3 }}
-              />
-              <Group x={9} y={9}>
-                {[0, 1, 2].map((row) => (
-                  [0, 1, 2].map((col) => (
-                    <Rect
-                      key={`toolbar-arrange-${row}-${col}`}
-                      x={col * 8}
-                      y={row * 8}
-                      width={6}
-                      height={6}
-                      cornerRadius={2}
-                      fill={row === col ? '#2563eb' : '#cbd5f5'}
-                      opacity={row === col ? 0.95 : 1}
-                    />
-                  ))
-                ))}
-              </Group>
-            </Group>
-          </Group>
+                  .toolbar-btn {
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      width: 36px;
+                      height: 36px;
+                      border-radius: 8px;
+                      border: 1px solid transparent;
+                      background: transparent;
+                      color: #a1a1aa;
+                      cursor: pointer;
+                      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                  }
+                  .toolbar-btn:hover {
+                      background: rgba(255, 255, 255, 0.1);
+                      color: #fff;
+                      border-color: rgba(255, 255, 255, 0.1);
+                  }
+                  .toolbar-divider {
+                      width: 1px;
+                      height: 20px;
+                      background: rgba(255, 255, 255, 0.15);
+                      margin: 0 4px;
+                  }
+                  `}
+              </style>
+              <div className="selection-toolbar-initial" onMouseDown={(e) => e.stopPropagation()}>
+                {/* Group Button */}
+                {!isGroupSelected && (
+                  <button
+                    className="toolbar-btn"
+                    onClick={() => onCreateGroup?.()}
+                    title="Group Selection"
+                  >
+                    <GroupIcon size={20} />
+                  </button>
+                )}
+
+                {!isGroupSelected && totalSelected >= 2 && <div className="toolbar-divider" />}
+
+                {/* Arrange Button */}
+                {totalSelected >= 2 && (
+                  <button
+                    className="toolbar-btn"
+                    onClick={() => triggerArrange({ x: boxX, y: boxY, width: boxWidth, height: boxHeight })}
+                    title="Arrange Grid"
+                  >
+                    <LayoutGrid size={20} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </Html>
         )}
       </Group>
     );

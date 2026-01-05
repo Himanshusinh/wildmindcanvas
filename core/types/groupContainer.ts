@@ -23,6 +23,7 @@ export interface GroupContainerState {
     children: GroupChild[];
     meta: {
         name: string;
+        color?: string;
         createdAt?: number;
         [key: string]: any;
     };

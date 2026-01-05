@@ -11,7 +11,7 @@ interface CanvasImageProps {
   imageData: ImageUpload;
   index: number;
   onUpdate?: (updates: Partial<ImageUpload>) => void;
-  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
+  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
   isSelected?: boolean;
   onDelete?: () => void;
   stageRef?: React.RefObject<any>;
@@ -572,16 +572,30 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           node.scaleY(1);
           onUpdate?.({ width: newWidth, height: newHeight, rotation: newRotation });
         }}
-        onClick={(e) => {
+        onMouseDown={(e) => {
           e.cancelBubble = true;
           setIsSelected(true);
           if (onSelect) {
-            // Pass event info for multi-select support
             onSelect({
               ctrlKey: e.evt.ctrlKey,
               metaKey: e.evt.metaKey,
+              shiftKey: e.evt.shiftKey,
             });
           }
+        }}
+        onTouchStart={(e) => {
+          e.cancelBubble = true;
+          setIsSelected(true);
+          if (onSelect) {
+            onSelect({
+              ctrlKey: e.evt.ctrlKey,
+              metaKey: e.evt.metaKey,
+              shiftKey: e.evt.shiftKey,
+            });
+          }
+        }}
+        onClick={(e) => {
+          e.cancelBubble = true;
           // Context menu removed - icons are now shown at top-right corner of image
           // Don't play/pause when showing context menu
           // Video play/pause is handled by the center button on hover

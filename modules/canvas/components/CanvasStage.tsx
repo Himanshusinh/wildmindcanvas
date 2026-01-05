@@ -85,7 +85,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
         isDragSelection, setIsDragSelection,
-        // selectedGroupIds,
+        setSelectedGroupIds,
         // Pass selection states
         selectedTextInputIds, setSelectedTextInputIds,
         selectedImageModalIds, setSelectedImageModalIds,
@@ -282,12 +282,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                             isDraggable={true} // helper
                             isSelected={selectedImageIndices.includes(index)}
                             onSelect={(e) => {
-                                // Logic for selection with ctrl/shift?
-                                // Maybe extract this logic to event hook or helper?
-                                // "handleImageSelect"?
-                                // For now, assume passed function handles it.
-                                // Canvas.tsx had inline logic 7841+
-                                // We should probably extract handleImageSelect(index, event) to event hook.
+                                const isMulti = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                                if (isMulti) {
+                                    if (selectedImageIndices.includes(index)) {
+                                        setSelectedImageIndices(prev => prev.filter(i => i !== index));
+                                        if (selectedImageIndex === index) setSelectedImageIndex(null);
+                                    } else {
+                                        setSelectedImageIndices(prev => [...prev, index]);
+                                        setSelectedImageIndex(index);
+                                    }
+                                } else {
+                                    // Exclusive select
+                                    clearAllSelections(false); // don't clear boxes yet if needed, but here we want to clear other selections
+                                    setSelectedImageIndices([index]);
+                                    setSelectedImageIndex(index);
+                                }
                             }}
                             onUpdate={(updates) => {
                                 groupLogic.handleImageUpdateWithGroup(index, updates)
@@ -315,7 +324,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 />
 
                 <SelectionBox
-                    isGroupSelected={selectedGroupIds.length > 0}
+                    isGroupSelected={selectedGroupIds.length === 1}
+                    onUngroup={() => {
+                        if (selectedGroupIds.length === 1) {
+                            groupLogic.handleUngroup(selectedGroupIds);
+                        }
+                    }}
+                    scale={scale}
                     isSelecting={isSelecting}
                     {...canvasSelection}
                     {...canvasState}
@@ -333,8 +348,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUngroup={(id) => groupLogic.handleUngroup([id])}
                     onGroupMove={groupLogic.handleGroupMove}
                     onGroupDrag={groupLogic.handleGroupDrag}
-                    onGroupNameChange={(id, name) => {
-                        setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, meta: { ...g.meta, name } } : g));
+                    onGroupUpdate={groupLogic.handleGroupUpdate}
+                    onGroupSelect={(id) => {
+                        clearAllSelections(false);
+                        setSelectedGroupIds([id]);
                     }}
                     getItemBounds={() => null}
                     images={images}

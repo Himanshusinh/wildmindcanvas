@@ -218,11 +218,33 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         const sweepStartOffset = approxLength + sweepSegmentLength + Math.max(30, 40 * scale);
         const dashAnimationDuration = Math.max(1.6, (approxLength + sweepSegmentLength) / (100 * Math.max(scale, 0.4)));
 
+        // Bezier Control Point Logic
+        // Enforce a minimum straight segment ("2cm" approx 65px) coming out of the nodes
+        const minStraight = 65 * scale;
+
+        // Calculate control distance
+        // For standard flow (Left->Right), we allow some scaling but cap it to prevent huge loops.
+        // For reverse flow (Right->Left), we strictly cap it to ensure consistent loop size.
+        const absDx = Math.abs(dx);
+        // Base control distance is usually half distance or minStraight
+        let controlDist = Math.max(absDx * 0.5, minStraight);
+
+        // Cap the control distance to ensure curvature consistency ("don't increase curve when far")
+        // approx 250px max loop size
+        const maxLoop = 250 * scale;
+        controlDist = Math.min(controlDist, maxLoop);
+
+        // CP1 extends Right from source. CP2 extends Left from target.
+        const cp1x = line.fromX + controlDist;
+        const cp2x = line.toX - controlDist;
+
+        const pathData = `M ${line.fromX} ${line.fromY} C ${cp1x} ${line.fromY}, ${cp2x} ${line.toY}, ${line.toX} ${line.toY}`;
+
         return (
           <g key={connectionId}>
             {/* Dashed helper line showing connection path (like in demo) */}
             <path
-              d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+              d={pathData}
               stroke="#666"
               strokeWidth={computeStrokeForScale(3, scale)}
               fill="none"
@@ -236,7 +258,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
             />
             {/* Main connection line */}
             <path
-              d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+              d={pathData}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
               fill="none"
@@ -283,7 +305,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 {[-dashAnimationDuration / 2, 0].map((delay, idx) => (
                   <path
                     key={`${connectionId}-glow-${idx}`}
-                    d={`M ${line.fromX} ${line.fromY} C ${(line.fromX + line.toX) / 2} ${line.fromY}, ${(line.fromX + line.toX) / 2} ${line.toY}, ${line.toX} ${line.toY}`}
+                    d={pathData}
                     stroke={`url(#${GLOW_GRADIENT_ID})`}
                     strokeWidth={idx === 0 ? glowWidth : sweepWidth}
                     fill="none"
@@ -352,7 +374,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         <>
           {/* Dashed helper line for active drag */}
           <path
-            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
+            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${activeDrag.startX + 100 * scale} ${activeDrag.startY}, ${activeDrag.currentX - 100 * scale} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
             stroke="#666"
             strokeWidth={computeStrokeForScale(3, scale)}
             fill="none"
@@ -365,7 +387,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
           />
           {/* Main active drag line */}
           <path
-            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.startY}, ${(activeDrag.startX + activeDrag.currentX) / 2} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
+            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${activeDrag.startX + 100 * scale} ${activeDrag.startY}, ${activeDrag.currentX - 100 * scale} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
             stroke="#437eb5"
             strokeWidth={computeStrokeForScale(1.6, scale)}
             fill="none"
