@@ -72,12 +72,19 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       const incomingX = imageData.x || 50;
       const incomingY = imageData.y || 50;
 
+      // CRITICAL: Check if this incoming position is one we already processed OR one we just sent
+      const lastSent = lastSentPositionRef.current;
+      if (lastSent && Math.abs(lastSent.x - incomingX) < 0.1 && Math.abs(lastSent.y - incomingY) < 0.1) {
+        // This is a reflected update from our own drag, ignore it if we are already there
+        return;
+      }
+
       // Check if this is a new position from parent (different from what we last received)
       const lastReceived = lastReceivedPositionRef.current;
-      if (!lastReceived || lastReceived.x !== incomingX || lastReceived.y !== incomingY) {
-        // Only update if it's different from current position
+      if (!lastReceived || Math.abs(lastReceived.x - incomingX) > 0.1 || Math.abs(lastReceived.y - incomingY) > 0.1) {
+        // Only update if it's actually different from our current local state
         const current = currentPositionRef.current;
-        if (incomingX !== current.x || incomingY !== current.y) {
+        if (Math.abs(incomingX - current.x) > 0.1 || Math.abs(incomingY - current.y) > 0.1) {
           setCurrentX(incomingX);
           setCurrentY(incomingY);
           currentPositionRef.current = { x: incomingX, y: incomingY };
@@ -477,9 +484,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           });
           // Allow sync after a short delay to let parent update
           // Use setTimeout to ensure parent has time to process the update
+          // Increased to 500ms to better handle busy canvases/slower persistence
           setTimeout(() => {
             justFinishedDragRef.current = false;
-          }, 100);
+          }, 500);
         }}
         onDragMove={(e) => {
           // Update drag position ref and state during move

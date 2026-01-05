@@ -54,7 +54,8 @@ export function createPluginHandlers(
   appendOp: (op: any) => Promise<void>,
   realtimeActive: boolean,
   realtimeRef: React.RefObject<any>,
-  removeAndPersistConnectorsForElement: (elementId: string) => Promise<void>
+  removeAndPersistConnectorsForElement: (elementId: string) => Promise<void>,
+  debounceMove: (type: string, id: string, updates: any, originalHandler: (id: string, updates: any) => Promise<void>) => void
 ): PluginHandlers {
   const onPersistUpscaleModalCreate = async (modal: UpscaleGenerator) => {
     // Optimistic update
@@ -126,80 +127,82 @@ export function createPluginHandlers(
     if (realtimeActive) {
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    // Always append op for undo/redo and persistence
+    // Always append op for undo/redo and persistence (Debounced)
     if (projectId && opManagerInitialized) {
-      // Structure updates correctly: meta fields go under meta, position fields go top-level
-      const structuredUpdates: any = {};
+      debounceMove('upscale', id, updates, async (id: string, upds: any) => {
+        // Structure updates correctly: meta fields go under meta, position fields go top-level
+        const structuredUpdates: any = {};
 
-      // Get existing meta from previous state (fields are stored at top level in state)
-      const existingMeta = prev ? {
-        upscaledImageUrl: (prev as any).upscaledImageUrl ?? null,
-        sourceImageUrl: (prev as any).sourceImageUrl ?? null,
-        localUpscaledImageUrl: (prev as any).localUpscaledImageUrl ?? null,
-        model: (prev as any).model ?? 'Crystal Upscaler',
-        scale: (prev as any).scale ?? 2,
-        frameWidth: (prev as any).frameWidth ?? 400,
-        frameHeight: (prev as any).frameHeight ?? 500,
-        isUpscaling: (prev as any).isUpscaling ?? false,
-        faceEnhance: (prev as any).faceEnhance ?? false,
-        faceEnhanceStrength: (prev as any).faceEnhanceStrength ?? 0.8,
-        topazModel: (prev as any).topazModel ?? 'Standard V2',
-        faceEnhanceCreativity: (prev as any).faceEnhanceCreativity ?? 0,
-      } : {
-        upscaledImageUrl: null,
-        sourceImageUrl: null,
-        localUpscaledImageUrl: null,
-        model: 'Crystal Upscaler',
-        scale: 2,
-        frameWidth: 400,
-        frameHeight: 500,
-        isUpscaling: false,
-        faceEnhance: false,
-        faceEnhanceStrength: 0.8,
-        topazModel: 'Standard V2',
-        faceEnhanceCreativity: 0,
-      };
+        // Get existing meta from previous state (fields are stored at top level in state)
+        const existingMeta = prev ? {
+          upscaledImageUrl: (prev as any).upscaledImageUrl ?? null,
+          sourceImageUrl: (prev as any).sourceImageUrl ?? null,
+          localUpscaledImageUrl: (prev as any).localUpscaledImageUrl ?? null,
+          model: (prev as any).model ?? 'Crystal Upscaler',
+          scale: (prev as any).scale ?? 2,
+          frameWidth: (prev as any).frameWidth ?? 400,
+          frameHeight: (prev as any).frameHeight ?? 500,
+          isUpscaling: (prev as any).isUpscaling ?? false,
+          faceEnhance: (prev as any).faceEnhance ?? false,
+          faceEnhanceStrength: (prev as any).faceEnhanceStrength ?? 0.8,
+          topazModel: (prev as any).topazModel ?? 'Standard V2',
+          faceEnhanceCreativity: (prev as any).faceEnhanceCreativity ?? 0,
+        } : {
+          upscaledImageUrl: null,
+          sourceImageUrl: null,
+          localUpscaledImageUrl: null,
+          model: 'Crystal Upscaler',
+          scale: 2,
+          frameWidth: 400,
+          frameHeight: 500,
+          isUpscaling: false,
+          faceEnhance: false,
+          faceEnhanceStrength: 0.8,
+          topazModel: 'Standard V2',
+          faceEnhanceCreativity: 0,
+        };
 
-      // Merge updates into meta
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
-          metaUpdates[k] = (updates as any)[k];
-        } else {
-          structuredUpdates[k] = (updates as any)[k];
-        }
-      }
-
-      // Always include meta in updates (backend does shallow merge)
-      structuredUpdates.meta = metaUpdates;
-
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        if ('width' in updates) inverseUpdates.width = (prev as any).width;
-        if ('height' in updates) inverseUpdates.height = (prev as any).height;
-
-        // Inverse meta should restore previous meta
-        const inverseMeta: any = {};
-        for (const k of Object.keys(updates || {})) {
-          if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
-            inverseMeta[k] = (prev as any)[k] ?? (existingMeta as any)[k];
+        // Merge updates into meta
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
+            metaUpdates[k] = (upds as any)[k];
+          } else {
+            structuredUpdates[k] = (upds as any)[k];
           }
         }
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
-        }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+        // Always include meta in updates (backend does shallow merge)
+        structuredUpdates.meta = metaUpdates;
+
+        // Build inverse updates
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          if ('width' in upds) inverseUpdates.width = (prev as any).width;
+          if ('height' in upds) inverseUpdates.height = (prev as any).height;
+
+          // Inverse meta should restore previous meta
+          const inverseMeta: any = {};
+          for (const k of Object.keys(upds || {})) {
+            if (k === 'model' || k === 'scale' || k === 'upscaledImageUrl' || k === 'sourceImageUrl' || k === 'localUpscaledImageUrl' || k === 'isUpscaling' || k === 'frameWidth' || k === 'frameHeight' || k === 'faceEnhance' || k === 'faceEnhanceStrength' || k === 'topazModel' || k === 'faceEnhanceCreativity') {
+              inverseMeta[k] = (prev as any)[k] ?? (existingMeta as any)[k];
+            }
+          }
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
+        }
+
+        await appendOp({
+          type: 'update',
+          elementId: id,
+          data: { updates: structuredUpdates },
+          inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+        });
       });
     }
   };
@@ -362,17 +365,19 @@ export function createPluginHandlers(
       console.log('[Realtime] broadcast move multiangle-camera', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
-    // Always append op for undo/redo and persistence
+    // Always append op for undo/redo and persistence (Debounced)
     if (projectId && opManagerInitialized) {
-      const inverseUpdates: any = {};
-      for (const k of Object.keys(updates)) {
-        (inverseUpdates as any)[k] = (prevItem as any)[k];
-      }
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates },
-        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+      debounceMove('multiangle-camera', id, updates, async (id: string, upds: any) => {
+        const inverseUpdates: any = {};
+        for (const k of Object.keys(upds)) {
+          (inverseUpdates as any)[k] = (prevItem as any)[k];
+        }
+        await appendOp({
+          type: 'update',
+          elementId: id,
+          data: { updates: upds },
+          inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+        });
       });
     }
   };
@@ -547,74 +552,76 @@ export function createPluginHandlers(
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
 
-    // 4. Append op for undo/redo
+    // 4. Append op for undo/redo (Debounced)
     if (projectId && opManagerInitialized) {
-      // Structure updates: meta fields go under meta, position fields top-level
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        removedBgImageUrl: prev.removedBgImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localRemovedBgImageUrl: prev.localRemovedBgImageUrl || null,
-        model: prev.model || '851-labs/background-remover',
-        backgroundType: prev.backgroundType || 'rgba (transparent)',
-        scaleValue: prev.scaleValue || 0.5,
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isRemovingBg: prev.isRemovingBg || false,
-      } : {
-        removedBgImageUrl: null,
-        sourceImageUrl: null,
-        localRemovedBgImageUrl: null,
-        model: '851-labs/background-remover',
-        backgroundType: 'rgba (transparent)',
-        scaleValue: 0.5,
-        frameWidth: 400,
-        frameHeight: 500,
-        isRemovingBg: false,
-      };
+      debounceMove('removebg', id, updates, async (id: string, upds: any) => {
+        // Structure updates: meta fields go under meta, position fields top-level
+        const structuredUpdates: any = {};
+        const existingMeta = prev ? {
+          removedBgImageUrl: prev.removedBgImageUrl || null,
+          sourceImageUrl: prev.sourceImageUrl || null,
+          localRemovedBgImageUrl: prev.localRemovedBgImageUrl || null,
+          model: prev.model || '851-labs/background-remover',
+          backgroundType: prev.backgroundType || 'rgba (transparent)',
+          scaleValue: prev.scaleValue || 0.5,
+          frameWidth: prev.frameWidth || 400,
+          frameHeight: prev.frameHeight || 500,
+          isRemovingBg: prev.isRemovingBg || false,
+        } : {
+          removedBgImageUrl: null,
+          sourceImageUrl: null,
+          localRemovedBgImageUrl: null,
+          model: '851-labs/background-remover',
+          backgroundType: 'rgba (transparent)',
+          scaleValue: 0.5,
+          frameWidth: 400,
+          frameHeight: 500,
+          isRemovingBg: false,
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          // All other fields go in meta
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            // All other fields go in meta
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('removedBgImageUrl' in updates) inverseMeta.removedBgImageUrl = prev.removedBgImageUrl || null;
-        if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-        if ('localRemovedBgImageUrl' in updates) inverseMeta.localRemovedBgImageUrl = prev.localRemovedBgImageUrl || null;
-        if ('model' in updates) inverseMeta.model = prev.model || '851-labs/background-remover';
-        if ('backgroundType' in updates) inverseMeta.backgroundType = prev.backgroundType || 'rgba (transparent)';
-        if ('scaleValue' in updates) inverseMeta.scaleValue = prev.scaleValue || 0.5;
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-        if ('isRemovingBg' in updates) inverseMeta.isRemovingBg = prev.isRemovingBg || false;
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
+        // Build inverse updates
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          const inverseMeta: any = {};
+          if ('removedBgImageUrl' in upds) inverseMeta.removedBgImageUrl = prev.removedBgImageUrl || null;
+          if ('sourceImageUrl' in upds) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+          if ('localRemovedBgImageUrl' in upds) inverseMeta.localRemovedBgImageUrl = prev.localRemovedBgImageUrl || null;
+          if ('model' in upds) inverseMeta.model = prev.model || '851-labs/background-remover';
+          if ('backgroundType' in upds) inverseMeta.backgroundType = prev.backgroundType || 'rgba (transparent)';
+          if ('scaleValue' in upds) inverseMeta.scaleValue = prev.scaleValue || 0.5;
+          if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth || 400;
+          if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight || 500;
+          if ('isRemovingBg' in upds) inverseMeta.isRemovingBg = prev.isRemovingBg || false;
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
         }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -768,29 +775,26 @@ export function createPluginHandlers(
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
 
-    // 4. Append op for undo/redo and persistence
+    // 4. Append op for undo/redo and persistence (Debounced)
     if (projectId && opManagerInitialized && prev) {
-      await appendOp({
-        type: 'move',
-        elementType: 'erase',
-        elementId: id,
-        data: updates,
-        inverse: {
-          type: 'move',
+      debounceMove('erase', id, updates, async (id: string, upds: any) => {
+        await appendOp({
+          type: 'update', // Changed from 'move' to consistent 'update'
           elementType: 'erase',
           elementId: id,
-          data: {
-            x: prev.x,
-            y: prev.y,
-            erasedImageUrl: prev.erasedImageUrl || null,
-            sourceImageUrl: prev.sourceImageUrl || null,
-            localErasedImageUrl: prev.localErasedImageUrl || null,
-            model: prev.model,
-            frameWidth: prev.frameWidth,
-            frameHeight: prev.frameHeight,
-            isErasing: prev.isErasing,
+          data: { updates: upds },
+          inverse: {
+            type: 'update',
+            elementType: 'erase',
+            elementId: id,
+            data: {
+              updates: {
+                x: prev.x,
+                y: prev.y,
+              }
+            },
           },
-        },
+        });
       });
     }
   };
@@ -967,53 +971,56 @@ export function createPluginHandlers(
       console.log('[Realtime] broadcast move expand', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
+    // 4. Append op for undo/redo and persistence (Debounced)
     if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        expandedImageUrl: prev.expandedImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localExpandedImageUrl: prev.localExpandedImageUrl || null,
-        model: prev.model || 'expand/base',
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isExpanding: prev.isExpanding || false,
-      };
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+      debounceMove('expand', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          expandedImageUrl: prev.expandedImageUrl || null,
+          sourceImageUrl: prev.sourceImageUrl || null,
+          localExpandedImageUrl: prev.localExpandedImageUrl || null,
+          model: prev.model || 'expand/base',
+          frameWidth: prev.frameWidth || 400,
+          frameHeight: prev.frameHeight || 500,
+          isExpanding: prev.isExpanding || false,
+        };
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-      const inverseMeta: any = {};
-      if ('expandedImageUrl' in updates) inverseMeta.expandedImageUrl = prev.expandedImageUrl || null;
-      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-      if ('localExpandedImageUrl' in updates) inverseMeta.localExpandedImageUrl = prev.localExpandedImageUrl || null;
-      if ('model' in updates) inverseMeta.model = prev.model || 'expand/base';
-      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-      if ('isExpanding' in updates) inverseMeta.isExpanding = prev.isExpanding || false;
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
+        const inverseUpdates: any = {};
+        if ('x' in upds) inverseUpdates.x = prev.x;
+        if ('y' in upds) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('expandedImageUrl' in upds) inverseMeta.expandedImageUrl = prev.expandedImageUrl || null;
+        if ('sourceImageUrl' in upds) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+        if ('localExpandedImageUrl' in upds) inverseMeta.localExpandedImageUrl = prev.localExpandedImageUrl || null;
+        if ('model' in upds) inverseMeta.model = prev.model || 'expand/base';
+        if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth || 400;
+        if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight || 500;
+        if ('isExpanding' in upds) inverseMeta.isExpanding = prev.isExpanding || false;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -1098,38 +1105,41 @@ export function createPluginHandlers(
       console.log('[Realtime] broadcast move video-editor', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
+    // 4. Append op for undo/redo (Debounced)
     if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        color: prev.color || '#000000'
-      };
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+      debounceMove('video-editor', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          color: prev.color || '#000000'
+        };
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-      if ('width' in updates) inverseUpdates.width = prev.width;
-      if ('height' in updates) inverseUpdates.height = prev.height;
+        const inverseUpdates: any = {};
+        if ('x' in upds) inverseUpdates.x = prev.x;
+        if ('y' in upds) inverseUpdates.y = prev.y;
+        if ('width' in upds) inverseUpdates.width = prev.width;
+        if ('height' in upds) inverseUpdates.height = prev.height;
 
-      const inverseMeta: any = {};
-      if ('color' in updates) inverseMeta.color = prev.color || '#000000';
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
+        const inverseMeta: any = {};
+        if ('color' in upds) inverseMeta.color = prev.color || '#000000';
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+        await appendOp({
+          type: 'update',
+          elementId: id,
+          data: { updates: structuredUpdates },
+          inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any,
+        });
       });
     }
   };
@@ -1236,44 +1246,47 @@ export function createPluginHandlers(
     if (realtimeActive) {
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
+    // Persistence (Debounced)
     if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        scale: prev.scale ?? 1,
-        prompt: prev.prompt ?? '',
-        model: prev.model ?? 'base'
-      };
+      debounceMove('compare', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          scale: prev.scale ?? 1,
+          prompt: prev.prompt ?? '',
+          model: prev.model ?? 'base'
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y' || k === 'width' || k === 'height') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-      if ('width' in updates) inverseUpdates.width = (prev as any).width;
-      if ('height' in updates) inverseUpdates.height = (prev as any).height;
+        const inverseUpdates: any = {};
+        if ('x' in upds) inverseUpdates.x = prev.x;
+        if ('y' in upds) inverseUpdates.y = prev.y;
+        if ('width' in upds) inverseUpdates.width = (prev as any).width;
+        if ('height' in upds) inverseUpdates.height = (prev as any).height;
 
-      const inverseMeta: any = {};
-      if ('scale' in updates) inverseMeta.scale = prev.scale ?? existingMeta.scale;
-      if ('prompt' in updates) inverseMeta.prompt = prev.prompt ?? existingMeta.prompt;
-      if ('model' in updates) inverseMeta.model = prev.model ?? existingMeta.model;
+        const inverseMeta: any = {};
+        if ('scale' in upds) inverseMeta.scale = prev.scale ?? existingMeta.scale;
+        if ('prompt' in upds) inverseMeta.prompt = prev.prompt ?? existingMeta.prompt;
+        if ('model' in upds) inverseMeta.model = prev.model ?? existingMeta.model;
 
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any
+        await appendOp({
+          type: 'update',
+          elementId: id,
+          data: { updates: structuredUpdates },
+          inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any
+        });
       });
     }
   };
@@ -1440,68 +1453,62 @@ export function createPluginHandlers(
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
 
-    // 4. Append op for undo/redo
-    if (projectId && opManagerInitialized) {
-      // Structure updates: meta fields go under meta, position fields top-level
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        vectorizedImageUrl: prev.vectorizedImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localVectorizedImageUrl: prev.localVectorizedImageUrl || null,
-        mode: prev.mode || 'simple',
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isVectorizing: prev.isVectorizing || false,
-      } : {
-        vectorizedImageUrl: null,
-        sourceImageUrl: null,
-        localVectorizedImageUrl: null,
-        mode: 'simple',
-        frameWidth: 400,
-        frameHeight: 500,
-        isVectorizing: false,
-      };
+    // 4. Append op for undo/redo (Debounced)
+    if (projectId && opManagerInitialized && prev) {
+      debounceMove('vectorize', id, updates, async (id: string, upds: any) => {
+        // Structure updates: meta fields go under meta, position fields top-level
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          vectorizedImageUrl: prev.vectorizedImageUrl || null,
+          sourceImageUrl: prev.sourceImageUrl || null,
+          localVectorizedImageUrl: prev.localVectorizedImageUrl || null,
+          mode: prev.mode || 'simple',
+          frameWidth: prev.frameWidth || 400,
+          frameHeight: prev.frameHeight || 500,
+          isVectorizing: prev.isVectorizing || false,
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          // All other fields go in meta
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            // All other fields go in meta
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('vectorizedImageUrl' in updates) inverseMeta.vectorizedImageUrl = prev.vectorizedImageUrl || null;
-        if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-        if ('localVectorizedImageUrl' in updates) inverseMeta.localVectorizedImageUrl = prev.localVectorizedImageUrl || null;
-        if ('mode' in updates) inverseMeta.mode = prev.mode || 'simple';
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-        if ('isVectorizing' in updates) inverseMeta.isVectorizing = prev.isVectorizing || false;
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
+        // Build inverse updates
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          const inverseMeta: any = {};
+          if ('vectorizedImageUrl' in upds) inverseMeta.vectorizedImageUrl = prev.vectorizedImageUrl || null;
+          if ('sourceImageUrl' in upds) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+          if ('localVectorizedImageUrl' in upds) inverseMeta.localVectorizedImageUrl = prev.localVectorizedImageUrl || null;
+          if ('mode' in upds) inverseMeta.mode = prev.mode || 'simple';
+          if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth || 400;
+          if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight || 500;
+          if ('isVectorizing' in upds) inverseMeta.isVectorizing = prev.isVectorizing || false;
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
         }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -1608,53 +1615,56 @@ export function createPluginHandlers(
       console.log('[Realtime] broadcast move next-scene', id);
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
+    // 4. Append op for undo/redo (Debounced)
     if (projectId && opManagerInitialized && prev) {
-      const structuredUpdates: any = {};
-      const existingMeta = {
-        nextSceneImageUrl: prev.nextSceneImageUrl || null,
-        sourceImageUrl: prev.sourceImageUrl || null,
-        localNextSceneImageUrl: prev.localNextSceneImageUrl || null,
-        mode: prev.mode || 'scene',
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        isProcessing: prev.isProcessing || false,
-      };
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+      debounceMove('next-scene', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          nextSceneImageUrl: prev.nextSceneImageUrl || null,
+          sourceImageUrl: prev.sourceImageUrl || null,
+          localNextSceneImageUrl: prev.localNextSceneImageUrl || null,
+          mode: prev.mode || 'scene',
+          frameWidth: prev.frameWidth || 400,
+          frameHeight: prev.frameHeight || 500,
+          isProcessing: prev.isProcessing || false,
+        };
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if ('x' in updates) inverseUpdates.x = prev.x;
-      if ('y' in updates) inverseUpdates.y = prev.y;
-      const inverseMeta: any = {};
-      if ('nextSceneImageUrl' in updates) inverseMeta.nextSceneImageUrl = prev.nextSceneImageUrl || null;
-      if ('sourceImageUrl' in updates) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
-      if ('localNextSceneImageUrl' in updates) inverseMeta.localNextSceneImageUrl = prev.localNextSceneImageUrl || null;
-      if ('mode' in updates) inverseMeta.mode = prev.mode || 'scene';
-      if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-      if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-      if ('isProcessing' in updates) inverseMeta.isProcessing = prev.isProcessing || false;
-      if (Object.keys(inverseMeta).length > 0) {
-        inverseUpdates.meta = inverseMeta;
-      }
+        const inverseUpdates: any = {};
+        if ('x' in upds) inverseUpdates.x = prev.x;
+        if ('y' in upds) inverseUpdates.y = prev.y;
+        const inverseMeta: any = {};
+        if ('nextSceneImageUrl' in upds) inverseMeta.nextSceneImageUrl = prev.nextSceneImageUrl || null;
+        if ('sourceImageUrl' in upds) inverseMeta.sourceImageUrl = prev.sourceImageUrl || null;
+        if ('localNextSceneImageUrl' in upds) inverseMeta.localNextSceneImageUrl = prev.localNextSceneImageUrl || null;
+        if ('mode' in upds) inverseMeta.mode = prev.mode || 'scene';
+        if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth || 400;
+        if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight || 500;
+        if ('isProcessing' in upds) inverseMeta.isProcessing = prev.isProcessing || false;
+        if (Object.keys(inverseMeta).length > 0) {
+          inverseUpdates.meta = inverseMeta;
+        }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -1901,63 +1911,58 @@ export function createPluginHandlers(
     }
 
     // 4. Append op for undo/redo
-    if (projectId && opManagerInitialized) {
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        frameWidth: prev.frameWidth || 400,
-        frameHeight: prev.frameHeight || 500,
-        scriptText: (prev as StoryboardGenerator).scriptText || null,
-        characterNamesMap: (prev as any).characterNamesMap || {},
-        propsNamesMap: (prev as any).propsNamesMap || {},
-        backgroundNamesMap: (prev as any).backgroundNamesMap || {},
-      } : {
-        frameWidth: 400,
-        frameHeight: 500,
-        scriptText: null,
-        characterNamesMap: {},
-        propsNamesMap: {},
-        backgroundNamesMap: {},
-        stitchedImageUrl: undefined,
-      };
+    // 4. Append op for undo/redo (Debounced)
+    if (projectId && opManagerInitialized && prev) {
+      debounceMove('storyboard', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          frameWidth: prev.frameWidth || 400,
+          frameHeight: prev.frameHeight || 500,
+          scriptText: (prev as StoryboardGenerator).scriptText || null,
+          characterNamesMap: (prev as any).characterNamesMap || {},
+          propsNamesMap: (prev as any).propsNamesMap || {},
+          backgroundNamesMap: (prev as any).backgroundNamesMap || {},
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth || 400;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight || 500;
-        if ('scriptText' in updates) inverseMeta.scriptText = (prev as StoryboardGenerator).scriptText || null;
-        if ('characterNamesMap' in updates) inverseMeta.characterNamesMap = (prev as any).characterNamesMap || {};
-        if ('propsNamesMap' in updates) inverseMeta.propsNamesMap = (prev as any).propsNamesMap || {};
-        if ('backgroundNamesMap' in updates) inverseMeta.backgroundNamesMap = (prev as any).backgroundNamesMap || {};
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
+        // Build inverse updates
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          const inverseMeta: any = {};
+          if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth || 400;
+          if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight || 500;
+          if ('scriptText' in upds) inverseMeta.scriptText = (prev as StoryboardGenerator).scriptText || null;
+          if ('characterNamesMap' in upds) inverseMeta.characterNamesMap = (prev as any).characterNamesMap || {};
+          if ('propsNamesMap' in upds) inverseMeta.propsNamesMap = (prev as any).propsNamesMap || {};
+          if ('backgroundNamesMap' in upds) inverseMeta.backgroundNamesMap = (prev as any).backgroundNamesMap || {};
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
         }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -2071,55 +2076,53 @@ export function createPluginHandlers(
     }
 
     // 4. Append op
-    if (projectId && opManagerInitialized) {
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        pluginId: prev.pluginId,
-        frameWidth: prev.frameWidth,
-        frameHeight: prev.frameHeight,
-        text: prev.text,
-      } : {
-        pluginId: '',
-        frameWidth: 300,
-        frameHeight: 200,
-        text: '',
-      };
+    // 4. Append op (Debounced)
+    if (projectId && opManagerInitialized && prev) {
+      debounceMove('script-frame', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          pluginId: prev.pluginId,
+          frameWidth: prev.frameWidth,
+          frameHeight: prev.frameHeight,
+          text: prev.text,
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('pluginId' in updates) inverseMeta.pluginId = prev.pluginId;
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
-        if ('text' in updates) inverseMeta.text = prev.text;
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          const inverseMeta: any = {};
+          if ('pluginId' in upds) inverseMeta.pluginId = prev.pluginId;
+          if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth;
+          if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight;
+          if ('text' in upds) inverseMeta.text = prev.text;
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
         }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };
@@ -2237,61 +2240,58 @@ export function createPluginHandlers(
       realtimeRef.current?.sendUpdate(id, updates as any);
     }
 
-    if (projectId && opManagerInitialized) {
-      const structuredUpdates: any = {};
-      const existingMeta = prev ? {
-        scriptFrameId: prev.scriptFrameId,
-        sceneNumber: prev.sceneNumber,
-        frameWidth: prev.frameWidth,
-        frameHeight: prev.frameHeight,
-        content: prev.content,
-      } : {
-        scriptFrameId: '',
-        sceneNumber: 0,
-        frameWidth: 300,
-        frameHeight: 200,
-        content: '',
-      };
+    // Persistence (Debounced)
+    if (projectId && opManagerInitialized && prev) {
+      debounceMove('scene-frame', id, updates, async (id: string, upds: any) => {
+        const structuredUpdates: any = {};
+        const existingMeta = {
+          scriptFrameId: prev.scriptFrameId,
+          sceneNumber: prev.sceneNumber,
+          frameWidth: prev.frameWidth,
+          frameHeight: prev.frameHeight,
+          content: prev.content,
+        };
 
-      const metaUpdates = { ...existingMeta };
-      for (const k of Object.keys(updates || {})) {
-        if (k === 'x' || k === 'y') {
-          structuredUpdates[k] = (updates as any)[k];
-        } else {
-          (metaUpdates as any)[k] = (updates as any)[k];
+        const metaUpdates = { ...existingMeta };
+        for (const k of Object.keys(upds || {})) {
+          if (k === 'x' || k === 'y') {
+            structuredUpdates[k] = (upds as any)[k];
+          } else {
+            (metaUpdates as any)[k] = (upds as any)[k];
+          }
         }
-      }
-      structuredUpdates.meta = metaUpdates;
+        structuredUpdates.meta = metaUpdates;
 
-      const inverseUpdates: any = {};
-      if (prev) {
-        if ('x' in updates) inverseUpdates.x = prev.x;
-        if ('y' in updates) inverseUpdates.y = prev.y;
-        const inverseMeta: any = {};
-        if ('scriptFrameId' in updates) inverseMeta.scriptFrameId = prev.scriptFrameId;
-        if ('sceneNumber' in updates) inverseMeta.sceneNumber = prev.sceneNumber;
-        if ('frameWidth' in updates) inverseMeta.frameWidth = prev.frameWidth;
-        if ('frameHeight' in updates) inverseMeta.frameHeight = prev.frameHeight;
-        if ('content' in updates) inverseMeta.content = prev.content;
-        if ('characterIds' in updates) inverseMeta.characterIds = (prev as any).characterIds;
-        if ('locationId' in updates) inverseMeta.locationId = (prev as any).locationId;
-        if ('mood' in updates) inverseMeta.mood = (prev as any).mood;
-        if (Object.keys(inverseMeta).length > 0) {
-          inverseUpdates.meta = inverseMeta;
+        const inverseUpdates: any = {};
+        if (prev) {
+          if ('x' in upds) inverseUpdates.x = prev.x;
+          if ('y' in upds) inverseUpdates.y = prev.y;
+          const inverseMeta: any = {};
+          if ('scriptFrameId' in upds) inverseMeta.scriptFrameId = prev.scriptFrameId;
+          if ('sceneNumber' in upds) inverseMeta.sceneNumber = prev.sceneNumber;
+          if ('frameWidth' in upds) inverseMeta.frameWidth = prev.frameWidth;
+          if ('frameHeight' in upds) inverseMeta.frameHeight = prev.frameHeight;
+          if ('content' in upds) inverseMeta.content = prev.content;
+          if ('characterIds' in upds) inverseMeta.characterIds = (prev as any).characterIds;
+          if ('locationId' in upds) inverseMeta.locationId = (prev as any).locationId;
+          if ('mood' in upds) inverseMeta.mood = (prev as any).mood;
+          if (Object.keys(inverseMeta).length > 0) {
+            inverseUpdates.meta = inverseMeta;
+          }
         }
-      }
 
-      await appendOp({
-        type: 'update',
-        elementId: id,
-        data: { updates: structuredUpdates },
-        inverse: {
+        await appendOp({
           type: 'update',
           elementId: id,
-          data: { updates: inverseUpdates },
-          requestId: '',
-          clientTs: 0,
-        } as any,
+          data: { updates: structuredUpdates },
+          inverse: {
+            type: 'update',
+            elementId: id,
+            data: { updates: inverseUpdates },
+            requestId: '',
+            clientTs: 0,
+          } as any,
+        });
       });
     }
   };

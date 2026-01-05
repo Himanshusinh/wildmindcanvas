@@ -291,6 +291,9 @@ export function useGroupLogic(
                             if (idx !== -1) {
                                 onImageUpdate(idx, { x: absX, y: absY });
                             }
+                        } else if (onPersistImageModalMove) {
+                            // Fallback if onImageUpdate is not available, though images are usually regular ImageUpload
+                            onPersistImageModalMove(child.id, { x: absX, y: absY });
                         }
                         break;
                     case 'image-modal':

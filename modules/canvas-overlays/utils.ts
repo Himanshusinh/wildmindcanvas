@@ -56,12 +56,24 @@ export const computeNodeCenter = (
   nextSceneModalStates?: NextSceneModalState[],
   storyboardModalStates?: StoryboardModalState[],
   scriptFrameModalStates?: ScriptFrameModalState[],
-  sceneFrameModalStates?: any[]
+  sceneFrameModalStates?: any[],
+  domCache?: Map<string, Element | null>
 ): { x: number; y: number } | null => {
   if (!id) return null;
 
+  // Helper for cached lookups
+  const cachedQuery = (query: string): Element | null => {
+    if (domCache) {
+      if (domCache.has(query)) return domCache.get(query) || null;
+      const res = document.querySelector(query);
+      domCache.set(query, res);
+      return res;
+    }
+    return document.querySelector(query);
+  };
+
   // First, try to use the actual node element position (most accurate for plugins with circular nodes)
-  const el = document.querySelector(`[data-node-id="${id}"][data-node-side="${side}"]`);
+  const el = cachedQuery(`[data-node-id="${id}"][data-node-side="${side}"]`);
   if (el) {
     const rect = el.getBoundingClientRect();
     // Return exact center of the circular node
@@ -71,7 +83,7 @@ export const computeNodeCenter = (
   }
 
   // Fallback: Prefer frame element (set via data-frame-id on inner frame)
-  const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`);
+  const frameEl = cachedQuery(`[data-frame-id="${id}-frame"]`);
   if (frameEl) {
     const rect = frameEl.getBoundingClientRect();
     const centerY = rect.top + rect.height / 2;
@@ -80,7 +92,7 @@ export const computeNodeCenter = (
   }
 
   // Next prefer the overlay container
-  const overlay = document.querySelector(`[data-overlay-id="${id}"]`);
+  const overlay = cachedQuery(`[data-overlay-id="${id}"]`);
   if (overlay) {
     const rect = overlay.getBoundingClientRect();
     const centerY = rect.top + rect.height / 2;

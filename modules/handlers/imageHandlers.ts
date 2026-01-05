@@ -160,7 +160,8 @@ export const createImageHandlers = (
   realtimeActive: boolean,
   realtimeRef: any,
   viewportCenterRef: any,
-  processMediaFile: any
+  processMediaFile: any,
+  debounceMove: (type: string, id: string, updates: any, originalHandler: (id: string, updates: any) => Promise<void>) => void
 ) => {
 
   const handleImageUpdate = async (index: number, updates: Partial<ImageUpload>) => {
@@ -178,27 +179,29 @@ export const createImageHandlers = (
     });
 
     const elementId = prevImage.elementId;
-    if (!elementId) return; // Legacy images might not have elementId
+    if (!elementId) return;
 
     // 3. Realtime
     if (realtimeActive && realtimeRef.current) {
       realtimeRef.current.sendUpdate(elementId, updates);
     }
 
-    // 4. Persistence
+    // 4. Persistence (Debounced)
     if (projectId && opManagerInitialized) {
-      // Build inverse updates
-      const inverseUpdates: any = {};
-      for (const k of Object.keys(updates)) {
-        // @ts-ignore
-        inverseUpdates[k] = prevImage[k];
-      }
+      debounceMove('image', elementId, updates, async (id: string, upds: any) => {
+        // Build inverse updates
+        const inverseUpdates: any = {};
+        for (const k of Object.keys(upds)) {
+          // @ts-ignore
+          inverseUpdates[k] = prevImage[k];
+        }
 
-      await appendOp({
-        type: 'update',
-        elementId: elementId,
-        data: { updates },
-        inverse: { type: 'update', elementId, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 }
+        await appendOp({
+          type: 'update',
+          elementId: id,
+          data: { updates: upds },
+          inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 }
+        });
       });
     }
   };
