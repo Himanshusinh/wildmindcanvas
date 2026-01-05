@@ -431,7 +431,7 @@ export function createPluginHandlers(
     useWideAngle?: boolean
   ) => {
     if (!sourceImageUrl || !projectId) {
-      console.error('[onMultiangleCamera] Missing sourceImageUrl or projectId');
+      console.error('[onMultiangleCamera] Missing sourceImageUrl or projectId', { sourceImageUrl: !!sourceImageUrl, projectId: !!projectId });
       return null;
     }
 
@@ -449,14 +449,9 @@ export function createPluginHandlers(
 
     try {
       console.log('[onMultiangleCamera] Starting multiangle generation:', {
-        sourceImageUrl,
+        sourceImageUrl: sourceImageUrl ? (sourceImageUrl.substring(0, 50) + '...') : 'MISSING',
         prompt,
-        loraScale,
-        aspectRatio,
-        moveForward,
-        verticalTilt,
-        rotateDegrees,
-        useWideAngle,
+        projectId
       });
       const { multiangleImageForCanvas } = await import('@/core/api/api');
       const result = await multiangleImageForCanvas(
@@ -471,12 +466,20 @@ export function createPluginHandlers(
         useWideAngle
       );
 
-      console.log('[onMultiangleCamera] Multiangle generation completed:', result);
+      console.log('[onMultiangleCamera] Multiangle generation completed result:', result);
       // Remove from queue immediately after completion
       setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      // Extract URL from result
-      const resultUrl = result?.url || (typeof result === 'string' ? result : null);
-      console.log('[onMultiangleCamera] Extracted URL:', resultUrl);
+
+      // Extract URL from result with more robustness
+      let resultUrl: string | null = null;
+      if (typeof result === 'string') {
+        resultUrl = result;
+      } else if (result) {
+        const res = result as any;
+        resultUrl = res.url || res.data?.url || (Array.isArray(res.images) ? res.images[0]?.url : null) || null;
+      }
+
+      console.log('[onMultiangleCamera] Final extracted URL:', resultUrl);
       return resultUrl;
     } catch (error: any) {
       console.error('[onMultiangleCamera] Error:', error);

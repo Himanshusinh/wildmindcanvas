@@ -717,9 +717,9 @@ export async function multiangleImageForCanvas(
         prompt: prompt || '',
         lora_scale: loraScale !== undefined ? loraScale : 1.25,
         aspect_ratio: aspectRatio || 'match_input_image',
-        move_forward: moveForward !== undefined ? Math.max(0, Math.min(10, moveForward)) : 0,
-        vertical_tilt: verticalTilt !== undefined ? verticalTilt : 0,
-        rotate_degrees: rotateDegrees !== undefined ? Math.max(-90, Math.min(90, rotateDegrees)) : 0,
+        move_forward: moveForward !== undefined ? Math.round(Math.max(0, Math.min(10, moveForward))) : 0,
+        vertical_tilt: verticalTilt !== undefined ? Math.round(verticalTilt) : 0,
+        rotate_degrees: rotateDegrees !== undefined ? Math.round(Math.max(-90, Math.min(90, rotateDegrees))) : 0,
         wide_angle: useWideAngle === true,
         meta: {
           source: 'canvas',
@@ -743,6 +743,12 @@ export async function multiangleImageForCanvas(
     if (contentType.includes('application/json')) {
       try {
         result = JSON.parse(text);
+        console.log('[multiangleImageForCanvas] 📥 Parsed response:', {
+          status: response.status,
+          responseStatus: result.responseStatus,
+          hasData: !!result.data,
+          resultKeys: Object.keys(result)
+        });
       } catch (parseError: any) {
         if (parseError instanceof SyntaxError) {
           throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);

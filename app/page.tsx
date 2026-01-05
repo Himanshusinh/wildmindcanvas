@@ -1792,11 +1792,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setGeneratedImages: () => { }, // No-op as not used but destructured
   };
 
-  // Create handlers using factory functions
   // Handlers will be created after processMediaFile is defined
-  // For now, declare them as let so they can be assigned later
-  let imageHandlers: ReturnType<typeof createImageHandlers>;
-  let pluginHandlers: ReturnType<typeof createPluginHandlers>;
 
   // Handler assignments will be done after handlers are created (after processMediaFile)
 
@@ -2010,7 +2006,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const naturalHeight = video.videoHeight || 600;
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
-        let frameWidth = maxFrameWidth;
+        const frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
@@ -2043,7 +2039,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const naturalHeight = img.naturalHeight || 600;
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
-        let frameWidth = maxFrameWidth;
+        const frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
         if (naturalHeight > naturalWidth) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
@@ -2096,7 +2092,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   };
 
   // Now that processMediaFile is defined, create the actual handlers
-  imageHandlers = createImageHandlers(
+  const imageHandlers = createImageHandlers(
     canvasState,
     canvasSetters,
     projectId,
@@ -2109,7 +2105,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     debounceMove
   );
 
-  pluginHandlers = createPluginHandlers(
+  const pluginHandlers = createPluginHandlers(
     canvasState,
     canvasSetters,
     projectId,
@@ -2526,7 +2522,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         // Calculate frame dimensions
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
-        let frameWidth = maxFrameWidth;
+        const frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
 
         if (naturalHeight > naturalWidth) {
@@ -2559,7 +2555,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         // Calculate frame dimensions
         const maxFrameWidth = 600;
         const aspectRatio = naturalWidth / naturalHeight;
-        let frameWidth = maxFrameWidth;
+        const frameWidth = maxFrameWidth;
         let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
 
         if (naturalHeight > naturalWidth) {
