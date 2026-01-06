@@ -28,6 +28,7 @@ interface CanvasOverlaysProps {
     setIsSettingsOpen: (isOpen: boolean) => void;
     activeGenerationCount: number;
     onFitView: () => void;
+    setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -44,7 +45,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     isSettingsOpen,
     setIsSettingsOpen,
     activeGenerationCount,
-    onFitView
+    onFitView,
+    setGenerationQueue
 }) => {
     const {
         images,
@@ -303,6 +305,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
 
                 projectId={props.projectId}
                 isUIHidden={props.isUIHidden}
+                setGenerationQueue={setGenerationQueue}
             />
 
             {isSettingsOpen && (

@@ -132,6 +132,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [imageCount, setImageCount] = useState<number>(initialCount ?? 1);
   const [selectedResolution, setSelectedResolution] = useState<string>('1024'); // Default to 1024px
 
+  const [gptQuality, setGptQuality] = useState<'low' | 'medium' | 'high' | 'auto'>('auto');
+  const [gptBackground, setGptBackground] = useState<'auto' | 'transparent' | 'opaque'>('auto');
+  const [gptModeration, setGptModeration] = useState<'auto' | 'low'>('auto');
+
   // Check if this is a scene image and detect auto-reference
   const relatedScene = useMemo(() => {
     if (!id || !sceneFrameModalStates) return null;
@@ -340,6 +344,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Seedream v4 4K',
     'Seedream 4.5',
+    'ChatGPT 1.5',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo'
   ];
@@ -356,6 +361,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
+    'ChatGPT 1.5',
     // 'Seedream v4 4K',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo',
@@ -979,6 +985,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
         });
 
+        // Collect model-specific options
+        const generationOptions: Record<string, any> = { style: undefined };
+
+        // Add ChatGPT 1.5 specific options
+        if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+          generationOptions.quality = gptQuality;
+          generationOptions.background = gptBackground;
+          generationOptions.moderation = gptModeration;
+        }
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
@@ -989,7 +1005,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           finalSourceImageUrlParam,
           width,
           height,
-          { style: undefined } // Pass style options (placeholder until UI is added)
+          generationOptions
         );
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
 
@@ -1301,6 +1317,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // ChatGPT 1.5 supports: 1:1, 3:2, 2:3
+    if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+      ];
+    }
+
     // FAL models (Google Nano Banana, Seedream v4, Imagen) support: 1:1, 16:9, 9:16, 3:4, 4:3
     return [
       { value: '1:1', label: '1:1' },
@@ -1397,6 +1422,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
     if (modelLower.includes('p-image') && !modelLower.includes('p-image-edit')) {
       return 'P-Image';
+    }
+
+    // For ChatGPT 1.5, use as-is but normalized
+    if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+      return 'ChatGPT 1.5';
     }
 
     // For Google Nano Banana Pro, append resolution
@@ -1954,6 +1984,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onSetIsModelDropdownOpen={setIsModelDropdownOpen}
             onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
             onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
+            gptQuality={gptQuality}
+            gptBackground={gptBackground}
+            gptModeration={gptModeration}
+            onGptQualityChange={setGptQuality}
+            onGptBackgroundChange={setGptBackground}
+            onGptModerationChange={setGptModeration}
           />
 
           {/* Invisible Hover Trigger Zone for Bottom Approach */}

@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { ChevronDown } from 'lucide-react';
 
 interface ImageModalControlsProps {
   scale: number;
@@ -36,6 +37,12 @@ interface ImageModalControlsProps {
   onSetIsModelDropdownOpen: (open: boolean) => void;
   onSetIsAspectRatioDropdownOpen: (open: boolean) => void;
   onSetIsResolutionDropdownOpen: (open: boolean) => void;
+  gptQuality: 'low' | 'medium' | 'high' | 'auto';
+  gptBackground: 'auto' | 'transparent' | 'opaque';
+  gptModeration: 'auto' | 'low';
+  onGptQualityChange: (quality: 'low' | 'medium' | 'high' | 'auto') => void;
+  onGptBackgroundChange: (bg: 'auto' | 'transparent' | 'opaque') => void;
+  onGptModerationChange: (mod: 'auto' | 'low') => void;
 }
 
 export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
@@ -72,6 +79,12 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   onSetIsModelDropdownOpen,
   onSetIsAspectRatioDropdownOpen,
   onSetIsResolutionDropdownOpen,
+  gptQuality,
+  gptBackground,
+  gptModeration,
+  onGptQualityChange,
+  onGptBackgroundChange,
+  onGptModerationChange,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -90,6 +103,15 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
   const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
   const countText = isDark ? '#ffffff' : '#1f2937';
+  const labelColor = isDark ? '#9ca3af' : '#6b7280';
+
+  const [isQualityDropdownOpen, setIsQualityDropdownOpen] = useState(false);
+  const [isBackgroundDropdownOpen, setIsBackgroundDropdownOpen] = useState(false);
+  const [isModerationDropdownOpen, setIsModerationDropdownOpen] = useState(false);
+
+  const qualityDropdownRef = useRef<HTMLDivElement>(null);
+  const backgroundDropdownRef = useRef<HTMLDivElement>(null);
+  const moderationDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -104,9 +126,18 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
       if (resolutionDropdownRef.current && !resolutionDropdownRef.current.contains(target)) {
         onSetIsResolutionDropdownOpen(false);
       }
+      if (qualityDropdownRef.current && !qualityDropdownRef.current.contains(target)) {
+        setIsQualityDropdownOpen(false);
+      }
+      if (backgroundDropdownRef.current && !backgroundDropdownRef.current.contains(target)) {
+        setIsBackgroundDropdownOpen(false);
+      }
+      if (moderationDropdownRef.current && !moderationDropdownRef.current.contains(target)) {
+        setIsModerationDropdownOpen(false);
+      }
     };
 
-    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isResolutionDropdownOpen) {
+    if (isModelDropdownOpen || isAspectRatioDropdownOpen || isResolutionDropdownOpen || isQualityDropdownOpen || isBackgroundDropdownOpen || isModerationDropdownOpen) {
       // Use 'click' instead of 'mousedown' so it fires after dropdown item clicks
       // This ensures the item's onMouseDown handler can stop propagation first
       document.addEventListener('click', handleClickOutside);
@@ -173,7 +204,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
               outline: 'none',
               cursor: isPromptDisabled ? 'not-allowed' : 'text',
               opacity: isPromptDisabled ? 0.7 : 1,
-              transition: 'background-color 0.3s ease, color 0.3s ease',
+              transition: 'background-color, color',
             }}
             onFocus={(e) => {
               e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
@@ -593,6 +624,202 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
             </button>
           </div>
         </div>
+
+        {/* ChatGPT 1.5 Specific Controls - Simplified Redesign */}
+        {(selectedModel.toLowerCase().includes('chatgpt 1.5') || selectedModel.toLowerCase().includes('chat-gpt-1.5')) && (
+          <div style={{ width: '100%', marginTop: `${12 * scale}px`, display: 'flex', flexDirection: 'column', gap: `${12 * scale}px` }}>
+            {/* Single horizontal divider line */}
+            <div style={{
+              height: '1px',
+              background: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+              marginInline: `${8 * scale}px`,
+              width: `calc(100% - ${16 * scale}px)`
+            }} />
+
+            <div style={{
+              display: 'flex',
+              gap: `${16 * scale}px`,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              padding: `0 ${16 * scale}px ${8 * scale}px ${16 * scale}px`,
+              animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}>
+              <style>{`
+                @keyframes slideUp {
+                  from { opacity: 0; transform: translateY(8px); }
+                  to { opacity: 1; transform: translateY(0); }
+                }
+                .gpt-control-label {
+                  font-size: ${8 * scale}px;
+                  color: ${labelColor};
+                  font-weight: 800;
+                  letter-spacing: 0.1em;
+                  margin-bottom: ${4 * scale}px;
+                  opacity: 0.7;
+                  text-transform: uppercase;
+                  text-align: center;
+                }
+                .gpt-control-button {
+                  background: ${isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)'};
+                  border: 1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)'};
+                  border-radius: 999px; /* Fully Rounded */
+                  padding: ${6 * scale}px ${14 * scale}px;
+                  color: ${dropdownText};
+                  font-size: ${11 * scale}px;
+                  font-weight: 600;
+                  display: flex;
+                  align-items: center;
+                  gap: ${6 * scale}px;
+                  cursor: pointer;
+                  min-width: ${94 * scale}px;
+                  justify-content: space-between;
+                }
+                .gpt-control-button:hover {
+                  background: ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)'};
+                  border-color: ${isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.12)'};
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                }
+                .gpt-dropdown-menu {
+                  position: absolute;
+                  bottom: calc(100% + ${8 * scale}px); 
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background: ${isDark ? 'rgba(25, 25, 25, 0.98)' : 'rgba(255, 255, 255, 0.98)'};
+                  backdrop-filter: blur(20px);
+                  border: 1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'};
+                  border-radius: ${16 * scale}px;
+                  padding: ${6 * scale}px;
+                  min-width: ${120 * scale}px;
+                  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+                  z-index: 3005;
+                  animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+                .gpt-dropdown-item {
+                  padding: ${8 * scale}px ${12 * scale}px;
+                  border-radius: ${12 * scale}px;
+                  font-size: ${11 * scale}px;
+                  font-weight: 500;
+                  color: ${dropdownText};
+                  cursor: pointer;
+
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  white-space: nowrap;
+                }
+              `}</style>
+
+              {/* Quality Selector */}
+              <div ref={qualityDropdownRef} style={{ position: 'relative' }}>
+                <div className="gpt-control-label">Quality</div>
+                <button
+                  type="button"
+                  className="gpt-control-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsQualityDropdownOpen(!isQualityDropdownOpen);
+                    setIsBackgroundDropdownOpen(false);
+                    setIsModerationDropdownOpen(false);
+                  }}
+                >
+                  <span>{gptQuality === 'auto' ? 'Automatic' : gptQuality.charAt(0).toUpperCase() + gptQuality.slice(1)}</span>
+                  <ChevronDown size={14 * scale} style={{ transform: isQualityDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: '' }} />
+                </button>
+
+                {isQualityDropdownOpen && (
+                  <div className="gpt-dropdown-menu">
+                    {['auto', 'low', 'medium', 'high'].map((opt) => (
+                      <div
+                        key={opt}
+                        className={`gpt-dropdown-item ${gptQuality === opt ? 'selected' : ''}`}
+                        onClick={() => {
+                          onGptQualityChange(opt as any);
+                          setIsQualityDropdownOpen(false);
+                        }}
+                      >
+                        {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                        {gptQuality === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Background Selector */}
+              <div ref={backgroundDropdownRef} style={{ position: 'relative' }}>
+                <div className="gpt-control-label">Background</div>
+                <button
+                  type="button"
+                  className="gpt-control-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsBackgroundDropdownOpen(!isBackgroundDropdownOpen);
+                    setIsQualityDropdownOpen(false);
+                    setIsModerationDropdownOpen(false);
+                  }}
+                >
+                  <span>{gptBackground === 'auto' ? 'Automatic' : gptBackground.charAt(0).toUpperCase() + gptBackground.slice(1)}</span>
+                  <ChevronDown size={14 * scale} style={{ transform: isBackgroundDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: '' }} />
+                </button>
+
+                {isBackgroundDropdownOpen && (
+                  <div className="gpt-dropdown-menu">
+                    {['auto', 'transparent', 'opaque'].map((opt) => (
+                      <div
+                        key={opt}
+                        className={`gpt-dropdown-item ${gptBackground === opt ? 'selected' : ''}`}
+                        onClick={() => {
+                          onGptBackgroundChange(opt as any);
+                          setIsBackgroundDropdownOpen(false);
+                        }}
+                      >
+                        {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                        {gptBackground === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Moderation Selector */}
+              <div ref={moderationDropdownRef} style={{ position: 'relative' }}>
+                <div className="gpt-control-label">Moderation</div>
+                <button
+                  type="button"
+                  className="gpt-control-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsModerationDropdownOpen(!isModerationDropdownOpen);
+                    setIsQualityDropdownOpen(false);
+                    setIsBackgroundDropdownOpen(false);
+                  }}
+                >
+                  <span>{gptModeration === 'auto' ? 'Automatic' : gptModeration.charAt(0).toUpperCase() + gptModeration.slice(1)}</span>
+                  <ChevronDown size={14 * scale} style={{ transform: isModerationDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: '' }} />
+                </button>
+
+                {isModerationDropdownOpen && (
+                  <div className="gpt-dropdown-menu">
+                    {['auto', 'low'].map((opt) => (
+                      <div
+                        key={opt}
+                        className={`gpt-dropdown-item ${gptModeration === opt ? 'selected' : ''}`}
+                        onClick={() => {
+                          onGptModerationChange(opt as any);
+                          setIsModerationDropdownOpen(false);
+                        }}
+                      >
+                        {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                        {gptModeration === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

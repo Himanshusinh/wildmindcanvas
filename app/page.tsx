@@ -180,6 +180,38 @@ export function CanvasApp({ user }: CanvasAppProps) {
     viewportCenterRef.current = { x: center.x, y: center.y, scale };
   };
 
+  const getCanvasAppState = useCallback((): CanvasAppState => ({
+    images,
+    imageGenerators,
+    videoGenerators,
+    videoEditorGenerators,
+    musicGenerators,
+    upscaleGenerators,
+    multiangleCameraGenerators,
+    removeBgGenerators,
+    eraseGenerators,
+    expandGenerators,
+    vectorizeGenerators,
+    nextSceneGenerators,
+    storyboardGenerators,
+    scriptFrameGenerators,
+    sceneFrameGenerators,
+    textGenerators,
+    canvasTextStates,
+    richTextStates,
+    connectors,
+    generationQueue,
+    compareGenerators,
+    groupContainerStates,
+  }), [
+    images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators,
+    upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
+    expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators,
+    scriptFrameGenerators, sceneFrameGenerators, textGenerators, canvasTextStates,
+    richTextStates, connectors, generationQueue, compareGenerators, groupContainerStates
+  ]);
+
+
   // Initialize OpManager
   const { appendOp, undo, redo, canUndo, canRedo, isInitialized: opManagerInitialized } = useOpManager({
     projectId,
@@ -722,24 +754,47 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setRichTextStates((prev) => prev.filter(t => t.id !== op.elementId));
           // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
           setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
+          // Cleanup generation queue if parent generator deleted
+          setGenerationQueue(prev => prev.filter(item => !item.id.includes(op.elementId!)));
         } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
           // Delete multiple elements
-          setImages((prev) => {
-            const elementIdsSet = new Set(op.elementIds);
-            const newImages = prev.filter((img) => {
-              const elementId = (img as any).elementId;
-              if (elementId && elementIdsSet.has(elementId)) {
-                // Clean up blob URL if it exists
-                if (img?.url && img.url.startsWith('blob:')) {
-                  URL.revokeObjectURL(img.url);
-                }
-                return false; // Remove this element
-              }
-              return true; // Keep this element
-            });
-            return newImages;
-          });
-        } else if (op.type === 'move' && op.elementId && op.data.delta) {
+          const elementIdsSet = new Set(op.elementIds);
+
+          setImages((prev) => prev.filter((img) => {
+            const elementId = (img as any).elementId;
+            if (elementId && elementIdsSet.has(elementId)) {
+              if (img?.url && img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
+              return false;
+            }
+            return true;
+          }));
+
+          setImageGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setVideoGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setVideoEditorGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setMusicGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setUpscaleGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setMultiangleCameraGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setRemoveBgGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setEraseGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setExpandGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setVectorizeGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setNextSceneGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setStoryboardGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setScriptFrameGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setSceneFrameGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setCanvasTextStates(prev => prev.filter(txt => !elementIdsSet.has(txt.id)));
+          setRichTextStates(prev => prev.filter(txt => !elementIdsSet.has(txt.id)));
+          setGenerationQueue(prev => prev.filter(item => !op.elementIds!.some(id => item.id.includes(id))));
+          setCompareGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
+          setGroupContainerStates(prev => prev.filter(group => !elementIdsSet.has(group.id)));
+          setConnectors(prev => prev.filter(conn =>
+            !elementIdsSet.has(conn.id) &&
+            !elementIdsSet.has(conn.from) &&
+            !elementIdsSet.has(conn.to)
+          ));
+        }
+        else if (op.type === 'move' && op.elementId && op.data.delta) {
           // Move element
           setImages((prev) => {
             const index = prev.findIndex(img => (img as any).elementId === op.elementId);
@@ -910,33 +965,102 @@ export function CanvasApp({ user }: CanvasAppProps) {
       // Force-persist snapshot to reflect removals immediately
       try {
         const filteredConnectors = connectors.filter(c => !toRemove.includes(c.id));
-        const elements = buildSnapshotElements({
-          images,
-          imageGenerators,
-          videoGenerators,
-          videoEditorGenerators,
-          musicGenerators,
-          upscaleGenerators,
-          multiangleCameraGenerators,
-          removeBgGenerators,
-          eraseGenerators,
-          expandGenerators,
-          vectorizeGenerators,
-          nextSceneGenerators,
-          storyboardGenerators,
-          scriptFrameGenerators,
-          sceneFrameGenerators,
-          textGenerators,
-          connectors: filteredConnectors,
-          generationQueue,
-          compareGenerators,
-        });
+        const elements = buildSnapshotElements(getCanvasAppState(), filteredConnectors);
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
       } catch (e) {
         console.warn('Failed to persist snapshot after connector removals', e);
       }
     }
   };
+
+  const handleBulkDelete = useCallback(async (elementIds: string[]) => {
+    if (!elementIds || elementIds.length === 0) return;
+    if (!projectId || !opManagerInitialized) return;
+
+    console.log('[BulkDelete] processing deletion of:', elementIds);
+
+    // 1. Update React states for all possible element types locally (optimistic)
+    setImages(prev => prev.filter(img => !elementIds.includes(img.elementId || '')));
+    setImageGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setVideoGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setVideoEditorGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setMusicGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setUpscaleGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setMultiangleCameraGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setRemoveBgGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setEraseGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setExpandGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setVectorizeGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setNextSceneGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setStoryboardGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setScriptFrameGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setSceneFrameGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setCanvasTextStates(prev => prev.filter(txt => !elementIds.includes(txt.id)));
+    setRichTextStates(prev => prev.filter(txt => !elementIds.includes(txt.id)));
+    setGenerationQueue(prev => prev.filter(item => !elementIds.includes(item.id)));
+    setCompareGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
+    setGroupContainerStates(prev => prev.filter(group => !elementIds.includes(group.id)));
+
+    // 2. Also handle connected items (connectors)
+    setConnectors(prev => prev.filter(conn =>
+      !elementIds.includes(conn.id) &&
+      !elementIds.includes(conn.from) &&
+      !elementIds.includes(conn.to)
+    ));
+
+    // 3. Append single Bulk Delete Op to OpManager
+    await appendOp({
+      type: 'delete',
+      elementIds, // Custom property for multi-delete
+      data: {},
+      inverse: { type: 'bulk-restore-placeholder' } as any
+    });
+
+    // 4. Update local groups ref
+    elementIds.forEach(id => {
+      if (groupsRef.current[id]) delete groupsRef.current[id];
+    });
+
+    // 5. Trigger a single snapshot save with updated states
+    try {
+      const state = {
+        images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators,
+        upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
+        expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators,
+        scriptFrameGenerators, sceneFrameGenerators, textGenerators,
+        canvasTextStates, richTextStates, connectors, generationQueue, compareGenerators,
+        groupContainerStates
+      };
+
+      const filteredState = {
+        ...state,
+        images: images.filter(img => !elementIds.includes(img.elementId || '')),
+        imageGenerators: imageGenerators.filter(gen => !elementIds.includes(gen.id)),
+        videoGenerators: videoGenerators.filter(gen => !elementIds.includes(gen.id)),
+        canvasTextStates: canvasTextStates.filter(txt => !elementIds.includes(txt.id)),
+        richTextStates: richTextStates.filter(txt => !elementIds.includes(txt.id)),
+        groupContainerStates: groupContainerStates.filter(g => !elementIds.includes(g.id)),
+        connectors: connectors.filter(c => !elementIds.includes(c.id) && !elementIds.includes(c.from) && !elementIds.includes(c.to))
+      };
+
+      const elements = buildSnapshotElements(filteredState);
+      await apiSetCurrentSnapshot(projectId, {
+        elements,
+        metadata: { version: '1.2', viewport: viewportCenterRef.current }
+      });
+      console.log('[BulkDelete] snapshot persisted');
+    } catch (e) {
+      console.error('[BulkDelete] snapshot failed', e);
+    }
+  }, [
+    projectId, opManagerInitialized, images, imageGenerators, videoGenerators,
+    videoEditorGenerators, musicGenerators, upscaleGenerators,
+    multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
+    expandGenerators, vectorizeGenerators, nextSceneGenerators,
+    storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators,
+    textGenerators, canvasTextStates, richTextStates, connectors,
+    generationQueue, compareGenerators, groupContainerStates, appendOp
+  ]);
 
   // Auto-persist any newly created media nodes that don't yet have a stable elementId.
   // This ensures nodes created locally are assigned a stable ID and persisted via an appendOp,
@@ -1145,29 +1269,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     persistTimerRef.current = window.setTimeout(async () => {
       try {
-        const elements = buildSnapshotElements({
-          images,
-          imageGenerators,
-          videoGenerators,
-          videoEditorGenerators,
-          musicGenerators,
-          upscaleGenerators,
-          multiangleCameraGenerators,
-          removeBgGenerators,
-          eraseGenerators,
-          expandGenerators,
-          vectorizeGenerators,
-          nextSceneGenerators,
-          storyboardGenerators,
-          scriptFrameGenerators,
-          sceneFrameGenerators,
-          textGenerators,
-          canvasTextStates,
-          richTextStates,
-          connectors,
-          generationQueue,
-          compareGenerators,
-        });
+        const elements = buildSnapshotElements(getCanvasAppState());
         // Merge any known group elements we've persisted via the group handlers so autosave doesn't wipe them out
         if (groupsRef.current && Object.keys(groupsRef.current).length > 0) {
           Object.keys(groupsRef.current).forEach((gid) => {
@@ -2838,6 +2940,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onViewportChange={handleViewportChange}
               onImageUpdate={handleImageUpdate}
               onImageDelete={handleImageDelete}
+              onBulkDelete={handleBulkDelete}
               onImageDownload={handleImageDownload}
               onImageDuplicate={handleImageDuplicate}
               onImagesDrop={handleImagesDrop}
@@ -2922,27 +3025,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     await appendOp({ type: 'create', elementId: cid, data: { element: elementPayload }, inverse } as any);
                     // Force-persist snapshot so connector element is immediately present in saved snapshot
                     try {
-                      const elements = buildSnapshotElements({
-                        images,
-                        imageGenerators,
-                        videoGenerators,
-                        videoEditorGenerators,
-                        musicGenerators,
-                        upscaleGenerators,
-                        multiangleCameraGenerators,
-                        removeBgGenerators,
-                        eraseGenerators,
-                        expandGenerators,
-                        vectorizeGenerators,
-                        nextSceneGenerators,
-                        storyboardGenerators,
-                        scriptFrameGenerators,
-                        sceneFrameGenerators,
-                        textGenerators,
-                        connectors: [...connectors, connToAdd],
-                        generationQueue,
-                        compareGenerators,
-                      });
+                      const elements = buildSnapshotElements(getCanvasAppState(), [...connectors, connToAdd]);
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Connector] apiSetCurrentSnapshot success', { projectId, ssRes });
                     } catch (e) {
@@ -2968,27 +3051,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     await appendOp({ type: 'delete', elementId: connectorId, data: {}, inverse } as any);
                     // Force snapshot persist so connector deletion is immediately reflected
                     try {
-                      const elements = buildSnapshotElements({
-                        images,
-                        imageGenerators,
-                        videoGenerators,
-                        videoEditorGenerators,
-                        musicGenerators,
-                        upscaleGenerators,
-                        multiangleCameraGenerators,
-                        removeBgGenerators,
-                        eraseGenerators,
-                        expandGenerators,
-                        vectorizeGenerators,
-                        nextSceneGenerators,
-                        storyboardGenerators,
-                        scriptFrameGenerators,
-                        sceneFrameGenerators,
-                        textGenerators,
-                        connectors: connectors.filter(c => c.id !== connectorId),
-                        generationQueue,
-                        compareGenerators,
-                      });
+                      const elements = buildSnapshotElements(getCanvasAppState(), connectors.filter(c => c.id !== connectorId));
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
                       console.log('[Connector] apiSetCurrentSnapshot success after delete', { projectId, ssRes });
                     } catch (e) { console.warn('[Connector] Failed to persist snapshot after connector delete', e); }
@@ -3023,28 +3086,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
                     // Force-persist snapshot including the new group element so it appears immediately
                     try {
-                      const elements = buildSnapshotElements({
-                        images,
-                        imageGenerators,
-                        videoGenerators,
-                        videoEditorGenerators,
-                        musicGenerators,
-                        upscaleGenerators,
-                        multiangleCameraGenerators,
-                        removeBgGenerators,
-                        eraseGenerators,
-                        expandGenerators,
-                        vectorizeGenerators,
-                        nextSceneGenerators,
-                        storyboardGenerators,
-                        scriptFrameGenerators,
-                        sceneFrameGenerators,
-                        textGenerators,
-                        connectors,
-                        generationQueue,
-                        compareGenerators,
-                        richTextStates,
-                      });
+                      const elements = buildSnapshotElements(getCanvasAppState());
                       // Inject the group element into the elements map
                       elements[group.id] = elementPayload;
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
@@ -3074,28 +3116,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     console.log('[Group] appended update op', id, updates);
                     // Force snapshot persist so updated group is reflected immediately
                     try {
-                      const elements = buildSnapshotElements({
-                        images,
-                        imageGenerators,
-                        videoGenerators,
-                        videoEditorGenerators,
-                        musicGenerators,
-                        upscaleGenerators,
-                        multiangleCameraGenerators,
-                        removeBgGenerators,
-                        eraseGenerators,
-                        expandGenerators,
-                        vectorizeGenerators,
-                        nextSceneGenerators,
-                        storyboardGenerators,
-                        scriptFrameGenerators,
-                        sceneFrameGenerators,
-                        textGenerators,
-                        connectors,
-                        generationQueue,
-                        compareGenerators,
-                        richTextStates,
-                      });
+                      const elements = buildSnapshotElements(getCanvasAppState());
                       // Merge/replace the group element in the snapshot
                       // CAREFUL: updates.meta might be partial.
                       // prev is the full previous state of the group.
@@ -3145,28 +3166,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     await appendOp({ type: 'delete', elementId: groupId, data: {}, inverse } as any);
                     // Force snapshot persist so deleted group is removed immediately
                     try {
-                      const elements = buildSnapshotElements({
-                        images,
-                        imageGenerators,
-                        videoGenerators,
-                        videoEditorGenerators,
-                        musicGenerators,
-                        upscaleGenerators,
-                        multiangleCameraGenerators,
-                        removeBgGenerators,
-                        eraseGenerators,
-                        expandGenerators,
-                        vectorizeGenerators,
-                        nextSceneGenerators,
-                        storyboardGenerators,
-                        scriptFrameGenerators,
-                        sceneFrameGenerators,
-                        textGenerators,
-                        connectors,
-                        generationQueue,
-                        compareGenerators,
-                        richTextStates,
-                      });
+                      const elements = buildSnapshotElements(getCanvasAppState());
                       // Ensure group is not present in snapshot (don't inject it)
                       if (elements[groupId]) delete elements[groupId];
                       const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });

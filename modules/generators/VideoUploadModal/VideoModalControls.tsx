@@ -290,7 +290,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 onSetIsDurationDropdownOpen(false);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              title={isFirstLastMode ? 'Only Veo 3.1 models support connected frames' : undefined}
+              title={(isFirstLastMode || hasSingleFrame) ? 'Only Veo 3.1 and Seedance models support connected frames' : undefined}
               style={{
                 width: '100%',
                 padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
@@ -724,7 +724,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             )}
           </div>
 
-          {isVeo31Model && (hasSingleFrame || isFirstLastMode) && (
+          {(isVeo31Model || selectedModel.toLowerCase().includes('seedance')) && (hasSingleFrame || isFirstLastMode) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: `${6 * scale}px`, marginTop: `${6 * scale}px` }}>
               <div style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: labelText, transition: 'color 0.3s ease' }}>
                 {isFirstLastMode

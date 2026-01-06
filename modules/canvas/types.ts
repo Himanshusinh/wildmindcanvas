@@ -139,6 +139,7 @@ export interface CanvasProps {
     onPersistGroupCreate?: (group: GroupContainerState) => void | Promise<void>;
     onPersistGroupDelete?: (groupId: string) => void | Promise<void>;
     onPersistGroupUpdate?: (groupId: string, updates: Partial<GroupContainerState> | { meta: Record<string, any> }, group?: GroupContainerState) => void | Promise<void>;
+    onBulkDelete?: (elementIds: string[]) => void | Promise<void>;
     // Allow initial groups to be provided from parent snapshot hydration
     initialGroupContainerStates?: GroupContainerState[];
     // Compare plugin persistence callbacks

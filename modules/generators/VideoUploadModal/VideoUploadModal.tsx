@@ -242,7 +242,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const isFirstLastMode = frameCount >= 2 && Boolean(firstFrameUrl && lastFrameUrl);
   const hasSingleFrame = frameCount === 1 && Boolean(firstFrameUrl);
   const availableModelOptions = (isFirstLastMode || hasSingleFrame)
-    ? ['Veo 3.1', 'Veo 3.1 Fast']
+    ? ['Veo 3.1', 'Veo 3.1 Fast', 'Seedance 1.0 Pro', 'Seedance 1.0 Lite']
     : VIDEO_MODEL_OPTIONS;
   const isVeo31Model = selectedModel.toLowerCase().includes('veo 3.1');
   const displayFirstFrameUrl = isFrameOrderSwapped ? lastFrameUrl : firstFrameUrl;
@@ -263,8 +263,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       return;
     }
 
-    const isCurrentVeo31 = selectedModel.toLowerCase().includes('veo 3.1');
-    const targetModel = isCurrentVeo31 ? selectedModel : 'Veo 3.1';
+    const isCurrentValid = selectedModel.toLowerCase().includes('veo 3.1') ||
+      selectedModel.toLowerCase().includes('seedance');
+    const targetModel = isCurrentValid ? selectedModel : 'Veo 3.1';
     const defaultAspectRatio = getModelDefaultAspectRatio(targetModel);
     const defaultDuration = getModelDefaultDuration(targetModel);
     const defaultResolution = getModelDefaultResolution(targetModel);
