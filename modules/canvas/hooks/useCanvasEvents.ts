@@ -131,6 +131,13 @@ export function useCanvasEvents(
 
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     const [isShiftPressed, setIsShiftPressed] = useState(false);
+    const positionRef = useRef(position);
+    const scaleRef = useRef(scale);
+    const isPanningRef = useRef(isPanning);
+
+    useEffect(() => { positionRef.current = position; }, [position]);
+    useEffect(() => { scaleRef.current = scale; }, [scale]);
+    useEffect(() => { isPanningRef.current = isPanning; }, [isPanning]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -947,11 +954,14 @@ export function useCanvasEvents(
 
             if (!isZoomAction) {
                 // Pan
-                if (stage) { stage.draggable(false); setIsPanning(false); }
+                if (stage) {
+                    stage.draggable(false);
+                    if (isPanningRef.current) setIsPanning(false);
+                }
                 requestAnimationFrame(() => {
                     setPosition(prev => {
                         const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-                        setTimeout(() => updateViewportCenter?.(newPos, scale), 0);
+                        setTimeout(() => updateViewportCenter?.(newPos, scaleRef.current), 0);
                         return newPos;
                     });
                 });
@@ -959,10 +969,10 @@ export function useCanvasEvents(
             }
 
             // Zoom
-            const oldScale = scale;
+            const oldScale = scaleRef.current;
             const pointer = stage.getPointerPosition();
             if (!pointer) return;
-            const mousePointTo = { x: (pointer.x - position.x) / oldScale, y: (pointer.y - position.y) / oldScale };
+            const mousePointTo = { x: (pointer.x - positionRef.current.x) / oldScale, y: (pointer.y - positionRef.current.y) / oldScale };
             const direction = e.deltaY > 0 ? -1 : 1;
             const scaleBy = 1.1;
             const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
@@ -979,7 +989,7 @@ export function useCanvasEvents(
             container.addEventListener('wheel', handleWheel, { passive: false });
             return () => container.removeEventListener('wheel', handleWheel);
         }
-    }, [stageRef, containerRef, isMiddleButtonPressed, navigationMode, scale, position, setPosition, setScale, updateViewportCenter]);
+    }, [stageRef, containerRef, isMiddleButtonPressed, navigationMode, setPosition, setScale, updateViewportCenter]);
 
 
     // Mouse Move tracking for drag vs click

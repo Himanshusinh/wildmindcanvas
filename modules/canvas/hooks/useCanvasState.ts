@@ -271,7 +271,7 @@ export function useCanvasState(props: CanvasProps) {
                 if (!isRestoring.current) {
                     record(getCurrentState());
                 }
-            }, 300); // 300ms debounce
+            }, 100); // Reduced from 300ms to 100ms for more responsive history
             return () => clearTimeout(timer);
         }
     }, [

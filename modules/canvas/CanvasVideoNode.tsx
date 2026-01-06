@@ -65,6 +65,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
         let mounted = true;
         const rawUrl = videoState.generatedVideoUrl;
         // Apply proxy utility to allow loading from external sources/CORS
+        // Robustly handles unwrapping of existing proxies to prevent double-proxying
         const url = rawUrl ? buildProxyMediaUrl(rawUrl) : null;
 
         if (url) {
@@ -132,7 +133,16 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
             };
 
             video.onerror = (e) => {
-                console.error('[CanvasVideoNode] Video load error', e, url);
+                const errorDetail = video.error ? {
+                    code: video.error.code,
+                    message: video.error.message
+                } : 'unknown';
+                console.error('[CanvasVideoNode] Video load error:', {
+                    id: videoState.id,
+                    url: url?.substring(0, 100),
+                    errorDetail,
+                    nativeEvent: e
+                });
             };
 
             return () => {
