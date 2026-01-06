@@ -686,12 +686,33 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
 
   // Handle window resize
+  // Handle container resize
   useEffect(() => {
-    const handleResize = () => {
-      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Ensure we don't set zero or invalid sizes which can happen during initial layout
+        if (width > 0 && height > 0) {
+          setViewportSize({ width, height });
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    // Initial check (fallback)
+    if (containerRef.current) {
+      const { offsetWidth, offsetHeight } = containerRef.current;
+      if (offsetWidth > 0 && offsetHeight > 0) {
+        setViewportSize({ width: offsetWidth, height: offsetHeight });
+      }
+    }
+
+    return () => {
+      resizeObserver.disconnect();
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const layerRef = useRef<Konva.Layer | null>(null);

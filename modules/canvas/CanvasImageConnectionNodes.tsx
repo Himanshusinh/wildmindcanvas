@@ -164,9 +164,9 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   } catch (err) { }
                 }}
                 style={{
-                  position: 'fixed',
-                  left: `${containerRect.left + screenX - nodeOffset}px`,
-                  top: `${containerRect.top + screenY + screenHeight / 2}px`,
+                  position: 'absolute',
+                  left: `${screenX - nodeOffset}px`,
+                  top: `${screenY + screenHeight / 2}px`,
                   transform: 'translateY(-50%)',
                   width: `${nodeSize}px`,
                   height: `${nodeSize}px`,
@@ -238,9 +238,9 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   // Do NOT start on simple click — only start once user drags while holding
                 }}
                 style={{
-                  position: 'fixed',
-                  left: `${containerRect.left + screenX + screenWidth + nodeOffset}px`,
-                  top: `${containerRect.top + screenY + screenHeight / 2}px`,
+                  position: 'absolute',
+                  left: `${screenX + screenWidth + nodeOffset}px`,
+                  top: `${screenY + screenHeight / 2}px`,
                   transform: 'translateY(-50%)',
                   width: `${nodeSize}px`,
                   height: `${nodeSize}px`,
