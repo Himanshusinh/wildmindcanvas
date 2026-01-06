@@ -6,6 +6,9 @@ import { ImageUpload } from '@/core/types/canvas';
 import { CanvasTextState, CompareModalState, ScriptFrameModalState } from '@/modules/canvas-overlays/types';
 import { GroupContainerState } from '@/core/types/groupContainer';
 import { StoryWorld } from '@/core/types/storyWorld';
+import { setCurrentSnapshot } from '@/core/api/canvasApi';
+import { buildSnapshotElements } from '@/modules/utils/buildSnapshotElements';
+import { CanvasAppState } from '@/modules/canvas-app/types';
 
 export function useCanvasState(props: CanvasProps) {
     const {
@@ -32,6 +35,7 @@ export function useCanvasState(props: CanvasProps) {
         externalSceneFrameModals,
         externalTextModals,
         initialGroupContainerStates,
+        projectId,
     } = props;
 
     // Local state for canvas text (fallback if props not provided)
@@ -178,7 +182,60 @@ export function useCanvasState(props: CanvasProps) {
         setTimeout(() => {
             isRestoring.current = false;
         }, 100);
-    }, [effectiveSetCanvasTextStates, onConnectionsChange]);
+
+        // PERSISTENCE FIX:
+        // Update the backend snapshot immediately so that if the user refreshes,
+        // the undone/redone state is loaded instead of the previous state.
+        if (projectId) {
+            try {
+                // Map History State to App State for snapshot building
+                // Note: We use 'state' (history) for tracked items, and current scope variables for untracked items
+                // to avoid deleting untracked items from the snapshot.
+                const appState: CanvasAppState = {
+                    images: state.images || [],
+                    imageGenerators: state.imageModalStates || [],
+                    videoGenerators: state.videoModalStates || [],
+                    videoEditorGenerators: state.videoEditorModalStates || [],
+                    musicGenerators: state.musicModalStates || [],
+                    upscaleGenerators: state.upscaleModalStates || [],
+                    multiangleCameraGenerators: state.multiangleCameraModalStates || [],
+                    removeBgGenerators: state.removeBgModalStates || [],
+                    eraseGenerators: state.eraseModalStates || [],
+                    expandGenerators: state.expandModalStates || [],
+                    vectorizeGenerators: state.vectorizeModalStates || [],
+                    nextSceneGenerators: state.nextSceneModalStates || [],
+                    compareGenerators: compareModalStates as any || [], // Untracked in history, use current
+                    storyboardGenerators: state.storyboardModalStates || [],
+                    scriptFrameGenerators: state.scriptFrameModalStates || [],
+                    sceneFrameGenerators: state.sceneFrameModalStates || [],
+                    textGenerators: state.textInputStates as any || [],
+                    canvasTextStates: state.canvasTextStates || [],
+                    richTextStates: state.richTextStates || [],
+                    groupContainerStates: state.groupContainerStates || [],
+                    connectors: state.connections || [],
+                    generationQueue: [], // Untracked
+                };
+
+                // Generate elements map
+                const elements = buildSnapshotElements(appState, state.connections);
+
+                // Persist to backend
+                setCurrentSnapshot(projectId, {
+                    elements,
+                    metadata: {
+                        updatedBy: 'undo-redo',
+                        timestamp: Date.now()
+                    }
+                }).catch(err => console.error('[useCanvasState] Snapshot persist failed:', err));
+
+            } catch (err) {
+                console.error('[useCanvasState] Error preparing snapshot persist:', err);
+            }
+        }
+    }, [
+        effectiveSetCanvasTextStates, onConnectionsChange, projectId,
+        compareModalStates // Add dependency for untracked state
+    ]);
 
     const { record, undo, redo, canUndo, canRedo } = useCanvasHistory(
         {

@@ -243,7 +243,10 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             }
           }}
           placeholder="Enter text here..."
-          onMouseDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            // Allow event to bubble to parent for selection, but prevent event for other things if needed
+            // e.stopPropagation(); // REMOVED: sticky selection bug fix
+          }}
           style={{
             background: 'transparent',
             border: 'none',

@@ -134,17 +134,16 @@ export function applyStageCursor(
 /**
  * Check if a position overlaps with existing components
  */
+/**
+ * Check if a position overlaps with existing components
+ */
 export function checkOverlap(
   x: number,
   y: number,
   width: number,
   height: number,
-  images: ImageUpload[],
-  textInputStates: Array<{ x: number; y: number }>,
-  imageModalStates: Array<{ x: number; y: number }>,
-  videoModalStates: Array<{ x: number; y: number }>,
-  musicModalStates: Array<{ x: number; y: number }>,
-  padding: number = 100
+  occupiedRegions: Array<{ x: number; y: number; width: number; height: number }>,
+  padding: number = 20
 ): boolean {
   // Expand check rect with padding
   const checkRect = {
@@ -154,94 +153,18 @@ export function checkOverlap(
     height: height + padding * 2
   };
 
-  // Check against uploaded images/videos
-  for (const img of images) {
-    if (img.type === 'text' || img.type === 'model3d') continue;
-    const imgWidth = img.width || 400;
-    const imgHeight = img.height || 400;
-    const imgRect = {
-      x: (img.x || 0) - padding,
-      y: (img.y || 0) - padding,
-      width: imgWidth + padding * 2,
-      height: imgHeight + padding * 2,
+  for (const region of occupiedRegions) {
+    const regionRect = {
+      x: (region.x || 0) - padding,
+      y: (region.y || 0) - padding,
+      width: region.width + padding * 2,
+      height: region.height + padding * 2,
     };
     if (
-      checkRect.x < imgRect.x + imgRect.width &&
-      checkRect.x + checkRect.width > imgRect.x &&
-      checkRect.y < imgRect.y + imgRect.height &&
-      checkRect.y + checkRect.height > imgRect.y
-    ) {
-      return true;
-    }
-  }
-
-  // Check against text inputs (estimated size: 300x100)
-  for (const textState of textInputStates) {
-    const textRect = {
-      x: textState.x - padding,
-      y: textState.y - padding,
-      width: 300 + padding * 2,
-      height: 100 + padding * 2
-    };
-    if (
-      checkRect.x < textRect.x + textRect.width &&
-      checkRect.x + checkRect.width > textRect.x &&
-      checkRect.y < textRect.y + textRect.height &&
-      checkRect.y + checkRect.height > textRect.y
-    ) {
-      return true;
-    }
-  }
-
-  // Check against image modals (600px wide, ~400px tall for 1:1 aspect ratio)
-  for (const modalState of imageModalStates) {
-    const modalRect = {
-      x: modalState.x - padding,
-      y: modalState.y - padding,
-      width: 600 + padding * 2,
-      height: 400 + padding * 2
-    };
-    if (
-      checkRect.x < modalRect.x + modalRect.width &&
-      checkRect.x + checkRect.width > modalRect.x &&
-      checkRect.y < modalRect.y + modalRect.height &&
-      checkRect.y + checkRect.height > modalRect.y
-    ) {
-      return true;
-    }
-  }
-
-  // Check against video modals (600px wide, ~400px tall for 16:9 aspect ratio)
-  for (const modalState of videoModalStates) {
-    const modalRect = {
-      x: modalState.x - padding,
-      y: modalState.y - padding,
-      width: 600 + padding * 2,
-      height: 400 + padding * 2
-    };
-    if (
-      checkRect.x < modalRect.x + modalRect.width &&
-      checkRect.x + checkRect.width > modalRect.x &&
-      checkRect.y < modalRect.y + modalRect.height &&
-      checkRect.y + checkRect.height > modalRect.y
-    ) {
-      return true;
-    }
-  }
-
-  // Check against music modals (600px wide, ~300px tall)
-  for (const modalState of musicModalStates) {
-    const modalRect = {
-      x: modalState.x - padding,
-      y: modalState.y - padding,
-      width: 600 + padding * 2,
-      height: 300 + padding * 2
-    };
-    if (
-      checkRect.x < modalRect.x + modalRect.width &&
-      checkRect.x + checkRect.width > modalRect.x &&
-      checkRect.y < modalRect.y + modalRect.height &&
-      checkRect.y + checkRect.height > modalRect.y
+      checkRect.x < regionRect.x + regionRect.width &&
+      checkRect.x + checkRect.width > regionRect.x &&
+      checkRect.y < regionRect.y + regionRect.height &&
+      checkRect.y + checkRect.height > regionRect.y
     ) {
       return true;
     }
@@ -256,21 +179,13 @@ export function checkOverlap(
 export function findBlankSpace(
   componentWidth: number,
   componentHeight: number,
-  images: ImageUpload[],
-  textInputStates: Array<{ x: number; y: number }>,
-  imageModalStates: Array<{ x: number; y: number }>,
-  videoModalStates: Array<{ x: number; y: number }>,
-  musicModalStates: Array<{ x: number; y: number }>,
+  occupiedRegions: Array<{ x: number; y: number; width: number; height: number }>,
   viewportSize: { width: number; height: number },
   position: { x: number; y: number },
   scale: number
 ): { x: number; y: number } {
   // Check if canvas is empty
-  const isEmpty = images.length === 0 &&
-    textInputStates.length === 0 &&
-    imageModalStates.length === 0 &&
-    videoModalStates.length === 0 &&
-    musicModalStates.length === 0;
+  const isEmpty = occupiedRegions.length === 0;
 
   if (isEmpty) {
     // Center on screen when canvas is empty
@@ -284,8 +199,8 @@ export function findBlankSpace(
   const centerY = (viewportSize.height / 2 - position.y) / scale;
 
   // Try positions in a spiral pattern from center with larger spacing
-  const spacing = Math.max(componentWidth, componentHeight) + 200; // Space between attempts (component size + padding)
-  const maxAttempts = 100; // Search further
+  const spacing = Math.min(componentWidth, componentHeight) / 2; // Granular spacing
+  const maxAttempts = 200; // Search further
 
   // First try center position
   if (!checkOverlap(
@@ -293,45 +208,32 @@ export function findBlankSpace(
     centerY - componentHeight / 2,
     componentWidth,
     componentHeight,
-    images,
-    textInputStates,
-    imageModalStates,
-    videoModalStates,
-    musicModalStates
+    occupiedRegions
   )) {
     return { x: centerX - componentWidth / 2, y: centerY - componentHeight / 2 };
   }
 
   // Spiral search pattern
   for (let radius = 1; radius < maxAttempts; radius++) {
-    // Try 8 directions at each radius
-    for (let angle = 0; angle < 360; angle += 45) {
-      const rad = (angle * Math.PI) / 180;
-      const x = centerX - componentWidth / 2 + Math.cos(rad) * radius * spacing;
-      const y = centerY - componentHeight / 2 + Math.sin(rad) * radius * spacing;
+    // Try directions at each radius
+    // Circumference approx 2*pi*r*spacing
+    // We want step size around 'spacing' on the circle
+    const circumference = 2 * Math.PI * radius * spacing;
+    const steps = Math.max(8, Math.floor(circumference / spacing));
 
-      if (!checkOverlap(x, y, componentWidth, componentHeight, images, textInputStates, imageModalStates, videoModalStates, musicModalStates)) {
+    for (let i = 0; i < steps; i++) {
+      const angle = (i / steps) * 2 * Math.PI;
+      const x = centerX - componentWidth / 2 + Math.cos(angle) * radius * spacing;
+      const y = centerY - componentHeight / 2 + Math.sin(angle) * radius * spacing;
+
+      if (!checkOverlap(x, y, componentWidth, componentHeight, occupiedRegions)) {
         return { x, y };
       }
     }
   }
 
-  // Fallback: try positions further away in a grid pattern
-  const gridSpacing = spacing;
-  for (let row = -10; row <= 10; row++) {
-    for (let col = -10; col <= 10; col++) {
-      if (row === 0 && col === 0) continue; // Skip center (already checked)
-      const x = centerX - componentWidth / 2 + col * gridSpacing;
-      const y = centerY - componentHeight / 2 + row * gridSpacing;
-
-      if (!checkOverlap(x, y, componentWidth, componentHeight, images, textInputStates, imageModalStates, videoModalStates, musicModalStates)) {
-        return { x, y };
-      }
-    }
-  }
-
-  // Last resort: return a position far to the right
-  return { x: centerX + 1000, y: centerY - componentHeight / 2 };
+  // Last resort: return a position slightly offset from center to avoid perfect stack
+  return { x: centerX + 50, y: centerY + 50 };
 }
 
 /**

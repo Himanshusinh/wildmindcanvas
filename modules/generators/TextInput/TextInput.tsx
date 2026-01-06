@@ -141,7 +141,8 @@ export const TextInput: React.FC<TextInputProps> = ({
 
     // Call onSelect when clicking on the text input container
     // Don't select if clicking on buttons, controls, inputs, or action icons
-    if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
+    // Call onSelect when clicking anywhere on the component to select it (and deselect others)
+    if (onSelect) {
       console.log('[TextInput] Calling onSelect');
       onSelect();
     }

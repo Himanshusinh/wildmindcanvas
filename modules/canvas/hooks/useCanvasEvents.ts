@@ -6,7 +6,7 @@ import { CanvasProps } from '../types';
 import { useCanvasState } from './useCanvasState';
 import { useCanvasSelection } from './useCanvasSelection';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
-import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE } from '@/core/canvas/canvasHelpers';
+import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE, findBlankSpace } from '@/core/canvas/canvasHelpers';
 import { useGroupLogic } from './useGroupLogic';
 
 // Module-level variable to debounce creation across Strict Mode remounts
@@ -180,24 +180,73 @@ export function useCanvasEvents(
         const stage = stageRef.current;
         if (!stage) return;
 
-        const spawnAtCenter = () => {
-            const centerX = (stage.width() / 2 - position.x) / scale;
-            const centerY = (stage.height() / 2 - position.y) / scale;
-            return { x: centerX, y: centerY };
+        const findSmartPosition = (width: number, height: number) => {
+            const occupied: { x: number; y: number; width: number; height: number }[] = [];
+
+            const addItems = (items: any[], type: string) => {
+                items.forEach((item, idx) => {
+                    const idOrIndex = type === 'image' ? idx : item.id;
+                    // Construct data object that matches CanvasItemsData
+                    const dataForDims = {
+                        ...canvasState,
+                        canvasTextStates: effectiveCanvasTextStates,
+                        richTextStates: (canvasState as any).richTextStates || []
+                    };
+                    const dims = getComponentDimensions(type, idOrIndex, dataForDims as any);
+                    if (dims.width > 0 && dims.height > 0) {
+                        occupied.push({
+                            x: item.x,
+                            y: item.y,
+                            width: dims.width,
+                            height: dims.height
+                        });
+                    }
+                });
+            };
+
+            addItems(images, 'image');
+            addItems(effectiveCanvasTextStates, 'text'); // Plain Canvas Text
+            addItems(textInputStates, 'input'); // AI Text
+            addItems(imageModalStates, 'imageModal');
+            addItems(videoModalStates, 'videoModal');
+            addItems(musicModalStates, 'musicModal');
+            addItems(upscaleModalStates, 'upscaleModal');
+            addItems(multiangleCameraModalStates, 'multiangleCameraModal');
+            addItems(removeBgModalStates, 'removeBgModal');
+            addItems(eraseModalStates, 'eraseModal');
+            addItems(expandModalStates, 'expandModal');
+            addItems(vectorizeModalStates, 'vectorizeModal');
+            addItems(nextSceneModalStates, 'nextSceneModal');
+            addItems(compareModalStates, 'compareModal');
+            addItems(storyboardModalStates, 'storyboardModal');
+            addItems(scriptFrameModalStates, 'scriptFrameModal');
+            addItems(sceneFrameModalStates, 'sceneFrameModal');
+            addItems(videoEditorModalStates, 'videoEditorModal');
+
+            return findBlankSpace(
+                width,
+                height,
+                occupied,
+                { width: stage.width(), height: stage.height() },
+                position,
+                scale
+            );
         };
 
-        const { x, y } = spawnAtCenter();
         const id = `${selectedTool}-${Date.now()}`;
 
         if (selectedTool === 'image') {
+            const { x, y } = findSmartPosition(600, 400); // Default image modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setImageModalStates(prev => [...prev, newState]);
             onPersistImageModalCreate?.(newState);
         } else if (selectedTool === 'video') {
+            const { x, y } = findSmartPosition(600, 400); // Default video modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setVideoModalStates(prev => [...prev, newState]);
             onPersistVideoModalCreate?.(newState);
         } else if (selectedTool === 'music') {
+            const { x, y } = findSmartPosition(600, 300); // Default music modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setMusicModalStates(prev => [...prev, newState]);
             onPersistMusicModalCreate?.(newState);
@@ -213,6 +262,8 @@ export function useCanvasEvents(
                 hasCreatedTextRef.current = true;
 
                 console.log('[useCanvasEvents] Creating AI Text (TextInput)');
+                // Estimated size of new text input
+                const { x, y } = findSmartPosition(400, 140);
                 const newState = { id, x, y, value: '', autoFocusInput: false };
                 setTextInputStates(prev => [...prev, newState]);
                 onPersistTextModalCreate?.(newState);
@@ -228,7 +279,13 @@ export function useCanvasEvents(
     }, [selectedTool, toolClickCounter, stageRef, scale, position,
         setImageModalStates, setVideoModalStates, setMusicModalStates, setTextInputStates,
         effectiveSetCanvasTextStates, setSelectedCanvasTextId,
-        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate]);
+        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate,
+        // Add dependencies for all modal states to ensure we have latest positions
+        images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+        upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates,
+        expandModalStates, vectorizeModalStates, nextSceneModalStates, compareModalStates,
+        storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, videoEditorModalStates
+    ]);
 
     // Update selectionRectCoords when selectionBox changes
     useEffect(() => {
