@@ -65,8 +65,8 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           cursor: 'pointer',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
-          opacity: (isHovered || globalDragActive) ? 1 : 0,
-          visibility: 'visible',
+          opacity: (activeCategory && (isHovered || globalDragActive)) ? 1 : 0,
+          visibility: activeCategory ? 'visible' : 'hidden',
           pointerEvents: 'auto',
         }}
       />
