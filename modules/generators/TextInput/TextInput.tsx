@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { TextModalTooltip } from './TextModalTooltip';
-import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { TextModalFrame } from './TextModalFrame';
 import { TextModalNodes } from './TextModalNodes';
 import { TextModalControls } from './TextModalControls';
@@ -378,16 +377,14 @@ export const TextInput: React.FC<TextInputProps> = ({
         zIndex: isHovered || isSelected ? 2001 : 2000,
         display: 'flex',
         flexDirection: 'column',
-        gap: `${1 * scale}px`,
-        padding: `${20 * scale}px ${12 * scale}px`,
-        paddingTop: `${24 * scale}px`,
-        paddingBottom: `${24 * scale}px`,
+        gap: `${0 * scale}px`, // Removed gap as header is merging
+        padding: 0, // Remove padding, let internal components handle spacing
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: `${12 * scale}px`,
+        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`, // Increased radius slightly
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,

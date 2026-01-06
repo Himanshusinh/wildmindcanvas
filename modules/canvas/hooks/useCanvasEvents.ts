@@ -213,7 +213,7 @@ export function useCanvasEvents(
                 hasCreatedTextRef.current = true;
 
                 console.log('[useCanvasEvents] Creating AI Text (TextInput)');
-                const newState = { id, x, y, value: '', autoFocusInput: true };
+                const newState = { id, x, y, value: '', autoFocusInput: false };
                 setTextInputStates(prev => [...prev, newState]);
                 onPersistTextModalCreate?.(newState);
             } else {
