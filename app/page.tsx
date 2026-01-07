@@ -1552,10 +1552,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }
 
         // For new projects, snapshot should be null or empty - don't load anything
-        console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
-        snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
-        setIsHydrated(true); // Enable autosave for new projects
-        return;
+        if (!snapshot || !snapshot.elements) {
+          console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
+          snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
+          setIsHydrated(true); // Enable autosave for new projects
+          return;
+        }
 
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
