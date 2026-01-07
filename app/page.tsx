@@ -58,7 +58,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // Text generator (input overlay) persistence state
   const [textGenerators, setTextGenerators] = useState<TextModalState[]>([]);
   const [groupContainerStates, setGroupContainerStates] = useState<any[]>([]);
-  const [refImages, setRefImages] = useState<Record<string, string>>({});
+  // Canonical Ref Stores (Sync source for Modals/Snapshots)
+  const refImages = useRef<Record<string, any>>({});
+  const refVideos = useRef<Record<string, any>>({});
+  const elementsRef = useRef<Record<string, any>>({});
 
   interface Connector {
     id: string;
@@ -158,7 +161,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
       setSelectedCanvasTextId(null);
       setGenerationQueue([]);
       setTextGenerators([]);
-      setRefImages({});
+      refImages.current = {};
+      refVideos.current = {};
+      elementsRef.current = {};
       setConnectors([]);
       snapshotLoadedRef.current = false;
       // Reset viewport to center
