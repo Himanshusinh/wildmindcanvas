@@ -8,10 +8,13 @@ interface UseSnapshotManagerProps {
   projectId: string | null;
   state: CanvasAppState;
   setters: CanvasAppSetters;
+  isHydrated: boolean;
+  mutationVersion: number;
 }
 
-export function useSnapshotManager({ projectId, state, setters }: UseSnapshotManagerProps) {
+export function useSnapshotManager({ projectId, state, setters, isHydrated, mutationVersion }: UseSnapshotManagerProps) {
   const persistTimerRef = useRef<number | null>(null);
+  const snapshotInFlight = useRef(false);
 
   // Helper: build elements map snapshot from current state
   const buildSnapshotElements = (connectorsOverride?: Connector[]): Record<string, any> => {
@@ -383,25 +386,36 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
 
   // Persist full snapshot on every interaction (debounced)
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !isHydrated) return;
+
     if (persistTimerRef.current) {
       window.clearTimeout(persistTimerRef.current);
     }
+
     persistTimerRef.current = window.setTimeout(async () => {
+      if (snapshotInFlight.current) {
+        console.warn('[Snapshot] Skipped (in-flight)');
+        return;
+      }
+
+      snapshotInFlight.current = true;
       try {
         const elements = buildSnapshotElements();
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
         // console.debug('[Snapshot] persisted', Object.keys(elements).length);
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
+      } finally {
+        snapshotInFlight.current = false;
       }
-    }, 300) as unknown as number;
+    }, 500) as unknown as number; // Slightly increased debounce to 500ms for safety
+
     return () => {
       if (persistTimerRef.current) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
+  }, [projectId, isHydrated, mutationVersion]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {

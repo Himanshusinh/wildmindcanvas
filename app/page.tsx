@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useSnapshotManager } from '@/modules/hooks/useSnapshotManager';
 import { CompareGenerator } from '@/modules/canvas-app/types';
 import { Canvas } from '@/modules/canvas';
 import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
@@ -88,11 +89,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const groupsRef = useRef<Record<string, any>>({});
   const [initialGroupContainerStates, setInitialGroupContainerStates] = useState<any[]>([]);
   const snapshotLoadedRef = useRef(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [mutationVersion, setMutationVersion] = useState(0);
   const moveDebounceTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Helper to debounce movement persistence
   const debounceMove = useCallback((type: string, id: string, updates: any, originalHandler: (id: string, updates: any) => Promise<void>) => {
-    const timerKey = `${type}-${id}`;
+    const timerKey = `${type} -${id} `;
     if (moveDebounceTimersRef.current[timerKey]) {
       clearTimeout(moveDebounceTimersRef.current[timerKey]);
     }
@@ -181,6 +184,70 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
   }, [projectId]); // Only run when projectId changes
 
+  // --- Snapshot Manager (Autosave & Hydration) ---
+  // Create state object for the hook
+  const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
+
+  const canvasAppState: CanvasAppState = {
+    images,
+    imageGenerators,
+    videoGenerators,
+    videoEditorGenerators,
+    musicGenerators,
+    upscaleGenerators,
+    multiangleCameraGenerators,
+    removeBgGenerators,
+    eraseGenerators,
+    expandGenerators,
+    vectorizeGenerators,
+    nextSceneGenerators,
+    compareGenerators,
+    storyboardGenerators,
+    scriptFrameGenerators,
+    sceneFrameGenerators,
+    textGenerators,
+    canvasTextStates,
+    richTextStates,
+    groupContainerStates,
+    connectors,
+    generationQueue,
+    showImageGenerationModal,
+  };
+
+  const canvasAppSetters: CanvasAppSetters = {
+    setImages,
+    setImageGenerators,
+    setVideoGenerators,
+    setVideoEditorGenerators,
+    setMusicGenerators,
+    setUpscaleGenerators,
+    setMultiangleCameraGenerators,
+    setRemoveBgGenerators,
+    setEraseGenerators,
+    setExpandGenerators,
+    setVectorizeGenerators,
+    setCompareGenerators,
+    setNextSceneGenerators,
+    setStoryboardGenerators,
+    setScriptFrameGenerators,
+    setSceneFrameGenerators,
+    setTextGenerators,
+    setCanvasTextStates,
+    setRichTextStates,
+    setGroupContainerStates,
+    setConnectors,
+    setGenerationQueue,
+    setShowImageGenerationModal,
+  };
+
+  useSnapshotManager({
+    projectId: projectId || '',
+    state: canvasAppState,
+    setters: canvasAppSetters,
+    isHydrated,
+    mutationVersion
+  });
+
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
     viewportCenterRef.current = { x: center.x, y: center.y, scale };
   };
@@ -219,6 +286,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Shared Op Application Logic
   const handleOpApplied = async (op: CanvasOp, isOptimistic: boolean) => {
+    // Rule 1: Block all operations until initial hydration is complete
+    if (!isHydrated) return;
+
     try {
       const summary = {
         type: op.type,
@@ -747,136 +817,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             }];
           });
         }
-      } else if (op.type === 'create' && op.data && op.data.element) {
-        // Handle single element creation (Undo/Redo or Remote)
-        const element = op.data.element;
-        console.log('[Ops] apply create', element.type, element.id);
-
-        if (element.type === 'connector') {
-          setConnectors(prev => {
-            if (prev.some(c => c.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              from: element.from || element.meta?.from,
-              to: element.to || element.meta?.to,
-              color: element.meta?.color || '#437eb5',
-              fromAnchor: element.meta?.fromAnchor,
-              toAnchor: element.meta?.toAnchor
-            }];
-          });
-        } else if (element.type === 'image-generator') {
-          setImageGenerators(prev => {
-            if (prev.some(c => c.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              generatedImageUrl: element.meta?.generatedImageUrl || null,
-              sourceImageUrl: element.meta?.sourceImageUrl || null,
-              prompt: element.meta?.prompt,
-              model: element.meta?.model,
-              frame: element.meta?.frame,
-              aspectRatio: element.meta?.aspectRatio,
-              frameWidth: element.meta?.frameWidth,
-              frameHeight: element.meta?.frameHeight
-            }];
-          });
-        } else if (element.type === 'video-generator') {
-          setVideoGenerators(prev => {
-            if (prev.some(c => c.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              generatedVideoUrl: element.meta?.generatedVideoUrl || null,
-              prompt: element.meta?.prompt,
-              model: element.meta?.model,
-              frame: element.meta?.frame,
-              aspectRatio: element.meta?.aspectRatio,
-              frameWidth: element.meta?.frameWidth,
-              frameHeight: element.meta?.frameHeight
-            }];
-          });
-        } else if (element.type === 'music-generator') {
-          setMusicGenerators(prev => {
-            if (prev.some(m => m.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              generatedMusicUrl: element.meta?.generatedMusicUrl || null,
-              activeCategory: element.meta?.activeCategory,
-              lyrics: element.meta?.lyrics,
-              sampleRate: element.meta?.sampleRate,
-              bitrate: element.meta?.bitrate,
-              audioFormat: element.meta?.audioFormat,
-              prompt: element.meta?.prompt,
-              model: element.meta?.model,
-              frameWidth: element.meta?.frameWidth,
-              frameHeight: element.meta?.frameHeight
-            }];
-          });
-        } else if (element.type === 'text-generator') {
-          setTextGenerators(prev => {
-            if (prev.some(t => t.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              value: element.meta?.value || ''
-            }];
-          });
-        } else if (element.type === 'rich-text') {
-          setRichTextStates(prev => {
-            if (prev.some(t => t.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              text: element.meta?.text || '',
-              fontSize: element.meta?.fontSize || 24,
-              fontWeight: element.meta?.fontWeight || 'normal',
-              fontStyle: element.meta?.fontStyle || 'normal',
-              fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
-              textAlign: element.meta?.textAlign || 'left',
-              width: element.bounds?.width || 300,
-              height: element.bounds?.height || 100,
-              color: element.meta?.color || element.meta?.fill || '#ffffff',
-              backgroundColor: element.meta?.backgroundColor || 'transparent',
-              textDecoration: element.meta?.textDecoration || 'none',
-              styleType: element.meta?.styleType || 'paragraph',
-            }];
-          });
-        } else if (element.type === 'group') {
-          setGroupContainerStates(prev => {
-            if (prev.some(g => g.id === element.id)) return prev;
-            return [...prev, {
-              id: element.id,
-              x: element.x || 0,
-              y: element.y || 0,
-              width: element.width || 100,
-              height: element.height || 100,
-              padding: element.padding || 0,
-              children: element.children || [],
-              meta: element.meta || { name: 'Group' }
-            }];
-          });
-        } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
-          setImages(prev => {
-            if (prev.some(i => (i as any).elementId === element.id)) return prev;
-            return [...prev, {
-              type: element.type,
-              url: element.meta?.url || element.url,
-              x: element.x || 0,
-              y: element.y || 0,
-              width: element.width || 400,
-              height: element.height || 400,
-              elementId: element.id,
-              meta: element.meta
-            }];
-          });
-        }
-        // Add other plugins as needed
+        setMutationVersion(v => v + 1);
       } else if (op.type === 'bulk-create' && op.data && Array.isArray(op.data.elements)) {
         // Handle bulk creation (Inverse of Bulk Delete)
         const elements = op.data.elements;
@@ -1004,31 +945,20 @@ export function CanvasApp({ user }: CanvasAppProps) {
         if (newGroups.length > 0) setGroupContainerStates(prev => [...prev.filter(x => !newGroups.some(n => n.id === x.id)), ...newGroups]);
         if (newImages.length > 0) setImages(prev => [...prev.filter(x => !newImages.some(n => (n as any).elementId === x.elementId)), ...newImages]);
 
-      } else if (op.type === 'delete' || op.type === 'generator.delete' || op.type === 'media.delete') {
-        // CLEAN DELETE LOGIC
-        const ids = (op as any).elementIds || [(op as any).elementId || (op as any).id];
-        console.log('[handleOpApplied] DELETE BLOCK ENTERED. IDs:', ids, 'IsArray:', Array.isArray(ids));
-        if (Array.isArray(ids)) {
-          const idsSet = new Set(ids);
-          ids.forEach(id => {
-            console.log('[handleOpApplied] DELETING ID:', id);
+        setMutationVersion(v => v + 1);
 
-            // Clear blob URLs for deleted images to prevent memory leaks
+      } else if (op.type === 'delete' || op.type === 'generator.delete' || op.type === 'media.delete') {
+        const ids = (op as any).elementIds || [(op as any).elementId || (op as any).id];
+        if (Array.isArray(ids)) {
+          ids.forEach((id: string) => {
             setImages(prev => {
-              const target = prev.find(img => (img as any).elementId === id);
-              if (target) console.log('[handleOpApplied] Found in IMAGES', id);
-              if (target && target.url && target.url.startsWith('blob:')) {
-                URL.revokeObjectURL(target.url);
+              if (prev.some(img => (img as any).elementId === id)) {
+                const target = prev.find(img => (img as any).elementId === id);
+                if (target && target.url && target.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
               }
               return prev.filter(m => (m as any).elementId !== id);
             });
-
-            // Clear generators
-            setImageGenerators(prev => {
-              const found = prev.some(m => m.id === id);
-              if (found) console.log('[handleOpApplied] REMOVING from ImageGenerators', id);
-              return prev.filter(m => m.id !== id);
-            });
+            setImageGenerators(prev => prev.filter(m => m.id !== id));
             setVideoGenerators(prev => prev.filter(m => m.id !== id));
             setVideoEditorGenerators(prev => prev.filter(m => m.id !== id));
             setMusicGenerators(prev => prev.filter(m => m.id !== id));
@@ -1044,20 +974,16 @@ export function CanvasApp({ user }: CanvasAppProps) {
             setSceneFrameGenerators(prev => prev.filter(m => m.id !== id));
             setTextGenerators(prev => prev.filter(t => t.id !== id));
             setCompareGenerators(prev => prev.filter(m => m.id !== id));
-
-            // Clear text states
             setCanvasTextStates(prev => prev.filter(t => t.id !== id));
             setRichTextStates(prev => prev.filter(t => t.id !== id));
-
-            // Clear connectors
             setConnectors(prev => prev.filter(c => c.from !== id && c.to !== id));
-
-            // Clear groupsRef (CRITICAL FOR PERSISTENCE FIX)
             if (groupsRef.current && groupsRef.current[id]) {
               delete groupsRef.current[id];
             }
           });
         }
+        setMutationVersion(v => v + 1);
+
       } else if (op.type === 'move' && op.elementId && op.data.delta) {
         // Move element
         setImages((prev) => {
@@ -1144,6 +1070,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           }
           return prev;
         });
+        setMutationVersion(v => v + 1);
       } else if (op.type === 'update' && op.elementId && op.data.updates) {
         const targetId = op.elementId;
         const updates = { ...op.data.updates };
@@ -1201,6 +1128,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             return [...filtered, ...conns];
           });
         }
+        setMutationVersion(v => v + 1);
       }
     } catch (err: any) {
       console.error('[Ops] error applying op', err);
@@ -1379,7 +1307,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       if (!img.url && !img.file && img.type !== 'text') return;
 
       // Assign a stable element id and persist
-      const newElementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newElementId = `element - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       // Update local state with the new elementId
       setImages((prev) => {
         const next = [...prev];
@@ -1555,7 +1483,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const op = evt.op;
         // Apply operation if valid
         if (op) {
-          console.log(`[Realtime] Applying ${evt.type}`, evt.seq, op.type);
+          console.log(`[Realtime] Applying ${evt.type} `, evt.seq, op.type);
           // We pass isOptimistic=false because this is a confirmed op from server
           // FIX: Use ref to call the LATEST version of the handler (updates state correctly)
           if (handleOpAppliedRef.current) {
@@ -1578,92 +1506,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // buildSnapshotElements is now imported from utils
 
   // Persist full snapshot on every interaction (debounced)
-  // Use longer debounce for canvasTextStates to prevent lag during typing/dragging
-  useEffect(() => {
-    if (!projectId) return;
-    if (persistTimerRef.current) {
-      window.clearTimeout(persistTimerRef.current);
-    }
-
-    // Use longer debounce (1000ms) when only canvasTextStates changes to prevent lag during typing
-    const debounceTime = 300;
-
-    persistTimerRef.current = window.setTimeout(async () => {
-      try {
-        console.log('[Autosave] Triggered. State counts:', {
-          images: images.length,
-          imgGens: imageGenerators.length,
-          vidGens: videoGenerators.length,
-          connectors: connectors.length,
-          groupsRefKeys: groupsRef.current ? Object.keys(groupsRef.current) : []
-        });
-
-        // DIRECTLY BUILD SNAPSHOT FROM REACT STATE (Source of Truth)
-        // usage ofRefs in prod often yields empty objects, so we skip getCanvasAppState()
-        const elements: Record<string, any> = {};
-
-        // Helper to add to elements
-        const addAll = (items: any[], typeOverride?: string) => {
-          items.forEach(item => {
-            if (item && item.id) {
-              elements[item.id] = { ...item, type: typeOverride || item.type || 'unknown' };
-            }
-          });
-        };
-
-        // 1. Add all state arrays
-        addAll(images, 'image');
-        addAll(imageGenerators, 'image-generator');
-        addAll(videoGenerators, 'video-generator');
-        addAll(videoEditorGenerators, 'video-editor-generator');
-        addAll(musicGenerators, 'music-generator');
-        addAll(textGenerators, 'text-generator');
-        addAll(upscaleGenerators, 'upscale-generator');
-        addAll(multiangleCameraGenerators, 'multiangle-camera-generator');
-        addAll(removeBgGenerators, 'remove-bg-generator');
-        addAll(eraseGenerators, 'erase-generator');
-        addAll(expandGenerators, 'expand-generator');
-        addAll(vectorizeGenerators, 'vectorize-generator');
-        addAll(nextSceneGenerators, 'next-scene-generator');
-        addAll(storyboardGenerators, 'storyboard-plugin');
-        addAll(scriptFrameGenerators, 'script-frame-plugin');
-        addAll(sceneFrameGenerators, 'scene-frame-plugin');
-        addAll(compareGenerators, 'compare-generator');
-        addAll(canvasTextStates, 'text');
-        addAll(richTextStates, 'rich-text');
-        addAll(groupContainerStates, 'group');
-        addAll(connectors, 'connector');
-
-        // 2. Ensure Group Children are preserved if they are in groupsRef but mostly trust state
-        // If we strictly trust state, we don't need groupsRef for specific field mutations unless 
-        // the state is shallow. The GroupContainerState usually has 'children' array.
-        // But for safety, let's mix in valid groupsRef items if state missed them (unlikely if hydrated)
-        if (groupsRef.current) {
-          Object.keys(groupsRef.current).forEach(key => {
-            // Only use ref content if we also have it in state (merge) 
-            // OR if we are sure it's not a zombie. 
-            // Actually, "State is Truth". If it's not in state, it's deleted.
-            if (elements[key]) {
-              // Merge ref props if needed (e.g. updated x/y during drag before state commit)
-              // But usually onDragEnd updates state. Autosave debounce should catch state.
-              elements[key] = { ...elements[key], ...groupsRef.current[key] };
-            }
-          });
-        }
-
-        console.log('[Autosave] Persisting elements from State:', Object.keys(elements).length);
-
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.2', viewport: viewportCenterRef.current } });
-      } catch (e) {
-        console.warn('Failed to persist snapshot', e);
-      }
-    }, debounceTime) as unknown as number;
-    return () => {
-      if (persistTimerRef.current) {
-        window.clearTimeout(persistTimerRef.current);
-      }
-    };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, richTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators, groupContainerStates, getCanvasAppState]);
+  // Use longer debounce for canvasTextStates to prevent lag during typing
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -1709,11 +1552,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }
 
         // For new projects, snapshot should be null or empty - don't load anything
-        if (!snapshot || !snapshot.elements || Object.keys(snapshot.elements).length === 0) {
-          console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
-          snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
-          return;
-        }
+        console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
+        snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
+        setIsHydrated(true); // Enable autosave for new projects
+        return;
 
         if (snapshot && snapshot.elements) {
           const elements = snapshot.elements as Record<string, any>;
@@ -1790,7 +1632,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               ) {
                 return;
               }
-              const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
+              const signature = `${connector.from}| ${connector.to}| ${connector.toAnchor || ''} `;
               if (!connectorSignatures.has(signature)) {
                 connectorSignatures.add(signature);
                 newConnectors.push(connector);
@@ -2101,6 +1943,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           setConnectors(newConnectors);
           setCompareGenerators(newCompareGenerators);
 
+          setIsHydrated(true); // Enable autosave after successful hydration
         }
       } catch (e) {
         console.warn('No current snapshot to hydrate or failed to fetch', e);
@@ -2339,7 +2182,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     const modelX = center.x - 400 / 2 + offsetX;
     const modelY = center.y - 400 / 2 + offsetY;
 
-    const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const elementId = `element - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
     const newImage: ImageUpload = {
       file: gltfFile,
       url,
@@ -2388,8 +2231,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     // 1. Generate deterministic IDs safely
     const baseId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    const modalId = fileType.startsWith('video/') ? `video-${baseId}` : `image-${baseId}`;
-    const elementId = `element-${baseId}`;
+    const modalId = fileType.startsWith('video/') ? `video - ${baseId} ` : `image - ${baseId} `;
+    const elementId = `element - ${baseId} `;
 
     // 2. Create local blob URL for immediate display
     const blobUrl = URL.createObjectURL(file);
@@ -2516,7 +2359,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           frameHeight,
           model: 'Uploaded Video',
           frame: 'Frame',
-          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`,
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}: 1`,
           prompt: '',
           duration: video.duration || 5,
           resolution: '720p',
@@ -2549,7 +2392,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           frameHeight,
           model: 'Uploaded Image',
           frame: 'Frame',
-          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`,
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}: 1`,
           prompt: '',
         };
         setImageGenerators(prev => [...prev, newModal]);
@@ -2673,7 +2516,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
 
     if (tool === 'rich-text') {
-      const modalId = `rich-text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `rich - text - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const viewportCenter = viewportCenterRef.current;
       const newRichText = {
         id: modalId,
@@ -2799,10 +2642,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
     const modalY = y !== undefined ? y : viewportCenter.y;
 
     if (pluginId === 'video-editor') {
-      const modalId = `video-editor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `video - editor - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       await pluginHandlers.onPersistVideoEditorModalCreate({ id: modalId, x: modalX, y: modalY });
     } else if (pluginId === 'upscale') {
-      const modalId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `upscale - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newUpscale = {
         id: modalId, x: modalX, y: modalY,
         upscaledImageUrl: null, sourceImageUrl: null, localUpscaledImageUrl: null,
@@ -2817,10 +2660,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'multiangle-camera') {
-      const modalId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `multiangle - camera - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       await pluginHandlers.onPersistMultiangleCameraModalCreate({ id: modalId, x: modalX, y: modalY, sourceImageUrl: null });
     } else if (pluginId === 'compare') {
-      const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `compare - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newCompare = { id: modalId, x: modalX, y: modalY, width: 600, height: 400, scale: 1 };
       if (projectId) {
         await appendOp({
@@ -2831,7 +2674,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'vectorize') {
-      const modalId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `vectorize - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newVectorize = {
         id: modalId, x: modalX, y: modalY,
         vectorizedImageUrl: null, sourceImageUrl: null, localVectorizedImageUrl: null,
@@ -2846,7 +2689,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'storyboard') {
-      const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `storyboard - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newStoryboard = { id: modalId, x: modalX, y: modalY, frameWidth: 400, frameHeight: 500, scriptText: null };
       if (projectId) {
         await appendOp({
@@ -2857,7 +2700,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'removebg') {
-      const modalId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `removebg - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newRemoveBg = {
         id: modalId, x: modalX, y: modalY,
         removedBgImageUrl: null, sourceImageUrl: null, localRemovedBgImageUrl: null,
@@ -2873,7 +2716,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'erase') {
-      const modalId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `erase - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newErase = {
         id: modalId, x: modalX, y: modalY,
         erasedImageUrl: null, sourceImageUrl: null, localErasedImageUrl: null,
@@ -2888,7 +2731,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'expand') {
-      const modalId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `expand - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newExpand = {
         id: modalId, x: modalX, y: modalY,
         expandedImageUrl: null, sourceImageUrl: null, localExpandedImageUrl: null,
@@ -2903,7 +2746,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
       }
     } else if (pluginId === 'next-scene') {
-      const modalId = `next-scene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const modalId = `next - scene - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const newNextScene = {
         id: modalId, x: modalX, y: modalY,
         nextSceneImageUrl: null, sourceImageUrl: null, localNextSceneImageUrl: null,
@@ -2954,7 +2797,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const modalX = x !== undefined ? x - width / 2 : viewportCenter.x - width / 2;
         const modalY = y !== undefined ? y - height / 2 : viewportCenter.y - height / 2;
 
-        const modalId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const modalId = `image - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
         const newModal = {
           id: modalId,
           x: modalX,
@@ -2995,7 +2838,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
         }
 
-        createModal(frameWidth, frameHeight, `${Math.round(aspectRatio * 10) / 10}:1`);
+        createModal(frameWidth, frameHeight, `${Math.round(aspectRatio * 10) / 10}: 1`);
       };
 
       img.onerror = () => {
@@ -3033,7 +2876,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const modalY = y !== undefined ? y - frameHeight / 2 : viewportCenter.y - frameHeight / 2;
 
         // Create video modal with library video
-        const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const modalId = `video - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
         const newModal = {
           id: modalId,
           x: modalX,
@@ -3043,7 +2886,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           frameHeight,
           model: 'Library Video',
           frame: 'Frame',
-          aspectRatio: `${Math.round(aspectRatio * 10) / 10}:1`,
+          aspectRatio: `${Math.round(aspectRatio * 10) / 10}: 1`,
           prompt: '',
           duration: 5,
           resolution: '720p',
@@ -3060,7 +2903,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         const modalX = x !== undefined ? x - 300 : viewportCenter.x - 300;
         const modalY = y !== undefined ? y - 200 : viewportCenter.y - 200;
 
-        const modalId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const modalId = `video - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
         const newModal = {
           id: modalId,
           x: modalX,
@@ -3082,7 +2925,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       video.src = mediaUrl;
     } else {
       // For other media types (music, etc.), add directly to canvas (existing behavior)
-      const elementId = `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const elementId = `element - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
       const viewportCenter = viewportCenterRef.current;
       const canvasX = x !== undefined ? x : viewportCenter.x - 200;
       const canvasY = y !== undefined ? y : viewportCenter.y - 200;
@@ -3163,7 +3006,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
 
     // Add to generation queue
-    const queueId = `video-${modalId || 'video'}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const queueId = `video - ${modalId || 'video'} -${Date.now()} -${Math.random().toString(36).slice(2)} `;
     const queueItem: GenerationQueueItem = {
       id: queueId,
       type: 'video',
@@ -3354,7 +3197,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               connections={connectors as any[]}
               onConnectionsChange={(conns: any[]) => {
                 setConnectors(conns.map((conn) => ({
-                  id: conn.id ?? `${conn.from}-${conn.to}-${Date.now()}`,
+                  id: conn.id ?? `${conn.from} -${conn.to} -${Date.now()} `,
                   from: conn.from,
                   to: conn.to,
                   color: conn.color,
@@ -3368,7 +3211,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistConnectorCreate={async (connector) => {
                 // Ensure a stable id for connector
-                const cid = connector.id || `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+                const cid = connector.id || `connector - ${Date.now()} -${Math.random().toString(36).substr(2, 6)} `;
                 const connToAdd = { id: cid, from: connector.from, to: connector.to, color: connector.color || '#437eb5', fromAnchor: connector.fromAnchor, toAnchor: connector.toAnchor };
 
                 // Optimistic update
