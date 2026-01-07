@@ -214,36 +214,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
     showImageGenerationModal,
   };
 
-  const canvasAppSetters: CanvasAppSetters = {
-    setImages,
-    setImageGenerators,
-    setVideoGenerators,
-    setVideoEditorGenerators,
-    setMusicGenerators,
-    setUpscaleGenerators,
-    setMultiangleCameraGenerators,
-    setRemoveBgGenerators,
-    setEraseGenerators,
-    setExpandGenerators,
-    setVectorizeGenerators,
-    setCompareGenerators,
-    setNextSceneGenerators,
-    setStoryboardGenerators,
-    setScriptFrameGenerators,
-    setSceneFrameGenerators,
-    setTextGenerators,
-    setCanvasTextStates,
-    setRichTextStates,
-    setGroupContainerStates,
-    setConnectors,
-    setGenerationQueue,
-    setShowImageGenerationModal,
-  };
-
   useSnapshotManager({
     projectId: projectId || '',
     state: canvasAppState,
-    setters: canvasAppSetters,
     isHydrated,
     mutationVersion
   });
