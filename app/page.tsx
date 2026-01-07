@@ -218,6 +218,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleSnapshotSaved = useCallback((snapshot: { elements: Record<string, any>; metadata: any }) => {
     if (!snapshot || !snapshot.elements) return;
     const elements = snapshot.elements;
+    console.log('[Snapshot System] 🔄 Rehydrating canvas from verified snapshot source (Single Source of Truth).');
 
     // Categorize elements
     const newImages: ImageUpload[] = [];
