@@ -979,7 +979,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
       } else if (op.type === 'delete' || op.type === 'generator.delete' || op.type === 'media.delete') {
         // CLEAN DELETE LOGIC
-        const ids = (op as any).elementIds || [(op as any).elementId || op.id];
+        const ids = (op as any).elementIds || [(op as any).elementId || (op as any).id];
         console.log('[handleOpApplied] DELETE BLOCK ENTERED. IDs:', ids, 'IsArray:', Array.isArray(ids));
         if (Array.isArray(ids)) {
           const idsSet = new Set(ids);
@@ -1171,7 +1171,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
   // Strict Server-Authoritative Methods
   // Removed useOpManager and local history
 
-  const appendOp = useCallback((op: any) => {
+  const appendOp = useCallback(async (op: any) => {
     if (realtimeRef.current) {
       realtimeRef.current.sendOperation(op, op.inverse);
     } else {
@@ -1375,9 +1375,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           },
         },
         inverse: { type: 'delete', elementId: newElementId, data: {}, requestId: '', clientTs: 0 } as any,
-      } as any).catch((err) => {
-        console.error('Failed to persist new node', err);
-      });
+      } as any);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images, projectId, opManagerInitialized]);
@@ -2331,7 +2329,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             },
           },
           inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-        }).catch(console.error);
+        });
       }
       return updated;
     });
@@ -2440,7 +2438,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           elementId,
           data: { element: { id: elementId, type: 'model3d', x: modelX, y: modelY, width: 400, height: 400, meta: { url: blobUrl } } },
           inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-        }).catch(console.error);
+        });
       }
 
     } else if (isVideo) {
@@ -3075,7 +3073,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             },
           },
           inverse: { type: 'delete', elementId, data: {}, requestId: '', clientTs: 0 } as any,
-        }).catch(console.error);
+        });
       }
     }
   };
