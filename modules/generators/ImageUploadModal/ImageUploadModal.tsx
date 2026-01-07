@@ -110,6 +110,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isPinned = false,
   onTogglePin,
 }) => {
+  // Fix 3: Strict Guard - Prevent rendering invalid modals
+  if (!id) return null;
+
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const processedImageRef = useRef<string | null>(null);

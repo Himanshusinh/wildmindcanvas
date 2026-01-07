@@ -7,9 +7,10 @@ interface UseSnapshotManagerProps {
   state: CanvasAppState;
   isHydrated: boolean;
   mutationVersion: number;
+  onSnapshotSaved?: (snapshot: { elements: Record<string, any>; metadata: any }) => void;
 }
 
-export function useSnapshotManager({ projectId, state, isHydrated, mutationVersion }: UseSnapshotManagerProps) {
+export function useSnapshotManager({ projectId, state, isHydrated, mutationVersion, onSnapshotSaved }: UseSnapshotManagerProps) {
   const persistTimerRef = useRef<number | null>(null);
   const snapshotInFlight = useRef(false);
   const snapshotPendingRef = useRef(false);
@@ -94,30 +95,6 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         meta: metaObj,
       };
     });
-    // Upscale generators
-    state.upscaleGenerators.forEach((modal) => {
-      if (!modal || !modal.id) return;
-      const metaObj: any = {
-        upscaledImageUrl: modal.upscaledImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localUpscaledImageUrl: modal.localUpscaledImageUrl || null,
-        model: modal.model || 'Crystal Upscaler',
-        scale: modal.scale || 2,
-        frameWidth: modal.frameWidth || 400,
-        frameHeight: modal.frameHeight || 500,
-        isUpscaling: modal.isUpscaling || false,
-      };
-      if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-        metaObj.connections = connectionsBySource[modal.id];
-      }
-      elements[modal.id] = {
-        id: modal.id,
-        type: 'upscale-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: metaObj,
-      };
-    });
     // Remove BG generators
     state.removeBgGenerators.forEach((modal) => {
       if (!modal || !modal.id) return;
@@ -132,6 +109,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         frameHeight: modal.frameHeight || 500,
         isRemovingBg: modal.isRemovingBg || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -155,6 +133,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         frameHeight: modal.frameHeight || 500,
         isErasing: modal.isErasing || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -178,6 +157,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         frameHeight: modal.frameHeight || 500,
         isExpanding: modal.isExpanding || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -201,6 +181,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         frameHeight: modal.frameHeight || 500,
         isVectorizing: modal.isVectorizing || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -239,19 +220,12 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
       const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
       const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
 
-      console.log(`[useSnapshotManager] Storyboard ${modal.id} connections:`, {
-        totalConnections: storyboardConnections.length,
-        characterConnections: characterConnections.length,
-        characterConnectionsDetails: characterConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor })),
-      });
-
-      // Build character name -> imageUrl map
+      // Build character names map
       if ((modal as any).characterNamesMap) {
         const characterMap: Record<string, string> = {};
         Object.entries((modal as any).characterNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && characterConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = characterConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -278,13 +252,12 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         }
       }
 
-      // Build background name -> imageUrl map
+      // Build background names map
       if ((modal as any).backgroundNamesMap) {
         const backgroundMap: Record<string, string> = {};
         Object.entries((modal as any).backgroundNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && backgroundConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = backgroundConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -311,13 +284,12 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         }
       }
 
-      // Build props name -> imageUrl map
+      // Build props map
       if ((modal as any).propsNamesMap) {
         const propsMap: Record<string, string> = {};
         Object.entries((modal as any).propsNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && propsConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = propsConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -344,15 +316,8 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         }
       }
 
-      // Add namedImages to meta if it has any data
       if (Object.keys(namedImages).length > 0) {
         metaObj.namedImages = namedImages;
-        console.log(`[useSnapshotManager] ✅ Added namedImages to storyboard ${modal.id}:`, namedImages);
-      } else {
-        console.warn(`[useSnapshotManager] ⚠️ No namedImages built for storyboard ${modal.id}`, {
-          hasCharacterNamesMap: !!(modal as any).characterNamesMap,
-          characterConnectionsCount: characterConnections.length,
-        });
       }
 
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
@@ -379,7 +344,20 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
       if (!c || !c.id) return;
       elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
     });
-    return elements;
+
+    // Fix 4: Strict Snapshot Schema - Filter out garbage
+    const sanitizedElements = Object.fromEntries(
+      Object.entries(elements).filter(([_, el]) => {
+        if (el.type === 'image-generator') {
+          // Keep if it has image, OR if it has prompt (text-to-image setup), OR if it has a model initialized
+          // We only want to discard completely empty/broken nodes
+          return !!(el.meta?.generatedImageUrl || el.meta?.sourceImageUrl || el.meta?.prompt || el.meta?.formattedPrompt);
+        }
+        return true;
+      })
+    );
+
+    return sanitizedElements;
   };
 
   // Helper: Persist the current state
@@ -397,7 +375,14 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
 
     try {
       const elements = buildSnapshotElements();
-      await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+      const payload = { elements, metadata: { version: '1.0' } };
+      await apiSetCurrentSnapshot(projectId, payload);
+
+      // Fix 2: Rehydrate after save to ensure single source of truth
+      if (onSnapshotSaved) {
+        onSnapshotSaved(payload);
+      }
+
       // console.debug('[Snapshot] persisted');
     } catch (e) {
       console.warn('Failed to persist snapshot', e);
@@ -405,9 +390,8 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
       snapshotInFlight.current = false;
       // If a new change came in while we were saving, save again immediately
       if (snapshotPendingRef.current) {
-        // Use setTimeout to yield to event loop and avoid recursion stack issues, 
-        // though irrelevant for async functions, strictness helps.
-        saveSnapshot();
+        // Use setTimeout to yield to event loop
+        setTimeout(saveSnapshot, 0);
       }
     }
   };

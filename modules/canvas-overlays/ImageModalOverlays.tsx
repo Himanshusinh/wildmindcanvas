@@ -124,6 +124,36 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
     setContextMenu({ x: e.clientX, y: e.clientY, modalId });
   };
 
+  const refImages = React.useMemo(() => {
+    // Build a flat refImages map from ALL storyboards' namedImages
+    const refMap: Record<string, string> = {};
+    storyboardModalStates.forEach(storyboard => {
+      if ((storyboard as any).namedImages) {
+        const namedImages = (storyboard as any).namedImages;
+        // Flatten characters
+        if (namedImages.characters) {
+          Object.entries(namedImages.characters).forEach(([name, url]) => {
+            refMap[name.toLowerCase().trim()] = url as string;
+          });
+        }
+        // Flatten backgrounds
+        if (namedImages.backgrounds) {
+          Object.entries(namedImages.backgrounds).forEach(([name, url]) => {
+            refMap[name.toLowerCase().trim()] = url as string;
+          });
+        }
+        // Flatten props
+        if (namedImages.props) {
+          Object.entries(namedImages.props).forEach(([name, url]) => {
+            refMap[name.toLowerCase().trim()] = url as string;
+          });
+        }
+      }
+    });
+    // console.log('[ImageModalOverlays] 🗺️ Built refImages map:', refMap);
+    return refMap;
+  }, [storyboardModalStates]);
+
   return (
     <>
       {imageModalStates.map((modalState) => (
@@ -146,35 +176,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               Promise.resolve(onPersistImageModalDelete(modalState.id)).catch(console.error);
             }
           }}
-          refImages={(() => {
-            // Build a flat refImages map from ALL storyboards' namedImages
-            const refMap: Record<string, string> = {};
-            storyboardModalStates.forEach(storyboard => {
-              if ((storyboard as any).namedImages) {
-                const namedImages = (storyboard as any).namedImages;
-                // Flatten characters
-                if (namedImages.characters) {
-                  Object.entries(namedImages.characters).forEach(([name, url]) => {
-                    refMap[name.toLowerCase().trim()] = url as string;
-                  });
-                }
-                // Flatten backgrounds
-                if (namedImages.backgrounds) {
-                  Object.entries(namedImages.backgrounds).forEach(([name, url]) => {
-                    refMap[name.toLowerCase().trim()] = url as string;
-                  });
-                }
-                // Flatten props
-                if (namedImages.props) {
-                  Object.entries(namedImages.props).forEach(([name, url]) => {
-                    refMap[name.toLowerCase().trim()] = url as string;
-                  });
-                }
-              }
-            });
-            console.log('[ImageModalOverlays] 🗺️ Built refImages map:', refMap);
-            return refMap;
-          })()}  // Pass flat refImages map for easy lookup
+          refImages={refImages}
           sourceImageUrl={(() => {
             const sourceUrl = modalState.sourceImageUrl;
             console.log('[ImageModalOverlays] 🚨 CRITICAL: About to render ImageUploadModal:', {

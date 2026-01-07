@@ -214,11 +214,159 @@ export function CanvasApp({ user }: CanvasAppProps) {
     showImageGenerationModal,
   };
 
+  // Fix 1 & 2: Rehydrate from snapshot after every save to ensure Single Source of Truth
+  const handleSnapshotSaved = useCallback((snapshot: { elements: Record<string, any>; metadata: any }) => {
+    if (!snapshot || !snapshot.elements) return;
+    const elements = snapshot.elements;
+
+    // Categorize elements
+    const newImages: ImageUpload[] = [];
+    const newImageGenerators: ImageModalState[] = [];
+    const newVideoGenerators: VideoModalState[] = [];
+    const newMusicGenerators: MusicModalState[] = [];
+    const newUpscaleGenerators: any[] = [];
+    const newRemoveBgGenerators: any[] = [];
+    const newEraseGenerators: any[] = [];
+    const newExpandGenerators: any[] = [];
+    const newVectorizeGenerators: any[] = [];
+    const newStoryboardGenerators: any[] = [];
+    const newTextGenerators: TextModalState[] = [];
+    const newConnectors: Connector[] = [];
+    const connectorSignatures = new Set<string>();
+
+    // FIRST PASS: Connectors
+    Object.values(elements).forEach((element: any) => {
+      if (element && element.type === 'connector') {
+        const connector = {
+          id: element.id,
+          from: element.from || element.meta?.from,
+          to: element.to || element.meta?.to,
+          color: element.meta?.color || '#437eb5',
+          fromAnchor: element.meta?.fromAnchor,
+          toAnchor: element.meta?.toAnchor
+        };
+        if ((connector.from && connector.from.startsWith('replace-')) || (connector.to && connector.to.startsWith('replace-'))) return;
+        const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
+        if (!connectorSignatures.has(signature)) {
+          connectorSignatures.add(signature);
+          newConnectors.push(connector);
+        }
+      }
+    });
+
+    // SECOND PASS: Other elements
+    Object.values(elements).forEach((element: any) => {
+      if (!element || !element.type) return;
+
+      if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
+        const newImage: ImageUpload = {
+          type: element.type,
+          url: element.meta?.url || element.meta?.mediaId || '',
+          x: element.x || 0,
+          y: element.y || 0,
+          width: element.width || 400,
+          height: element.height || 400,
+          rotation: element.rotation || 0,
+          elementId: element.id, // Ensure ID is preserved
+          // Restore text properties if applicable
+          ...(element.type === 'text' && {
+            text: element.meta?.text,
+            fontSize: element.meta?.fontSize,
+            fontFamily: element.meta?.fontFamily,
+            fill: element.meta?.fill
+          })
+        };
+        newImages.push(newImage);
+      } else if (element.type === 'image-generator') {
+        newImageGenerators.push({
+          id: element.id,
+          x: element.x,
+          y: element.y,
+          generatedImageUrl: element.meta?.generatedImageUrl,
+          sourceImageUrl: element.meta?.sourceImageUrl,
+          frameWidth: element.meta?.frameWidth,
+          frameHeight: element.meta?.frameHeight,
+          model: element.meta?.model,
+          frame: element.meta?.frame,
+          aspectRatio: element.meta?.aspectRatio,
+          prompt: element.meta?.prompt,
+          imageCount: element.meta?.imageCount,
+          isPinned: element.meta?.isPinned
+        });
+      } else if (element.type === 'video-generator') {
+        newVideoGenerators.push({
+          id: element.id,
+          x: element.x,
+          y: element.y,
+          generatedVideoUrl: element.meta?.generatedVideoUrl,
+          frameWidth: element.meta?.frameWidth,
+          frameHeight: element.meta?.frameHeight,
+          model: element.meta?.model,
+          frame: element.meta?.frame,
+          aspectRatio: element.meta?.aspectRatio,
+          prompt: element.meta?.prompt,
+          taskId: element.meta?.taskId,
+          generationId: element.meta?.generationId,
+          status: element.meta?.status
+        });
+      } else if (element.type === 'music-generator') {
+        newMusicGenerators.push({
+          id: element.id,
+          x: element.x,
+          y: element.y,
+          generatedMusicUrl: element.meta?.generatedMusicUrl,
+          frameWidth: element.meta?.frameWidth,
+          frameHeight: element.meta?.frameHeight,
+          model: element.meta?.model,
+          frame: element.meta?.frame,
+          aspectRatio: element.meta?.aspectRatio,
+          prompt: element.meta?.prompt
+        });
+      } else if (element.type === 'text-generator') {
+        newTextGenerators.push({
+          id: element.id,
+          x: element.x,
+          y: element.y,
+          value: element.meta?.value || ''
+        });
+      } else if (element.type === 'upscale-plugin') {
+        newUpscaleGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      } else if (element.type === 'removebg-plugin') {
+        newRemoveBgGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      } else if (element.type === 'erase-plugin') {
+        newEraseGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      } else if (element.type === 'expand-plugin') {
+        newExpandGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      } else if (element.type === 'vectorize-plugin') {
+        newVectorizeGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      } else if (element.type === 'storyboard-plugin') {
+        newStoryboardGenerators.push({ ...element.meta, id: element.id, x: element.x, y: element.y });
+      }
+    });
+
+    // Update State (Single Source of Truth)
+    setImages(newImages);
+    setImageGenerators(newImageGenerators);
+    setVideoGenerators(newVideoGenerators);
+    setMusicGenerators(newMusicGenerators);
+    setUpscaleGenerators(newUpscaleGenerators);
+    setRemoveBgGenerators(newRemoveBgGenerators);
+    setEraseGenerators(newEraseGenerators);
+    setExpandGenerators(newExpandGenerators);
+    setVectorizeGenerators(newVectorizeGenerators);
+    setStoryboardGenerators(newStoryboardGenerators);
+    setTextGenerators(newTextGenerators);
+    setConnectors(newConnectors);
+
+    // console.log('[App] Rehydrated state from snapshot save');
+  }, []);
+
   useSnapshotManager({
     projectId: projectId || '',
     state: canvasAppState,
     isHydrated,
-    mutationVersion
+    mutationVersion,
+    onSnapshotSaved: handleSnapshotSaved
   });
 
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
