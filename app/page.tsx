@@ -480,6 +480,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               frameHeight: element.bounds?.height || 500,
             } as any];
           });
+          // SYNC REF UPDATE
+          if (refImages.current && element.id) refImages.current[element.id] = element;
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'video-generator') {
           setVideoGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -504,14 +508,20 @@ export function CanvasApp({ user }: CanvasAppProps) {
               frameHeight: element.bounds?.height || 400,
             }];
           });
+          // SYNC REF UPDATE
+          if (refVideos.current && element.id) refVideos.current[element.id] = element;
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'video-editor-trigger') {
           setVideoEditorGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0 }];
           });
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'music-generator') {
           setMusicGenerators((prev) => {
-            console.log('[Hydration] Loading music generator:', element.id, element.meta); // Debug logging
+            // ... (keep creating logic)
             if (prev.some(m => m.id === element.id)) return prev;
             let genMusicUrl = element.meta?.generatedMusicUrl || null;
             if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
@@ -549,15 +559,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
               useSpeakerBoost: element.meta?.useSpeakerBoost,
             }];
           });
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
           const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
           setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'text-generator') {
           setTextGenerators((prev) => {
             if (prev.some(t => t.id === element.id)) return prev;
             return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
           });
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'remove-bg-plugin') {
           setRemoveBgGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -576,6 +592,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
               isRemovingBg: element.meta?.isRemovingBg
             }];
           });
+          if (refImages.current && element.id) refImages.current[element.id] = element;
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'erase-plugin') {
           setEraseGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -592,6 +611,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
               isErasing: element.meta?.isErasing
             }];
           });
+          if (refImages.current && element.id) refImages.current[element.id] = element;
+          if (elementsRef.current && element.id) elementsRef.current[element.id] = element;
+
         } else if (element.type === 'expand-plugin') {
           setExpandGenerators((prev) => {
             if (prev.some(m => m.id === element.id)) return prev;
@@ -1125,6 +1147,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
           delete updates.meta;
         }
 
+        // SYNC REF UPDATE (Critical for Modals/Persistence in Prod)
+        if (elementsRef.current && elementsRef.current[targetId]) {
+          Object.assign(elementsRef.current[targetId], updates);
+        }
+        if (refImages.current && refImages.current[targetId]) {
+          Object.assign(refImages.current[targetId], updates);
+        }
+        if (refVideos.current && refVideos.current[targetId]) {
+          Object.assign(refVideos.current[targetId], updates);
+        }
+
         // Optimized update: only call the setter if the ID matches
         const updateIfContains = (prev: any[]) => {
           const idx = prev.findIndex(item => (item.id || item.elementId) === targetId);
@@ -1153,6 +1186,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setScriptFrameGenerators(updateIfContains);
         setSceneFrameGenerators(updateIfContains);
         setRichTextStates(updateIfContains);
+        setCompareGenerators(updateIfContains);
 
         // If this update modified connections, update connectors state accordingly
         if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
