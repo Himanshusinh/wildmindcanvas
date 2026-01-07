@@ -362,13 +362,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
     // console.log('[App] Rehydrated state from snapshot save');
   }, []);
 
-  useSnapshotManager({
+  const snapshotManager = useSnapshotManager({
     projectId: projectId || '',
     state: canvasAppState,
     isHydrated,
     mutationVersion,
     onSnapshotSaved: handleSnapshotSaved
   });
+
+  // Expose saveSnapshot to be used explicitly
+  const { saveSnapshot } = snapshotManager;
+  // Use a Ref to allow handleOpApplied to access the latest saveSnapshot without dependency cycles
+  const saveSnapshotRef = useRef(saveSnapshot);
+  saveSnapshotRef.current = saveSnapshot;
 
   const handleViewportChange = (center: { x: number; y: number }, scale: number) => {
     viewportCenterRef.current = { x: center.x, y: center.y, scale };
@@ -1067,7 +1073,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
         if (newGroups.length > 0) setGroupContainerStates(prev => [...prev.filter(x => !newGroups.some(n => n.id === x.id)), ...newGroups]);
         if (newImages.length > 0) setImages(prev => [...prev.filter(x => !newImages.some(n => (n as any).elementId === x.elementId)), ...newImages]);
 
+        if (newImages.length > 0) setImages(prev => [...prev.filter(x => !newImages.some(n => (n as any).elementId === x.elementId)), ...newImages]);
+
         setMutationVersion(v => v + 1);
+        // Explicit Snapshot Save (User Request)
+        if (saveSnapshotRef.current) saveSnapshotRef.current();
 
       } else if (op.type === 'delete' || op.type === 'generator.delete' || op.type === 'media.delete') {
         const ids = (op as any).elementIds || [(op as any).elementId || (op as any).id];
@@ -1105,6 +1115,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           });
         }
         setMutationVersion(v => v + 1);
+        // Explicit Snapshot Save (User Request)
+        if (saveSnapshotRef.current) saveSnapshotRef.current();
 
       } else if (op.type === 'move' && op.elementId && op.data.delta) {
         // Move element
@@ -1251,6 +1263,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
           });
         }
         setMutationVersion(v => v + 1);
+        // Explicit Snapshot Save (User Request)
+        if (saveSnapshotRef.current) saveSnapshotRef.current();
       }
     } catch (err: any) {
       console.error('[Ops] error applying op', err);

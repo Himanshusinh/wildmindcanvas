@@ -413,5 +413,5 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
     };
   }, [projectId, isHydrated, mutationVersion]);
 
-  return { buildSnapshotElements };
+  return { buildSnapshotElements, saveSnapshot };
 }
