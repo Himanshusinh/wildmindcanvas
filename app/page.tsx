@@ -1524,402 +1524,403 @@ export function CanvasApp({ user }: CanvasAppProps) {
           return;
         }
 
-        // For new projects, snapshot should be null or empty - don't load anything
-        if (!snapshot || !snapshot.elements) {
+        if (snapshot === null) {
           console.log('[Project] No snapshot data for project (new project or empty):', currentProjectId);
           snapshotLoadedRef.current = true; // Mark as loaded so we don't try again
+          setInitialGroupContainerStates([]); // Ensure groups are cleared
+          setImages([]); // Ensure other states are cleared (optional, as they start empty)
           setIsHydrated(true); // Enable autosave for new projects
           return;
         }
 
-        if (snapshot && snapshot.elements) {
-          const elements = snapshot.elements as Record<string, any>;
-          // Extract group elements and store them for Canvas initialisation and autosave merging
-          const loadedGroups: any[] = [];
-          Object.values(elements).forEach((element: any) => {
-            if (element && element.type === 'group') {
-              // Normalize serialized snapshot element into Canvas GroupContainerState shape
-              const normalized = {
-                id: element.id,
-                name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : '',
-                x: typeof element.x === 'number' ? element.x : 0,
-                y: typeof element.y === 'number' ? element.y : 0,
-                width: typeof element.width === 'number' ? element.width : 0,
-                height: typeof element.height === 'number' ? element.height : 0,
-                padding: element.padding ?? 20,
-                children: Array.isArray(element.children) ? element.children : [], // Hydrate children
-                meta: {
-                  name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : 'Group',
-                  ...element.meta
-                }
-              } as any;
-              loadedGroups.push(normalized);
-              // Keep serialized element in groupsRef
-              groupsRef.current[element.id] = {
-                id: element.id,
-                type: 'group',
-                x: normalized.x,
-                y: normalized.y,
-                width: normalized.width,
-                height: normalized.height,
-                padding: normalized.padding,
-                children: normalized.children,
-                meta: normalized.meta
+        // ⬇️ From here onward, snapshot is NOT null
+        const elements = snapshot.elements ?? {};
+
+        // Extract group elements and store them for Canvas initialisation and autosave merging
+        const loadedGroups: any[] = [];
+        Object.values(elements).forEach((element: any) => {
+          if (element && element.type === 'group') {
+            // Normalize serialized snapshot element into Canvas GroupContainerState shape
+            const normalized = {
+              id: element.id,
+              name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : '',
+              x: typeof element.x === 'number' ? element.x : 0,
+              y: typeof element.y === 'number' ? element.y : 0,
+              width: typeof element.width === 'number' ? element.width : 0,
+              height: typeof element.height === 'number' ? element.height : 0,
+              padding: element.padding ?? 20,
+              children: Array.isArray(element.children) ? element.children : [], // Hydrate children
+              meta: {
+                name: (element.meta && typeof element.meta.name === 'string') ? element.meta.name : 'Group',
+                ...element.meta
+              }
+            } as any;
+            loadedGroups.push(normalized);
+            // Keep serialized element in groupsRef
+            groupsRef.current[element.id] = {
+              id: element.id,
+              type: 'group',
+              x: normalized.x,
+              y: normalized.y,
+              width: normalized.width,
+              height: normalized.height,
+              padding: normalized.padding,
+              children: normalized.children,
+              meta: normalized.meta
+            };
+          }
+        });
+        if (loadedGroups.length > 0) setInitialGroupContainerStates(loadedGroups);
+        const newImages: ImageUpload[] = [];
+        const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
+        const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
+        const newMusicGenerators: MusicModalState[] = [];
+        const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
+        const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
+        const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
+        const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
+        const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
+        const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
+        const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
+        const newScriptFrameGenerators: ScriptFrameGenerator[] = [];
+        const newSceneFrameGenerators: SceneFrameGenerator[] = [];
+        const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
+        const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
+        const newCompareGenerators: CompareGenerator[] = [];
+        const newCanvasTextStates: Array<CanvasTextState> = [];
+        const newRichTextStates: Array<CanvasTextState> = [];
+        const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
+        const connectorSignatures = new Set<string>();
+
+        // FIRST PASS: Process connector elements first (they are the source of truth)
+        Object.values(elements).forEach((element: any) => {
+          if (element && element.type === 'connector') {
+            const connector = {
+              id: element.id,
+              from: element.from || element.meta?.from,
+              to: element.to || element.meta?.to,
+              color: element.meta?.color || '#437eb5',
+              fromAnchor: element.meta?.fromAnchor,
+              toAnchor: element.meta?.toAnchor
+            };
+            if (
+              (connector.from && connector.from.startsWith('replace-')) ||
+              (connector.to && connector.to.startsWith('replace-'))
+            ) {
+              return;
+            }
+            const signature = `${connector.from}| ${connector.to}| ${connector.toAnchor || ''} `;
+            if (!connectorSignatures.has(signature)) {
+              connectorSignatures.add(signature);
+              newConnectors.push(connector);
+            }
+          }
+        });
+
+        // SECOND PASS: Process all other elements (skip restoring from meta.connections to prevent duplicates)
+        Object.values(elements).forEach((element: any) => {
+          if (element && element.type) {
+            let imageUrl = element.meta?.url || element.meta?.mediaId || '';
+            if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
+              imageUrl = buildProxyResourceUrl(imageUrl);
+            }
+            if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
+              const newImage: ImageUpload = {
+                type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
+                url: imageUrl,
+                x: element.x || 0,
+                y: element.y || 0,
+                width: element.width || 400,
+                height: element.height || 400,
+                rotation: element.rotation || 0,
+                ...(element.id && { elementId: element.id }),
               };
-            }
-          });
-          if (loadedGroups.length > 0) setInitialGroupContainerStates(loadedGroups);
-          const newImages: ImageUpload[] = [];
-          const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
-          const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
-          const newMusicGenerators: MusicModalState[] = [];
-          const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
-          const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }> = [];
-          const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean }> = [];
-          const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isErasing?: boolean }> = [];
-          const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }> = [];
-          const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }> = [];
-          const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
-          const newScriptFrameGenerators: ScriptFrameGenerator[] = [];
-          const newSceneFrameGenerators: SceneFrameGenerator[] = [];
-          const newNextSceneGenerators: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }> = [];
-          const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
-          const newCompareGenerators: CompareGenerator[] = [];
-          const newCanvasTextStates: Array<CanvasTextState> = [];
-          const newRichTextStates: Array<CanvasTextState> = [];
-          const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
-          const connectorSignatures = new Set<string>();
-
-          // FIRST PASS: Process connector elements first (they are the source of truth)
-          Object.values(elements).forEach((element: any) => {
-            if (element && element.type === 'connector') {
-              const connector = {
+              newImages.push(newImage);
+              // If this element had connections in meta, collect them
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'image-generator') {
+              newImageGenerators.push({
                 id: element.id,
-                from: element.from || element.meta?.from,
-                to: element.to || element.meta?.to,
-                color: element.meta?.color || '#437eb5',
-                fromAnchor: element.meta?.fromAnchor,
-                toAnchor: element.meta?.toAnchor
-              };
-              if (
-                (connector.from && connector.from.startsWith('replace-')) ||
-                (connector.to && connector.to.startsWith('replace-'))
-              ) {
-                return;
-              }
-              const signature = `${connector.from}| ${connector.to}| ${connector.toAnchor || ''} `;
-              if (!connectorSignatures.has(signature)) {
-                connectorSignatures.add(signature);
-                newConnectors.push(connector);
-              }
+                x: element.x || 0,
+                y: element.y || 0,
+                generatedImageUrl: element.meta?.generatedImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl from snapshot
+                frameWidth: element.meta?.frameWidth,
+                frameHeight: element.meta?.frameHeight,
+                model: element.meta?.model,
+                frame: element.meta?.frame,
+                aspectRatio: element.meta?.aspectRatio,
+                prompt: element.meta?.prompt
+              } as any);
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'connector') {
+              // Skip - already processed in first pass
+            } else if (element.type === 'video-generator') {
+              newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'music-generator') {
+              newMusicGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                generatedMusicUrl: element.meta?.generatedMusicUrl || null,
+                frameWidth: element.meta?.frameWidth,
+                frameHeight: element.meta?.frameHeight,
+                model: element.meta?.model,
+                frame: element.meta?.frame,
+                aspectRatio: element.meta?.aspectRatio,
+                prompt: element.meta?.prompt,
+                activeCategory: element.meta?.activeCategory,
+                lyrics: element.meta?.lyrics,
+                sampleRate: element.meta?.sampleRate,
+                bitrate: element.meta?.bitrate,
+                audioFormat: element.meta?.audioFormat,
+                voiceId: element.meta?.voiceId,
+                stability: element.meta?.stability,
+                similarityBoost: element.meta?.similarityBoost,
+                style: element.meta?.style,
+                speed: element.meta?.speed,
+                exaggeration: element.meta?.exaggeration,
+                temperature: element.meta?.temperature,
+                cfgScale: element.meta?.cfgScale,
+                voicePrompt: element.meta?.voicePrompt,
+                topP: element.meta?.topP,
+                maxTokens: element.meta?.maxTokens,
+                repetitionPenalty: element.meta?.repetitionPenalty,
+                dialogueInputs: element.meta?.dialogueInputs,
+                useSpeakerBoost: element.meta?.useSpeakerBoost,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'text-generator') {
+              newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'canvas-text') {
+              newCanvasTextStates.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                text: element.meta?.text || 'add text here',
+                fontSize: element.meta?.fontSize || 24,
+                fontWeight: element.meta?.fontWeight || 'normal',
+                fontStyle: element.meta?.fontStyle || 'normal',
+                fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                styleType: element.meta?.styleType || 'paragraph',
+                textAlign: element.meta?.textAlign || 'left',
+                color: element.meta?.color || '#ffffff',
+                width: element.meta?.width || 300,
+                height: element.meta?.height || 100,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'rich-text') {
+              newRichTextStates.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                text: element.meta?.text || 'double click to edit',
+                fontSize: element.meta?.fontSize || 24,
+                fontWeight: element.meta?.fontWeight || 'normal',
+                fontStyle: element.meta?.fontStyle || 'normal',
+                fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+                styleType: element.meta?.styleType || 'paragraph',
+                textAlign: element.meta?.textAlign || 'left',
+                color: element.meta?.color || element.meta?.fill || '#ffffff',
+                backgroundColor: element.meta?.backgroundColor || 'transparent',
+                textDecoration: element.meta?.textDecoration || 'none',
+                width: element.meta?.width || 200,
+                height: element.meta?.height || 50,
+                rotation: element.rotation || 0,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'upscale-plugin') {
+              newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'multiangle-camera-plugin') {
+              newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'removebg-plugin') {
+              newRemoveBgGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                removedBgImageUrl: element.meta?.removedBgImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null,
+                localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
+                model: element.meta?.model || '851-labs/background-remover',
+                backgroundType: element.meta?.backgroundType || 'rgba (transparent)',
+                scaleValue: element.meta?.scaleValue || 0.5,
+                frameWidth: element.meta?.frameWidth || 400,
+                frameHeight: element.meta?.frameHeight || 500,
+                isRemovingBg: element.meta?.isRemovingBg || false,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'erase-plugin') {
+              newEraseGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                erasedImageUrl: element.meta?.erasedImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null,
+                localErasedImageUrl: element.meta?.localErasedImageUrl || null,
+                model: element.meta?.model || 'bria/eraser',
+                frameWidth: element.meta?.frameWidth || 400,
+                frameHeight: element.meta?.frameHeight || 500,
+                isErasing: element.meta?.isErasing || false,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'expand-plugin') {
+              newExpandGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                expandedImageUrl: element.meta?.expandedImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null,
+                localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
+                model: element.meta?.model || 'expand/base',
+                frameWidth: element.meta?.frameWidth || 400,
+                frameHeight: element.meta?.frameHeight || 500,
+                isExpanding: element.meta?.isExpanding || false,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'vectorize-plugin') {
+              newVectorizeGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null,
+                localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
+                mode: element.meta?.mode || 'simple',
+                frameWidth: element.meta?.frameWidth || 400,
+                frameHeight: element.meta?.frameHeight || 500,
+                isVectorizing: element.meta?.isVectorizing || false,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'storyboard-plugin') {
+              newStoryboardGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                characterNamesMap: element.meta?.characterNamesMap || {},
+                propsNamesMap: element.meta?.propsNamesMap || {},
+                backgroundNamesMap: element.meta?.backgroundNamesMap || {},
+                namedImages: element.meta?.namedImages || undefined,
+                frameWidth: element.meta?.frameWidth,
+                frameHeight: element.meta?.frameHeight,
+                scriptText: element.meta?.scriptText,
+              } as any); // Type assertion needed due to optional fields
+              // NOTE: Storyboard connections are NOT stored in storyboard.meta.connections
+              // They are stored in the image elements' meta.connections (as outgoing connections)
+              // OR as top-level connector elements. We'll restore them from connector elements below.
+              // Do NOT restore connections from storyboard.meta.connections as that would create duplicates.
+            } else if (element.type === 'script-frame') {
+              newScriptFrameGenerators.push({
+                id: element.id,
+                pluginId: element.meta?.pluginId || '',
+                x: element.x || 0,
+                y: element.y || 0,
+                frameWidth: element.meta?.frameWidth || 300,
+                frameHeight: element.meta?.frameHeight || 200,
+                text: element.meta?.text || '',
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'scene-frame') {
+              newSceneFrameGenerators.push({
+                id: element.id,
+                scriptFrameId: element.meta?.scriptFrameId || '',
+                sceneNumber: element.meta?.sceneNumber || 0,
+                x: element.x || 0,
+                y: element.y || 0,
+                frameWidth: element.meta?.frameWidth || 300,
+                frameHeight: element.meta?.frameHeight || 200,
+                content: element.meta?.content || '',
+                characterIds: element.meta?.characterIds || undefined,
+                locationId: element.meta?.locationId || undefined,
+                mood: element.meta?.mood || undefined,
+                characterNames: element.meta?.characterNames || undefined,
+                locationName: element.meta?.locationName || undefined,
+              } as any); // Type assertion needed due to optional fields
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'next-scene-plugin') {
+              newNextSceneGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
+                sourceImageUrl: element.meta?.sourceImageUrl || null,
+                localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
+                mode: element.meta?.mode || 'scene',
+                frameWidth: element.meta?.frameWidth || 400,
+                frameHeight: element.meta?.frameHeight || 500,
+                isProcessing: element.meta?.isProcessing || false,
+              });
+              // Skip restoring connections from element.meta.connections
+              // Top-level connector elements are the source of truth and are already processed in the first pass.
+              // Restoring from meta.connections would create duplicates.
+            } else if (element.type === 'compare-plugin') {
+              newCompareGenerators.push({
+                id: element.id,
+                x: element.x || 0,
+                y: element.y || 0,
+                width: element.width,
+                height: element.height,
+                scale: element.meta?.scale,
+                prompt: element.meta?.prompt,
+                model: element.meta?.model,
+              });
             }
-          });
+          }
+        });
+        setImages(newImages);
+        setImageGenerators(newImageGenerators);
+        setVideoGenerators(newVideoGenerators);
+        setMusicGenerators(newMusicGenerators);
+        setUpscaleGenerators(newUpscaleGenerators);
+        setMultiangleCameraGenerators(newMultiangleCameraGenerators);
+        setRemoveBgGenerators(newRemoveBgGenerators);
+        setEraseGenerators(newEraseGenerators);
+        setExpandGenerators(newExpandGenerators);
+        setVectorizeGenerators(newVectorizeGenerators);
+        setStoryboardGenerators(newStoryboardGenerators);
+        setScriptFrameGenerators(newScriptFrameGenerators);
+        setSceneFrameGenerators(newSceneFrameGenerators);
+        setNextSceneGenerators(newNextSceneGenerators);
+        setTextGenerators(newTextGenerators);
+        setCanvasTextStates(newCanvasTextStates);
+        setRichTextStates(newRichTextStates);
+        setConnectors(newConnectors);
+        setCompareGenerators(newCompareGenerators);
 
-          // SECOND PASS: Process all other elements (skip restoring from meta.connections to prevent duplicates)
-          Object.values(elements).forEach((element: any) => {
-            if (element && element.type) {
-              let imageUrl = element.meta?.url || element.meta?.mediaId || '';
-              if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
-                imageUrl = buildProxyResourceUrl(imageUrl);
-              }
-              if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
-                const newImage: ImageUpload = {
-                  type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
-                  url: imageUrl,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  width: element.width || 400,
-                  height: element.height || 400,
-                  rotation: element.rotation || 0,
-                  ...(element.id && { elementId: element.id }),
-                };
-                newImages.push(newImage);
-                // If this element had connections in meta, collect them
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'image-generator') {
-                newImageGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedImageUrl: element.meta?.generatedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl from snapshot
-                  frameWidth: element.meta?.frameWidth,
-                  frameHeight: element.meta?.frameHeight,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: element.meta?.aspectRatio,
-                  prompt: element.meta?.prompt
-                } as any);
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'connector') {
-                // Skip - already processed in first pass
-              } else if (element.type === 'video-generator') {
-                newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: element.meta?.aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'music-generator') {
-                newMusicGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedMusicUrl: element.meta?.generatedMusicUrl || null,
-                  frameWidth: element.meta?.frameWidth,
-                  frameHeight: element.meta?.frameHeight,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: element.meta?.aspectRatio,
-                  prompt: element.meta?.prompt,
-                  activeCategory: element.meta?.activeCategory,
-                  lyrics: element.meta?.lyrics,
-                  sampleRate: element.meta?.sampleRate,
-                  bitrate: element.meta?.bitrate,
-                  audioFormat: element.meta?.audioFormat,
-                  voiceId: element.meta?.voiceId,
-                  stability: element.meta?.stability,
-                  similarityBoost: element.meta?.similarityBoost,
-                  style: element.meta?.style,
-                  speed: element.meta?.speed,
-                  exaggeration: element.meta?.exaggeration,
-                  temperature: element.meta?.temperature,
-                  cfgScale: element.meta?.cfgScale,
-                  voicePrompt: element.meta?.voicePrompt,
-                  topP: element.meta?.topP,
-                  maxTokens: element.meta?.maxTokens,
-                  repetitionPenalty: element.meta?.repetitionPenalty,
-                  dialogueInputs: element.meta?.dialogueInputs,
-                  useSpeakerBoost: element.meta?.useSpeakerBoost,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'text-generator') {
-                newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'canvas-text') {
-                newCanvasTextStates.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  text: element.meta?.text || 'add text here',
-                  fontSize: element.meta?.fontSize || 24,
-                  fontWeight: element.meta?.fontWeight || 'normal',
-                  fontStyle: element.meta?.fontStyle || 'normal',
-                  fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
-                  styleType: element.meta?.styleType || 'paragraph',
-                  textAlign: element.meta?.textAlign || 'left',
-                  color: element.meta?.color || '#ffffff',
-                  width: element.meta?.width || 300,
-                  height: element.meta?.height || 100,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'rich-text') {
-                newRichTextStates.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  text: element.meta?.text || 'double click to edit',
-                  fontSize: element.meta?.fontSize || 24,
-                  fontWeight: element.meta?.fontWeight || 'normal',
-                  fontStyle: element.meta?.fontStyle || 'normal',
-                  fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
-                  styleType: element.meta?.styleType || 'paragraph',
-                  textAlign: element.meta?.textAlign || 'left',
-                  color: element.meta?.color || element.meta?.fill || '#ffffff',
-                  backgroundColor: element.meta?.backgroundColor || 'transparent',
-                  textDecoration: element.meta?.textDecoration || 'none',
-                  width: element.meta?.width || 200,
-                  height: element.meta?.height || 50,
-                  rotation: element.rotation || 0,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'upscale-plugin') {
-                newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'multiangle-camera-plugin') {
-                newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'removebg-plugin') {
-                newRemoveBgGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  removedBgImageUrl: element.meta?.removedBgImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
-                  model: element.meta?.model || '851-labs/background-remover',
-                  backgroundType: element.meta?.backgroundType || 'rgba (transparent)',
-                  scaleValue: element.meta?.scaleValue || 0.5,
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isRemovingBg: element.meta?.isRemovingBg || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'erase-plugin') {
-                newEraseGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  erasedImageUrl: element.meta?.erasedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localErasedImageUrl: element.meta?.localErasedImageUrl || null,
-                  model: element.meta?.model || 'bria/eraser',
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isErasing: element.meta?.isErasing || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'expand-plugin') {
-                newExpandGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  expandedImageUrl: element.meta?.expandedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
-                  model: element.meta?.model || 'expand/base',
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isExpanding: element.meta?.isExpanding || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'vectorize-plugin') {
-                newVectorizeGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
-                  mode: element.meta?.mode || 'simple',
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isVectorizing: element.meta?.isVectorizing || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'storyboard-plugin') {
-                newStoryboardGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  characterNamesMap: element.meta?.characterNamesMap || {},
-                  propsNamesMap: element.meta?.propsNamesMap || {},
-                  backgroundNamesMap: element.meta?.backgroundNamesMap || {},
-                  namedImages: element.meta?.namedImages || undefined,
-                  frameWidth: element.meta?.frameWidth,
-                  frameHeight: element.meta?.frameHeight,
-                  scriptText: element.meta?.scriptText,
-                } as any); // Type assertion needed due to optional fields
-                // NOTE: Storyboard connections are NOT stored in storyboard.meta.connections
-                // They are stored in the image elements' meta.connections (as outgoing connections)
-                // OR as top-level connector elements. We'll restore them from connector elements below.
-                // Do NOT restore connections from storyboard.meta.connections as that would create duplicates.
-              } else if (element.type === 'script-frame') {
-                newScriptFrameGenerators.push({
-                  id: element.id,
-                  pluginId: element.meta?.pluginId || '',
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  frameWidth: element.meta?.frameWidth || 300,
-                  frameHeight: element.meta?.frameHeight || 200,
-                  text: element.meta?.text || '',
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'scene-frame') {
-                newSceneFrameGenerators.push({
-                  id: element.id,
-                  scriptFrameId: element.meta?.scriptFrameId || '',
-                  sceneNumber: element.meta?.sceneNumber || 0,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  frameWidth: element.meta?.frameWidth || 300,
-                  frameHeight: element.meta?.frameHeight || 200,
-                  content: element.meta?.content || '',
-                  characterIds: element.meta?.characterIds || undefined,
-                  locationId: element.meta?.locationId || undefined,
-                  mood: element.meta?.mood || undefined,
-                  characterNames: element.meta?.characterNames || undefined,
-                  locationName: element.meta?.locationName || undefined,
-                } as any); // Type assertion needed due to optional fields
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'next-scene-plugin') {
-                newNextSceneGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null,
-                  localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
-                  mode: element.meta?.mode || 'scene',
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  isProcessing: element.meta?.isProcessing || false,
-                });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'compare-plugin') {
-                newCompareGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  width: element.width,
-                  height: element.height,
-                  scale: element.meta?.scale,
-                  prompt: element.meta?.prompt,
-                  model: element.meta?.model,
-                });
-              }
-            }
-          });
-          setImages(newImages);
-          setImageGenerators(newImageGenerators);
-          setVideoGenerators(newVideoGenerators);
-          setMusicGenerators(newMusicGenerators);
-          setUpscaleGenerators(newUpscaleGenerators);
-          setMultiangleCameraGenerators(newMultiangleCameraGenerators);
-          setRemoveBgGenerators(newRemoveBgGenerators);
-          setEraseGenerators(newEraseGenerators);
-          setExpandGenerators(newExpandGenerators);
-          setVectorizeGenerators(newVectorizeGenerators);
-          setStoryboardGenerators(newStoryboardGenerators);
-          setScriptFrameGenerators(newScriptFrameGenerators);
-          setSceneFrameGenerators(newSceneFrameGenerators);
-          setNextSceneGenerators(newNextSceneGenerators);
-          setTextGenerators(newTextGenerators);
-          setCanvasTextStates(newCanvasTextStates);
-          setRichTextStates(newRichTextStates);
-          setConnectors(newConnectors);
-          setCompareGenerators(newCompareGenerators);
-
-          setIsHydrated(true); // Enable autosave after successful hydration
-        }
+        setIsHydrated(true); // Enable autosave after successful hydration
       } catch (e) {
         console.warn('No current snapshot to hydrate or failed to fetch', e);
       }
