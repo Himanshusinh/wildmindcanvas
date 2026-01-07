@@ -1559,54 +1559,62 @@ export function CanvasApp({ user }: CanvasAppProps) {
           groupsRefKeys: groupsRef.current ? Object.keys(groupsRef.current) : []
         });
 
-        const elements = buildSnapshotElements(getCanvasAppState());
+        // DIRECTLY BUILD SNAPSHOT FROM REACT STATE (Source of Truth)
+        // usage ofRefs in prod often yields empty objects, so we skip getCanvasAppState()
+        const elements: Record<string, any> = {};
 
-        if (Object.keys(elements).length === 0 && (images.length > 0 || imageGenerators.length > 0)) {
-          console.error('[Autosave] CRITICAL: Snapshot elements empty but state is not!', { elements, images: images.length, imgGens: imageGenerators.length });
-        }
+        // Helper to add to elements
+        const addAll = (items: any[], typeOverride?: string) => {
+          items.forEach(item => {
+            if (item && item.id) {
+              elements[item.id] = { ...item, type: typeOverride || item.type || 'unknown' };
+            }
+          });
+        };
 
-        // Merge any known group elements we've persisted via the group handlers so autosave doesn't wipe them out
-        // Defensive Filter: Only merge from groupsRef if the ID currently exists in our React State
-        // This prevents "Zombie Resurrection" of deleted items that linger in the Ref.
-        const validStateIds = new Set<string>();
+        // 1. Add all state arrays
+        addAll(images, 'image');
+        addAll(imageGenerators, 'image-generator');
+        addAll(videoGenerators, 'video-generator');
+        addAll(videoEditorGenerators, 'video-editor-generator');
+        addAll(musicGenerators, 'music-generator');
+        addAll(textGenerators, 'text-generator');
+        addAll(upscaleGenerators, 'upscale-generator');
+        addAll(multiangleCameraGenerators, 'multiangle-camera-generator');
+        addAll(removeBgGenerators, 'remove-bg-generator');
+        addAll(eraseGenerators, 'erase-generator');
+        addAll(expandGenerators, 'expand-generator');
+        addAll(vectorizeGenerators, 'vectorize-generator');
+        addAll(nextSceneGenerators, 'next-scene-generator');
+        addAll(storyboardGenerators, 'storyboard-plugin');
+        addAll(scriptFrameGenerators, 'script-frame-plugin');
+        addAll(sceneFrameGenerators, 'scene-frame-plugin');
+        addAll(compareGenerators, 'compare-generator');
+        addAll(canvasTextStates, 'text');
+        addAll(richTextStates, 'rich-text');
+        addAll(groupContainerStates, 'group');
+        addAll(connectors, 'connector');
 
-        // Collect all valid IDs from the authoritative React State
-        images.forEach(i => i.elementId && validStateIds.add(i.elementId));
-        imageGenerators.forEach(g => validStateIds.add(g.id));
-        videoGenerators.forEach(g => validStateIds.add(g.id));
-        videoEditorGenerators.forEach(g => validStateIds.add(g.id));
-        musicGenerators.forEach(g => validStateIds.add(g.id));
-        textGenerators.forEach(g => validStateIds.add(g.id));
-        upscaleGenerators.forEach(g => validStateIds.add(g.id));
-        multiangleCameraGenerators.forEach(g => validStateIds.add(g.id));
-        removeBgGenerators.forEach(g => validStateIds.add(g.id));
-        eraseGenerators.forEach(g => validStateIds.add(g.id));
-        expandGenerators.forEach(g => validStateIds.add(g.id));
-        vectorizeGenerators.forEach(g => validStateIds.add(g.id));
-        nextSceneGenerators.forEach(g => validStateIds.add(g.id));
-        storyboardGenerators.forEach(g => validStateIds.add(g.id));
-        scriptFrameGenerators.forEach(g => validStateIds.add(g.id));
-        sceneFrameGenerators.forEach(g => validStateIds.add(g.id));
-        compareGenerators.forEach(g => validStateIds.add(g.id));
-        canvasTextStates.forEach(g => validStateIds.add(g.id));
-        richTextStates.forEach(g => validStateIds.add(g.id));
-        groupContainerStates.forEach(g => validStateIds.add(g.id));
-        // Connectors usually don't have group info in groupsRef, but good to be safe if implementation changes
-        connectors.forEach(c => validStateIds.add(c.id));
-
-        if (groupsRef.current && Object.keys(groupsRef.current).length > 0) {
-          Object.keys(groupsRef.current).forEach((gid) => {
-            if (validStateIds.has(gid)) {
-              elements[gid] = groupsRef.current[gid];
-            } else {
-              // Found a Zombie! Kill it.
-              console.warn('[Autosave] Pruning zombie item from groupsRef:', gid);
-              delete groupsRef.current[gid];
+        // 2. Ensure Group Children are preserved if they are in groupsRef but mostly trust state
+        // If we strictly trust state, we don't need groupsRef for specific field mutations unless 
+        // the state is shallow. The GroupContainerState usually has 'children' array.
+        // But for safety, let's mix in valid groupsRef items if state missed them (unlikely if hydrated)
+        if (groupsRef.current) {
+          Object.keys(groupsRef.current).forEach(key => {
+            // Only use ref content if we also have it in state (merge) 
+            // OR if we are sure it's not a zombie. 
+            // Actually, "State is Truth". If it's not in state, it's deleted.
+            if (elements[key]) {
+              // Merge ref props if needed (e.g. updated x/y during drag before state commit)
+              // But usually onDragEnd updates state. Autosave debounce should catch state.
+              elements[key] = { ...elements[key], ...groupsRef.current[key] };
             }
           });
         }
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
-        console.log('[Snapshot] persisted via autosave', Object.keys(elements).length);
+
+        console.log('[Autosave] Persisting elements from State:', Object.keys(elements).length);
+
+        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.2', viewport: viewportCenterRef.current } });
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
       }
