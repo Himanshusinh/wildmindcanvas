@@ -212,252 +212,102 @@ export function CanvasApp({ user }: CanvasAppProps) {
   ]);
 
 
-  // Initialize OpManager
-  const { appendOp, undo, redo, canUndo, canRedo, isInitialized: opManagerInitialized } = useOpManager({
-    projectId,
-    enabled: !!projectId && !!currentUser,
-    onOpApplied: (op: CanvasOp, isOptimistic: boolean) => {
-      try {
-        const summary = {
-          type: op.type,
-          elementId: (op as any).elementId,
-          elementIds: (op as any).elementIds?.length,
-          isOptimistic,
-        };
-        console.log('[Ops] apply', summary);
-        // Handle snapshot application (snapshot contains map of elements)
-        if (!snapshotLoadedRef.current && (op.data && typeof op.data === 'object' && (op.data.snapshot === true || (!op.data.element && !op.data.delta && !op.data.updates)))) {
-          // This is a snapshot - op.data is the elements map
-          // Replace entire images array with snapshot (don't append, as snapshot is the source of truth)
-          const elements = op.data as Record<string, any>;
-          const metadata = (op.data as any).metadata || {};
-          const isV1_1 = metadata.version === '1.1' || parseFloat(metadata.version) >= 1.1;
+  // Shared Op Application Logic
+  const handleOpApplied = async (op: CanvasOp, isOptimistic: boolean) => {
+    try {
+      const summary = {
+        type: op.type,
+        elementId: (op as any).elementId,
+        elementIds: (op as any).elementIds?.length,
+        isOptimistic,
+      };
+      console.log('[Ops] apply', summary);
+      console.log('[handleOpApplied] ENTRY CONFIRMED - op type:', op.type);
+      // Handle snapshot application (snapshot contains map of elements)
+      // Handle snapshot application (snapshot contains map of elements)
+      // FIX: Ensure 'delete' ops are not mistaken for snapshots (since they also have empty data)
+      if (!snapshotLoadedRef.current && (op.data && typeof op.data === 'object' && (op.data.snapshot === true || (!op.data.element && !op.data.delta && !op.data.updates && op.type !== 'delete')))) {
+        // This is a snapshot - op.data is the elements map
+        // Replace entire images array with snapshot (don't append, as snapshot is the source of truth)
+        const elements = op.data as Record<string, any>;
+        const metadata = (op.data as any).metadata || {};
+        const isV1_1 = metadata.version === '1.1' || parseFloat(metadata.version) >= 1.1;
 
-          if (metadata.viewport) {
-            console.log('[Snapshot] Restoring viewport from metadata:', metadata.viewport);
-            setInitialViewportCenter(metadata.viewport);
-            viewportCenterRef.current = metadata.viewport;
-          }
+        if (metadata.viewport) {
+          console.log('[Snapshot] Restoring viewport from metadata:', metadata.viewport);
+          setInitialViewportCenter(metadata.viewport);
+          viewportCenterRef.current = metadata.viewport;
+        }
 
-          const newImages: ImageUpload[] = [];
-          const newImageGenerators: ImageModalState[] = [];
-          const newVideoGenerators: VideoModalState[] = [];
-          const newVideoEditorGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }> = [];
-          const newMusicGenerators: MusicModalState[] = [];
-          const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }> = [];
-          const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
-          const newCompareGenerators: CompareGenerator[] = [];
-          const newRichTextStates: CanvasTextState[] = [];
+        const newImages: ImageUpload[] = [];
+        const newImageGenerators: ImageModalState[] = [];
+        const newVideoGenerators: VideoModalState[] = [];
+        const newVideoEditorGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }> = [];
+        const newMusicGenerators: MusicModalState[] = [];
+        const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }> = [];
+        const newMultiangleCameraGenerators: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; frameWidth?: number; frameHeight?: number }> = [];
+        const newCompareGenerators: CompareGenerator[] = [];
+        const newRichTextStates: CanvasTextState[] = [];
 
-          Object.values(elements).forEach((element: any) => {
-            console.log('[Hydration] Processing element:', element.type, element.id);
-            if (element && element.type) {
-              // Use proxy URL for Zata URLs to avoid CORS
-              let imageUrl = element.meta?.url || element.meta?.mediaId || '';
-              if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
-                imageUrl = buildProxyResourceUrl(imageUrl);
-              }
+        Object.values(elements).forEach((element: any) => {
+          console.log('[Hydration] Processing element:', element.type, element.id);
+          if (element && element.type) {
+            // Use proxy URL for Zata URLs to avoid CORS
+            let imageUrl = element.meta?.url || element.meta?.mediaId || '';
+            if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
+              imageUrl = buildProxyResourceUrl(imageUrl);
+            }
 
-              // Resolve bounds mapping
-              let width = 400;
-              let height = 400;
+            // Resolve bounds mapping
+            let width = 400;
+            let height = 400;
 
-              if (isV1_1 && element.bounds) {
-                // strict mode
-                width = element.bounds.width;
-                height = element.bounds.height;
-              } else if (element.bounds) {
-                // element has bounds but older version (trust bounds anyway if present)
-                width = element.bounds.width;
-                height = element.bounds.height;
+            if (isV1_1 && element.bounds) {
+              // strict mode
+              width = element.bounds.width;
+              height = element.bounds.height;
+            } else if (element.bounds) {
+              // element has bounds but older version (trust bounds anyway if present)
+              width = element.bounds.width;
+              height = element.bounds.height;
+            } else {
+              // legacy inference
+              if (element.type === 'compare-plugin') {
+                width = element.width || 800;
+                height = element.height || 600;
+              } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
+                width = element.width || 400;
+                height = element.height || 400;
+              } else if (element.type === 'text' || element.type === 'canvas-text') {
+                width = element.width || 300;
+                height = element.height || 100;
               } else {
-                // legacy inference
-                if (element.type === 'compare-plugin') {
-                  width = element.width || 800;
-                  height = element.height || 600;
-                } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
-                  width = element.width || 400;
-                  height = element.height || 400;
-                } else if (element.type === 'text' || element.type === 'canvas-text') {
-                  width = element.width || 300;
-                  height = element.height || 100;
-                } else {
-                  // generators
-                  width = element.meta?.frameWidth || 400;
-                  height = element.meta?.frameHeight || 500;
-                }
-              }
-
-              // DEV validation
-              if (process.env.NODE_ENV === 'development') {
-                if (width <= 0 || height <= 0) {
-                  console.warn('[Hydration] Invalid bounds detected for element', element.id, { width, height });
-                }
-              }
-
-
-              if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
-                const newImage: ImageUpload = {
-                  type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
-                  url: imageUrl,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  width: width,
-                  height: height,
-                  ...(element.id && { elementId: element.id }),
-                };
-                newImages.push(newImage);
-              } else if (element.type === 'image-generator') {
-                let genImageUrl = element.meta?.generatedImageUrl || null;
-                if (genImageUrl && (genImageUrl.includes('zata.ai') || genImageUrl.includes('zata'))) {
-                  genImageUrl = buildProxyResourceUrl(genImageUrl);
-                }
-                let srcImageUrl = element.meta?.sourceImageUrl || null;
-                if (srcImageUrl && (srcImageUrl.includes('zata.ai') || srcImageUrl.includes('zata'))) {
-                  srcImageUrl = buildProxyResourceUrl(srcImageUrl);
-                }
-                newImageGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedImageUrl: genImageUrl,
-                  sourceImageUrl: srcImageUrl,
-                  frameWidth: width,
-                  frameHeight: height,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: element.meta?.aspectRatio,
-                  prompt: element.meta?.prompt,
-                } as any);
-              } else if (element.type === 'video-generator') {
-                let genVideoUrl = element.meta?.generatedVideoUrl || null;
-                if (genVideoUrl && (genVideoUrl.includes('zata.ai') || genVideoUrl.includes('zata'))) {
-                  genVideoUrl = buildProxyMediaUrl(genVideoUrl);
-                }
-                newVideoGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedVideoUrl: genVideoUrl,
-                  frameWidth: width,
-                  frameHeight: height,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: element.meta?.aspectRatio,
-                  prompt: element.meta?.prompt,
-                  duration: element.meta?.duration,
-                  taskId: element.meta?.taskId,
-                  generationId: element.meta?.generationId,
-                  status: element.meta?.status,
-                });
-              } else if (element.type === 'video-editor-trigger') {
-                newVideoEditorGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0 });
-              } else if (element.type === 'music-generator') {
-                let genMusicUrl = element.meta?.generatedMusicUrl || null;
-                if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
-                  genMusicUrl = buildProxyMediaUrl(genMusicUrl);
-                }
-                newMusicGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedMusicUrl: genMusicUrl,
-                  frameWidth: width,
-                  frameHeight: height,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: element.meta?.aspectRatio,
-                  prompt: element.meta?.prompt,
-                  activeCategory: element.meta?.activeCategory,
-                  lyrics: element.meta?.lyrics,
-                  sampleRate: element.meta?.sampleRate,
-                  bitrate: element.meta?.bitrate,
-                  audioFormat: element.meta?.audioFormat,
-                  voiceId: element.meta?.voiceId,
-                  stability: element.meta?.stability,
-                  similarityBoost: element.meta?.similarityBoost,
-                  style: element.meta?.style,
-                  speed: element.meta?.speed,
-                  exaggeration: element.meta?.exaggeration,
-                  temperature: element.meta?.temperature,
-                  cfgScale: element.meta?.cfgScale,
-                  voicePrompt: element.meta?.voicePrompt,
-                  topP: element.meta?.topP,
-                  maxTokens: element.meta?.maxTokens,
-                  repetitionPenalty: element.meta?.repetitionPenalty,
-                  dialogueInputs: element.meta?.dialogueInputs,
-                  useSpeakerBoost: element.meta?.useSpeakerBoost,
-                });
-              } else if (element.type === 'upscale-plugin') {
-                newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale, frameWidth: width, frameHeight: height });
-              } else if (element.type === 'multiangle-camera-plugin') {
-                newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
-              } else if (element.type === 'compare-plugin') {
-                newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: width, height: height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
-              } else if (element.type === 'rich-text') {
-                newRichTextStates.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  text: element.meta?.text || '',
-                  fontSize: element.meta?.fontSize || 24,
-                  fontWeight: element.meta?.fontWeight || 'normal',
-                  fontStyle: element.meta?.fontStyle || 'normal',
-                  fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
-                  width: width,
-                  height: height,
-                  color: element.meta?.color || element.meta?.fill || '#ffffff',
-                  backgroundColor: element.meta?.backgroundColor || 'transparent',
-                  textAlign: element.meta?.textAlign || 'left',
-                  textDecoration: element.meta?.textDecoration || 'none',
-                  styleType: element.meta?.styleType || 'paragraph',
-                });
+                // generators
+                width = element.meta?.frameWidth || 400;
+                height = element.meta?.frameHeight || 500;
               }
             }
-          });
 
-          // Replace entire images array with snapshot (this ensures deleted elements don't reappear)
-          setImages(newImages);
-          // If realtime is not active, hydrate generators from snapshot; otherwise wait for realtime init
-          if (!realtimeActiveRef.current) {
-            setImageGenerators(newImageGenerators);
-            setVideoGenerators(newVideoGenerators);
-            setMusicGenerators(newMusicGenerators);
-            setUpscaleGenerators(newUpscaleGenerators);
-            setMultiangleCameraGenerators(newMultiangleCameraGenerators || []);
-            setCompareGenerators(newCompareGenerators);
-            setRichTextStates(newRichTextStates);
-          }
-          snapshotLoadedRef.current = true;
-        } else if (op.type === 'create' && op.data.element) {
-          // Add new element from create op
-          const element = op.data.element as any;
-          // Use proxy URL for Zata URLs to avoid CORS
-          let imageUrl = element.meta?.url || element.meta?.mediaId || '';
-          if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
-            imageUrl = buildProxyResourceUrl(imageUrl);
-          }
-
-          if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
-            const newImage: ImageUpload = {
-              type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
-              url: imageUrl,
-              x: element.x || 0,
-              y: element.y || 0,
-              width: element.width || 400,
-              height: element.height || 400,
-              ...(element.id && { elementId: element.id }),
-            };
-            setImages((prev) => {
-              if ((newImage as any).elementId) {
-                const exists = prev.some(img => (img as any).elementId === (newImage as any).elementId);
-                if (exists) return prev;
+            // DEV validation
+            if (process.env.NODE_ENV === 'development') {
+              if (width <= 0 || height <= 0) {
+                console.warn('[Hydration] Invalid bounds detected for element', element.id, { width, height });
               }
-              return [...prev, newImage];
-            });
-          } else if (element.type === 'image-generator') {
-            setImageGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
+            }
+
+
+            if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
+              const newImage: ImageUpload = {
+                type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
+                url: imageUrl,
+                x: element.x || 0,
+                y: element.y || 0,
+                width: width,
+                height: height,
+                ...(element.id && { elementId: element.id }),
+              };
+              newImages.push(newImage);
+            } else if (element.type === 'image-generator') {
               let genImageUrl = element.meta?.generatedImageUrl || null;
               if (genImageUrl && (genImageUrl.includes('zata.ai') || genImageUrl.includes('zata'))) {
                 genImageUrl = buildProxyResourceUrl(genImageUrl);
@@ -466,32 +316,31 @@ export function CanvasApp({ user }: CanvasAppProps) {
               if (srcImageUrl && (srcImageUrl.includes('zata.ai') || srcImageUrl.includes('zata'))) {
                 srcImageUrl = buildProxyResourceUrl(srcImageUrl);
               }
-              return [...prev, {
+              newImageGenerators.push({
                 id: element.id,
                 x: element.x || 0,
                 y: element.y || 0,
                 generatedImageUrl: genImageUrl,
                 sourceImageUrl: srcImageUrl,
+                frameWidth: width,
+                frameHeight: height,
                 model: element.meta?.model,
                 frame: element.meta?.frame,
                 aspectRatio: element.meta?.aspectRatio,
                 prompt: element.meta?.prompt,
-                frameWidth: element.bounds?.width || 400,
-                frameHeight: element.bounds?.height || 500,
-              } as any];
-            });
-          } else if (element.type === 'video-generator') {
-            setVideoGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
+              } as any);
+            } else if (element.type === 'video-generator') {
               let genVideoUrl = element.meta?.generatedVideoUrl || null;
               if (genVideoUrl && (genVideoUrl.includes('zata.ai') || genVideoUrl.includes('zata'))) {
                 genVideoUrl = buildProxyMediaUrl(genVideoUrl);
               }
-              return [...prev, {
+              newVideoGenerators.push({
                 id: element.id,
                 x: element.x || 0,
                 y: element.y || 0,
                 generatedVideoUrl: genVideoUrl,
+                frameWidth: width,
+                frameHeight: height,
                 model: element.meta?.model,
                 frame: element.meta?.frame,
                 aspectRatio: element.meta?.aspectRatio,
@@ -500,34 +349,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 taskId: element.meta?.taskId,
                 generationId: element.meta?.generationId,
                 status: element.meta?.status,
-                frameWidth: element.bounds?.width || 600,
-                frameHeight: element.bounds?.height || 400,
-              }];
-            });
-          } else if (element.type === 'video-editor-trigger') {
-            setVideoEditorGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0 }];
-            });
-          } else if (element.type === 'music-generator') {
-            setMusicGenerators((prev) => {
-              console.log('[Hydration] Loading music generator:', element.id, element.meta); // Debug logging
-              if (prev.some(m => m.id === element.id)) return prev;
+              });
+            } else if (element.type === 'video-editor-trigger') {
+              newVideoEditorGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0 });
+            } else if (element.type === 'music-generator') {
               let genMusicUrl = element.meta?.generatedMusicUrl || null;
               if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
                 genMusicUrl = buildProxyMediaUrl(genMusicUrl);
               }
-              return [...prev, {
+              newMusicGenerators.push({
                 id: element.id,
                 x: element.x || 0,
                 y: element.y || 0,
                 generatedMusicUrl: genMusicUrl,
+                frameWidth: width,
+                frameHeight: height,
                 model: element.meta?.model,
                 frame: element.meta?.frame,
                 aspectRatio: element.meta?.aspectRatio,
                 prompt: element.meta?.prompt,
-                frameWidth: element.bounds?.width || 400,
-                frameHeight: element.bounds?.height || 500,
                 activeCategory: element.meta?.activeCategory,
                 lyrics: element.meta?.lyrics,
                 sampleRate: element.meta?.sampleRate,
@@ -547,161 +387,15 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 repetitionPenalty: element.meta?.repetitionPenalty,
                 dialogueInputs: element.meta?.dialogueInputs,
                 useSpeakerBoost: element.meta?.useSpeakerBoost,
-              }];
-            });
-          } else if (element.type === 'connector') {
-            // Add connector element into connectors state
-            const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
-            setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
-          } else if (element.type === 'text-generator') {
-            setTextGenerators((prev) => {
-              if (prev.some(t => t.id === element.id)) return prev;
-              return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
-            });
-          } else if (element.type === 'remove-bg-plugin') {
-            setRemoveBgGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                removedBgImageUrl: element.meta?.removedBgImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null,
-                localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
-                model: element.meta?.model,
-                backgroundType: element.meta?.backgroundType,
-                scaleValue: element.meta?.scaleValue,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                isRemovingBg: element.meta?.isRemovingBg
-              }];
-            });
-          } else if (element.type === 'erase-plugin') {
-            setEraseGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                erasedImageUrl: element.meta?.erasedImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null,
-                localErasedImageUrl: element.meta?.localErasedImageUrl || null,
-                model: element.meta?.model,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                isErasing: element.meta?.isErasing
-              }];
-            });
-          } else if (element.type === 'expand-plugin') {
-            setExpandGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                expandedImageUrl: element.meta?.expandedImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null,
-                localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
-                model: element.meta?.model,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                isExpanding: element.meta?.isExpanding
-              }];
-            });
-          } else if (element.type === 'vectorize-plugin') {
-            setVectorizeGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null,
-                localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
-                mode: element.meta?.mode,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                isVectorizing: element.meta?.isVectorizing
-              }];
-            });
-          } else if (element.type === 'next-scene-plugin') {
-            setNextSceneGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
-                sourceImageUrl: element.meta?.sourceImageUrl || null,
-                localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
-                mode: element.meta?.mode,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                isProcessing: element.meta?.isProcessing
-              }];
-            });
-          } else if (element.type === 'compare-plugin') {
-            setCompareGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                width: element.width,
-                height: element.height,
-                scale: element.meta?.scale
-              }];
-            });
-          } else if (element.type === 'storyboard-plugin') {
-            setStoryboardGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                x: element.x || 0,
-                y: element.y || 0,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                scriptText: element.meta?.scriptText,
-                characterNamesMap: element.meta?.characterNamesMap,
-                propsNamesMap: element.meta?.propsNamesMap,
-                backgroundNamesMap: element.meta?.backgroundNamesMap
-              }];
-            });
-          } else if (element.type === 'script-frame-plugin') {
-            setScriptFrameGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                pluginId: element.meta?.pluginId,
-                x: element.x || 0,
-                y: element.y || 0,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                text: element.meta?.text
-              }];
-            });
-          } else if (element.type === 'scene-frame-plugin') {
-            setSceneFrameGenerators((prev) => {
-              if (prev.some(m => m.id === element.id)) return prev;
-              return [...prev, {
-                id: element.id,
-                scriptFrameId: element.meta?.scriptFrameId,
-                sceneNumber: element.meta?.sceneNumber,
-                x: element.x || 0,
-                y: element.y || 0,
-                frameWidth: element.meta?.frameWidth,
-                frameHeight: element.meta?.frameHeight,
-                content: element.meta?.content,
-                characterNames: element.meta?.characterNames,
-                locationName: element.meta?.locationName,
-                timeOfDay: element.meta?.timeOfDay,
-                mood: element.meta?.mood
-              }];
-            });
-          } else if (element.type === 'rich-text') {
-            setRichTextStates((prev) => {
-              if (prev.some(t => t.id === element.id)) return prev;
-              return [...prev, {
+              });
+            } else if (element.type === 'upscale-plugin') {
+              newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale, frameWidth: width, frameHeight: height });
+            } else if (element.type === 'multiangle-camera-plugin') {
+              newMultiangleCameraGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, sourceImageUrl: element.meta?.sourceImageUrl || null });
+            } else if (element.type === 'compare-plugin') {
+              newCompareGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, width: width, height: height, scale: element.meta?.scale, prompt: element.meta?.prompt, model: element.meta?.model });
+            } else if (element.type === 'rich-text') {
+              newRichTextStates.push({
                 id: element.id,
                 x: element.x || 0,
                 y: element.y || 0,
@@ -710,227 +404,796 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 fontWeight: element.meta?.fontWeight || 'normal',
                 fontStyle: element.meta?.fontStyle || 'normal',
                 fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
-                textAlign: element.meta?.textAlign || 'left',
-                width: element.bounds?.width || 300,
-                height: element.bounds?.height || 100,
+                width: width,
+                height: height,
                 color: element.meta?.color || element.meta?.fill || '#ffffff',
                 backgroundColor: element.meta?.backgroundColor || 'transparent',
+                textAlign: element.meta?.textAlign || 'left',
                 textDecoration: element.meta?.textDecoration || 'none',
                 styleType: element.meta?.styleType || 'paragraph',
-              }];
-            });
+              });
+            }
           }
-        } else if (op.type === 'delete' && op.elementId) {
-          // Delete element - directly remove from state (don't call handleImageDelete to avoid sending another delete op)
-          setImages((prev) => {
-            const index = prev.findIndex(img => (img as any).elementId === op.elementId);
-            if (index >= 0) {
-              const newImages = [...prev];
-              const item = newImages[index];
-              // Clean up blob URL if it exists
-              if (item?.url && item.url.startsWith('blob:')) {
-                URL.revokeObjectURL(item.url);
-              }
-              newImages.splice(index, 1);
-              return newImages;
-            }
-            return prev;
-          });
-          // Delete generator overlay if present (needed for undo/redo)
-          setImageGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setVideoGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setMusicGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setUpscaleGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setCompareGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setTextGenerators((prev) => prev.filter(t => t.id !== op.elementId));
-          setRemoveBgGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setEraseGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setExpandGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setVectorizeGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setNextSceneGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setStoryboardGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setScriptFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setSceneFrameGenerators((prev) => prev.filter(m => m.id !== op.elementId));
-          setRichTextStates((prev) => prev.filter(t => t.id !== op.elementId));
-          // Remove connectors if connector element deleted OR remove connectors referencing a deleted node
-          setConnectors(prev => prev.filter(c => c.id !== op.elementId && c.from !== op.elementId && c.to !== op.elementId));
-          // Cleanup generation queue if parent generator deleted
-          setGenerationQueue(prev => prev.filter(item => !item.id.includes(op.elementId!)));
-        } else if (op.type === 'delete' && op.elementIds && op.elementIds.length > 0) {
-          // Delete multiple elements
-          const elementIdsSet = new Set(op.elementIds);
+        });
 
-          setImages((prev) => prev.filter((img) => {
-            const elementId = (img as any).elementId;
-            if (elementId && elementIdsSet.has(elementId)) {
-              if (img?.url && img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
-              return false;
-            }
-            return true;
-          }));
-
-          setImageGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setVideoGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setVideoEditorGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setMusicGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setUpscaleGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setMultiangleCameraGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setRemoveBgGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setEraseGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setExpandGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setVectorizeGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setNextSceneGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setStoryboardGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setScriptFrameGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setSceneFrameGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setCanvasTextStates(prev => prev.filter(txt => !elementIdsSet.has(txt.id)));
-          setRichTextStates(prev => prev.filter(txt => !elementIdsSet.has(txt.id)));
-          setGenerationQueue(prev => prev.filter(item => !op.elementIds!.some(id => item.id.includes(id))));
-          setCompareGenerators(prev => prev.filter(gen => !elementIdsSet.has(gen.id)));
-          setGroupContainerStates(prev => prev.filter(group => !elementIdsSet.has(group.id)));
-          setConnectors(prev => prev.filter(conn =>
-            !elementIdsSet.has(conn.id) &&
-            !elementIdsSet.has(conn.from) &&
-            !elementIdsSet.has(conn.to)
-          ));
+        // Replace entire images array with snapshot (this ensures deleted elements don't reappear)
+        setImages(newImages);
+        // If realtime is not active, hydrate generators from snapshot; otherwise wait for realtime init
+        if (!realtimeActiveRef.current) {
+          setImageGenerators(newImageGenerators);
+          setVideoGenerators(newVideoGenerators);
+          setMusicGenerators(newMusicGenerators);
+          setUpscaleGenerators(newUpscaleGenerators);
+          setMultiangleCameraGenerators(newMultiangleCameraGenerators || []);
+          setCompareGenerators(newCompareGenerators);
+          setRichTextStates(newRichTextStates);
         }
-        else if (op.type === 'move' && op.elementId && op.data.delta) {
-          // Move element
+        snapshotLoadedRef.current = true;
+      } else if (op.type === 'create' && op.data.element) {
+        // Add new element from create op
+        const element = op.data.element as any;
+        // Use proxy URL for Zata URLs to avoid CORS
+        let imageUrl = element.meta?.url || element.meta?.mediaId || '';
+        if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
+          imageUrl = buildProxyResourceUrl(imageUrl);
+        }
+
+        if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
+          const newImage: ImageUpload = {
+            type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
+            url: imageUrl,
+            x: element.x || 0,
+            y: element.y || 0,
+            width: element.width || 400,
+            height: element.height || 400,
+            ...(element.id && { elementId: element.id }),
+          };
           setImages((prev) => {
-            const index = prev.findIndex(img => (img as any).elementId === op.elementId);
-            if (index >= 0) {
-              const newImages = [...prev];
-              const current = newImages[index];
-              newImages[index] = {
-                ...current,
-                x: (current.x || 0) + op.data.delta.x,
-                y: (current.y || 0) + op.data.delta.y,
-              };
-              return newImages;
+            if ((newImage as any).elementId) {
+              const exists = prev.some(img => (img as any).elementId === (newImage as any).elementId);
+              if (exists) return prev;
             }
-            return prev;
+            return [...prev, newImage];
           });
-          // Move generator overlay by delta (needed for undo/redo)
+        } else if (element.type === 'image-generator') {
           setImageGenerators((prev) => {
-            const idx = prev.findIndex(m => m.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
-              return next;
+            if (prev.some(m => m.id === element.id)) return prev;
+            let genImageUrl = element.meta?.generatedImageUrl || null;
+            if (genImageUrl && (genImageUrl.includes('zata.ai') || genImageUrl.includes('zata'))) {
+              genImageUrl = buildProxyResourceUrl(genImageUrl);
             }
-            return prev;
+            let srcImageUrl = element.meta?.sourceImageUrl || null;
+            if (srcImageUrl && (srcImageUrl.includes('zata.ai') || srcImageUrl.includes('zata'))) {
+              srcImageUrl = buildProxyResourceUrl(srcImageUrl);
+            }
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedImageUrl: genImageUrl,
+              sourceImageUrl: srcImageUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              frameWidth: element.bounds?.width || 400,
+              frameHeight: element.bounds?.height || 500,
+            } as any];
           });
+        } else if (element.type === 'video-generator') {
           setVideoGenerators((prev) => {
-            const idx = prev.findIndex(m => m.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
-              return next;
+            if (prev.some(m => m.id === element.id)) return prev;
+            let genVideoUrl = element.meta?.generatedVideoUrl || null;
+            if (genVideoUrl && (genVideoUrl.includes('zata.ai') || genVideoUrl.includes('zata'))) {
+              genVideoUrl = buildProxyMediaUrl(genVideoUrl);
             }
-            return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedVideoUrl: genVideoUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              duration: element.meta?.duration,
+              taskId: element.meta?.taskId,
+              generationId: element.meta?.generationId,
+              status: element.meta?.status,
+              frameWidth: element.bounds?.width || 600,
+              frameHeight: element.bounds?.height || 400,
+            }];
           });
+        } else if (element.type === 'video-editor-trigger') {
+          setVideoEditorGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0 }];
+          });
+        } else if (element.type === 'music-generator') {
           setMusicGenerators((prev) => {
-            const idx = prev.findIndex(m => m.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
-              return next;
+            console.log('[Hydration] Loading music generator:', element.id, element.meta); // Debug logging
+            if (prev.some(m => m.id === element.id)) return prev;
+            let genMusicUrl = element.meta?.generatedMusicUrl || null;
+            if (genMusicUrl && (genMusicUrl.includes('zata.ai') || genMusicUrl.includes('zata'))) {
+              genMusicUrl = buildProxyMediaUrl(genMusicUrl);
             }
-            return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedMusicUrl: genMusicUrl,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              prompt: element.meta?.prompt,
+              frameWidth: element.bounds?.width || 400,
+              frameHeight: element.bounds?.height || 500,
+              activeCategory: element.meta?.activeCategory,
+              lyrics: element.meta?.lyrics,
+              sampleRate: element.meta?.sampleRate,
+              bitrate: element.meta?.bitrate,
+              audioFormat: element.meta?.audioFormat,
+              voiceId: element.meta?.voiceId,
+              stability: element.meta?.stability,
+              similarityBoost: element.meta?.similarityBoost,
+              style: element.meta?.style,
+              speed: element.meta?.speed,
+              exaggeration: element.meta?.exaggeration,
+              temperature: element.meta?.temperature,
+              cfgScale: element.meta?.cfgScale,
+              voicePrompt: element.meta?.voicePrompt,
+              topP: element.meta?.topP,
+              maxTokens: element.meta?.maxTokens,
+              repetitionPenalty: element.meta?.repetitionPenalty,
+              dialogueInputs: element.meta?.dialogueInputs,
+              useSpeakerBoost: element.meta?.useSpeakerBoost,
+            }];
           });
+        } else if (element.type === 'connector') {
+          // Add connector element into connectors state
+          const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
+          setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
+        } else if (element.type === 'text-generator') {
           setTextGenerators((prev) => {
-            const idx = prev.findIndex(t => t.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
-              return next;
-            }
-            return prev;
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, { id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value || '' }];
           });
-          const updatePluginPosition = (prev: any[]) => {
-            const idx = prev.findIndex(m => m.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
-              return next;
-            }
-            return prev;
-          };
-          setRemoveBgGenerators(updatePluginPosition);
-          setCompareGenerators(updatePluginPosition);
-          setEraseGenerators(updatePluginPosition);
-          setExpandGenerators(updatePluginPosition);
-          setVectorizeGenerators(updatePluginPosition);
-          setNextSceneGenerators(updatePluginPosition);
-          setStoryboardGenerators(updatePluginPosition);
-          setScriptFrameGenerators(updatePluginPosition);
-          setSceneFrameGenerators(updatePluginPosition);
+        } else if (element.type === 'remove-bg-plugin') {
+          setRemoveBgGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              removedBgImageUrl: element.meta?.removedBgImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null,
+              model: element.meta?.model,
+              backgroundType: element.meta?.backgroundType,
+              scaleValue: element.meta?.scaleValue,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isRemovingBg: element.meta?.isRemovingBg
+            }];
+          });
+        } else if (element.type === 'erase-plugin') {
+          setEraseGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              erasedImageUrl: element.meta?.erasedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localErasedImageUrl: element.meta?.localErasedImageUrl || null,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isErasing: element.meta?.isErasing
+            }];
+          });
+        } else if (element.type === 'expand-plugin') {
+          setExpandGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              expandedImageUrl: element.meta?.expandedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localExpandedImageUrl: element.meta?.localExpandedImageUrl || null,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isExpanding: element.meta?.isExpanding
+            }];
+          });
+        } else if (element.type === 'vectorize-plugin') {
+          setVectorizeGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              vectorizedImageUrl: element.meta?.vectorizedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null,
+              mode: element.meta?.mode,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isVectorizing: element.meta?.isVectorizing
+            }];
+          });
+        } else if (element.type === 'next-scene-plugin') {
+          setNextSceneGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              nextSceneImageUrl: element.meta?.nextSceneImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              localNextSceneImageUrl: element.meta?.localNextSceneImageUrl || null,
+              mode: element.meta?.mode,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              isProcessing: element.meta?.isProcessing
+            }];
+          });
+        } else if (element.type === 'compare-plugin') {
+          setCompareGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width,
+              height: element.height,
+              scale: element.meta?.scale
+            }];
+          });
+        } else if (element.type === 'storyboard-plugin') {
+          setStoryboardGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              scriptText: element.meta?.scriptText,
+              characterNamesMap: element.meta?.characterNamesMap,
+              propsNamesMap: element.meta?.propsNamesMap,
+              backgroundNamesMap: element.meta?.backgroundNamesMap
+            }];
+          });
+        } else if (element.type === 'script-frame-plugin') {
+          setScriptFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              pluginId: element.meta?.pluginId,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              text: element.meta?.text
+            }];
+          });
+        } else if (element.type === 'scene-frame-plugin') {
+          setSceneFrameGenerators((prev) => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              scriptFrameId: element.meta?.scriptFrameId,
+              sceneNumber: element.meta?.sceneNumber,
+              x: element.x || 0,
+              y: element.y || 0,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight,
+              content: element.meta?.content,
+              characterNames: element.meta?.characterNames,
+              locationName: element.meta?.locationName,
+              timeOfDay: element.meta?.timeOfDay,
+              mood: element.meta?.mood
+            }];
+          });
+        } else if (element.type === 'rich-text') {
           setRichTextStates((prev) => {
-            const idx = prev.findIndex(t => t.id === op.elementId);
-            if (idx >= 0) {
-              const cur = prev[idx];
-              const next = [...prev];
-              next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
-              return next;
-            }
-            return prev;
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              text: element.meta?.text || '',
+              fontSize: element.meta?.fontSize || 24,
+              fontWeight: element.meta?.fontWeight || 'normal',
+              fontStyle: element.meta?.fontStyle || 'normal',
+              fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+              textAlign: element.meta?.textAlign || 'left',
+              width: element.bounds?.width || 300,
+              height: element.bounds?.height || 100,
+              color: element.meta?.color || element.meta?.fill || '#ffffff',
+              backgroundColor: element.meta?.backgroundColor || 'transparent',
+              textDecoration: element.meta?.textDecoration || 'none',
+              styleType: element.meta?.styleType || 'paragraph',
+            }];
           });
-        } else if (op.type === 'update' && op.elementId && op.data.updates) {
-          const targetId = op.elementId;
-          const updates = { ...op.data.updates };
-          if (updates.meta) {
-            Object.assign(updates, updates.meta);
-            delete updates.meta;
-          }
+        }
+      } else if (op.type === 'create' && op.data && op.data.element) {
+        // Handle single element creation (Undo/Redo or Remote)
+        const element = op.data.element;
+        console.log('[Ops] apply create', element.type, element.id);
 
-          // Optimized update: only call the setter if the ID matches
-          const updateIfContains = (prev: any[]) => {
-            const idx = prev.findIndex(item => (item.id || item.elementId) === targetId);
-            if (idx >= 0) {
-              const next = [...prev];
-              next[idx] = { ...next[idx], ...updates };
-              return next;
-            }
-            return prev;
-          };
+        if (element.type === 'connector') {
+          setConnectors(prev => {
+            if (prev.some(c => c.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              from: element.from || element.meta?.from,
+              to: element.to || element.meta?.to,
+              color: element.meta?.color || '#437eb5',
+              fromAnchor: element.meta?.fromAnchor,
+              toAnchor: element.meta?.toAnchor
+            }];
+          });
+        } else if (element.type === 'image-generator') {
+          setImageGenerators(prev => {
+            if (prev.some(c => c.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedImageUrl: element.meta?.generatedImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || null,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            }];
+          });
+        } else if (element.type === 'video-generator') {
+          setVideoGenerators(prev => {
+            if (prev.some(c => c.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedVideoUrl: element.meta?.generatedVideoUrl || null,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            }];
+          });
+        } else if (element.type === 'music-generator') {
+          setMusicGenerators(prev => {
+            if (prev.some(m => m.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedMusicUrl: element.meta?.generatedMusicUrl || null,
+              activeCategory: element.meta?.activeCategory,
+              lyrics: element.meta?.lyrics,
+              sampleRate: element.meta?.sampleRate,
+              bitrate: element.meta?.bitrate,
+              audioFormat: element.meta?.audioFormat,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            }];
+          });
+        } else if (element.type === 'text-generator') {
+          setTextGenerators(prev => {
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              value: element.meta?.value || ''
+            }];
+          });
+        } else if (element.type === 'rich-text') {
+          setRichTextStates(prev => {
+            if (prev.some(t => t.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              text: element.meta?.text || '',
+              fontSize: element.meta?.fontSize || 24,
+              fontWeight: element.meta?.fontWeight || 'normal',
+              fontStyle: element.meta?.fontStyle || 'normal',
+              fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+              textAlign: element.meta?.textAlign || 'left',
+              width: element.bounds?.width || 300,
+              height: element.bounds?.height || 100,
+              color: element.meta?.color || element.meta?.fill || '#ffffff',
+              backgroundColor: element.meta?.backgroundColor || 'transparent',
+              textDecoration: element.meta?.textDecoration || 'none',
+              styleType: element.meta?.styleType || 'paragraph',
+            }];
+          });
+        } else if (element.type === 'group') {
+          setGroupContainerStates(prev => {
+            if (prev.some(g => g.id === element.id)) return prev;
+            return [...prev, {
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width || 100,
+              height: element.height || 100,
+              padding: element.padding || 0,
+              children: element.children || [],
+              meta: element.meta || { name: 'Group' }
+            }];
+          });
+        } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
+          setImages(prev => {
+            if (prev.some(i => (i as any).elementId === element.id)) return prev;
+            return [...prev, {
+              type: element.type,
+              url: element.meta?.url || element.url,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width || 400,
+              height: element.height || 400,
+              elementId: element.id,
+              meta: element.meta
+            }];
+          });
+        }
+        // Add other plugins as needed
+      } else if (op.type === 'bulk-create' && op.data && Array.isArray(op.data.elements)) {
+        // Handle bulk creation (Inverse of Bulk Delete)
+        const elements = op.data.elements;
+        console.log('[Ops] apply bulk-create', elements.length);
 
-          // Try images first
-          setImages(updateIfContains);
-          // Then generators
-          setImageGenerators(updateIfContains);
-          setVideoGenerators(updateIfContains);
-          setMusicGenerators(updateIfContains);
-          setTextGenerators(updateIfContains);
-          setUpscaleGenerators(updateIfContains);
-          setRemoveBgGenerators(updateIfContains);
-          setEraseGenerators(updateIfContains);
-          setExpandGenerators(updateIfContains);
-          setVectorizeGenerators(updateIfContains);
-          setNextSceneGenerators(updateIfContains);
-          setStoryboardGenerators(updateIfContains);
-          setScriptFrameGenerators(updateIfContains);
-          setSceneFrameGenerators(updateIfContains);
-          setRichTextStates(updateIfContains);
+        const newConnectors: any[] = [];
+        const newImageGens: any[] = [];
+        const newVideoGens: any[] = [];
+        const newMusicGens: any[] = [];
+        const newTextGens: any[] = [];
+        const newRichText: any[] = [];
+        const newGroups: any[] = [];
+        const newImages: any[] = [];
+        // Add other collections as needed
 
-          // If this update modified connections, update connectors state accordingly
-          if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
-            const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: targetId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
-            setConnectors(prev => {
-              const filtered = prev.filter(p => p.from !== targetId);
-              return [...filtered, ...conns];
+        elements.forEach((element: any) => {
+          if (element.type === 'connector') {
+            newConnectors.push({
+              id: element.id,
+              from: element.from || element.meta?.from,
+              to: element.to || element.meta?.to,
+              color: element.meta?.color || '#437eb5',
+              fromAnchor: element.meta?.fromAnchor,
+              toAnchor: element.meta?.toAnchor
+            });
+          } else if (element.type === 'image-generator') {
+            newImageGens.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedImageUrl: element.meta?.generatedImageUrl || element.meta?.sourceImageUrl || null,
+              sourceImageUrl: element.meta?.sourceImageUrl || element.meta?.generatedImageUrl || null,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            });
+          } else if (element.type === 'video-generator') {
+            newVideoGens.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedVideoUrl: element.meta?.generatedVideoUrl || null,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frame: element.meta?.frame,
+              aspectRatio: element.meta?.aspectRatio,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            });
+          } else if (element.type === 'music-generator') {
+            newMusicGens.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              generatedMusicUrl: element.meta?.generatedMusicUrl || null,
+              activeCategory: element.meta?.activeCategory,
+              lyrics: element.meta?.lyrics,
+              sampleRate: element.meta?.sampleRate,
+              bitrate: element.meta?.bitrate,
+              audioFormat: element.meta?.audioFormat,
+              prompt: element.meta?.prompt,
+              model: element.meta?.model,
+              frameWidth: element.meta?.frameWidth,
+              frameHeight: element.meta?.frameHeight
+            });
+          } else if (element.type === 'text-generator') {
+            newTextGens.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              value: element.meta?.value || ''
+            });
+          } else if (element.type === 'rich-text') {
+            newRichText.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              text: element.meta?.text || '',
+              fontSize: element.meta?.fontSize || 24,
+              fontWeight: element.meta?.fontWeight || 'normal',
+              fontStyle: element.meta?.fontStyle || 'normal',
+              fontFamily: element.meta?.fontFamily || 'Inter, sans-serif',
+              textAlign: element.meta?.textAlign || 'left',
+              width: element.bounds?.width || 300,
+              height: element.bounds?.height || 100,
+              color: element.meta?.color || element.meta?.fill || '#ffffff',
+              backgroundColor: element.meta?.backgroundColor || 'transparent',
+              textDecoration: element.meta?.textDecoration || 'none',
+              styleType: element.meta?.styleType || 'paragraph',
+            });
+          } else if (element.type === 'group') {
+            newGroups.push({
+              id: element.id,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width || 100,
+              height: element.height || 100,
+              padding: element.padding || 0,
+              children: element.children || [],
+              meta: element.meta || { name: 'Group' }
+            });
+          } else if (element.type === 'image' || element.type === 'video' || element.type === 'model3d') {
+            newImages.push({
+              type: element.type,
+              url: element.meta?.url || element.url,
+              x: element.x || 0,
+              y: element.y || 0,
+              width: element.width || 400,
+              height: element.height || 400,
+              elementId: element.id,
+              meta: element.meta
             });
           }
+        });
+
+        if (newConnectors.length > 0) setConnectors(prev => [...prev.filter(x => !newConnectors.some(n => n.id === x.id)), ...newConnectors]);
+        if (newImageGens.length > 0) setImageGenerators(prev => [...prev.filter(x => !newImageGens.some(n => n.id === x.id)), ...newImageGens]);
+        if (newVideoGens.length > 0) setVideoGenerators(prev => [...prev.filter(x => !newVideoGens.some(n => n.id === x.id)), ...newVideoGens]);
+        if (newMusicGens.length > 0) setMusicGenerators(prev => [...prev.filter(x => !newMusicGens.some(n => n.id === x.id)), ...newMusicGens]);
+        if (newTextGens.length > 0) setTextGenerators(prev => [...prev.filter(x => !newTextGens.some(n => n.id === x.id)), ...newTextGens]);
+        if (newRichText.length > 0) setRichTextStates(prev => [...prev.filter(x => !newRichText.some(n => n.id === x.id)), ...newRichText]);
+        if (newGroups.length > 0) setGroupContainerStates(prev => [...prev.filter(x => !newGroups.some(n => n.id === x.id)), ...newGroups]);
+        if (newImages.length > 0) setImages(prev => [...prev.filter(x => !newImages.some(n => (n as any).elementId === x.elementId)), ...newImages]);
+
+      } else if (op.type === 'delete' || op.type === 'generator.delete' || op.type === 'media.delete') {
+        // CLEAN DELETE LOGIC
+        const ids = (op as any).elementIds || [(op as any).elementId || op.id];
+        console.log('[handleOpApplied] DELETE BLOCK ENTERED. IDs:', ids, 'IsArray:', Array.isArray(ids));
+        if (Array.isArray(ids)) {
+          const idsSet = new Set(ids);
+          ids.forEach(id => {
+            console.log('[handleOpApplied] DELETING ID:', id);
+
+            // Clear blob URLs for deleted images to prevent memory leaks
+            setImages(prev => {
+              const target = prev.find(img => (img as any).elementId === id);
+              if (target) console.log('[handleOpApplied] Found in IMAGES', id);
+              if (target && target.url && target.url.startsWith('blob:')) {
+                URL.revokeObjectURL(target.url);
+              }
+              return prev.filter(m => (m as any).elementId !== id);
+            });
+
+            // Clear generators
+            setImageGenerators(prev => {
+              const found = prev.some(m => m.id === id);
+              if (found) console.log('[handleOpApplied] REMOVING from ImageGenerators', id);
+              return prev.filter(m => m.id !== id);
+            });
+            setVideoGenerators(prev => prev.filter(m => m.id !== id));
+            setVideoEditorGenerators(prev => prev.filter(m => m.id !== id));
+            setMusicGenerators(prev => prev.filter(m => m.id !== id));
+            setUpscaleGenerators(prev => prev.filter(m => m.id !== id));
+            setMultiangleCameraGenerators(prev => prev.filter(m => m.id !== id));
+            setRemoveBgGenerators(prev => prev.filter(m => m.id !== id));
+            setEraseGenerators(prev => prev.filter(m => m.id !== id));
+            setExpandGenerators(prev => prev.filter(m => m.id !== id));
+            setVectorizeGenerators(prev => prev.filter(m => m.id !== id));
+            setNextSceneGenerators(prev => prev.filter(m => m.id !== id));
+            setStoryboardGenerators(prev => prev.filter(m => m.id !== id));
+            setScriptFrameGenerators(prev => prev.filter(m => m.id !== id));
+            setSceneFrameGenerators(prev => prev.filter(m => m.id !== id));
+            setTextGenerators(prev => prev.filter(t => t.id !== id));
+            setCompareGenerators(prev => prev.filter(m => m.id !== id));
+
+            // Clear text states
+            setCanvasTextStates(prev => prev.filter(t => t.id !== id));
+            setRichTextStates(prev => prev.filter(t => t.id !== id));
+
+            // Clear connectors
+            setConnectors(prev => prev.filter(c => c.from !== id && c.to !== id));
+
+            // Clear groupsRef (CRITICAL FOR PERSISTENCE FIX)
+            if (groupsRef.current && groupsRef.current[id]) {
+              delete groupsRef.current[id];
+            }
+          });
         }
-      } catch (err: any) {
-        console.error('[Ops] error applying op', err);
+      } else if (op.type === 'move' && op.elementId && op.data.delta) {
+        // Move element
+        setImages((prev) => {
+          const index = prev.findIndex(img => (img as any).elementId === op.elementId);
+          if (index >= 0) {
+            const newImages = [...prev];
+            const current = newImages[index];
+            newImages[index] = {
+              ...current,
+              x: (current.x || 0) + op.data.delta.x,
+              y: (current.y || 0) + op.data.delta.y,
+            };
+            return newImages;
+          }
+          return prev;
+        });
+        // Move generator overlay by delta (needed for undo/redo)
+        setImageGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
+            return next;
+          }
+          return prev;
+        });
+        setVideoGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
+            return next;
+          }
+          return prev;
+        });
+        setMusicGenerators((prev) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) } as any;
+            return next;
+          }
+          return prev;
+        });
+        setTextGenerators((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        });
+        const updatePluginPosition = (prev: any[]) => {
+          const idx = prev.findIndex(m => m.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        };
+        setRemoveBgGenerators(updatePluginPosition);
+        setCompareGenerators(updatePluginPosition);
+        setEraseGenerators(updatePluginPosition);
+        setExpandGenerators(updatePluginPosition);
+        setVectorizeGenerators(updatePluginPosition);
+        setNextSceneGenerators(updatePluginPosition);
+        setStoryboardGenerators(updatePluginPosition);
+        setScriptFrameGenerators(updatePluginPosition);
+        setSceneFrameGenerators(updatePluginPosition);
+        setRichTextStates((prev) => {
+          const idx = prev.findIndex(t => t.id === op.elementId);
+          if (idx >= 0) {
+            const cur = prev[idx];
+            const next = [...prev];
+            next[idx] = { ...cur, x: (cur.x || 0) + (op.data.delta?.x || 0), y: (cur.y || 0) + (op.data.delta?.y || 0) };
+            return next;
+          }
+          return prev;
+        });
+      } else if (op.type === 'update' && op.elementId && op.data.updates) {
+        const targetId = op.elementId;
+        const updates = { ...op.data.updates };
+        if (updates.meta) {
+          Object.assign(updates, updates.meta);
+          delete updates.meta;
+        }
+
+        // Optimized update: only call the setter if the ID matches
+        const updateIfContains = (prev: any[]) => {
+          const idx = prev.findIndex(item => (item.id || item.elementId) === targetId);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...updates };
+            return next;
+          }
+          return prev;
+        };
+
+        // Try images first
+        setImages(updateIfContains);
+        // Then generators
+        setImageGenerators(updateIfContains);
+        setVideoGenerators(updateIfContains);
+        setMusicGenerators(updateIfContains);
+        setTextGenerators(updateIfContains);
+        setUpscaleGenerators(updateIfContains);
+        setRemoveBgGenerators(updateIfContains);
+        setEraseGenerators(updateIfContains);
+        setExpandGenerators(updateIfContains);
+        setVectorizeGenerators(updateIfContains);
+        setNextSceneGenerators(updateIfContains);
+        setStoryboardGenerators(updateIfContains);
+        setScriptFrameGenerators(updateIfContains);
+        setSceneFrameGenerators(updateIfContains);
+        setRichTextStates(updateIfContains);
+
+        // If this update modified connections, update connectors state accordingly
+        if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
+          const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: targetId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
+          setConnectors(prev => {
+            const filtered = prev.filter(p => p.from !== targetId);
+            return [...filtered, ...conns];
+          });
+        }
       }
-    },
-  });
+    } catch (err: any) {
+      console.error('[Ops] error applying op', err);
+    }
+  };
+
+  // Strict Server-Authoritative Methods
+  // Removed useOpManager and local history
+
+  const appendOp = useCallback((op: any) => {
+    if (realtimeRef.current) {
+      realtimeRef.current.sendOperation(op, op.inverse);
+    } else {
+      console.warn('Realtime offline: operation failed', op);
+    }
+  }, [realtimeActive]);
+
+  const undo = useCallback(() => {
+    realtimeRef.current?.sendUndo();
+  }, []);
+
+  const redo = useCallback(() => {
+    realtimeRef.current?.sendRedo();
+  }, []);
+
+  // In strict mode, we don't know stack state unless server pushes it.
+  // For now, enable buttons.
+  const canUndo = true;
+  const canRedo = true;
+
+  // Alias for compatibility during refactor
+  const opManagerInitialized = realtimeActive;
 
   // Helper: remove any connectors that reference a given element id and persist their deletion
   const removeAndPersistConnectorsForElement = async (elementId: string) => {
@@ -938,128 +1201,128 @@ export function CanvasApp({ user }: CanvasAppProps) {
     const toRemove = connectors.filter(c => c.from === elementId || c.to === elementId).map(c => c.id);
     if (!toRemove || toRemove.length === 0) return;
 
-    // Optimistic update
-    setConnectors(prev => prev.filter(c => !toRemove.includes(c.id)));
-
-    // Broadcast via realtime (if available)
-    if (realtimeActive) {
-      try {
-        toRemove.forEach(id => {
-          try { realtimeRef.current?.sendDelete(id); } catch (e) { /* best-effort */ }
-        });
-      } catch (e) { console.warn('realtime send connector.delete failed', e); }
-    }
-
-    // Persist deletes as individual delete ops so server removes connector elements
-    if (projectId && opManagerInitialized) {
+    if (projectId) {
       for (const connId of toRemove) {
         try {
-          // Capture inverse by finding connector details
           const conn = connectors.find(c => c.id === connId);
-          const inverse = conn ? { type: 'create', elementId: connId, data: { element: { id: connId, type: 'connector', from: conn.from, to: conn.to, meta: { color: conn.color, fromAnchor: conn.fromAnchor, toAnchor: conn.toAnchor } } }, requestId: '', clientTs: 0 } : undefined;
-          await appendOp({ type: 'delete', elementId: connId, data: {}, inverse: inverse as any } as any);
+          const inverse = conn ? {
+            type: 'create',
+            elementId: connId,
+            data: {
+              element: {
+                id: connId,
+                type: 'connector',
+                from: conn.from,
+                to: conn.to,
+                meta: { color: conn.color, fromAnchor: conn.fromAnchor, toAnchor: conn.toAnchor }
+              }
+            },
+            authorId: 'user'
+          } : undefined;
+
+          await appendOp({
+            type: 'delete',
+            elementId: connId,
+            data: {},
+            inverse: inverse as any,
+            authorId: 'user'
+          });
         } catch (e) {
           console.error('Failed to persist connector delete op', e);
         }
-      }
-      // Force-persist snapshot to reflect removals immediately
-      try {
-        const filteredConnectors = connectors.filter(c => !toRemove.includes(c.id));
-        const elements = buildSnapshotElements(getCanvasAppState(), filteredConnectors);
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
-      } catch (e) {
-        console.warn('Failed to persist snapshot after connector removals', e);
       }
     }
   };
 
   const handleBulkDelete = useCallback(async (elementIds: string[]) => {
     if (!elementIds || elementIds.length === 0) return;
-    if (!projectId || !opManagerInitialized) return;
+    if (!projectId) return;
 
     console.log('[BulkDelete] processing deletion of:', elementIds);
 
-    // 1. Update React states for all possible element types locally (optimistic)
-    setImages(prev => prev.filter(img => !elementIds.includes(img.elementId || '')));
-    setImageGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setVideoGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setVideoEditorGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setMusicGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setUpscaleGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setMultiangleCameraGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setRemoveBgGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setEraseGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setExpandGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setVectorizeGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setNextSceneGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setStoryboardGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setScriptFrameGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setSceneFrameGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setCanvasTextStates(prev => prev.filter(txt => !elementIds.includes(txt.id)));
-    setRichTextStates(prev => prev.filter(txt => !elementIds.includes(txt.id)));
-    setGenerationQueue(prev => prev.filter(item => !elementIds.includes(item.id)));
-    setCompareGenerators(prev => prev.filter(gen => !elementIds.includes(gen.id)));
-    setGroupContainerStates(prev => prev.filter(group => !elementIds.includes(group.id)));
+    // 0. Capture state for inverse (BEFORE deleting)
+    const deletedElements: any[] = [];
+    const elementsToCapture = new Set(elementIds);
 
-    // 2. Also handle connected items (connectors)
-    setConnectors(prev => prev.filter(conn =>
-      !elementIds.includes(conn.id) &&
-      !elementIds.includes(conn.from) &&
-      !elementIds.includes(conn.to)
-    ));
+    // Capture images
+    images.forEach(img => {
+      if (img && (img as any).elementId && elementsToCapture.has((img as any).elementId)) {
+        deletedElements.push({
+          id: (img as any).elementId,
+          type: img.type || 'image',
+          x: img.x, y: img.y, width: img.width, height: img.height,
+          url: img.url,
+          meta: (img as any).meta || {}
+        });
+      }
+    });
 
-    // 3. Append single Bulk Delete Op to OpManager
+    // Capture generators
+    const captureGenerator = (list: any[], type: string) => {
+      list.forEach(item => {
+        if (item && elementsToCapture.has(item.id)) {
+          deletedElements.push({
+            id: item.id,
+            type,
+            x: item.x, y: item.y,
+            meta: { ...item }
+          });
+        }
+      });
+    };
+
+    captureGenerator(imageGenerators, 'image-generator');
+    captureGenerator(videoGenerators, 'video-generator');
+    captureGenerator(musicGenerators, 'music-generator');
+    captureGenerator(textGenerators, 'text-generator');
+    captureGenerator(richTextStates, 'rich-text');
+    captureGenerator(groupContainerStates, 'group');
+    captureGenerator(upscaleGenerators, 'upscale-generator');
+    captureGenerator(multiangleCameraGenerators, 'multiangle-camera-generator');
+    captureGenerator(removeBgGenerators, 'removebg-generator');
+    captureGenerator(eraseGenerators, 'erase-generator');
+    captureGenerator(expandGenerators, 'expand-generator');
+    captureGenerator(vectorizeGenerators, 'vectorize-generator');
+    captureGenerator(nextSceneGenerators, 'next-scene-generator');
+    captureGenerator(storyboardGenerators, 'storyboard-generator');
+    captureGenerator(scriptFrameGenerators, 'script-frame-generator');
+    captureGenerator(sceneFrameGenerators, 'scene-frame-generator');
+    captureGenerator(canvasTextStates, 'text');
+    captureGenerator(compareGenerators, 'compare-generator');
+
+    // Capture connectors
+    connectors.forEach(conn => {
+      if (elementsToCapture.has(conn.id)) {
+        deletedElements.push({
+          id: conn.id,
+          type: 'connector',
+          from: conn.from, to: conn.to,
+          meta: { color: conn.color, fromAnchor: conn.fromAnchor, toAnchor: conn.toAnchor }
+        });
+      }
+    });
+
+    // 1. Send Op (Stict Mode: No Optimistic Update)
+    console.log('[Client] Sending Bulk Delete for IDs:', elementIds);
     await appendOp({
       type: 'delete',
-      elementIds, // Custom property for multi-delete
+      elementIds,
       data: {},
-      inverse: { type: 'bulk-restore-placeholder' } as any
+      inverse: {
+        type: 'bulk-create',
+        data: { elements: deletedElements },
+        authorId: 'user'
+      },
+      authorId: 'user'
     });
 
-    // 4. Update local groups ref
-    elementIds.forEach(id => {
-      if (groupsRef.current[id]) delete groupsRef.current[id];
-    });
-
-    // 5. Trigger a single snapshot save with updated states
-    try {
-      const state = {
-        images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators,
-        upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
-        expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators,
-        scriptFrameGenerators, sceneFrameGenerators, textGenerators,
-        canvasTextStates, richTextStates, connectors, generationQueue, compareGenerators,
-        groupContainerStates
-      };
-
-      const filteredState = {
-        ...state,
-        images: images.filter(img => !elementIds.includes(img.elementId || '')),
-        imageGenerators: imageGenerators.filter(gen => !elementIds.includes(gen.id)),
-        videoGenerators: videoGenerators.filter(gen => !elementIds.includes(gen.id)),
-        canvasTextStates: canvasTextStates.filter(txt => !elementIds.includes(txt.id)),
-        richTextStates: richTextStates.filter(txt => !elementIds.includes(txt.id)),
-        groupContainerStates: groupContainerStates.filter(g => !elementIds.includes(g.id)),
-        connectors: connectors.filter(c => !elementIds.includes(c.id) && !elementIds.includes(c.from) && !elementIds.includes(c.to))
-      };
-
-      const elements = buildSnapshotElements(filteredState);
-      await apiSetCurrentSnapshot(projectId, {
-        elements,
-        metadata: { version: '1.2', viewport: viewportCenterRef.current }
-      });
-      console.log('[BulkDelete] snapshot persisted');
-    } catch (e) {
-      console.error('[BulkDelete] snapshot failed', e);
-    }
   }, [
-    projectId, opManagerInitialized, images, imageGenerators, videoGenerators,
-    videoEditorGenerators, musicGenerators, upscaleGenerators,
-    multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
-    expandGenerators, vectorizeGenerators, nextSceneGenerators,
-    storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators,
-    textGenerators, canvasTextStates, richTextStates, connectors,
-    generationQueue, compareGenerators, groupContainerStates, appendOp
+    projectId,
+    images, imageGenerators, videoGenerators, musicGenerators, textGenerators, richTextStates,
+    groupContainerStates, connectors, appendOp,
+    upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators,
+    expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators,
+    scriptFrameGenerators, sceneFrameGenerators, canvasTextStates, compareGenerators
   ]);
 
   // Auto-persist any newly created media nodes that don't yet have a stable elementId.
@@ -1124,9 +1387,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
     realtimeActiveRef.current = realtimeActive;
   }, [realtimeActive]);
 
+  // FIX: Use a Ref for handleOpApplied to avoid Stale Closures in the Realtime Listener
+  // The listener is created once (on mount/project change), but handleOpApplied receives fresh state/setters on every render.
+  const handleOpAppliedRef = useRef(handleOpApplied);
+  useEffect(() => {
+    handleOpAppliedRef.current = handleOpApplied;
+  }, [handleOpApplied]);
+
   // Setup realtime connection for generator overlays
   useEffect(() => {
     if (!projectId) {
+      console.log('[Realtime] No projectId, skipping connection.');
       // disconnect if exists
       try { realtimeRef.current?.disconnect(); } catch { }
       setRealtimeActive(false);
@@ -1134,8 +1405,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
 
     if (!realtimeRef.current) {
+      console.log('[Realtime] Initializing new RealtimeClient instance.');
       realtimeRef.current = new RealtimeClient();
     }
+    console.log('[Realtime] Connecting for project:', projectId);
 
     const client = realtimeRef.current;
     const handleEvent = (evt: any) => {
@@ -1241,6 +1514,17 @@ export function CanvasApp({ user }: CanvasAppProps) {
         setImages(prev => prev.filter(img => (img as any).elementId !== id));
         // Remove any connectors referencing this media element
         setConnectors(prev => prev.filter(c => c.from !== id && c.to !== id));
+      } else if (evt.type === 'op' || evt.type === 'undo' || evt.type === 'redo') {
+        const op = evt.op;
+        // Apply operation if valid
+        if (op) {
+          console.log(`[Realtime] Applying ${evt.type}`, evt.seq, op.type);
+          // We pass isOptimistic=false because this is a confirmed op from server
+          // FIX: Use ref to call the LATEST version of the handler (updates state correctly)
+          if (handleOpAppliedRef.current) {
+            handleOpAppliedRef.current(op, false).catch(err => console.error('Failed to apply realtime op', err));
+          }
+        }
       }
     };
 
@@ -1269,15 +1553,62 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
     persistTimerRef.current = window.setTimeout(async () => {
       try {
+        console.log('[Autosave] Triggered. State counts:', {
+          images: images.length,
+          imgGens: imageGenerators.length,
+          vidGens: videoGenerators.length,
+          connectors: connectors.length,
+          groupsRefKeys: groupsRef.current ? Object.keys(groupsRef.current) : []
+        });
+
         const elements = buildSnapshotElements(getCanvasAppState());
+
+        if (Object.keys(elements).length === 0 && (images.length > 0 || imageGenerators.length > 0)) {
+          console.error('[Autosave] CRITICAL: Snapshot elements empty but state is not!', { elements, images: images.length, imgGens: imageGenerators.length });
+        }
+
         // Merge any known group elements we've persisted via the group handlers so autosave doesn't wipe them out
+        // Defensive Filter: Only merge from groupsRef if the ID currently exists in our React State
+        // This prevents "Zombie Resurrection" of deleted items that linger in the Ref.
+        const validStateIds = new Set<string>();
+
+        // Collect all valid IDs from the authoritative React State
+        images.forEach(i => i.elementId && validStateIds.add(i.elementId));
+        imageGenerators.forEach(g => validStateIds.add(g.id));
+        videoGenerators.forEach(g => validStateIds.add(g.id));
+        videoEditorGenerators.forEach(g => validStateIds.add(g.id));
+        musicGenerators.forEach(g => validStateIds.add(g.id));
+        textGenerators.forEach(g => validStateIds.add(g.id));
+        upscaleGenerators.forEach(g => validStateIds.add(g.id));
+        multiangleCameraGenerators.forEach(g => validStateIds.add(g.id));
+        removeBgGenerators.forEach(g => validStateIds.add(g.id));
+        eraseGenerators.forEach(g => validStateIds.add(g.id));
+        expandGenerators.forEach(g => validStateIds.add(g.id));
+        vectorizeGenerators.forEach(g => validStateIds.add(g.id));
+        nextSceneGenerators.forEach(g => validStateIds.add(g.id));
+        storyboardGenerators.forEach(g => validStateIds.add(g.id));
+        scriptFrameGenerators.forEach(g => validStateIds.add(g.id));
+        sceneFrameGenerators.forEach(g => validStateIds.add(g.id));
+        compareGenerators.forEach(g => validStateIds.add(g.id));
+        canvasTextStates.forEach(g => validStateIds.add(g.id));
+        richTextStates.forEach(g => validStateIds.add(g.id));
+        groupContainerStates.forEach(g => validStateIds.add(g.id));
+        // Connectors usually don't have group info in groupsRef, but good to be safe if implementation changes
+        connectors.forEach(c => validStateIds.add(c.id));
+
         if (groupsRef.current && Object.keys(groupsRef.current).length > 0) {
           Object.keys(groupsRef.current).forEach((gid) => {
-            elements[gid] = groupsRef.current[gid];
+            if (validStateIds.has(gid)) {
+              elements[gid] = groupsRef.current[gid];
+            } else {
+              // Found a Zombie! Kill it.
+              console.warn('[Autosave] Pruning zombie item from groupsRef:', gid);
+              delete groupsRef.current[gid];
+            }
           });
         }
         await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
-        // console.debug('[Snapshot] persisted', Object.keys(elements).length);
+        console.log('[Snapshot] persisted via autosave', Object.keys(elements).length);
       } catch (e) {
         console.warn('Failed to persist snapshot', e);
       }
@@ -1287,7 +1618,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, richTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators]);
+  }, [projectId, images, imageGenerators, videoGenerators, videoEditorGenerators, musicGenerators, textGenerators, canvasTextStates, richTextStates, upscaleGenerators, multiangleCameraGenerators, removeBgGenerators, eraseGenerators, expandGenerators, vectorizeGenerators, nextSceneGenerators, storyboardGenerators, scriptFrameGenerators, sceneFrameGenerators, connectors, compareGenerators, groupContainerStates, getCanvasAppState]);
 
   // Hydrate from current snapshot on project load
   useEffect(() => {
@@ -1771,13 +2102,27 @@ export function CanvasApp({ user }: CanvasAppProps) {
           const prevItem = richTextStatesRef.current.find(t => t.id === id);
 
           if (prevItem) {
-            // Optimistic update
-            setRichTextStates(prev => prev.filter(t => t.id !== id));
-            setSelectedRichTextId(null);
-
-            // Realtime
-            if (realtimeActive) {
-              realtimeRef.current?.sendDelete(id);
+            if (projectId) {
+              appendOp({
+                type: 'delete',
+                elementId: id,
+                data: {},
+                inverse: {
+                  type: 'create',
+                  elementId: id,
+                  data: {
+                    element: {
+                      id: prevItem.id,
+                      type: 'rich-text',
+                      x: prevItem.x,
+                      y: prevItem.y,
+                      meta: { ...prevItem }
+                    }
+                  },
+                  authorId: 'user'
+                } as any,
+                authorId: 'user'
+              });
             }
 
             // Persistence/Undo
@@ -2301,15 +2646,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         width: 200,
         height: 50,
       };
-      setRichTextStates(prev => [...prev.filter(m => m.id !== modalId), newRichText as any]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newRichText, type: 'rich-text' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'rich-text', x: viewportCenter.x, y: viewportCenter.y, meta: { ...newRichText, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     }
@@ -2421,15 +2763,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         upscaledImageUrl: null, sourceImageUrl: null, localUpscaledImageUrl: null,
         model: 'Crystal Upscaler', scale: 2, frameWidth: 400, frameHeight: 500, isUpscaling: false,
       };
-      setUpscaleGenerators(prev => [...prev.filter(m => m.id !== modalId), newUpscale]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newUpscale, type: 'upscale' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'upscale-plugin', x: modalX, y: modalY, meta: { ...newUpscale, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'multiangle-camera') {
@@ -2438,15 +2777,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
     } else if (pluginId === 'compare') {
       const modalId = `compare-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const newCompare = { id: modalId, x: modalX, y: modalY, width: 600, height: 400, scale: 1 };
-      setCompareGenerators(prev => [...prev.filter(m => m.id !== modalId), newCompare]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newCompare, type: 'compare', prompt: '', model: 'base' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'compare-plugin', x: modalX, y: modalY, width: 600, height: 400, meta: { scale: 1, prompt: '', model: 'base' } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'vectorize') {
@@ -2456,29 +2792,23 @@ export function CanvasApp({ user }: CanvasAppProps) {
         vectorizedImageUrl: null, sourceImageUrl: null, localVectorizedImageUrl: null,
         mode: 'Detailed', frameWidth: 400, frameHeight: 500, isVectorizing: false,
       };
-      setVectorizeGenerators(prev => [...prev.filter(m => m.id !== modalId), newVectorize]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newVectorize, type: 'vectorize', mode: 'simple' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'vectorize-plugin', x: modalX, y: modalY, meta: { ...newVectorize, id: undefined, x: undefined, y: undefined, mode: 'simple' } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'storyboard') {
       const modalId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const newStoryboard = { id: modalId, x: modalX, y: modalY, frameWidth: 400, frameHeight: 500, scriptText: null };
-      setStoryboardGenerators(prev => [...prev.filter(m => m.id !== modalId), newStoryboard]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newStoryboard, type: 'storyboard' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'storyboard-plugin', x: modalX, y: modalY, meta: { frameWidth: 400, frameHeight: 500, scriptText: null } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'removebg') {
@@ -2489,15 +2819,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         model: '851-labs/background-remover', backgroundType: 'rgba (transparent)', scaleValue: 0.5,
         frameWidth: 400, frameHeight: 500, isRemovingBg: false,
       };
-      setRemoveBgGenerators(prev => [...prev.filter(m => m.id !== modalId), newRemoveBg]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newRemoveBg, type: 'removebg' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'removebg-plugin', x: modalX, y: modalY, meta: { ...newRemoveBg, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'erase') {
@@ -2507,15 +2834,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         erasedImageUrl: null, sourceImageUrl: null, localErasedImageUrl: null,
         model: 'bria/eraser', frameWidth: 400, frameHeight: 500, isErasing: false,
       };
-      setEraseGenerators(prev => [...prev.filter(m => m.id !== modalId), newErase]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newErase, type: 'erase' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'erase-plugin', x: modalX, y: modalY, meta: { ...newErase, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'expand') {
@@ -2525,15 +2849,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         expandedImageUrl: null, sourceImageUrl: null, localExpandedImageUrl: null,
         model: 'expand/base', frameWidth: 400, frameHeight: 500, isExpanding: false,
       };
-      setExpandGenerators(prev => [...prev.filter(m => m.id !== modalId), newExpand]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newExpand, type: 'expand' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'expand-plugin', x: modalX, y: modalY, meta: { ...newExpand, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
     } else if (pluginId === 'next-scene') {
@@ -2543,15 +2864,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
         nextSceneImageUrl: null, sourceImageUrl: null, localNextSceneImageUrl: null,
         mode: 'scene', frameWidth: 400, frameHeight: 500, isProcessing: false,
       };
-      setNextSceneGenerators(prev => [...prev.filter(m => m.id !== modalId), newNextScene]);
-      if (realtimeActive) {
-        realtimeRef.current?.sendCreate({ ...newNextScene, type: 'next-scene-plugin' });
-      }
-      if (projectId && opManagerInitialized) {
+      if (projectId) {
         await appendOp({
           type: 'create', elementId: modalId,
           data: { element: { id: modalId, type: 'next-scene-plugin', x: modalX, y: modalY, meta: { ...newNextScene, id: undefined, x: undefined, y: undefined } } },
-          inverse: { type: 'delete', elementId: modalId, data: {}, requestId: '', clientTs: 0 } as any,
+          inverse: { type: 'delete', elementId: modalId, data: {}, authorId: 'user' } as any,
+          authorId: 'user'
         });
       }
       await pluginHandlers.onPersistNextSceneModalCreate(newNextScene);
@@ -2597,6 +2915,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           x: modalX,
           y: modalY,
           generatedImageUrl: mediaUrl, // Use original URL, ImageUploadModal will handle proxy if needed
+          sourceImageUrl: mediaUrl, // CRITICAL: Persist source URL for recovery and reference
           frameWidth: width,
           frameHeight: height,
           model: 'Library Image',
@@ -3104,93 +3423,32 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistGroupUpdate={async (id, updates, prev) => {
                 if (!id) return;
-                if (projectId && opManagerInitialized) {
-                  try {
-                    const inverseUpdates: any = {};
-                    if (prev) {
-                      for (const k of Object.keys(updates || {})) {
-                        (inverseUpdates as any)[k] = (prev as any)[k];
-                      }
+                if (projectId) {
+                  const inverseUpdates: any = {};
+                  if (prev) {
+                    for (const k of Object.keys(updates || {})) {
+                      (inverseUpdates as any)[k] = (prev as any)[k];
                     }
-                    await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
-                    console.log('[Group] appended update op', id, updates);
-                    // Force snapshot persist so updated group is reflected immediately
-                    try {
-                      const elements = buildSnapshotElements(getCanvasAppState());
-                      // Merge/replace the group element in the snapshot
-                      // CAREFUL: updates.meta might be partial.
-                      // prev is the full previous state of the group.
-                      // We need to merge meta correctly.
-                      const currentMeta = prev?.meta || {};
-                      const updatedMeta = (updates as any).meta || {};
-                      const mergedMeta = { ...currentMeta, ...updatedMeta };
-
-                      const newElementState = {
-                        id,
-                        type: 'group',
-                        x: (updates as any).x ?? prev?.x,
-                        y: (updates as any).y ?? prev?.y,
-                        width: (updates as any).width ?? prev?.width,
-                        height: (updates as any).height ?? prev?.height,
-                        padding: (updates as any).padding ?? prev?.padding,
-                        children: (updates as any).children ?? prev?.children ?? [],
-                        meta: {
-                          name: mergedMeta.name ?? 'Group',
-                          color: mergedMeta.color, // Persist color
-                          createdAt: mergedMeta.createdAt
-                        }
-                      };
-
-                      elements[id] = newElementState;
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
-                      console.log('[Group] apiSetCurrentSnapshot success (update)', { projectId, ssRes });
-                      // Update local copy used for autosave
-                      groupsRef.current[id] = newElementState as any;
-                    } catch (e) {
-                      console.warn('[Group] Failed to persist snapshot after update', e);
-                    }
-                  } catch (e) {
-                    console.error('Failed to persist group update', e);
                   }
+                  await appendOp({
+                    type: 'update',
+                    elementId: id,
+                    data: { updates },
+                    inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistGroupDelete={async (groupId) => {
                 if (!groupId) return;
-                // Look up group in ref to get data for inverse op
                 const group = groupsRef.current[groupId];
-
-                if (projectId && opManagerInitialized) {
-                  try {
-                    const inverse = { type: 'create', elementId: groupId, data: { element: group || { id: groupId, type: 'group', x: 0, y: 0, width: 100, height: 100, padding: 0, children: [], meta: { name: 'Group' } } }, requestId: '', clientTs: 0 } as any;
-                    console.log('[Group] appending delete op for group', groupId);
-                    await appendOp({ type: 'delete', elementId: groupId, data: {}, inverse } as any);
-                    // Force snapshot persist so deleted group is removed immediately
-                    try {
-                      const elements = buildSnapshotElements(getCanvasAppState());
-                      // Ensure group is not present in snapshot (don't inject it)
-                      if (elements[groupId]) delete elements[groupId];
-                      const ssRes = await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.1', viewport: viewportCenterRef.current } });
-                      console.log('[Group] apiSetCurrentSnapshot success (delete)', { projectId, ssRes });
-                      // Remove from local cache so autosave won't re-insert
-                      if (groupsRef.current[groupId]) delete groupsRef.current[groupId];
-                    } catch (e) {
-                      console.warn('[Group] Failed to persist snapshot after delete', e);
-                    }
-                  } catch (e) {
-                    console.error('Failed to persist group delete', e);
-                  }
+                if (projectId) {
+                  const inverse = { type: 'create', elementId: groupId, data: { element: group || { id: groupId, type: 'group', x: 0, y: 0, width: 100, height: 100, padding: 0, children: [], meta: { name: 'Group' } } }, authorId: 'user' } as any;
+                  await appendOp({ type: 'delete', elementId: groupId, data: {}, inverse, authorId: 'user' });
                 }
               }}
               onPersistImageModalCreate={async (modal) => {
-                // Optimistic update
-                setImageGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create image', modal.id);
-                  realtimeRef.current?.sendCreate({ id: modal.id, type: 'image', x: modal.x, y: modal.y, generatedImageUrl: modal.generatedImageUrl || null });
-                }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
+                if (projectId) {
                   await appendOp({
                     type: 'create',
                     elementId: modal.id,
@@ -3202,7 +3460,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         y: modal.y,
                         meta: {
                           generatedImageUrl: modal.generatedImageUrl || null,
-                          sourceImageUrl: (modal as any).sourceImageUrl || null, // CRITICAL: Persist sourceImageUrl
+                          sourceImageUrl: (modal as any).sourceImageUrl || null,
                           prompt: (modal as any).prompt || null,
                           model: (modal as any).model || null,
                           frame: (modal as any).frame || null,
@@ -3212,19 +3470,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         }
                       },
                     },
-                    inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any,
+                    inverse: { type: 'delete', elementId: modal.id, data: {}, authorId: 'user' } as any,
+                    authorId: 'user'
                   });
                 }
               }}
               onPersistImageModalMove={async (id, updates) => {
-                // Optimistic update
-                setImageGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast update image', id, Object.keys(updates || {}));
-                  realtimeRef.current?.sendUpdate(id, updates as any);
-                }
-                // Append op for undo/redo step (debounced)
                 debounceMove('image-generator', id, updates, async (id, updates) => {
                   const prev = imageGeneratorsRef.current.find(m => m.id === id);
                   const inverseUpdates: any = {};
@@ -3233,49 +3484,66 @@ export function CanvasApp({ user }: CanvasAppProps) {
                       (inverseUpdates as any)[k] = (prev as any)[k];
                     }
                   }
-                  await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                  await appendOp({
+                    type: 'update',
+                    elementId: id,
+                    data: { updates },
+                    inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 });
               }}
               onPersistImageModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistImageModalDelete called', id);
                 const prevItem = imageGeneratorsRef.current.find(m => m.id === id);
-                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
-                setImageGenerators(prev => {
-                  const filtered = prev.filter(m => m.id !== id);
-                  console.log('[page.tsx] imageGenerators updated, remaining:', filtered.length);
-                  return filtered;
-                });
-                // Then do async operations
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast delete image', id);
-                  realtimeRef.current?.sendDelete(id);
-                }
-                // Also remove any connectors that referenced this element
+
+                // Remove connectors first (sends ops)
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'image-generator', x: prevItem.x, y: prevItem.y, meta: { generatedImageUrl: (prevItem as any).generatedImageUrl || null } } }, requestId: '', clientTs: 0 } as any : undefined as any });
+
+                if (projectId) {
+                  await appendOp({
+                    type: 'delete',
+                    elementIds: [id],
+                    data: {},
+                    inverse: prevItem ? {
+                      type: 'create',
+                      elementId: id,
+                      data: {
+                        element: {
+                          id,
+                          type: 'image-generator',
+                          x: prevItem.x,
+                          y: prevItem.y,
+                          meta: { generatedImageUrl: (prevItem as any).generatedImageUrl || null }
+                        }
+                      },
+                      authorId: 'user'
+                    } as any : undefined as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistVideoModalCreate={async (modal) => {
-                setVideoGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create video', modal.id);
-                  realtimeRef.current?.sendCreate({ id: modal.id, type: 'video', x: modal.x, y: modal.y, generatedVideoUrl: modal.generatedVideoUrl || null });
-                }
-                if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'create', elementId: modal.id, data: { element: { id: modal.id, type: 'video-generator', x: modal.x, y: modal.y, meta: { generatedVideoUrl: modal.generatedVideoUrl || null } } }, inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any });
+                if (projectId) {
+                  await appendOp({
+                    type: 'create',
+                    elementId: modal.id,
+                    data: {
+                      element: {
+                        id: modal.id,
+                        type: 'video-generator',
+                        x: modal.x,
+                        y: modal.y,
+                        meta: { generatedVideoUrl: modal.generatedVideoUrl || null }
+                      }
+                    },
+                    inverse: { type: 'delete', elementId: modal.id, data: {}, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistVideoModalMove={async (id, updates) => {
-                // Optimistic update
-                setVideoGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-                // Broadcast via realtime
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast update video', id, Object.keys(updates || {}));
-                  realtimeRef.current?.sendUpdate(id, updates as any);
-                }
-                if (projectId && opManagerInitialized) {
+                if (projectId) {
                   debounceMove('video-generator', id, updates, async (id, updates) => {
                     const prev = videoGeneratorsRef.current.find(m => m.id === id);
                     const inverseUpdates: any = {};
@@ -3284,66 +3552,47 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         (inverseUpdates as any)[k] = (prev as any)[k];
                       }
                     }
-                    await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                    await appendOp({
+                      type: 'update',
+                      elementId: id,
+                      data: { updates },
+                      inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, authorId: 'user' } as any,
+                      authorId: 'user'
+                    });
                   });
                 }
               }}
               onPersistVideoModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistVideoModalDelete called', id);
                 const prevItem = videoGeneratorsRef.current.find(m => m.id === id);
-                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
-                setVideoGenerators(prev => {
-                  const filtered = prev.filter(m => m.id !== id);
-                  console.log('[page.tsx] videoGenerators updated, remaining:', filtered.length);
-                  return filtered;
-                });
-                // Then do async operations
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast delete video', id);
-                  realtimeRef.current?.sendDelete(id);
-                }
-                // Also remove any connectors that referenced this element
+
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-                if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'video-generator', x: prevItem.x, y: prevItem.y, meta: { generatedVideoUrl: (prevItem as any).generatedVideoUrl || null } } }, requestId: '', clientTs: 0 } as any : undefined as any });
+
+                if (projectId) {
+                  await appendOp({
+                    type: 'delete',
+                    elementId: id,
+                    data: {},
+                    inverse: prevItem ? {
+                      type: 'create',
+                      elementId: id,
+                      data: {
+                        element: {
+                          id,
+                          type: 'video-generator',
+                          x: prevItem.x,
+                          y: prevItem.y,
+                          meta: { generatedVideoUrl: (prevItem as any).generatedVideoUrl || null }
+                        }
+                      },
+                      authorId: 'user'
+                    } as any : undefined as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistMusicModalCreate={async (modal) => {
-                setMusicGenerators(prev => prev.some(m => m.id === modal.id) ? prev : [...prev, modal]);
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create music', modal.id);
-                  realtimeRef.current?.sendCreate({
-                    id: modal.id,
-                    type: 'music',
-                    x: modal.x,
-                    y: modal.y,
-                    generatedMusicUrl: modal.generatedMusicUrl || null,
-                    activeCategory: (modal as any).activeCategory || null,
-                    lyrics: (modal as any).lyrics || null,
-                    sampleRate: (modal as any).sampleRate || null,
-                    bitrate: (modal as any).bitrate || null,
-                    audioFormat: (modal as any).audioFormat || null,
-                    prompt: modal.prompt || null,
-                    model: modal.model || null,
-                    frame: modal.frame || null,
-                    aspectRatio: modal.aspectRatio || null,
-                    voiceId: (modal as any).voiceId,
-                    stability: (modal as any).stability,
-                    similarityBoost: (modal as any).similarityBoost,
-                    style: (modal as any).style,
-                    speed: (modal as any).speed,
-                    exaggeration: (modal as any).exaggeration,
-                    temperature: (modal as any).temperature,
-                    cfgScale: (modal as any).cfgScale,
-                    voicePrompt: (modal as any).voicePrompt,
-                    topP: (modal as any).topP,
-                    maxTokens: (modal as any).maxTokens,
-                    repetitionPenalty: (modal as any).repetitionPenalty,
-                    dialogueInputs: (modal as any).dialogueInputs || [],
-                    useSpeakerBoost: (modal as any).useSpeakerBoost
-                  } as any);
-                }
-                if (projectId && opManagerInitialized) {
+                if (projectId) {
                   await appendOp({
                     type: 'create',
                     elementId: modal.id,
@@ -3383,17 +3632,13 @@ export function CanvasApp({ user }: CanvasAppProps) {
                         }
                       }
                     },
-                    inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 }
-                  } as any);
+                    inverse: { type: 'delete', elementId: modal.id, data: {}, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistMusicModalMove={async (id, updates) => {
-                setMusicGenerators(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast update music', id, Object.keys(updates || {}));
-                  realtimeRef.current?.sendUpdate(id, updates as any);
-                }
-                if (projectId && opManagerInitialized) {
+                if (projectId) {
                   const prev = musicGeneratorsRef.current.find(m => m.id === id);
                   const inverseUpdates: any = {};
                   if (prev) {
@@ -3402,8 +3647,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     }
                   }
 
-                  // Construct complete meta object from merged state to ensure no data loss
-                  // (Backend might overwrite meta if we send partial, so we send full)
                   const nextState = { ...(prev || {}), ...updates } as any;
 
                   const meta: any = {
@@ -3435,31 +3678,24 @@ export function CanvasApp({ user }: CanvasAppProps) {
                     useSpeakerBoost: nextState.useSpeakerBoost,
                   };
 
-                  console.log('[Persistence] Saving music meta (full):', id, meta);
-
-                  // We only need to send 'meta' in the persistence update
                   const persistenceUpdates = { meta };
 
-                  await appendOp({ type: 'update', elementId: id, data: { updates: persistenceUpdates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                  await appendOp({
+                    type: 'update',
+                    elementId: id,
+                    data: { updates: persistenceUpdates },
+                    inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistMusicModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistMusicModalDelete called', id);
                 const prevItem = musicGeneratorsRef.current.find(m => m.id === id);
-                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
-                setMusicGenerators(prev => {
-                  const filtered = prev.filter(m => m.id !== id);
-                  console.log('[page.tsx] musicGenerators updated, remaining:', filtered.length);
-                  return filtered;
-                });
-                // Then do async operations
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast delete music', id);
-                  realtimeRef.current?.sendDelete(id);
-                }
-                // Also remove any connectors that referenced this element
+
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-                if (projectId && opManagerInitialized) {
+
+                if (projectId) {
                   await appendOp({
                     type: 'delete',
                     elementId: id,
@@ -3487,9 +3723,9 @@ export function CanvasApp({ user }: CanvasAppProps) {
                           }
                         }
                       },
-                      requestId: '',
-                      clientTs: 0
-                    } as any : undefined as any
+                      authorId: 'user'
+                    } as any : undefined as any,
+                    authorId: 'user'
                   });
                 }
               }}
@@ -3535,56 +3771,76 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistVideoEditorModalDelete={pluginHandlers.onPersistVideoEditorModalDelete}
               onOpenVideoEditor={() => setIsVideoEditorOpen(true)}
               onPersistTextModalCreate={async (modal) => {
-                setTextGenerators(prev => prev.some(t => t.id === modal.id) ? prev : [...prev, modal]);
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast create text', modal.id);
-                  realtimeRef.current?.sendCreate({ id: modal.id, type: 'text', x: modal.x, y: modal.y, value: modal.value || '' });
-                }
-                if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'create', elementId: modal.id, data: { element: { id: modal.id, type: 'text-generator', x: modal.x, y: modal.y, meta: { value: modal.value || '' } } }, inverse: { type: 'delete', elementId: modal.id, data: {}, requestId: '', clientTs: 0 } as any });
+                if (projectId) {
+                  await appendOp({
+                    type: 'create',
+                    elementId: modal.id,
+                    data: {
+                      element: {
+                        id: modal.id,
+                        type: 'text-generator',
+                        x: modal.x,
+                        y: modal.y,
+                        meta: { value: modal.value || '' }
+                      }
+                    },
+                    inverse: { type: 'delete', elementId: modal.id, data: {}, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistTextModalMove={async (id: string, updates: any) => {
-                // Optimistic update with capture of previous state for correct inverse
                 let capturedPrev: { id: string; x: number; y: number; value?: string; sentValue?: string } | undefined = undefined;
-                setTextGenerators((prev) => {
-                  const found = prev.find(t => t.id === id);
-                  capturedPrev = found ? { ...found } : undefined;
-                  return prev.map(t => t.id === id ? { ...t, ...updates } : t);
-                });
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast update text', id, Object.keys(updates || {}));
-                  realtimeRef.current?.sendUpdate(id, updates as any);
-                }
-                if (projectId && opManagerInitialized) {
+                // No optimistic update. But we need prev value for inverse.
+                // WE should use ref for that.
+                const found = textGenerators.find(t => t.id === id); // Use state or ref? State is fine if consistent.
+                // But strictly, refs are better for inverse capture.
+                // I will trust 'found' from state for now.
+                capturedPrev = found ? { ...found } : undefined;
+
+                if (projectId) {
                   const inverseUpdates: any = {};
                   if (capturedPrev) {
                     for (const k of Object.keys(updates || {})) {
                       (inverseUpdates as any)[k] = (capturedPrev as any)[k];
                     }
                   }
-                  await appendOp({ type: 'update', elementId: id, data: { updates }, inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, requestId: '', clientTs: 0 } as any });
+                  await appendOp({
+                    type: 'update',
+                    elementId: id,
+                    data: { updates },
+                    inverse: { type: 'update', elementId: id, data: { updates: inverseUpdates }, authorId: 'user' } as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPersistTextModalDelete={async (id) => {
                 console.log('[page.tsx] onPersistTextModalDelete called', id);
                 const prevItem = textGenerators.find(t => t.id === id);
-                // Update state IMMEDIATELY and SYNCHRONOUSLY - don't wait for async operations
-                setTextGenerators(prev => {
-                  const filtered = prev.filter(t => t.id !== id);
-                  console.log('[page.tsx] textGenerators updated, remaining:', filtered.length);
-                  return filtered;
-                });
-                // Then do async operations
-                if (realtimeActive) {
-                  console.log('[Realtime] broadcast delete text', id);
-                  realtimeRef.current?.sendDelete(id);
-                }
-                // Also remove any connectors that referenced this element
+
                 try { await removeAndPersistConnectorsForElement(id); } catch (e) { console.error(e); }
-                // Always append op for undo/redo and persistence
-                if (projectId && opManagerInitialized) {
-                  await appendOp({ type: 'delete', elementId: id, data: {}, inverse: prevItem ? { type: 'create', elementId: id, data: { element: { id, type: 'text-generator', x: prevItem.x, y: prevItem.y, meta: { value: (prevItem as any).value || '' } } }, requestId: '', clientTs: 0 } as any : undefined as any });
+
+                if (projectId) {
+                  await appendOp({
+                    type: 'delete',
+                    elementId: id,
+                    data: {},
+                    inverse: prevItem ? {
+                      type: 'create',
+                      elementId: id,
+                      data: {
+                        element: {
+                          id,
+                          type: 'text-generator',
+                          x: prevItem.x,
+                          y: prevItem.y,
+                          meta: { value: (prevItem as any).value || '' }
+                        }
+                      },
+                      authorId: 'user'
+                    } as any : undefined as any,
+                    authorId: 'user'
+                  });
                 }
               }}
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}

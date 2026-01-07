@@ -670,6 +670,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setGroupContainerStates,
     setSelectedGroupIds: canvasSelection.setSelectedGroupIds,
     onPersistGroupDelete: props.onPersistGroupDelete,
+    onBulkDelete: props.onBulkDelete,
 
     images,
     textInputStates: canvasState.textInputStates,

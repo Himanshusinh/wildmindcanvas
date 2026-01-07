@@ -70,27 +70,24 @@ export type MediaElement = {
 
 // Realtime events that the CanvasApp expects
 export type RealtimeEvent =
-  | { type: 'connected' }
+  | { type: 'connected'; version?: number }
   | { type: 'disconnected' }
-  | { type: 'init'; overlays: GeneratorOverlay[]; media?: MediaElement[] }
-  | { type: 'generator.create'; overlay: GeneratorOverlay }
-  | { type: 'generator.update'; id: string; updates: Partial<GeneratorOverlay> }
-  | { type: 'generator.delete'; id: string }
-  | { type: 'media.create'; media: MediaElement }
-  | { type: 'media.update'; id: string; updates: Partial<MediaElement> }
-  | { type: 'media.delete'; id: string }
+  | { type: 'init'; overlays: GeneratorOverlay[]; media?: MediaElement[]; version: number }
+  | { type: 'sync_required' }
+  | { type: 'ack'; version: number }
+  | { type: 'op'; op: any; version: number }
+  | { type: 'cursor'; x: number; y: number; authorId: string };
 
 export class RealtimeClient {
   private ws: WebSocket | null = null;
   private handlers = new Set<(evt: RealtimeEvent) => void>();
   private projectId: string | null = null;
   private url: string | null = null;
+  private clientVersion: number = 0;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      // Important: use direct access so Next.js inlines the value
       this.url = process.env.NEXT_PUBLIC_REALTIME_WS_URL || null;
-      // Debug: show configured WS URL
       console.log('[Realtime] Configured URL:', this.url);
     }
   }
@@ -109,65 +106,126 @@ export class RealtimeClient {
     });
   }
 
+  // Strict Sequential Consistency Check
+  private validateSequence(msgVersion: number): boolean {
+    if (msgVersion === this.clientVersion + 1) {
+      this.clientVersion = msgVersion;
+      return true;
+    }
+
+    if (msgVersion > this.clientVersion + 1) {
+      console.warn(`[Realtime] Version gap! Client: ${this.clientVersion}, Msg: ${msgVersion}. Requesting sync.`);
+      this.emit({ type: 'sync_required' });
+      // Force reload or re-init logic here
+      if (typeof window !== 'undefined') window.location.reload();
+      return false;
+    }
+
+    // Duplicate/Old message
+    return false;
+  }
+
   connect(projectId: string) {
     this.projectId = projectId;
+    this.clientVersion = 0;
 
+    if (typeof window === 'undefined') return;
     // Offline-safe: if no URL, just act as disabled realtime
-    if (!this.url || typeof window === 'undefined') {
-      // Emit a no-op init so UI can hydrate if needed
+    if (!this.url) {
+      console.warn('[Realtime] No URL configured, offline mode');
       this.emit({ type: 'disconnected' });
       return;
     }
 
     try {
-      const wsUrl = `${this.url}?projectId=${encodeURIComponent(projectId)}`;
-      console.log('[Realtime] Connecting to:', wsUrl);
+      // Append projectId to URL
+      const wsUrlStr = new URL(this.url);
+      wsUrlStr.searchParams.set('projectId', projectId);
+      const wsUrl = wsUrlStr.toString();
+
+      console.log('[Realtime] Connecting to:', wsUrl, 'Current clientVersion:', this.clientVersion);
       this.ws = new WebSocket(wsUrl);
 
-      this.ws.onopen = () => {
-        console.log('[Realtime] Connected for project:', projectId);
-        this.emit({ type: 'connected' });
+      this.ws.onopen = (ev) => {
+        console.log('[Realtime] WebSocket.onopen fired. Project:', projectId, 'ReadyState:', this.ws?.readyState);
+        this.emit({ type: 'connected', version: this.clientVersion });
         // Ask server for initial overlays
         this.send({ type: 'init', projectId });
       };
 
       this.ws.onmessage = (ev) => {
         try {
-          const msg = JSON.parse(ev.data);
-          if (msg?.type) {
-            const meta = msg.overlay?.id || msg.id || '';
-            console.log('[Realtime] Message:', msg.type, meta);
+          const raw = JSON.parse(ev.data);
+          // Normalize type/kind
+          const msg = { ...raw, type: raw.type || raw.kind };
+
+          if (msg?.type && msg.type !== 'cursor') {
+            const meta = msg.overlay?.id || msg.id || (msg.op ? msg.op.type : '');
+            console.log('[Realtime] Message:', msg.type, meta, 'v:', msg.version);
           }
-          // Expect messages in the same shape as RealtimeEvent
-          if (msg && msg.type) {
-            if (msg.type === 'init' && Array.isArray(msg.overlays)) {
-              this.emit({ type: 'init', overlays: msg.overlays, media: Array.isArray(msg.media) ? msg.media : [] });
-            } else if (msg.type === 'generator.create' && msg.overlay) {
-              this.emit({ type: 'generator.create', overlay: msg.overlay });
-            } else if (msg.type === 'generator.update' && msg.id && msg.updates) {
-              this.emit({ type: 'generator.update', id: msg.id, updates: msg.updates });
-            } else if (msg.type === 'generator.delete' && msg.id) {
-              this.emit({ type: 'generator.delete', id: msg.id });
-            } else if (msg.type === 'media.create' && msg.media) {
-              this.emit({ type: 'media.create', media: msg.media });
-            } else if (msg.type === 'media.update' && msg.id && msg.updates) {
-              this.emit({ type: 'media.update', id: msg.id, updates: msg.updates });
-            } else if (msg.type === 'media.delete' && msg.id) {
-              this.emit({ type: 'media.delete', id: msg.id });
+
+          if (!msg || !msg.type) return;
+
+          // Special handling for init
+          if (msg.type === 'init') {
+            if (typeof msg.version === 'number') {
+              this.clientVersion = msg.version;
+              console.log('[Realtime] Synced to version:', this.clientVersion);
             }
+            if (Array.isArray(msg.overlays)) {
+              this.emit({ type: 'init', overlays: msg.overlays, media: Array.isArray(msg.media) ? msg.media : [], version: msg.version });
+            }
+            return;
+          }
+
+          // Special handling for ack
+          if (msg.type === 'ack' && typeof msg.version === 'number') {
+            // Confirm our outgoing op was sequenced
+            if (msg.version > this.clientVersion) {
+              this.clientVersion = msg.version;
+            }
+            this.emit({ type: 'ack', version: msg.version });
+            return;
+          }
+
+          // Standard ops validation
+          const isValid = this.validateSequence(msg.version);
+          if (!isValid) return; // Drop message, sync requested
+
+          // Dispatch
+          if (msg.type === 'op') {
+            this.emit({ type: 'op', op: msg.op, version: msg.version } as any);
+          } else if (msg.type === 'generator.create' && msg.overlay) {
+            this.emit({ type: 'generator.create', overlay: msg.overlay, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'generator.update' && msg.id && msg.updates) {
+            this.emit({ type: 'generator.update', id: msg.id, updates: msg.updates, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'generator.delete' && msg.id) {
+            this.emit({ type: 'generator.delete', id: msg.id, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'media.create' && msg.media) {
+            this.emit({ type: 'media.create', media: msg.media, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'media.update' && msg.id && msg.updates) {
+            this.emit({ type: 'media.update', id: msg.id, updates: msg.updates, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'media.delete' && msg.id) {
+            this.emit({ type: 'media.delete', id: msg.id, src: msg.src, version: msg.version, seq: msg.seq } as any);
+          } else if (msg.type === 'history.appended' && msg.op) {
+            this.emit({ type: 'op', op: msg.op, version: msg.version } as any);
+          } else if (msg.type === 'history.undone' && msg.op) {
+            this.emit({ type: 'undo', op: msg.op, version: msg.version } as any);
+          } else if (msg.type === 'history.redone' && msg.op) {
+            this.emit({ type: 'redo', op: msg.op, version: msg.version } as any);
           }
         } catch (e) {
           console.warn('Realtime message parse failed', e);
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('[Realtime] Disconnected');
+      this.ws.onclose = (ev) => {
+        console.warn('[Realtime] WebSocket.onclose fired:', ev.code, ev.reason, 'Clean:', ev.wasClean);
         this.emit({ type: 'disconnected' });
       };
 
       this.ws.onerror = (err) => {
-        console.warn('[Realtime] Socket error', err);
+        console.error('[Realtime] WebSocket.onerror fired:', err);
         this.emit({ type: 'disconnected' });
       };
     } catch (e) {
@@ -190,7 +248,8 @@ export class RealtimeClient {
     }
   }
 
-  // Public helpers used by page to broadcast changes
+  // Public helpers used by page to broadcast changes directly (Legacy mode)
+  // NOTE: Moving to sendOperation for undoable actions
   sendCreate(overlay: GeneratorOverlay) {
     this.send({ type: 'generator.create', overlay, projectId: this.projectId });
   }
@@ -214,6 +273,48 @@ export class RealtimeClient {
     this.send({ type: 'media.delete', id, projectId: this.projectId });
   }
 
+  // ------------------------------------------------------------------
+  // NEW: History / Undo Redo API
+  // ------------------------------------------------------------------
+
+  /**
+   * Send an undoable operation to the server.
+   * Server will:
+   * 1. Push to undo stack
+   * 2. Clear redo stack
+   * 3. Broadcast 'op' to OTHERS
+   * 4. Ack version to US
+   */
+  sendOperation(op: any, inverse: any) {
+    if (!this.isConnected()) return;
+    this.send({
+      type: 'history.push',
+      op,
+      inverse,
+      projectId: this.projectId
+    });
+    // Optimistic: we don't increment version here, wait for Ack or Broadcast
+  }
+
+  sendUndo() {
+    if (!this.isConnected()) return;
+    this.send({
+      type: 'history.undo',
+      projectId: this.projectId
+    });
+  }
+
+  sendRedo() {
+    if (!this.isConnected()) return;
+    this.send({
+      type: 'history.redo',
+      projectId: this.projectId
+    });
+  }
+
+  isConnected() {
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  }
 
   disconnect() {
     try {
@@ -226,3 +327,4 @@ export class RealtimeClient {
     }
   }
 }
+

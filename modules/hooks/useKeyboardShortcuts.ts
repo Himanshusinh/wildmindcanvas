@@ -969,5 +969,9 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     isPanning,
     stageRef,
     selectedTool,
+    onBulkDelete,
+    selectedGroupIds,
+    groupContainerStates,
+    onFitView,
   ]);
 };
