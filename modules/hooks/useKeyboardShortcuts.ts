@@ -103,6 +103,7 @@ interface UseKeyboardShortcutsProps {
   setSelectedUpscaleModalIds: (ids: string[]) => void;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
 
+  // Multiangle Camera deletion
   selectedMultiangleCameraModalIds: string[];
   selectedMultiangleCameraModalId: string | null;
   multiangleCameraModalStates: any[];
@@ -111,6 +112,7 @@ interface UseKeyboardShortcutsProps {
   setSelectedMultiangleCameraModalIds: (ids: string[]) => void;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
 
+  // RemoveBG deletion
   selectedRemoveBgModalIds: string[];
   selectedRemoveBgModalId: string | null;
   removeBgModalStates: any[];
@@ -119,6 +121,7 @@ interface UseKeyboardShortcutsProps {
   setSelectedRemoveBgModalIds: (ids: string[]) => void;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
 
+  // Erase deletion
   selectedEraseModalIds: string[];
   selectedEraseModalId: string | null;
   eraseModalStates: any[];
@@ -127,14 +130,7 @@ interface UseKeyboardShortcutsProps {
   setSelectedEraseModalIds: (ids: string[]) => void;
   onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
 
-  selectedVectorizeModalIds: string[];
-  selectedVectorizeModalId: string | null;
-  vectorizeModalStates: any[];
-  setVectorizeModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedVectorizeModalId: (id: string | null) => void;
-  setSelectedVectorizeModalIds: (ids: string[]) => void;
-  onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
-
+  // Expand deletion
   selectedExpandModalIds: string[];
   selectedExpandModalId: string | null;
   expandModalStates: any[];
@@ -143,26 +139,16 @@ interface UseKeyboardShortcutsProps {
   setSelectedExpandModalIds: (ids: string[]) => void;
   onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
 
-  selectedStoryboardModalIds: string[];
-  selectedStoryboardModalId: string | null;
-  storyboardModalStates: any[];
-  setStoryboardModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedStoryboardModalId: (id: string | null) => void;
-  setSelectedStoryboardModalIds: (ids: string[]) => void;
-  onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
+  // Vectorize deletion
+  selectedVectorizeModalIds: string[];
+  selectedVectorizeModalId: string | null;
+  vectorizeModalStates: any[];
+  setVectorizeModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedVectorizeModalId: (id: string | null) => void;
+  setSelectedVectorizeModalIds: (ids: string[]) => void;
+  onPersistVectorizeModalDelete?: (id: string) => void | Promise<void>;
 
-  selectedScriptFrameModalIds: string[];
-  selectedScriptFrameModalId: string | null;
-  handleDeleteScriptFrame: (id: string) => void;
-  setSelectedScriptFrameModalId: (id: string | null) => void;
-  setSelectedScriptFrameModalIds: (ids: string[]) => void;
-
-  selectedSceneFrameModalIds: string[];
-  selectedSceneFrameModalId: string | null;
-  handleDeleteSceneFrame: (id: string) => void;
-  setSelectedSceneFrameModalId: (id: string | null) => void;
-  setSelectedSceneFrameModalIds: (ids: string[]) => void;
-
+  // Next Scene deletion
   selectedNextSceneModalIds: string[];
   selectedNextSceneModalId: string | null;
   nextSceneModalStates: any[];
@@ -171,6 +157,36 @@ interface UseKeyboardShortcutsProps {
   setSelectedNextSceneModalIds: (ids: string[]) => void;
   onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
 
+  // Storyboard deletion
+  selectedStoryboardModalIds: string[];
+  selectedStoryboardModalId: string | null;
+  storyboardModalStates: any[];
+  setStoryboardModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedStoryboardModalId: (id: string | null) => void;
+  setSelectedStoryboardModalIds: (ids: string[]) => void;
+  onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
+
+  // Script Frame deletion
+  selectedScriptFrameModalIds: string[];
+  selectedScriptFrameModalId: string | null;
+  scriptFrameModalStates: any[];
+  setScriptFrameModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedScriptFrameModalId: (id: string | null) => void;
+  setSelectedScriptFrameModalIds: (ids: string[]) => void;
+  onPersistScriptFrameModalDelete?: (id: string) => void | Promise<void>;
+  handleDeleteScriptFrame?: (id: string) => void;
+
+  // Scene Frame deletion
+  selectedSceneFrameModalIds: string[];
+  selectedSceneFrameModalId: string | null;
+  sceneFrameModalStates: any[];
+  setSceneFrameModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedSceneFrameModalId: (id: string | null) => void;
+  setSelectedSceneFrameModalIds: (ids: string[]) => void;
+  onPersistSceneFrameModalDelete?: (id: string) => void | Promise<void>;
+  handleDeleteSceneFrame?: (id: string) => void;
+
+  // Compare deletion
   selectedCompareModalIds: string[];
   selectedCompareModalId: string | null;
   compareModalStates: any[];
@@ -178,6 +194,8 @@ interface UseKeyboardShortcutsProps {
   setSelectedCompareModalId: (id: string | null) => void;
   setSelectedCompareModalIds: (ids: string[]) => void;
   onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
+
+
 
   // Group Deletion
   selectedGroupIds?: string[];

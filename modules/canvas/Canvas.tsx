@@ -597,6 +597,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRemoveBgModalDelete: props.onPersistRemoveBgModalDelete,
 
     // Erase Deletion
+    // Erase Deletion
     selectedEraseModalIds: canvasSelection.selectedEraseModalIds,
     selectedEraseModalId: canvasSelection.selectedEraseModalId,
     eraseModalStates: canvasState.eraseModalStates,
@@ -604,6 +605,15 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedEraseModalId: canvasSelection.setSelectedEraseModalId,
     setSelectedEraseModalIds: canvasSelection.setSelectedEraseModalIds,
     onPersistEraseModalDelete: props.onPersistEraseModalDelete,
+
+    // Expand deletion
+    selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
+    selectedExpandModalId: canvasSelection.selectedExpandModalId,
+    expandModalStates: canvasState.expandModalStates,
+    setExpandModalStates: canvasState.setExpandModalStates,
+    setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
+    setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
+    onPersistExpandModalDelete: props.onPersistExpandModalDelete,
 
     // Vectorize Deletion
     selectedVectorizeModalIds: canvasSelection.selectedVectorizeModalIds,
@@ -614,14 +624,14 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedVectorizeModalIds: canvasSelection.setSelectedVectorizeModalIds,
     onPersistVectorizeModalDelete: props.onPersistVectorizeModalDelete,
 
-    // Expand Deletion
-    selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
-    selectedExpandModalId: canvasSelection.selectedExpandModalId,
-    expandModalStates: canvasState.expandModalStates,
-    setExpandModalStates: canvasState.setExpandModalStates,
-    setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
-    setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
-    onPersistExpandModalDelete: props.onPersistExpandModalDelete,
+    // Next Scene Deletion
+    selectedNextSceneModalIds: canvasSelection.selectedNextSceneModalIds,
+    selectedNextSceneModalId: canvasSelection.selectedNextSceneModalId,
+    nextSceneModalStates: canvasState.nextSceneModalStates,
+    setNextSceneModalStates: canvasState.setNextSceneModalStates,
+    setSelectedNextSceneModalId: canvasSelection.setSelectedNextSceneModalId,
+    setSelectedNextSceneModalIds: canvasSelection.setSelectedNextSceneModalIds,
+    onPersistNextSceneModalDelete: props.onPersistNextSceneModalDelete,
 
     // Storyboard Deletion
     selectedStoryboardModalIds: canvasSelection.selectedStoryboardModalIds,
@@ -635,25 +645,20 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     // Script Frame Deletion
     selectedScriptFrameModalIds: canvasSelection.selectedScriptFrameModalIds,
     selectedScriptFrameModalId: canvasSelection.selectedScriptFrameModalId,
-    handleDeleteScriptFrame: (id) => {/* Impl or pass from logic */ },
+    scriptFrameModalStates: canvasState.scriptFrameModalStates,
+    setScriptFrameModalStates: canvasState.setScriptFrameModalStates,
     setSelectedScriptFrameModalId: canvasSelection.setSelectedScriptFrameModalId,
     setSelectedScriptFrameModalIds: canvasSelection.setSelectedScriptFrameModalIds,
+    onPersistScriptFrameModalDelete: props.onPersistScriptFrameModalDelete,
 
     // Scene Frame Deletion
     selectedSceneFrameModalIds: canvasSelection.selectedSceneFrameModalIds,
     selectedSceneFrameModalId: canvasSelection.selectedSceneFrameModalId,
-    handleDeleteSceneFrame: (id) => {/* Impl or pass from logic */ },
+    sceneFrameModalStates: canvasState.sceneFrameModalStates,
+    setSceneFrameModalStates: canvasState.setSceneFrameModalStates,
     setSelectedSceneFrameModalId: canvasSelection.setSelectedSceneFrameModalId,
     setSelectedSceneFrameModalIds: canvasSelection.setSelectedSceneFrameModalIds,
-
-    // Next Scene Deletion
-    selectedNextSceneModalIds: canvasSelection.selectedNextSceneModalIds,
-    selectedNextSceneModalId: canvasSelection.selectedNextSceneModalId,
-    nextSceneModalStates: canvasState.nextSceneModalStates,
-    setNextSceneModalStates: canvasState.setNextSceneModalStates,
-    setSelectedNextSceneModalId: canvasSelection.setSelectedNextSceneModalId,
-    setSelectedNextSceneModalIds: canvasSelection.setSelectedNextSceneModalIds,
-    onPersistNextSceneModalDelete: props.onPersistNextSceneModalDelete,
+    onPersistSceneFrameModalDelete: props.onPersistSceneFrameModalDelete,
 
     // Compare Deletion
     selectedCompareModalIds: canvasSelection.selectedCompareModalIds,
@@ -664,13 +669,17 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedCompareModalIds: canvasSelection.setSelectedCompareModalIds,
     onPersistCompareModalDelete: props.onPersistCompareModalDelete,
 
+    // Bulk Delete
+    onBulkDelete: onBulkDelete,
+
+
     // Group Deletion
     selectedGroupIds: canvasSelection.selectedGroupIds,
     groupContainerStates,
     setGroupContainerStates,
     setSelectedGroupIds: canvasSelection.setSelectedGroupIds,
     onPersistGroupDelete: props.onPersistGroupDelete,
-    onBulkDelete: props.onBulkDelete,
+
 
     images,
     textInputStates: canvasState.textInputStates,
