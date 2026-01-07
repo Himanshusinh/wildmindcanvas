@@ -12,6 +12,7 @@ interface UseSnapshotManagerProps {
 export function useSnapshotManager({ projectId, state, isHydrated, mutationVersion }: UseSnapshotManagerProps) {
   const persistTimerRef = useRef<number | null>(null);
   const snapshotInFlight = useRef(false);
+  const snapshotPendingRef = useRef(false);
 
   // Helper: build elements map snapshot from current state
   const buildSnapshotElements = (connectorsOverride?: Connector[]): Record<string, any> => {
@@ -381,6 +382,36 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
     return elements;
   };
 
+  // Helper: Persist the current state
+  const saveSnapshot = async () => {
+    if (!projectId) return;
+
+    if (snapshotInFlight.current) {
+      // Mark that we have a pending save request
+      snapshotPendingRef.current = true;
+      return;
+    }
+
+    snapshotInFlight.current = true;
+    snapshotPendingRef.current = false; // We are processing the latest
+
+    try {
+      const elements = buildSnapshotElements();
+      await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
+      // console.debug('[Snapshot] persisted');
+    } catch (e) {
+      console.warn('Failed to persist snapshot', e);
+    } finally {
+      snapshotInFlight.current = false;
+      // If a new change came in while we were saving, save again immediately
+      if (snapshotPendingRef.current) {
+        // Use setTimeout to yield to event loop and avoid recursion stack issues, 
+        // though irrelevant for async functions, strictness helps.
+        saveSnapshot();
+      }
+    }
+  };
+
   // Persist full snapshot on every interaction (debounced)
   useEffect(() => {
     if (!projectId || !isHydrated) return;
@@ -389,23 +420,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
       window.clearTimeout(persistTimerRef.current);
     }
 
-    persistTimerRef.current = window.setTimeout(async () => {
-      if (snapshotInFlight.current) {
-        console.warn('[Snapshot] Skipped (in-flight)');
-        return;
-      }
-
-      snapshotInFlight.current = true;
-      try {
-        const elements = buildSnapshotElements();
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
-        // console.debug('[Snapshot] persisted', Object.keys(elements).length);
-      } catch (e) {
-        console.warn('Failed to persist snapshot', e);
-      } finally {
-        snapshotInFlight.current = false;
-      }
-    }, 500) as unknown as number; // Slightly increased debounce to 500ms for safety
+    persistTimerRef.current = window.setTimeout(saveSnapshot, 500) as unknown as number;
 
     return () => {
       if (persistTimerRef.current) {
