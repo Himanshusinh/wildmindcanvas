@@ -621,24 +621,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
       />
 
-      {/* Rich Text Overlays */}
-      <CanvasTextOverlays
-        canvasTextStates={richTextStates ?? []}
-        selectedCanvasTextId={selectedRichTextId ?? null}
-        onSelect={(id) => {
-          clearAllSelections();
-          if (setSelectedRichTextId) setSelectedRichTextId(id);
-          if (setSelectedRichTextIds) setSelectedRichTextIds([id]);
-        }}
-        onUpdate={(id, updates) => {
-          if (onPersistRichTextMove) onPersistRichTextMove(id, updates);
-        }}
-        onDelete={(id) => {
-          if (onPersistRichTextDelete) onPersistRichTextDelete(id);
-        }}
-        scale={scale}
-        position={position}
-      />
 
       <ComponentCreationMenu
         componentMenu={connectionManager.componentMenu}

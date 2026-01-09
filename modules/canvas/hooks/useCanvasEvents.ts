@@ -269,6 +269,7 @@ export function useCanvasEvents(
                 const { x, y } = findSmartPosition(200, 100);
                 const newState = {
                     id: `rich-text-${Date.now()}`,
+                    type: 'rich-text',
                     x,
                     y,
                     text: 'Some text here',

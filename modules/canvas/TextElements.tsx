@@ -29,7 +29,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
   return (
     <>
       {images
-        .filter((img) => img.type === 'text' && !img.elementId?.startsWith('rich-text-') && !(img as any).id?.startsWith('rich-text-'))
+        .filter((img) => img.type === 'text')
         .map((textData, index) => {
           const actualIndex = images.findIndex(img => img === textData);
           const isSelected = selectedImageIndex === actualIndex;

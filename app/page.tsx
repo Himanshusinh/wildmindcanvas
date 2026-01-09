@@ -1421,16 +1421,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               richTextStates={richTextStates}
               setRichTextStates={setRichTextStates}
               onPersistRichTextCreate={(state) => {
-                setRichTextStates(prev => {
-                  // Strict Deduplication: Check ID AND Position
-                  // If a node with same ID exists, or a node at exact same X/Y was created recently?
-                  // Just exact X/Y check (assuming smart position might return same).
-                  if (prev.some(s => s.id === state.id)) return prev;
-                  if (prev.some(s => Math.abs(s.x - state.x) < 1 && Math.abs(s.y - state.y) < 1)) return prev;
-
-                  // Force White color to ensure consistency and fix "black text" issue
-                  return [...prev, { ...state, fill: 'white' }];
-                });
+                setRichTextStates(prev => [...prev, state]);
               }}
               onPersistRichTextMove={(id, updates) => {
                 setRichTextStates(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
