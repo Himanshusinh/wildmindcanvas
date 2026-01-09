@@ -11,7 +11,8 @@ import { usePatternImage } from '../hooks/usePatternImage';
 import { CanvasImage } from '../CanvasImage';
 import { CanvasVideoNode } from '../CanvasVideoNode';
 import { CanvasTextNode } from '../CanvasTextNode';
-import { RichText } from '../RichText';
+import { RichTextNode } from '../RichText/RichTextNode';
+
 import { TextElements } from '../TextElements';
 import { SelectionBox } from '../SelectionBox';
 import { GroupContainerOverlay } from '../GroupContainerOverlay';
@@ -32,6 +33,7 @@ interface CanvasStageProps {
     scale: number;
     selectedGroupIds?: string[];
     isDarkTheme?: boolean;
+    handleRichTextUpdate?: (id: string, updates: any) => void;
 }
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
@@ -45,7 +47,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     position,
     scale,
     selectedGroupIds = [],
-    isDarkTheme = true
+    isDarkTheme = true,
+    handleRichTextUpdate,
 }) => {
     const {
         images,
@@ -54,7 +57,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         effectiveSelectedCanvasTextId,
         handleCanvasTextUpdate,
         effectiveRichTextStates,
-        handleRichTextUpdate,
+        // handleRichTextUpdate, // Removed duplicate
         videoModalStates,
         groupContainerStates, setGroupContainerStates,
         setIsTextInteracting,
@@ -256,18 +259,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     />
                 ))}
 
-                {effectiveRichTextStates.map((richText: any) => (
-                    <RichText
-                        key={richText.id}
-                        data={richText}
-                        isSelected={selectedRichTextId === richText.id}
-                        onSelect={setSelectedRichTextId}
-                        onChange={handleRichTextUpdate}
-                        onInteractionStart={() => setIsTextInteracting(true)}
-                        onInteractionEnd={() => setIsTextInteracting(false)}
-                        isDarkTheme={isDarkTheme}
-                    />
-                ))}
+
 
                 {images
                     .filter((img) => img.type !== 'model3d' && img.type !== 'text')
@@ -308,6 +300,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                             }}
                         />
                     ))}
+
+                {effectiveRichTextStates?.map((textState: any) => (
+                    <RichTextNode
+                        key={textState.id}
+                        {...textState}
+                        isSelected={selectedRichTextId === textState.id} // or check explicit IDs list
+                        onSelect={() => {
+                            clearAllSelections(false);
+                            setSelectedRichTextId(textState.id);
+                        }}
+                        onChange={(newAttrs: any) => {
+                            handleRichTextUpdate(textState.id, newAttrs);
+                        }}
+                    />
+                ))}
 
 
 

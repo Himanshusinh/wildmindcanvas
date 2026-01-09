@@ -50,6 +50,8 @@ export function useGroupLogic(
         effectiveCanvasTextStates,
     } = canvasState;
 
+    const { richTextStates, selectedRichTextIds } = props; // Access from props
+
     // Use a Ref to hold the latest selection state to avoid stale closures in move wrappers
     const selectionRef = useRef(canvasSelection);
     useEffect(() => {
@@ -101,7 +103,8 @@ export function useGroupLogic(
         onPersistScriptFrameModalMove,
         onPersistSceneFrameModalMove,
         onPersistVideoEditorModalMove,
-        onPersistCompareModalMove
+        onPersistCompareModalMove,
+        onPersistRichTextMove // Added
     } = props;
 
     // We need current canvas data for bounds calculation
@@ -131,6 +134,7 @@ export function useGroupLogic(
             ...selectedCompareModalIds,
             ...selectedNextSceneModalIds,
             ...(selectedCanvasTextIds || []),
+            ...(selectedRichTextIds || []), // Added
         ] as string[];
 
         console.log('[Canvas] Creating group with', allSelectedIds.length, 'items:', allSelectedIds);

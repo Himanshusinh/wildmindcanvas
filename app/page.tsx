@@ -705,28 +705,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (tool === 'library') setIsLibraryOpen(true);
     if (tool === 'plugin') setIsPluginSidebarOpen(true);
 
-    if (tool === 'rich-text') {
-      const modalId = `rich-text-${Date.now()}`;
-      const viewportCenter = viewportCenterRef.current;
-      const newRichText = {
-        id: modalId,
-        x: viewportCenter.x,
-        y: viewportCenter.y,
-        text: 'double click to edit',
-        fontSize: 24,
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        fontFamily: 'Inter, sans-serif',
-        styleType: 'paragraph' as const,
-        textAlign: 'left' as const,
-        color: '#FFFFFF',
-        backgroundColor: 'transparent',
-        width: 200,
-        height: 50,
-        rotation: 0
-      };
-      setRichTextStates(prev => [...prev, newRichText]);
-    }
+    if (tool === 'plugin') setIsPluginSidebarOpen(true);
+
+    // Rich Text creation is now handled in useCanvasEvents.ts to support smart positioning
+    // if (tool === 'rich-text') { ... }
   };
 
 
@@ -1293,8 +1275,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalTextModals={textGenerators}
               canvasTextStates={canvasTextStates}
               setCanvasTextStates={setCanvasTextStates}
-              richTextStates={richTextStates}
-              setRichTextStates={setRichTextStates}
+
               selectedRichTextId={selectedRichTextId}
               setSelectedRichTextId={setSelectedRichTextId}
               // Stub plurals if needed by interface but not used in logic
@@ -1347,18 +1328,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
               onPersistGroupDelete={async (groupId) => {
                 setGroupContainerStates(prev => prev.filter(g => g.id !== groupId));
-              }}
-              onPersistRichTextCreate={async (modal) => {
-                setRichTextStates(prev => [...prev, {
-                  ...modal,
-                  type: 'rich-text'
-                } as any]);
-              }}
-              onPersistRichTextMove={async (id, updates) => {
-                setRichTextStates(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-              }}
-              onPersistRichTextDelete={async (id) => {
-                setRichTextStates(prev => prev.filter(m => m.id !== id));
               }}
 
               onPersistUpscaleModalCreate={pluginHandlers.onPersistUpscaleModalCreate}
@@ -1446,6 +1415,28 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onBackgroundClick={() => {
                 setIsLibraryOpen(false);
                 setIsPluginSidebarOpen(false);
+              }}
+
+              // Rich Text Props
+              richTextStates={richTextStates}
+              setRichTextStates={setRichTextStates}
+              onPersistRichTextCreate={(state) => {
+                setRichTextStates(prev => {
+                  // Strict Deduplication: Check ID AND Position
+                  // If a node with same ID exists, or a node at exact same X/Y was created recently?
+                  // Just exact X/Y check (assuming smart position might return same).
+                  if (prev.some(s => s.id === state.id)) return prev;
+                  if (prev.some(s => Math.abs(s.x - state.x) < 1 && Math.abs(s.y - state.y) < 1)) return prev;
+
+                  // Force White color to ensure consistency and fix "black text" issue
+                  return [...prev, { ...state, fill: 'white' }];
+                });
+              }}
+              onPersistRichTextMove={(id, updates) => {
+                setRichTextStates(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+              }}
+              onPersistRichTextDelete={(id) => {
+                setRichTextStates(prev => prev.filter(s => s.id !== id));
               }}
             />
             <ToolbarPanel onToolSelect={handleToolSelect} onUpload={handleToolbarUpload} isHidden={isUIHidden} />

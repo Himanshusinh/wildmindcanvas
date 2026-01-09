@@ -280,6 +280,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   const effectiveVideoEditorModalStates = groupLogic.getEffectiveStates(videoEditorModalStates, 'video-editor-modal');
   const effectiveCompareModalStates = groupLogic.getEffectiveStates(compareModalStates, 'compare-modal');
   const effectiveCanvasTextStates = groupLogic.getEffectiveStates(canvasState.effectiveCanvasTextStates, 'canvas-text');
+  const effectiveRichTextStates = groupLogic.getEffectiveStates(richTextStates || [], 'rich-text');
 
   const effectiveCanvasState = {
     ...canvasState,
@@ -301,6 +302,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     videoEditorModalStates: effectiveVideoEditorModalStates,
     compareModalStates: effectiveCompareModalStates,
     effectiveCanvasTextStates,
+    effectiveRichTextStates,
   };
 
   const handleFitView = useCallback(() => {
@@ -792,6 +794,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         scale={scale}
         selectedGroupIds={canvasSelection.selectedGroupIds}
         isDarkTheme={isDarkTheme}
+        handleRichTextUpdate={canvasState.handleRichTextUpdate}
       />
 
       <CanvasOverlays

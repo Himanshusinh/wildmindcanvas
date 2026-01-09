@@ -38,6 +38,7 @@ export function useCanvasEvents(
         onPersistVideoModalCreate,
         onPersistMusicModalCreate,
         onPersistTextModalCreate,
+        onPersistRichTextCreate,
         isImageModalOpen,
         isVideoModalOpen,
         isMusicModalOpen,
@@ -124,7 +125,7 @@ export function useCanvasEvents(
     const [pendingSelectionStartCanvas, setPendingSelectionStartCanvas] = useState<{ x: number; y: number } | null>(null);
     const [selectionStartPoint, setSelectionStartPoint] = useState<{ x: number; y: number } | null>(null); // Screen coords
 
-    const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number }>({});
+    const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number; richText?: number }>({});
     const prevSelectedToolRef = useRef(selectedTool);
     const prevToolClickCounterRef = useRef(toolClickCounter);
     const hasCreatedTextRef = useRef(false);
@@ -257,6 +258,33 @@ export function useCanvasEvents(
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setMusicModalStates(prev => [...prev, newState]);
             onPersistMusicModalCreate?.(newState);
+        } else if (selectedTool === 'rich-text') {
+            const now = Date.now();
+            const lastTime = lastCreateTimesRef.current.richText || 0;
+
+            if (now - lastTime > 500) {
+                lastCreateTimesRef.current.richText = now;
+                console.log('[useCanvasEvents] Creating Rich Text');
+
+                const { x, y } = findSmartPosition(200, 100);
+                const newState = {
+                    id: `rich-text-${Date.now()}`,
+                    x,
+                    y,
+                    text: 'Some text here',
+                    width: 200,
+                    fontSize: 20,
+                    fontFamily: 'Arial',
+                    fill: 'white',
+                    align: 'left'
+                };
+
+                // (canvasState as any).setRichTextStates((prev: any[]) => [...prev, newState]); // Removed to avoid duplication
+                onPersistRichTextCreate?.(newState as any);
+
+                // Switch back to cursor immediately to allow interaction
+                onToolSelect?.('cursor');
+            }
         } else if (selectedTool === 'canvas-text') {
             // "AI Text" Tool
             const now = Date.now();
@@ -286,7 +314,7 @@ export function useCanvasEvents(
     }, [selectedTool, toolClickCounter, stageRef, scale, position,
         setImageModalStates, setVideoModalStates, setMusicModalStates, setTextInputStates,
         effectiveSetCanvasTextStates, setSelectedCanvasTextId,
-        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate,
+        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate, onPersistRichTextCreate,
         // Add dependencies for all modal states to ensure we have latest positions
         images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
         upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates,

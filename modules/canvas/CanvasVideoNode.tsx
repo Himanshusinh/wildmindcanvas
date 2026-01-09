@@ -105,10 +105,8 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 setVideoElement(video);
                 videoRef.current = video;
 
-                // Force refresh
-                setTimeout(() => {
-                    imageRef.current?.getLayer()?.batchDraw();
-                }, 100);
+                // imageRef is null here because we haven't rendered with videoElement yet
+                // The animation loop effect will pick it up once rendered
             };
 
             // Also handle oncanplay in case metadata loaded doesn't fire for some cached videos
@@ -116,7 +114,6 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 if (!videoElement && mounted) {
                     setVideoElement(video);
                     videoRef.current = video;
-                    imageRef.current?.getLayer()?.batchDraw();
                 }
             }
 
@@ -133,15 +130,16 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
             };
 
             video.onerror = (e) => {
+                if (!mounted) return;
                 const errorDetail = video.error ? {
                     code: video.error.code,
                     message: video.error.message
                 } : 'unknown';
                 console.error('[CanvasVideoNode] Video load error:', {
                     id: videoState.id,
-                    url: url?.substring(0, 100),
+                    url: url,
                     errorDetail,
-                    nativeEvent: e
+                    // nativeEvent: e // serializing event often results in {}
                 });
             };
 

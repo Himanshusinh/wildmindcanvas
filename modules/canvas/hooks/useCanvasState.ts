@@ -34,6 +34,8 @@ export function useCanvasState(props: CanvasProps) {
         externalTextModals,
         initialGroupContainerStates,
         projectId,
+        richTextStates, // Added from props
+        setRichTextStates, // Added from props
     } = props;
 
     // Local state for canvas text (fallback if props not provided)
@@ -48,22 +50,15 @@ export function useCanvasState(props: CanvasProps) {
     const effectiveSelectedCanvasTextId = selectedCanvasTextId;
     const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId;
 
-    // Local state for rich text
-    const [localRichTextStates, setLocalRichTextStates] = useState<CanvasTextState[]>([]);
-    const effectiveRichTextStates = props.richTextStates ?? localRichTextStates;
-    const effectiveSetRichTextStates = props.setRichTextStates ?? setLocalRichTextStates;
-
-    const [localSelectedRichTextId, setLocalSelectedRichTextId] = useState<string | null>(null);
-    const effectiveSelectedRichTextId = props.selectedRichTextId !== undefined ? props.selectedRichTextId : localSelectedRichTextId;
-    const effectiveSetSelectedRichTextId = props.setSelectedRichTextId ?? setLocalSelectedRichTextId;
-
     const handleCanvasTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
         effectiveSetCanvasTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetCanvasTextStates]);
 
-    const handleRichTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
-        effectiveSetRichTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    }, [effectiveSetRichTextStates]);
+    const handleRichTextUpdate = useCallback((id: string, updates: any) => {
+        setRichTextStates((prev: any[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    }, [setRichTextStates]);
+
+
 
     const [patternImage, setPatternImage] = useState<HTMLImageElement | null>(null);
     const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
@@ -107,7 +102,7 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalScriptFrameModals) setScriptFrameModalStates(externalScriptFrameModals); }, [externalScriptFrameModals]);
     useEffect(() => { if (externalSceneFrameModals) setSceneFrameModalStates(externalSceneFrameModals as any); }, [externalSceneFrameModals]);
     useEffect(() => { if (externalTextModals) setTextInputStates(externalTextModals as any); }, [externalTextModals]);
-    useEffect(() => { if (props.richTextStates) setLocalRichTextStates(props.richTextStates); }, [props.richTextStates]);
+
     useEffect(() => { if (initialGroupContainerStates) setGroupContainerStates(initialGroupContainerStates); }, [initialGroupContainerStates]);
 
     // --- EFFECTIVE STATES (No longer needed to mask, but we'll use local state as source of truth now) ---
@@ -137,6 +132,8 @@ export function useCanvasState(props: CanvasProps) {
         groupContainerStates, setGroupContainerStates,
         compareModalStates, setCompareModalStates,
         storyWorldStates, setStoryWorldStates,
+        richTextStates, // Added to return
+        setRichTextStates, // Added to return
 
         // Canvas Text (Effective)
         effectiveCanvasTextStates,
@@ -145,15 +142,13 @@ export function useCanvasState(props: CanvasProps) {
         setLocalCanvasTextStates,
         effectiveSelectedCanvasTextId,
         effectiveSetSelectedCanvasTextId,
+        effectiveSetSelectedCanvasTextId,
         handleCanvasTextUpdate,
+        handleRichTextUpdate, // Added
         isTextInteracting,
         setIsTextInteracting,
 
-        // Rich Text
-        effectiveRichTextStates,
-        effectiveSetRichTextStates,
-        selectedRichTextId: effectiveSelectedRichTextId,
-        setSelectedRichTextId: effectiveSetSelectedRichTextId,
-        handleRichTextUpdate,
+        isTextInteracting,
+        setIsTextInteracting,
     };
 }
