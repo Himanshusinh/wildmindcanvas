@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Text, Transformer } from 'react-konva';
+import { Text, Transformer, Group, Rect } from 'react-konva';
 import { TextEditor } from './TextEditor';
 import Konva from 'konva';
 
@@ -17,6 +17,10 @@ interface RichTextNodeProps {
     isSelected: boolean;
     onSelect: () => void;
     onChange: (newAttrs: any) => void;
+    backgroundColor?: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    textDecoration?: string;
     draggable?: boolean;
 }
 
@@ -27,9 +31,13 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
     y,
     width = 200,
     fontSize = 20,
-    fontFamily = 'Arial',
+    fontFamily = 'Inter',
     fill = 'white',
     align = 'left',
+    backgroundColor = 'transparent',
+    fontWeight = 'normal',
+    fontStyle = 'normal',
+    textDecoration = 'none',
     isEditing = false,
     isSelected,
     onSelect,
@@ -84,7 +92,19 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
     }, [onChange]);
 
     return (
-        <>
+        <Group>
+            {backgroundColor && backgroundColor !== 'transparent' && (
+                <Rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={textRef.current?.height() || fontSize * 1.2}
+                    fill={backgroundColor}
+                    cornerRadius={4}
+                    rotation={textRef.current?.rotation() || 0}
+                    visible={!isEditing}
+                />
+            )}
             <Text
                 id={id}
                 ref={textRef}
@@ -94,6 +114,8 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                 width={width}
                 fontSize={fontSize}
                 fontFamily={fontFamily}
+                fontStyle={`${fontStyle !== 'normal' ? fontStyle : ''} ${fontWeight !== 'normal' ? fontWeight : ''}`.trim() || 'normal'}
+                textDecoration={textDecoration}
                 fill={fill}
                 align={align}
                 draggable={draggable}
@@ -119,10 +141,15 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                     width={width}
                     fontSize={fontSize}
                     fontFamily={fontFamily}
+                    fontWeight={fontWeight}
+                    fontStyle={fontStyle}
+                    textDecoration={textDecoration}
                     fill={fill}
                     align={align}
+                    backgroundColor={backgroundColor}
                     rotation={textRef.current.rotation()}
                     onChange={handleTextChange}
+                    onUpdate={(updates) => onChange(updates)}
                     onClose={handleEditorClose}
                 />
             )}
@@ -143,6 +170,6 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                     }}
                 />
             )}
-        </>
+        </Group>
     );
 };

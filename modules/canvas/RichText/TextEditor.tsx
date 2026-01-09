@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html } from 'react-konva-utils';
-import Konva from 'konva';
+import { RichTextToolbar } from './RichTextToolbar';
 
 interface TextEditorProps {
     initialText: string;
@@ -9,10 +9,15 @@ interface TextEditorProps {
     width: number;
     fontSize: number;
     fontFamily: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    textDecoration?: string;
     fill: string;
     align: string;
+    backgroundColor?: string;
     rotation: number;
     onChange: (newText: string) => void;
+    onUpdate: (updates: any) => void;
     onClose: () => void;
 }
 
@@ -23,10 +28,15 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     width,
     fontSize,
     fontFamily,
+    fontWeight = 'normal',
+    fontStyle = 'normal',
+    textDecoration = 'none',
     fill,
     align,
+    backgroundColor = 'transparent',
     rotation,
     onChange,
+    onUpdate,
     onClose,
 }) => {
     const divRef = useRef<HTMLDivElement>(null);
@@ -72,39 +82,57 @@ export const TextEditor: React.FC<TextEditorProps> = ({
                 }
             }}
         >
-            <div
-                ref={divRef}
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={onClose}
-                onInput={(e) => {
-                    const newText = e.currentTarget.innerText;
-                    setText(newText);
-                    onChange(newText);
-                }}
-                style={{
-                    position: 'absolute',
-                    top: `0px`,
-                    left: `0px`,
-                    width: `${width}px`,
-                    minHeight: `${fontSize * 1.2}px`,
-                    fontSize: `${fontSize}px`,
-                    fontFamily: fontFamily,
-                    color: fill,
-                    textAlign: align as any,
-                    lineHeight: '1.2',
-                    background: 'transparent',
-                    outline: 'none',
-                    border: 'none',
-                    padding: '0px',
-                    margin: '0px',
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'break-word',
-                    pointerEvents: 'auto',
-                    transformOrigin: 'top left',
-                }}
-            >
-                {text}
+            <div className="relative">
+                <RichTextToolbar
+                    fontFamily={fontFamily}
+                    fontSize={fontSize}
+                    fontWeight={fontWeight}
+                    fontStyle={fontStyle}
+                    textDecoration={textDecoration}
+                    fill={fill}
+                    align={align}
+                    backgroundColor={backgroundColor}
+                    onChange={onUpdate}
+                    position={{ x: width / 2, y: -20 }} // Position relative to the editor div
+                />
+                <div
+                    ref={divRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={onClose}
+                    onInput={(e) => {
+                        const newText = e.currentTarget.innerText;
+                        setText(newText);
+                        onChange(newText);
+                    }}
+                    style={{
+                        position: 'absolute',
+                        top: `0px`,
+                        left: `0px`,
+                        width: `${width}px`,
+                        minHeight: `${fontSize * 1.2}px`,
+                        fontSize: `${fontSize}px`,
+                        fontFamily: fontFamily,
+                        fontWeight: fontWeight,
+                        fontStyle: fontStyle,
+                        textDecoration: textDecoration,
+                        color: fill,
+                        textAlign: align as any,
+                        lineHeight: '1.2',
+                        background: backgroundColor || 'transparent',
+                        borderRadius: '4px',
+                        outline: 'none',
+                        border: 'none',
+                        padding: '0px',
+                        margin: '0px',
+                        whiteSpace: 'pre-wrap',
+                        overflowWrap: 'break-word',
+                        pointerEvents: 'auto',
+                        transformOrigin: 'top left',
+                    }}
+                >
+                    {text}
+                </div>
             </div>
         </Html>
     );

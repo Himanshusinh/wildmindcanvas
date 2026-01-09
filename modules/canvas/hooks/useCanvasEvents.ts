@@ -275,9 +275,10 @@ export function useCanvasEvents(
                     text: 'Some text here',
                     width: 200,
                     fontSize: 20,
-                    fontFamily: 'Arial',
+                    fontFamily: 'Inter',
                     fill: 'white',
-                    align: 'left'
+                    align: 'left',
+                    backgroundColor: 'transparent'
                 };
 
                 // (canvasState as any).setRichTextStates((prev: any[]) => [...prev, newState]); // Removed to avoid duplication
