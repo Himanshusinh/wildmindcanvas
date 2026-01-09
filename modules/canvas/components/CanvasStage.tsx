@@ -311,7 +311,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                             setSelectedRichTextId(textState.id);
                         }}
                         onChange={(newAttrs: any) => {
-                            handleRichTextUpdate(textState.id, newAttrs);
+                            handleRichTextUpdate?.(textState.id, newAttrs);
                         }}
                     />
                 ))}

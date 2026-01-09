@@ -50,13 +50,18 @@ export function useCanvasState(props: CanvasProps) {
     const effectiveSelectedCanvasTextId = selectedCanvasTextId;
     const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId;
 
+    // Local state for rich text (fallback if props not provided)
+    const [localRichTextStates, setLocalRichTextStates] = useState<CanvasTextState[]>([]);
+    const effectiveRichTextStates = richTextStates ?? localRichTextStates;
+    const effectiveSetRichTextStates = setRichTextStates ?? setLocalRichTextStates;
+
     const handleCanvasTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
         effectiveSetCanvasTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetCanvasTextStates]);
 
     const handleRichTextUpdate = useCallback((id: string, updates: any) => {
-        setRichTextStates((prev: any[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    }, [setRichTextStates]);
+        effectiveSetRichTextStates((prev: any[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    }, [effectiveSetRichTextStates]);
 
 
 
@@ -132,8 +137,10 @@ export function useCanvasState(props: CanvasProps) {
         groupContainerStates, setGroupContainerStates,
         compareModalStates, setCompareModalStates,
         storyWorldStates, setStoryWorldStates,
-        richTextStates, // Added to return
-        setRichTextStates, // Added to return
+        richTextStates: effectiveRichTextStates,
+        setRichTextStates: effectiveSetRichTextStates,
+        effectiveRichTextStates,
+        effectiveSetRichTextStates,
 
         // Canvas Text (Effective)
         effectiveCanvasTextStates,
@@ -142,12 +149,8 @@ export function useCanvasState(props: CanvasProps) {
         setLocalCanvasTextStates,
         effectiveSelectedCanvasTextId,
         effectiveSetSelectedCanvasTextId,
-        effectiveSetSelectedCanvasTextId,
         handleCanvasTextUpdate,
-        handleRichTextUpdate, // Added
-        isTextInteracting,
-        setIsTextInteracting,
-
+        handleRichTextUpdate,
         isTextInteracting,
         setIsTextInteracting,
     };
