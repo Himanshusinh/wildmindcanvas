@@ -592,6 +592,16 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       />
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedVideoUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={!isUploadedVideo ? handleGenerate : undefined}
+        />
         <VideoModalFrame
           id={id}
           scale={scale}

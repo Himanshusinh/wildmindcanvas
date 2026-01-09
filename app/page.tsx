@@ -1199,7 +1199,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
             <Canvas
               key={projectId}
               isUIHidden={isUIHidden}
-              // Removed initialGroupContainerStates (undefined/legacy)
+              initialGroupContainerStates={groupContainerStates}
               // Removed initialCenter/Scale (undefined/legacy - handled by snapshot viewport)
               images={images}
               // setImages removed

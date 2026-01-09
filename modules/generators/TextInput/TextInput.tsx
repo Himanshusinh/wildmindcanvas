@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
+import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { TextModalTooltip } from './TextModalTooltip';
 import { TextModalFrame } from './TextModalFrame';
 import { TextModalNodes } from './TextModalNodes';
@@ -418,6 +419,18 @@ export const TextInput: React.FC<TextInputProps> = ({
 
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={Boolean(isSelected)}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          // Text Input doesn't usually produce downloadable content in the same way, but props exist.
+          // If onDownload is passed, use it.
+          onDownload={onDownload}
+          onTogglePin={onTogglePin}
+          onRegenerate={handleEnhance}
+        />
         <TextModalFrame
           id={id}
           scale={scale}

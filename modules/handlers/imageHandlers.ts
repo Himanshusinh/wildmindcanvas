@@ -16,10 +16,11 @@ export const handleImageGenerate = async (
   sceneNumber: number | undefined,
   previousSceneImageUrl: string | undefined,
   storyboardMetadata: Record<string, string> | undefined,
+  targetFrameId: string | undefined,
   setters: CanvasAppSetters,
   options?: Record<string, any>
 ) => {
-  const { setGenerationQueue, setShowImageGenerationModal } = setters;
+  const { setGenerationQueue, setShowImageGenerationModal, setImageGenerators } = setters;
 
   try {
     let effectiveSourceImageUrl = sourceImageUrl;
@@ -57,6 +58,7 @@ export const handleImageGenerate = async (
       prompt,
       model,
       count: queuedCount,
+      targetFrameId
     });
 
     const isTurboModel = model.toLowerCase().includes('turbo') || model.toLowerCase().includes('p image') || model.toLowerCase().includes('p-image');
@@ -84,6 +86,26 @@ export const handleImageGenerate = async (
 
     const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
     setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+
+    // IMPORTANT: Update state if targetFrameId is provided (Canvas Generation Flow)
+    if (targetFrameId && result && result.url) {
+      console.log('[handleImageGenerate] 🛠️ Updating generator state for:', targetFrameId);
+
+      setters.setImageGenerators(prev => {
+        const targetExists = prev.some(img => img.id === targetFrameId);
+        console.log('[handleImageGenerate] 🔍 Found target generator?', targetExists, 'Available IDs:', prev.map(p => p.id));
+
+        return prev.map(img => {
+          if (img.id === targetFrameId) {
+            console.log('[handleImageGenerate] ✅ Updating image for', targetFrameId, 'with URL', result.url);
+            return { ...img, generatedImageUrl: result.url };
+          }
+          return img;
+        });
+      });
+    } else {
+      console.warn('[handleImageGenerate] ⚠️ Skipping state update. Missing targetFrameId or result URL.', { targetFrameId, hasResult: !!result, url: result?.url });
+    }
 
     if (result.images && Array.isArray(result.images) && result.images.length > 0) {
       return { url: result.url, originalUrl: result.originalUrl, images: result.images, prompt: prompt };
@@ -228,6 +250,7 @@ export const createImageHandlers = (
         sceneNumber,
         previousSceneImageUrl,
         storyboardMetadata,
+        targetFrameId,
         setters,
         options
       );

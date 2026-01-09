@@ -917,6 +917,16 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       />
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned || isAutoPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedMusicUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={handleGenerate}
+        />
         <MusicModalFrame
           id={id}
           scale={scale}

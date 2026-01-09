@@ -13,6 +13,7 @@ interface ModalActionIconsProps {
   onTogglePin?: () => void;
   onCopy?: () => void;
   onEdit?: () => void;
+  onRegenerate?: () => void;
   editActive?: boolean;
   variant?: 'default' | 'text'; // 'text' variant has different styling (no backdrop blur)
 }
@@ -28,6 +29,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
   onTogglePin,
   onCopy,
   onEdit,
+  onRegenerate,
   editActive = false,
   variant = 'default',
 }) => {
@@ -60,15 +62,15 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
     width: `${28 * scale}px`,
     height: `${28 * scale}px`,
     padding: 0,
-    backgroundColor: bgColor,
-    backdropFilter: isTextVariant ? 'none' : 'blur(20px)',
-    WebkitBackdropFilter: isTextVariant ? 'none' : 'blur(20px)',
-    border: `1px solid ${borderColor}`,
+    backgroundColor: 'transparent',
+    backdropFilter: 'none',
+    WebkitBackdropFilter: 'none',
+    border: 'none',
     borderRadius: `${8 * scale}px`,
     color: textColor,
     cursor: 'pointer',
     transition: 'none',
-    boxShadow: `0 ${4 * scale}px ${12 * scale}px ${shadowColor}`,
+    boxShadow: 'none',
     flexShrink: 0,
   };
 
@@ -237,14 +239,23 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
       data-action-icons="true"
       style={{
         position: 'absolute',
-        top: 0,
-        right: `${-54 * scale}px`,
+        top: `${-72 * scale}px`, // Moved up significantly to clear tooltip
+        left: '50%',
+        transform: 'translateX(-50%)', // Center horizontally
         display: 'flex',
-        flexDirection: 'column',
-        gap: `${8 * scale}px`,
+        flexDirection: 'row',
+        gap: `${4 * scale}px`, // Reduced gap for bar feel
+        padding: `${4 * scale}px`, // Inner padding
         zIndex: 3001,
         pointerEvents: 'auto',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isDark ? 'rgba(18, 18, 18, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderRadius: `${100 * scale}px`, // Capsule shape
+        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`,
+        boxShadow: `0 ${4 * scale}px ${12 * scale}px ${isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)'}`,
       }}
       onMouseDown={(e) => {
         console.log('[ModalActionIcons] Container onMouseDown', {
@@ -271,6 +282,43 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
         }
       }}
     >
+      {/* Regenerate Icon */}
+      {onRegenerate && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRegenerate();
+          }}
+          title="Regenerate"
+          style={baseButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
+            e.currentTarget.style.color = '#a855f7';
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            const defaultBg = isDark
+              ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
+              : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)');
+            const defaultColor = isDark ? '#cccccc' : '#4b5563';
+
+            e.currentTarget.style.backgroundColor = defaultBg;
+            e.currentTarget.style.color = defaultColor;
+            if (!isTextVariant) {
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }}
+        >
+          <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </button>
+      )}
+
       {/* Delete Icon */}
       {onDelete && (
         <button

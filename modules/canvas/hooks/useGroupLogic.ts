@@ -528,14 +528,20 @@ export function useGroupLogic(
             const group = prev.find(g => g.id === id);
             if (!group) return prev;
 
-            // If updating meta, merge with existing meta
-            const newMeta = updates.name !== undefined || updates.color !== undefined
-                ? { ...group.meta, ...updates }
-                : group.meta;
+            // If updates contains 'meta', use it directly (it's already structured correctly from overlay)
+            // Otherwise, if it contains top-level properties like 'name' or 'color', merge them into meta (legacy support)
+            let newMeta = group.meta;
+
+            if (updates.meta) {
+                newMeta = { ...group.meta, ...updates.meta };
+            } else if (updates.name !== undefined || updates.color !== undefined) {
+                newMeta = { ...group.meta, ...updates };
+            }
 
             // Construct full updates object for persistence
-            // We strip out the meta keys from the root to keep the payload clean
-            const { name, color, ...otherUpdates } = updates;
+            // We strip out the meta keys from the root to keep the payload clean if they were top-level
+            const { name, color, meta, ...otherUpdates } = updates;
+
             const fullUpdates = {
                 ...otherUpdates,
                 meta: newMeta

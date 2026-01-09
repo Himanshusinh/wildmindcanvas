@@ -56,18 +56,21 @@ export function useCanvasStore(projectId: string | null) {
     const execute = useCallback((cmd: Command) => {
         // Use ref to get latest doc without dependency cycle
         const nextDoc = historyRef.current.execute(cmd, docRef.current);
+        docRef.current = nextDoc; // IMMEDIATE UPDATE to prevent stale reads in sync chains
         setDoc(nextDoc);
         setHistoryVersion(v => v + 1);
     }, []);
 
     const undo = useCallback(() => {
         const nextDoc = historyRef.current.undo(docRef.current);
+        docRef.current = nextDoc;
         setDoc(nextDoc);
         setHistoryVersion(v => v + 1);
     }, []);
 
     const redo = useCallback(() => {
         const nextDoc = historyRef.current.redo(docRef.current);
+        docRef.current = nextDoc;
         setDoc(nextDoc);
         setHistoryVersion(v => v + 1);
     }, []);
@@ -103,8 +106,22 @@ export function useCanvasStore(projectId: string | null) {
 
     // --- Compatible Setters ---
     // Make createSetter depend on execute (which is stable now)
-    const createSetter = useCallback(<T extends { id?: string, elementId?: string }>(type: NodeType, currentList: T[]) => {
+    const createSetter = useCallback(<T extends { id?: string, elementId?: string }>(type: NodeType, _ignoredCurrentList: T[]) => {
         return (action: React.SetStateAction<T[]>) => {
+            // ALWAYS derive fresh list from docRef.current to avoid stale closures in async handlers
+            const freshNodes = Object.values(docRef.current.nodes);
+
+            let currentList: T[];
+            if (type === 'image' || type === 'model3d') {
+                currentList = freshNodes
+                    .filter(n => ['image', 'video', 'text', 'model3d'].includes(n.type))
+                    .map(n => nodeToImage(n)) as unknown as T[];
+            } else {
+                currentList = freshNodes
+                    .filter(n => n.type === type)
+                    .map(n => itemFromNode<T>(n)) as T[];
+            }
+
             let newList: T[];
             if (typeof action === 'function') {
                 newList = (action as (prev: T[]) => T[])(currentList);
@@ -139,7 +156,7 @@ export function useCanvasStore(projectId: string | null) {
 
                     execute(new AddNodeCommand(node));
                 } else {
-                    if (oldItem === item) return;
+                    if (oldItem === item) return; // No change
 
                     let newNode = (type === 'image' || type === 'model3d')
                         ? imageToNode(item as any)

@@ -1689,6 +1689,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedImageUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={!isUploadedImage ? handleGenerate : undefined}
+        />
         <ImageModalFrame
           id={id}
           scale={scale}

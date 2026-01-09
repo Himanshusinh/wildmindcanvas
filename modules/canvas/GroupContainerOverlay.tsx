@@ -96,7 +96,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
 
                 const handleNameSave = () => {
                     if (tempName.trim() && tempName !== groupName) {
-                        onGroupUpdate(group.id, { name: tempName.trim() });
+                        onGroupUpdate(group.id, { meta: { ...group.meta, name: tempName.trim() } });
                     }
                     setEditingGroupId(null);
                 };
@@ -398,7 +398,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                                                 value={hex}
                                                                 onChange={(e) => {
                                                                     const newColor = hexToRgba(e.target.value, opacity);
-                                                                    onGroupUpdate(group.id, { color: newColor });
+                                                                    onGroupUpdate(group.id, { meta: { ...group.meta, color: newColor } });
                                                                 }}
                                                             />
                                                         </div>
@@ -409,7 +409,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                                                 className="opacity-btn"
                                                                 onClick={() => {
                                                                     const newOpacity = Math.max(0, opacity - 0.1);
-                                                                    onGroupUpdate(group.id, { color: hexToRgba(hex, newOpacity) });
+                                                                    onGroupUpdate(group.id, { meta: { ...group.meta, color: hexToRgba(hex, newOpacity) } });
                                                                 }}
                                                                 title="Decrease Opacity"
                                                             >
@@ -427,7 +427,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                                                 className="opacity-btn"
                                                                 onClick={() => {
                                                                     const newOpacity = Math.min(1, opacity + 0.1);
-                                                                    onGroupUpdate(group.id, { color: hexToRgba(hex, newOpacity) });
+                                                                    onGroupUpdate(group.id, { meta: { ...group.meta, color: hexToRgba(hex, newOpacity) } });
                                                                 }}
                                                                 title="Increase Opacity"
                                                             >
@@ -440,7 +440,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                                             <button
                                                                 className="toolbar-btn"
                                                                 style={{ fontSize: '16px', width: '24px', height: '24px', minHeight: 'unset', marginLeft: '4px' }}
-                                                                onClick={() => onGroupUpdate(group.id, { color: 'rgba(59, 130, 246, 0.1)' })}
+                                                                onClick={() => onGroupUpdate(group.id, { meta: { ...group.meta, color: 'rgba(59, 130, 246, 0.1)' } })}
                                                                 title="Reset Color & Opacity"
                                                             >
                                                                 ×
