@@ -1343,7 +1343,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 } as any]);
               }}
               onPersistGroupUpdate={async (id, updates) => {
-                setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
+                setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, ...updates } as any : g));
               }}
               onPersistGroupDelete={async (groupId) => {
                 setGroupContainerStates(prev => prev.filter(g => g.id !== groupId));
