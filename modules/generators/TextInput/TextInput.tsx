@@ -16,6 +16,7 @@ interface TextInputProps {
   onConfirm: (text: string, model?: string) => void;
   onCancel: () => void;
   onPositionChange?: (x: number, y: number) => void;
+  onPositionCommit?: (x: number, y: number) => void;
   onSelect?: () => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
@@ -43,6 +44,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   onConfirm,
   onCancel,
   onPositionChange,
+  onPositionCommit,
   onSelect,
   onDelete,
   onDuplicate,
@@ -162,6 +164,13 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const lastPositionRef = useRef({ x, y });
+
+  // Update ref when props change (in case unmounting/remounting affects it, though usually drag drives it)
+  useEffect(() => {
+    lastPositionRef.current = { x, y };
+  }, [x, y]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDragging) return;
@@ -178,10 +187,14 @@ export const TextInput: React.FC<TextInputProps> = ({
       const newCanvasY = (newScreenY - position.y) / scale;
 
       onPositionChange(newCanvasX, newCanvasY);
+      lastPositionRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      if (onPositionCommit) {
+        onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -192,7 +205,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDragging, dragOffset, scale, position, onPositionChange]);
+  }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit]);
 
   const handleConfirm = () => {
     if (text.trim()) {

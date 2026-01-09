@@ -411,7 +411,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, isHydrated, mutationVersion]);
+  }, [projectId, isHydrated, mutationVersion, state]);
 
   return { buildSnapshotElements, saveSnapshot };
 }

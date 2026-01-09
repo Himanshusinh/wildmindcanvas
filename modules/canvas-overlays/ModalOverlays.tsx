@@ -95,6 +95,18 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistCanvasTextCreate,
   onPersistCanvasTextMove,
   onPersistCanvasTextDelete,
+
+  // Rich Text
+  richTextStates,
+  setRichTextStates,
+  selectedRichTextId,
+  selectedRichTextIds,
+  setSelectedRichTextId,
+  setSelectedRichTextIds,
+  onPersistRichTextCreate,
+  onPersistRichTextMove,
+  onPersistRichTextDelete,
+
   isComponentDraggable, // New prop
 
   clearAllSelections,
@@ -604,6 +616,25 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         }}
         onDelete={(id) => {
           if (onPersistCanvasTextDelete) onPersistCanvasTextDelete(id);
+        }}
+        scale={scale}
+        position={position}
+      />
+
+      {/* Rich Text Overlays */}
+      <CanvasTextOverlays
+        canvasTextStates={richTextStates ?? []}
+        selectedCanvasTextId={selectedRichTextId ?? null}
+        onSelect={(id) => {
+          clearAllSelections();
+          if (setSelectedRichTextId) setSelectedRichTextId(id);
+          if (setSelectedRichTextIds) setSelectedRichTextIds([id]);
+        }}
+        onUpdate={(id, updates) => {
+          if (onPersistRichTextMove) onPersistRichTextMove(id, updates);
+        }}
+        onDelete={(id) => {
+          if (onPersistRichTextDelete) onPersistRichTextDelete(id);
         }}
         scale={scale}
         position={position}

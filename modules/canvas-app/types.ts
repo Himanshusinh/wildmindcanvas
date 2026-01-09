@@ -316,3 +316,9 @@ export interface ViewportCenter {
   scale: number;
 }
 
+export interface SnapshotActions {
+  createElement: (element: import('@/lib/snapshot/currentSnapshot').CanvasElement) => void;
+  updateElement: (id: string, updates: Partial<import('@/lib/snapshot/currentSnapshot').CanvasElement>) => void;
+  deleteElement: (id: string) => void;
+}
+

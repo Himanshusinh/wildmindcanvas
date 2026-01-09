@@ -73,6 +73,7 @@ interface VideoUploadModalProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  onPersistVideoModalCreate?: (modal: any) => void | Promise<void>;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -110,6 +111,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   onContextMenu,
   isPinned = false,
   onTogglePin,
+  onPersistVideoModalCreate,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -324,6 +326,27 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const promptToUse = effectivePrompt;
     if (onGenerate && promptToUse.trim() && !isGenerating) {
       setIsGenerating(true);
+
+      if (onPersistVideoModalCreate) {
+        const defaultDim = 512;
+        const persistData = {
+          id: id,
+          x: x,
+          y: y,
+          width: defaultDim,
+          height: defaultDim,
+          frameWidth: defaultDim,
+          frameHeight: defaultDim,
+          generatedVideoUrl: generatedVideoUrl || null,
+          model: selectedModel,
+          aspectRatio: selectedAspectRatio,
+          prompt: promptToUse,
+          duration: typeof selectedDuration === 'string' ? parseFloat(selectedDuration) : selectedDuration,
+          resolution: selectedResolution
+        };
+        await Promise.resolve(onPersistVideoModalCreate(persistData));
+      }
+
       try {
         // Pass first_frame_url and last_frame_url if 2 images are connected
         const generationFirstFrame = isFirstLastMode && isFrameOrderSwapped

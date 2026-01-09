@@ -106,8 +106,10 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             setTextInputStates(prev => prev.map(t =>
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
+          }}
+          onPositionCommit={(finalX, finalY) => {
             if (onPersistTextModalMove) {
-              Promise.resolve(onPersistTextModalMove(textState.id, { x: newX, y: newY })).catch(console.error);
+              Promise.resolve(onPersistTextModalMove(textState.id, { x: finalX, y: finalY })).catch(console.error);
             }
           }}
           onSelect={() => {

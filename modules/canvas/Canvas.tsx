@@ -20,7 +20,6 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setImages,
     onImageUpdate,
     onImageDelete,
-    onImageDownload,
     onImageDuplicate,
     onImagesDrop,
     onLibraryMediaDrop,
@@ -86,6 +85,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRichTextDelete,
     onBackgroundClick,
     onBulkDelete,
+    undo = () => { },
+    redo = () => { },
+    canUndo = false,
+    canRedo = false,
   } = props;
 
   // Refs
@@ -472,10 +475,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   useKeyboardShortcuts({
     onFitView: handleFitView,
     // Undo/Redo
-    canUndo: canvasState.canUndo,
-    canRedo: canvasState.canRedo,
-    undo: canvasState.undo,
-    redo: canvasState.redo,
+    // Undo/Redo
+    canUndo: canUndo,
+    canRedo: canRedo,
+    undo: undo,
+    redo: redo,
 
     // Keys
     setIsSpacePressed: events.setIsShiftPressed, // Note: events returns setIsShiftPressed, need to verify isSpacePressed is exposed

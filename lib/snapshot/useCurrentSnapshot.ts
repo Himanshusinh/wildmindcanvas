@@ -1,23 +1,24 @@
 import { useState, useCallback } from "react";
+import { setCurrentSnapshot } from "@/core/api/canvasApi";
 import { CanvasSnapshot, CanvasElement } from "./currentSnapshot";
 
-export function useCurrentSnapshot(initial: CanvasSnapshot) {
+export function useCurrentSnapshot(initial: CanvasSnapshot, projectId: string | null) {
     const [snapshot, setSnapshot] = useState<CanvasSnapshot>(initial);
 
     const saveSnapshot = useCallback(async (next: CanvasSnapshot) => {
         setSnapshot(next);
 
+        if (!projectId) return;
+
         try {
-            await fetch("/api/canvas/snapshot", { // Adjusted URL to match likely API route, or strictly /api/snapshot/current if user insisted? User said /api/snapshot/current but project might differ. Sticking to user's URL for now but noting potential 404.
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                // credentials: "include", // User requested this. Ensure backend handles it.
-                body: JSON.stringify(next),
+            await setCurrentSnapshot(projectId, {
+                elements: next.elements,
+                metadata: next.metadata
             });
         } catch (e) {
             console.error("Failed to save snapshot", e);
         }
-    }, []);
+    }, [projectId]);
 
     const createElement = useCallback((element: CanvasElement) => {
         saveSnapshot({
@@ -63,10 +64,20 @@ export function useCurrentSnapshot(initial: CanvasSnapshot) {
         });
     }, [snapshot, saveSnapshot]);
 
+    const loadSnapshot = useCallback((data: CanvasSnapshot | ((prev: CanvasSnapshot) => CanvasSnapshot)) => {
+        setSnapshot((prev) => {
+            const nextSnapshot = typeof data === 'function' ? data(prev) : data;
+            return nextSnapshot;
+        });
+        // We don't save here - this is for hydration/sync
+    }, []);
+
     return {
         snapshot,
         createElement,
         updateElement,
         deleteElement,
+        loadSnapshot,
+        saveSnapshot,
     };
 }

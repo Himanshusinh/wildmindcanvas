@@ -523,6 +523,17 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
   onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
+
+  // Rich Text
+  richTextStates?: CanvasTextState[];
+  setRichTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
+  selectedRichTextId?: string | null;
+  selectedRichTextIds?: string[];
+  setSelectedRichTextId?: (id: string | null) => void;
+  setSelectedRichTextIds?: (ids: string[]) => void;
+  onPersistRichTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
+  onPersistRichTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
+  onPersistRichTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
