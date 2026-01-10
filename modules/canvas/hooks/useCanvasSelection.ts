@@ -35,6 +35,9 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const [selectedVideoEditorModalId, setSelectedVideoEditorModalId] = useState<string | null>(null);
     const [selectedVideoEditorModalIds, setSelectedVideoEditorModalIds] = useState<string[]>([]);
 
+    const [selectedImageEditorModalId, setSelectedImageEditorModalId] = useState<string | null>(null);
+    const [selectedImageEditorModalIds, setSelectedImageEditorModalIds] = useState<string[]>([]);
+
     const [selectedMusicModalId, setSelectedMusicModalId] = useState<string | null>(null);
     const [selectedMusicModalIds, setSelectedMusicModalIds] = useState<string[]>([]);
 
@@ -102,6 +105,8 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         setSelectedVideoModalIds([]);
         setSelectedVideoEditorModalId(null);
         setSelectedVideoEditorModalIds([]);
+        setSelectedImageEditorModalId(null);
+        setSelectedImageEditorModalIds([]);
         setSelectedMusicModalId(null);
         setSelectedMusicModalIds([]);
         setSelectedUpscaleModalId(null);
@@ -167,6 +172,8 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedVideoModalIds, setSelectedVideoModalIds,
         selectedVideoEditorModalId, setSelectedVideoEditorModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds,
+        selectedImageEditorModalId, setSelectedImageEditorModalId,
+        selectedImageEditorModalIds, setSelectedImageEditorModalIds,
         selectedMusicModalId, setSelectedMusicModalId,
         selectedMusicModalIds, setSelectedMusicModalIds,
         selectedUpscaleModalId, setSelectedUpscaleModalId,

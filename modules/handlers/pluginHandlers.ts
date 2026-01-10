@@ -1,4 +1,4 @@
-import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator } from '@/modules/canvas-app/types';
+import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator, ImageEditorGenerator } from '@/modules/canvas-app/types';
 import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
 
 export interface PluginHandlers {
@@ -35,6 +35,9 @@ export interface PluginHandlers {
   onPersistVideoEditorModalCreate: (modal: VideoEditorGenerator) => Promise<void>;
   onPersistVideoEditorModalMove: (id: string, updates: Partial<VideoEditorGenerator>) => Promise<void>;
   onPersistVideoEditorModalDelete: (id: string) => Promise<void>;
+  onPersistImageEditorModalCreate: (modal: ImageEditorGenerator) => Promise<void>;
+  onPersistImageEditorModalMove: (id: string, updates: Partial<ImageEditorGenerator>) => Promise<void>;
+  onPersistImageEditorModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number) => Promise<string | null>;
   onMultiangleCamera: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
@@ -301,6 +304,18 @@ export function createPluginHandlers(
     removeConnectorsForElement(id);
   };
 
+  // --- IMAGE EDITOR ---
+  const onPersistImageEditorModalCreate = async (modal: ImageEditorGenerator) => {
+    setters.setImageEditorGenerators(prev => [...prev, modal]);
+  };
+  const onPersistImageEditorModalMove = async (id: string, updates: Partial<ImageEditorGenerator>) => {
+    setters.setImageEditorGenerators(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+  const onPersistImageEditorModalDelete = async (id: string) => {
+    setters.setImageEditorGenerators(prev => prev.filter(item => item.id !== id));
+    removeConnectorsForElement(id);
+  };
+
   // --- COMPARE ---
   const onPersistCompareModalCreate = async (modal: { id: string; x: number; y: number; width?: number; height?: number; scale?: number; prompt?: string; model?: string }) => {
     setters.setCompareGenerators(prev => [...prev, modal]);
@@ -325,6 +340,7 @@ export function createPluginHandlers(
     onPersistScriptFrameModalCreate, onPersistScriptFrameModalMove, onPersistScriptFrameModalDelete,
     onPersistSceneFrameModalCreate, onPersistSceneFrameModalMove, onPersistSceneFrameModalDelete,
     onPersistVideoEditorModalCreate, onPersistVideoEditorModalMove, onPersistVideoEditorModalDelete,
+    onPersistImageEditorModalCreate, onPersistImageEditorModalMove, onPersistImageEditorModalDelete,
     onUpscale, onMultiangleCamera, onRemoveBg, onErase, onExpand, onVectorize,
     onPersistCompareModalCreate, onPersistCompareModalMove, onPersistCompareModalDelete
   };

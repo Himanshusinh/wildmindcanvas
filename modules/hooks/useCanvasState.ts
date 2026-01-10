@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/core/types/canvas';
 import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
-import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, NextSceneGenerator, CompareGenerator, MultiangleCameraGenerator, Connector, CanvasAppState, CanvasAppSetters } from '@/modules/canvas-app/types';
+import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, ImageEditorGenerator, NextSceneGenerator, CompareGenerator, MultiangleCameraGenerator, Connector, CanvasAppState, CanvasAppSetters } from '@/modules/canvas-app/types';
 
 export function useCanvasState() {
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [imageGenerators, setImageGenerators] = useState<ImageGenerator[]>([]);
   const [videoGenerators, setVideoGenerators] = useState<VideoGenerator[]>([]);
   const [videoEditorGenerators, setVideoEditorGenerators] = useState<VideoEditorGenerator[]>([]);
+  const [imageEditorGenerators, setImageEditorGenerators] = useState<ImageEditorGenerator[]>([]);
   const [musicGenerators, setMusicGenerators] = useState<MusicGenerator[]>([]);
   const [upscaleGenerators, setUpscaleGenerators] = useState<UpscaleGenerator[]>([]);
   const [multiangleCameraGenerators, setMultiangleCameraGenerators] = useState<MultiangleCameraGenerator[]>([]);
@@ -33,6 +34,7 @@ export function useCanvasState() {
     imageGenerators,
     videoGenerators,
     videoEditorGenerators,
+    imageEditorGenerators,
     musicGenerators,
     upscaleGenerators,
     multiangleCameraGenerators,
@@ -59,6 +61,7 @@ export function useCanvasState() {
     setImageGenerators,
     setVideoGenerators,
     setVideoEditorGenerators,
+    setImageEditorGenerators,
     setMusicGenerators,
     setUpscaleGenerators,
     setMultiangleCameraGenerators,

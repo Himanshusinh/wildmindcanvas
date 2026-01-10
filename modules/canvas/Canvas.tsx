@@ -31,6 +31,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     externalImageModals,
     externalVideoModals,
     externalVideoEditorModals,
+    externalImageEditorModals,
     externalMusicModals,
     externalUpscaleModals,
     externalMultiangleCameraModals,
@@ -111,6 +112,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     externalImageModals,
     externalVideoModals,
     externalVideoEditorModals,
+    externalImageEditorModals,
     externalMusicModals,
     externalUpscaleModals,
     externalMultiangleCameraModals,
@@ -153,6 +155,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     imageModalStates,
     videoModalStates,
     videoEditorModalStates,
+    imageEditorModalStates,
     musicModalStates,
     upscaleModalStates,
     multiangleCameraModalStates,
@@ -205,6 +208,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     imageModalStates,
     videoModalStates,
     videoEditorModalStates,
+    imageEditorModalStates,
     musicModalStates,
     upscaleModalStates,
     multiangleCameraModalStates,
@@ -278,6 +282,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   const effectiveScriptFrameModalStates = groupLogic.getEffectiveStates(scriptFrameModalStates, 'script-frame');
   const effectiveSceneFrameModalStates = groupLogic.getEffectiveStates(sceneFrameModalStates, 'scene-frame');
   const effectiveVideoEditorModalStates = groupLogic.getEffectiveStates(videoEditorModalStates, 'video-editor-modal');
+  const effectiveImageEditorModalStates = groupLogic.getEffectiveStates(imageEditorModalStates, 'image-editor-modal');
   const effectiveCompareModalStates = groupLogic.getEffectiveStates(compareModalStates, 'compare-modal');
   const effectiveCanvasTextStates = groupLogic.getEffectiveStates(canvasState.effectiveCanvasTextStates, 'canvas-text');
   const effectiveRichTextStates = groupLogic.getEffectiveStates(richTextStates || [], 'rich-text');
@@ -300,6 +305,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     scriptFrameModalStates: effectiveScriptFrameModalStates,
     sceneFrameModalStates: effectiveSceneFrameModalStates,
     videoEditorModalStates: effectiveVideoEditorModalStates,
+    imageEditorModalStates: effectiveImageEditorModalStates,
     compareModalStates: effectiveCompareModalStates,
     effectiveCanvasTextStates,
     effectiveRichTextStates,

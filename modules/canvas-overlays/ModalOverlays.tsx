@@ -9,6 +9,7 @@ import { TextInputOverlays } from './TextInputOverlays';
 import { ImageModalOverlays } from './ImageModalOverlays';
 import { VideoModalOverlays } from './VideoModalOverlays';
 import { VideoEditorModalOverlays } from './VideoEditorModalOverlays';
+import { ImageEditorModalOverlays } from './ImageEditorModalOverlays';
 import { MusicModalOverlays } from './MusicModalOverlays';
 import { UpscaleModalOverlays } from './UpscaleModalOverlays';
 import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
@@ -31,6 +32,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   imageModalStates,
   videoModalStates,
   videoEditorModalStates,
+  imageEditorModalStates,
   musicModalStates,
   upscaleModalStates,
   removeBgModalStates,
@@ -68,6 +70,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedVideoModalIds,
   selectedVideoEditorModalId,
   selectedVideoEditorModalIds,
+  selectedImageEditorModalId,
+  selectedImageEditorModalIds,
   selectedMusicModalId,
   selectedMusicModalIds,
   selectedUpscaleModalId,
@@ -123,6 +127,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setVideoEditorModalStates = () => { },
   setSelectedVideoEditorModalId = () => { },
   setSelectedVideoEditorModalIds = () => { },
+  setImageEditorModalStates = () => { },
+  setSelectedImageEditorModalId = () => { },
+  setSelectedImageEditorModalIds = () => { },
   setMusicModalStates,
   setSelectedMusicModalId,
   setSelectedMusicModalIds,
@@ -175,6 +182,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistVideoEditorModalMove,
   onPersistVideoEditorModalDelete,
   onOpenVideoEditor,
+  onPersistImageEditorModalCreate,
+  onPersistImageEditorModalMove,
+  onPersistImageEditorModalDelete,
+  onOpenImageEditor,
   onPersistMusicModalCreate,
   onPersistMusicModalMove,
   onPersistMusicModalDelete,
@@ -373,6 +384,22 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
         onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
         onOpenVideoEditor={onOpenVideoEditor}
+        scale={scale}
+        position={position}
+      />
+
+      <ImageEditorModalOverlays
+        imageEditorModalStates={imageEditorModalStates}
+        selectedImageEditorModalId={selectedImageEditorModalId}
+        selectedImageEditorModalIds={selectedImageEditorModalIds}
+        clearAllSelections={clearAllSelections}
+        setImageEditorModalStates={setImageEditorModalStates}
+        setSelectedImageEditorModalId={setSelectedImageEditorModalId}
+        setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
+        onPersistImageEditorModalCreate={onPersistImageEditorModalCreate}
+        onPersistImageEditorModalMove={onPersistImageEditorModalMove}
+        onPersistImageEditorModalDelete={onPersistImageEditorModalDelete}
+        onOpenImageEditor={onOpenImageEditor}
         scale={scale}
         position={position}
       />

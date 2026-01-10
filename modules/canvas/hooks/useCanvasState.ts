@@ -19,6 +19,7 @@ export function useCanvasState(props: CanvasProps) {
         externalImageModals,
         externalVideoModals,
         externalVideoEditorModals,
+        externalImageEditorModals,
         externalMusicModals,
         externalUpscaleModals,
         externalMultiangleCameraModals,
@@ -70,6 +71,7 @@ export function useCanvasState(props: CanvasProps) {
     const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>>([]);
     const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
     const [videoEditorModalStates, setVideoEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
+    const [imageEditorModalStates, setImageEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
     const [musicModalStates, setMusicModalStates] = useState<import('../types').MusicGenerator[]>([]);
     const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>>([]);
     const [multiangleCameraModalStates, setMultiangleCameraModalStates] = useState<Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>>([]);
@@ -94,6 +96,7 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalImageModals) setImageModalStates(externalImageModals as any); }, [externalImageModals]);
     useEffect(() => { if (externalVideoModals) setVideoModalStates(externalVideoModals as any); }, [externalVideoModals]);
     useEffect(() => { if (externalVideoEditorModals) setVideoEditorModalStates(externalVideoEditorModals); }, [externalVideoEditorModals]);
+    useEffect(() => { if (externalImageEditorModals) setImageEditorModalStates(externalImageEditorModals as any); }, [externalImageEditorModals]);
     useEffect(() => { if (externalMusicModals) setMusicModalStates(externalMusicModals as any); }, [externalMusicModals]);
     useEffect(() => { if (externalUpscaleModals) setUpscaleModalStates(externalUpscaleModals as any); }, [externalUpscaleModals]);
     useEffect(() => { if (externalMultiangleCameraModals) setMultiangleCameraModalStates(externalMultiangleCameraModals as any); }, [externalMultiangleCameraModals]);
@@ -123,6 +126,7 @@ export function useCanvasState(props: CanvasProps) {
         imageModalStates: imageModalStates as any, setImageModalStates,
         videoModalStates: videoModalStates as any, setVideoModalStates,
         videoEditorModalStates, setVideoEditorModalStates,
+        imageEditorModalStates, setImageEditorModalStates,
         musicModalStates: musicModalStates as any, setMusicModalStates,
         upscaleModalStates: upscaleModalStates as any, setUpscaleModalStates,
         multiangleCameraModalStates: multiangleCameraModalStates as any, setMultiangleCameraModalStates,
