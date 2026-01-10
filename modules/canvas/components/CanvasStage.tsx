@@ -305,6 +305,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     <RichTextNode
                         key={textState.id}
                         {...textState}
+                        scale={scale}
                         isSelected={selectedRichTextId === textState.id} // or check explicit IDs list
                         onSelect={() => {
                             clearAllSelections(false);

@@ -16,6 +16,7 @@ interface TextEditorProps {
     align: string;
     backgroundColor?: string;
     rotation: number;
+    scale?: number;
     onChange: (newText: string) => void;
     onUpdate: (updates: any) => void;
     onClose: () => void;
@@ -35,6 +36,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     align,
     backgroundColor = 'transparent',
     rotation,
+    scale = 1,
     onChange,
     onUpdate,
     onClose,
@@ -82,7 +84,15 @@ export const TextEditor: React.FC<TextEditorProps> = ({
                 }
             }}
         >
-            <div className="relative">
+            <div
+                className="relative"
+                style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    // Compensate for scale expansion if needed, but relative positioning usually handles it
+                    // For the floating toolbar, we want it to stay centered
+                }}
+            >
                 <RichTextToolbar
                     fontFamily={fontFamily}
                     fontSize={fontSize}

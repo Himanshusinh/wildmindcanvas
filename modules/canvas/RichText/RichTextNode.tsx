@@ -22,6 +22,7 @@ interface RichTextNodeProps {
     fontStyle?: string;
     textDecoration?: string;
     draggable?: boolean;
+    scale?: number;
 }
 
 export const RichTextNode: React.FC<RichTextNodeProps> = ({
@@ -43,6 +44,7 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
     onSelect,
     onChange,
     draggable = true,
+    scale = 1,
 }) => {
     // Refs
     const textRef = useRef<Konva.Text>(null);
@@ -148,6 +150,7 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                     align={align}
                     backgroundColor={backgroundColor}
                     rotation={textRef.current.rotation()}
+                    scale={scale}
                     onChange={handleTextChange}
                     onUpdate={(updates) => onChange(updates)}
                     onClose={handleEditorClose}
