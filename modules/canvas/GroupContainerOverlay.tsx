@@ -43,8 +43,7 @@ interface GroupContainerOverlayProps {
 const COLORS = [
     '#FFFFFF', '#000000', '#F87171', '#FB923C',
     '#FBBF24', '#A3E635', '#34D399', '#22D3EE',
-    '#3B82F6', '#818CF8', '#C084FC', '#F472B6',
-    'transparent'
+    '#3B82F6', '#818CF8', '#C084FC', '#F472B6'
 ];
 
 export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
@@ -86,20 +85,20 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
 
     return (
         <>
-            {groups.map(group => {
+            {groups.map((group: any) => {
                 const isSelected = selectedGroupIds.includes(group.id);
                 const isToolbarVisible = isSelected && selectedGroupId === group.id;
                 const isEditing = editingGroupId === group.id;
                 const groupName = (group && group.meta && typeof group.meta.name === 'string') ? group.meta.name : '';
 
                 const bgColor = group.meta.color || 'rgba(59, 130, 246, 0.1)';
-                const strokeColor = group.meta.color && group.meta.color !== 'transparent'
+                const strokeColor = group.meta.color
                     ? (group.meta.color.startsWith('rgba(59, 130, 246, 0.1)') ? '#3b82f6' : group.meta.color.split(',')[0].replace('rgba', 'rgb'))
                     : '#3b82f6';
 
                 // Simple helper to get display hex for indicator
                 const getDisplayColor = (colorStr: string) => {
-                    if (!colorStr || colorStr === 'transparent') return '#3b82f6';
+                    if (!colorStr) return '#3b82f6';
                     if (colorStr.startsWith('#')) return colorStr;
                     if (colorStr.startsWith('rgba') || colorStr.startsWith('rgb')) {
                         const match = colorStr.match(/(\d+),\s*(\d+),\s*(\d+)/);
@@ -161,9 +160,9 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                         <Rect
                             width={group.width}
                             height={group.height}
-                            stroke={strokeColor === 'transparent' ? '#3b82f6' : strokeColor}
+                            stroke={strokeColor}
                             strokeWidth={1.5}
-                            fill={bgColor === 'transparent' ? 'rgba(0,0,0,0)' : bgColor}
+                            fill={bgColor}
                             listening={true}
                             cornerRadius={20}
                             dash={[0, 0]}
@@ -346,7 +345,7 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                             width: 32px;
                                             height: 32px;
                                             border-radius: 50%;
-                                            border: 2px solid transparent;
+                                            border: 1px solid rgba(255, 255, 255, 0.1);
                                             cursor: pointer;
                                             transition: transform 0.2s;
                                             display: flex;
@@ -356,12 +355,6 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                         }
                                         .color-swatch:hover {
                                             transform: scale(1.1);
-                                        }
-                                        .no-color-line {
-                                            width: 100%;
-                                            height: 2px;
-                                            background: #ef4444;
-                                            transform: rotate(45deg);
                                         }
                                         `}
                                     </style>
@@ -383,24 +376,18 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
                                                         <button
                                                             key={color}
                                                             className="color-swatch"
-                                                            style={{ backgroundColor: color === 'transparent' ? 'rgba(255,255,255,0.05)' : color, border: color === 'transparent' ? '1px solid rgba(255,255,255,0.2)' : 'none' }}
+                                                            style={{ backgroundColor: color }}
                                                             onClick={() => {
-                                                                const finalColor = color === 'transparent' ? 'transparent' : (color === '#FFFFFF' ? 'rgba(255,255,255,0.1)' : color.replace('#', 'rgba(') + ', 0.1)').replace('rgba(#', 'rgba(');
-                                                                // Convert hex to rgba for the 0.1 opacity effect if desired, or just use hex
-                                                                let updatedColor = color;
-                                                                if (color !== 'transparent' && color.startsWith('#')) {
-                                                                    const r = parseInt(color.slice(1, 3), 16);
-                                                                    const g = parseInt(color.slice(3, 5), 16);
-                                                                    const b = parseInt(color.slice(5, 7), 16);
-                                                                    updatedColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
-                                                                }
+                                                                // Convert hex to rgba for the 0.1 opacity effect
+                                                                const r = parseInt(color.slice(1, 3), 16);
+                                                                const g = parseInt(color.slice(3, 5), 16);
+                                                                const b = parseInt(color.slice(5, 7), 16);
+                                                                const updatedColor = `rgba(${r}, ${g}, ${b}, 0.1)`;
 
                                                                 onGroupUpdate(group.id, { meta: { ...group.meta, color: updatedColor } });
                                                                 setIsColorPickerOpen(false);
                                                             }}
-                                                        >
-                                                            {color === 'transparent' && <div className="no-color-line" />}
-                                                        </button>
+                                                        />
                                                     ))}
                                                 </div>
                                             )}
