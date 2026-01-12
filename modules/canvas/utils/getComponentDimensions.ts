@@ -33,11 +33,8 @@ export function getComponentDimensions(
         scriptFrameModalStates,
         sceneFrameModalStates,
         videoEditorModalStates,
-<<<<<<< HEAD
-        richTextStates
-=======
+        richTextStates,
         imageEditorModalStates
->>>>>>> 9626783a055e917f3e2f90a048ad4fea9671cfea
     } = data;
 
     switch (type) {

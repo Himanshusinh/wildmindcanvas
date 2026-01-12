@@ -5,7 +5,7 @@ import { CAPABILITY_REGISTRY, ModelConstraint } from './capabilityRegistry';
 export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAction {
     // 1. Capability Safety
     const capabilityType = (intent.capability === 'CONNECT' || intent.capability === 'UNKNOWN') ? 'IMAGE' : intent.capability;
-    const capability = CAPABILITY_REGISTRY[capabilityType as CapabilityType] || CAPABILITY_REGISTRY.IMAGE;
+    const capability = CAPABILITY_REGISTRY[capabilityType as keyof typeof CAPABILITY_REGISTRY] || CAPABILITY_REGISTRY.IMAGE;
 
     // 2. Model Selection Logic (Deterministic)
     const modelList = Object.values(capability.models) as ModelConstraint[];
@@ -17,7 +17,7 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
         selectedModel = modelList.find(m => m.supports.contentToContent) || modelList.find(m => m.isDefault) || modelList[0];
     } else if (intent.preferences?.preferredModel) {
         // Try strict ID match or loose name match
-        selectedModel = modelList.find(m => m.id === intent.preferences?.preferredModel || m.name.toLowerCase().includes(intent.preferences.preferredModel!.toLowerCase()))
+        selectedModel = modelList.find(m => m.id === intent.preferences?.preferredModel || m.name.toLowerCase().includes(intent.preferences?.preferredModel?.toLowerCase() || ''))
             || modelList.find(m => m.isDefault)
             || modelList[0];
     } else if (intent.preferences?.quality === 'high') {
