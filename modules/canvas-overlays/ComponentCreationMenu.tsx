@@ -261,7 +261,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   x: canvasX,
                   y: canvasY,
                   value: '',
-                  autoFocusInput: true,
+                  autoFocusInput: false,
                 };
                 Promise.resolve(onPersistTextModalCreate(newText)).catch(console.error);
               } else if (comp.type === 'image' && onPersistImageModalCreate) {

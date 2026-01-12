@@ -6,7 +6,7 @@ import { CanvasProps } from '../types';
 import { useCanvasState } from './useCanvasState';
 import { useCanvasSelection } from './useCanvasSelection';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
-import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE } from '@/core/canvas/canvasHelpers';
+import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE, findBlankSpace } from '@/core/canvas/canvasHelpers';
 import { useGroupLogic } from './useGroupLogic';
 
 // Module-level variable to debounce creation across Strict Mode remounts
@@ -38,6 +38,7 @@ export function useCanvasEvents(
         onPersistVideoModalCreate,
         onPersistMusicModalCreate,
         onPersistTextModalCreate,
+        onPersistRichTextCreate,
         isImageModalOpen,
         isVideoModalOpen,
         isMusicModalOpen,
@@ -79,12 +80,14 @@ export function useCanvasEvents(
         scriptFrameModalStates,
         sceneFrameModalStates,
         videoEditorModalStates,
+        richTextStates,
     } = canvasState;
 
     const {
         clearAllSelections,
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
+        selectionTransformerRect, setSelectionTransformerRect,
         isDragSelection, setIsDragSelection,
         selectedImageIndices, setSelectedImageIndices,
         selectedImageModalIds, setSelectedImageModalIds,
@@ -107,6 +110,7 @@ export function useCanvasEvents(
         effectiveSelectedCanvasTextIds: selectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextIds: setSelectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextId: setSelectedCanvasTextId, // Alias
+        selectedRichTextIds, setSelectedRichTextIds,
     } = canvasSelection;
 
     const { stageRef, containerRef } = refs;
@@ -124,13 +128,20 @@ export function useCanvasEvents(
     const [pendingSelectionStartCanvas, setPendingSelectionStartCanvas] = useState<{ x: number; y: number } | null>(null);
     const [selectionStartPoint, setSelectionStartPoint] = useState<{ x: number; y: number } | null>(null); // Screen coords
 
-    const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number }>({});
+    const lastCreateTimesRef = useRef<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number; richText?: number }>({});
     const prevSelectedToolRef = useRef(selectedTool);
     const prevToolClickCounterRef = useRef(toolClickCounter);
     const hasCreatedTextRef = useRef(false);
 
     const [isSpacePressed, setIsSpacePressed] = useState(false);
     const [isShiftPressed, setIsShiftPressed] = useState(false);
+    const positionRef = useRef(position);
+    const scaleRef = useRef(scale);
+    const isPanningRef = useRef(isPanning);
+
+    useEffect(() => { positionRef.current = position; }, [position]);
+    useEffect(() => { scaleRef.current = scale; }, [scale]);
+    useEffect(() => { isPanningRef.current = isPanning; }, [isPanning]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -180,27 +191,105 @@ export function useCanvasEvents(
         const stage = stageRef.current;
         if (!stage) return;
 
-        const spawnAtCenter = () => {
-            const centerX = (stage.width() / 2 - position.x) / scale;
-            const centerY = (stage.height() / 2 - position.y) / scale;
-            return { x: centerX, y: centerY };
+        const findSmartPosition = (width: number, height: number) => {
+            const occupied: { x: number; y: number; width: number; height: number }[] = [];
+
+            const addItems = (items: any[], type: string) => {
+                items.forEach((item, idx) => {
+                    const idOrIndex = type === 'image' ? idx : item.id;
+                    // Construct data object that matches CanvasItemsData
+                    const dataForDims = {
+                        ...canvasState,
+                        canvasTextStates: effectiveCanvasTextStates,
+                        richTextStates: (canvasState as any).richTextStates || []
+                    };
+                    const dims = getComponentDimensions(type, idOrIndex, dataForDims as any);
+                    if (dims.width > 0 && dims.height > 0) {
+                        occupied.push({
+                            x: item.x,
+                            y: item.y,
+                            width: dims.width,
+                            height: dims.height
+                        });
+                    }
+                });
+            };
+
+            addItems(images, 'image');
+            addItems(effectiveCanvasTextStates, 'text'); // Plain Canvas Text
+            addItems(textInputStates, 'input'); // AI Text
+            addItems(imageModalStates, 'imageModal');
+            addItems(videoModalStates, 'videoModal');
+            addItems(musicModalStates, 'musicModal');
+            addItems(upscaleModalStates, 'upscaleModal');
+            addItems(multiangleCameraModalStates, 'multiangleCameraModal');
+            addItems(removeBgModalStates, 'removeBgModal');
+            addItems(eraseModalStates, 'eraseModal');
+            addItems(expandModalStates, 'expandModal');
+            addItems(vectorizeModalStates, 'vectorizeModal');
+            addItems(nextSceneModalStates, 'nextSceneModal');
+            addItems(compareModalStates, 'compareModal');
+            addItems(storyboardModalStates, 'storyboardModal');
+            addItems(scriptFrameModalStates, 'scriptFrameModal');
+            addItems(sceneFrameModalStates, 'sceneFrameModal');
+            addItems(videoEditorModalStates, 'videoEditorModal');
+
+            return findBlankSpace(
+                width,
+                height,
+                occupied,
+                { width: stage.width(), height: stage.height() },
+                position,
+                scale
+            );
         };
 
-        const { x, y } = spawnAtCenter();
         const id = `${selectedTool}-${Date.now()}`;
 
         if (selectedTool === 'image') {
+            const { x, y } = findSmartPosition(600, 400); // Default image modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setImageModalStates(prev => [...prev, newState]);
             onPersistImageModalCreate?.(newState);
         } else if (selectedTool === 'video') {
+            const { x, y } = findSmartPosition(600, 400); // Default video modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setVideoModalStates(prev => [...prev, newState]);
             onPersistVideoModalCreate?.(newState);
         } else if (selectedTool === 'music') {
+            const { x, y } = findSmartPosition(600, 300); // Default music modal size
             const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
             setMusicModalStates(prev => [...prev, newState]);
             onPersistMusicModalCreate?.(newState);
+        } else if (selectedTool === 'rich-text') {
+            const now = Date.now();
+            const lastTime = lastCreateTimesRef.current.richText || 0;
+
+            if (now - lastTime > 500) {
+                lastCreateTimesRef.current.richText = now;
+                console.log('[useCanvasEvents] Creating Rich Text');
+
+                const { x, y } = findSmartPosition(200, 100);
+                const newState = {
+                    id: `rich-text-${Date.now()}`,
+                    type: 'rich-text',
+                    x,
+                    y,
+                    text: 'Some text here',
+                    width: 200,
+                    fontSize: 20,
+                    fontFamily: 'Inter',
+                    fill: 'white',
+                    align: 'left',
+                    backgroundColor: 'transparent'
+                };
+
+                // (canvasState as any).setRichTextStates((prev: any[]) => [...prev, newState]); // Removed to avoid duplication
+                onPersistRichTextCreate?.(newState as any);
+
+                // Switch back to cursor immediately to allow interaction
+                onToolSelect?.('cursor');
+            }
         } else if (selectedTool === 'canvas-text') {
             // "AI Text" Tool
             const now = Date.now();
@@ -213,7 +302,9 @@ export function useCanvasEvents(
                 hasCreatedTextRef.current = true;
 
                 console.log('[useCanvasEvents] Creating AI Text (TextInput)');
-                const newState = { id, x, y, value: '', autoFocusInput: true };
+                // Estimated size of new text input
+                const { x, y } = findSmartPosition(400, 140);
+                const newState = { id, x, y, value: '', autoFocusInput: false };
                 setTextInputStates(prev => [...prev, newState]);
                 onPersistTextModalCreate?.(newState);
             } else {
@@ -228,7 +319,13 @@ export function useCanvasEvents(
     }, [selectedTool, toolClickCounter, stageRef, scale, position,
         setImageModalStates, setVideoModalStates, setMusicModalStates, setTextInputStates,
         effectiveSetCanvasTextStates, setSelectedCanvasTextId,
-        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate]);
+        onPersistImageModalCreate, onPersistVideoModalCreate, onPersistMusicModalCreate, onPersistCanvasTextCreate, onPersistTextModalCreate, onPersistRichTextCreate,
+        // Add dependencies for all modal states to ensure we have latest positions
+        images, effectiveCanvasTextStates, textInputStates, imageModalStates, videoModalStates, musicModalStates,
+        upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates,
+        expandModalStates, vectorizeModalStates, nextSceneModalStates, compareModalStates,
+        storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, videoEditorModalStates
+    ]);
 
     // Update selectionRectCoords when selectionBox changes
     useEffect(() => {
@@ -308,6 +405,7 @@ export function useCanvasEvents(
         // Modified: only clear on LEFT CLICK (button 0)
         if (clickedOnEmpty && e.evt.button === 0 && !isResizeHandle && !isInsideSelection && !isEditingGroup && !isPanKey && !isShiftSelection && !isStartingSelection) {
             clearAllSelections(true);
+            props.onBackgroundClick?.();
             try {
                 applyStageCursorWrapper('pointer');
             } catch (err) { }
@@ -437,14 +535,25 @@ export function useCanvasEvents(
         }
 
         // Selection Rect Logic
-        if (selectionRectCoords) {
-            const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
-            const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+        // Fix: Use selectionBox for coordinates as it tracks Drag. selectionRectCoords is often stale.
+        const hasDrag = selectionBox && isSelecting;
+        if (selectionRectCoords || hasDrag) {
+            let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+            if (hasDrag && selectionBox) {
+                x1 = selectionBox.startX; y1 = selectionBox.startY;
+                x2 = selectionBox.currentX; y2 = selectionBox.currentY;
+            } else if (selectionRectCoords) {
+                x1 = selectionRectCoords.x1; y1 = selectionRectCoords.y1;
+                x2 = selectionRectCoords.x2; y2 = selectionRectCoords.y2;
+            }
+
+            const rectWidth = Math.abs(x2 - x1);
+            const rectHeight = Math.abs(y2 - y1);
 
             if (rectWidth >= 5 && rectHeight >= 5) {
                 const selectionRect = {
-                    x: Math.min(selectionRectCoords.x1, selectionRectCoords.x2),
-                    y: Math.min(selectionRectCoords.y1, selectionRectCoords.y2),
+                    x: Math.min(x1, x2),
+                    y: Math.min(y1, y2),
                     width: rectWidth,
                     height: rectHeight,
                 };
@@ -455,6 +564,7 @@ export function useCanvasEvents(
                 // ... initialize all other arrays
                 const newSelectedImageModalIds = isMultiSelect ? [...selectedImageModalIds] : [];
                 const newSelectedTextInputIds = isMultiSelect ? [...selectedTextInputIds] : [];
+                const newSelectedRichTextIds = isMultiSelect ? [...selectedRichTextIds] : [];
                 // (Shortened for brevity, implement logic similarly for all)
 
                 // Helper to check intersection
@@ -474,7 +584,7 @@ export function useCanvasEvents(
                     }
                 });
 
-                // Image Modals
+                // Image Modals 
                 imageModalStates.forEach((modal: any) => {
                     const dims = getComponentDimensions('imageModal', modal.id, canvasState as any);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
@@ -608,6 +718,31 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedCanvasTextIds = isMultiSelect ? [...selectedCanvasTextIds] : [];
+
+                richTextStates.forEach((text: any) => {
+                    const dims = getComponentDimensions('rich-text', text.id, canvasState as any);
+                    // Robust AABB Check (Manual) to fail-safe against rotation/clientRect issues
+                    const textRect = { x: text.x, y: text.y, width: dims.width, height: dims.height };
+                    const intersects = !(
+                        selectionRect.x > textRect.x + textRect.width ||
+                        selectionRect.x + selectionRect.width < textRect.x ||
+                        selectionRect.y > textRect.y + textRect.height ||
+                        selectionRect.y + selectionRect.height < textRect.y
+                    );
+
+                    if (intersects) {
+                        if (!newSelectedRichTextIds.includes(text.id)) newSelectedRichTextIds.push(text.id);
+                    }
+                });
+
+                effectiveCanvasTextStates.forEach((text: any) => {
+                    const dims = getComponentDimensions('text', text.id, canvasState as any);
+                    if (checkIntersection({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 })) {
+                        if (!newSelectedCanvasTextIds.includes(text.id)) newSelectedCanvasTextIds.push(text.id);
+                    }
+                });
+
                 // Update selections
                 setSelectedImageIndices(newSelectedIndices);
                 setSelectedImageModalIds(newSelectedImageModalIds);
@@ -626,12 +761,16 @@ export function useCanvasEvents(
                 setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
                 setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
                 setSelectedGroupIds(newSelectedGroupIds);
+                setSelectedRichTextIds(newSelectedRichTextIds);
+                setSelectedCanvasTextIds(newSelectedCanvasTextIds);
 
                 // Calculate tight bounding box for all selected items
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let transMinX = Infinity, transMinY = Infinity, transMaxX = -Infinity, transMaxY = -Infinity;
                 let hasSelection = false;
+                let hasTransformerSelection = false;
 
-                const updateBounds = (rect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
+                const updateBounds = (rect: { x: number; y: number; width: number; height: number; rotation?: number }, includeInTransformer: boolean = true) => {
                     // Use getClientRect to account for rotation/transform/shadows
                     hasSelection = true;
                     const client = getClientRect(rect);
@@ -639,6 +778,14 @@ export function useCanvasEvents(
                     minY = Math.min(minY, client.y);
                     maxX = Math.max(maxX, client.x + client.width);
                     maxY = Math.max(maxY, client.y + client.height);
+
+                    if (includeInTransformer) {
+                        hasTransformerSelection = true;
+                        transMinX = Math.min(transMinX, client.x);
+                        transMinY = Math.min(transMinY, client.y);
+                        transMaxX = Math.max(transMaxX, client.x + client.width);
+                        transMaxY = Math.max(transMaxY, client.y + client.height);
+                    }
                 };
 
                 // Check bounds for selected items
@@ -792,21 +939,73 @@ export function useCanvasEvents(
                     }
                 });
 
+                newSelectedRichTextIds.forEach(id => {
+                    const text = richTextStates.find((t: any) => t.id === id);
+                    if (text) {
+                        const dims = getComponentDimensions('rich-text', id, canvasState as any);
+                        // Include RichText in transformer bounds
+                        updateBounds({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 }, true);
+                    }
+                });
+
+                newSelectedCanvasTextIds.forEach(id => {
+                    const text = effectiveCanvasTextStates.find((t: any) => t.id === id);
+                    if (text) {
+                        const dims = getComponentDimensions('text', id, canvasState as any);
+                        updateBounds({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 });
+                    }
+                });
+
                 setSelectionBox(null);
                 setSelectionRectCoords(null);
                 setIsDragSelection(false);
                 setIsSelecting(false);
 
                 if (hasSelection) {
-                    const padding = 20; // Add padding to avoid cutting off borders
+                    const totalCount = newSelectedIndices.length +
+                        newSelectedImageModalIds.length +
+                        newSelectedVideoModalIds.length +
+                        newSelectedVideoEditorModalIds.length +
+                        newSelectedMusicModalIds.length +
+                        newSelectedTextInputIds.length +
+                        newSelectedUpscaleModalIds.length +
+                        newSelectedMultiangleCameraModalIds.length +
+                        newSelectedRemoveBgModalIds.length +
+                        newSelectedEraseModalIds.length +
+                        newSelectedExpandModalIds.length +
+                        newSelectedVectorizeModalIds.length +
+                        newSelectedNextSceneModalIds.length +
+                        newSelectedCompareModalIds.length +
+                        newSelectedStoryboardModalIds.length +
+                        newSelectedScriptFrameModalIds.length +
+                        newSelectedSceneFrameModalIds.length +
+                        newSelectedGroupIds.length +
+                        newSelectedRichTextIds.length +
+                        newSelectedCanvasTextIds.length;
+
+                    const isOnlyTextItems = (newSelectedRichTextIds.length > 0 || newSelectedCanvasTextIds.length > 0) &&
+                        (newSelectedRichTextIds.length + newSelectedCanvasTextIds.length === totalCount);
+                    const padding = isOnlyTextItems ? 0 : 5;
                     setSelectionTightRect({
                         x: minX - padding,
                         y: minY - padding,
                         width: (maxX - minX) + (padding * 2),
                         height: (maxY - minY) + (padding * 2)
                     });
+
+                    if (hasTransformerSelection) {
+                        setSelectionTransformerRect({
+                            x: transMinX - padding,
+                            y: transMinY - padding,
+                            width: (transMaxX - transMinX) + (padding * 2),
+                            height: (transMaxY - transMinY) + (padding * 2)
+                        });
+                    } else {
+                        setSelectionTransformerRect(null);
+                    }
                 } else {
                     setSelectionTightRect(null);
+                    setSelectionTransformerRect(null);
                 }
             } else {
                 // Cleared because too small
@@ -889,11 +1088,14 @@ export function useCanvasEvents(
 
             if (!isZoomAction) {
                 // Pan
-                if (stage) { stage.draggable(false); setIsPanning(false); }
+                if (stage) {
+                    stage.draggable(false);
+                    if (isPanningRef.current) setIsPanning(false);
+                }
                 requestAnimationFrame(() => {
                     setPosition(prev => {
                         const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-                        setTimeout(() => updateViewportCenter?.(newPos, scale), 0);
+                        setTimeout(() => updateViewportCenter?.(newPos, scaleRef.current), 0);
                         return newPos;
                     });
                 });
@@ -901,10 +1103,10 @@ export function useCanvasEvents(
             }
 
             // Zoom
-            const oldScale = scale;
+            const oldScale = scaleRef.current;
             const pointer = stage.getPointerPosition();
             if (!pointer) return;
-            const mousePointTo = { x: (pointer.x - position.x) / oldScale, y: (pointer.y - position.y) / oldScale };
+            const mousePointTo = { x: (pointer.x - positionRef.current.x) / oldScale, y: (pointer.y - positionRef.current.y) / oldScale };
             const direction = e.deltaY > 0 ? -1 : 1;
             const scaleBy = 1.1;
             const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
@@ -921,7 +1123,7 @@ export function useCanvasEvents(
             container.addEventListener('wheel', handleWheel, { passive: false });
             return () => container.removeEventListener('wheel', handleWheel);
         }
-    }, [stageRef, containerRef, isMiddleButtonPressed, navigationMode, scale, position, setPosition, setScale, updateViewportCenter]);
+    }, [stageRef, containerRef, isMiddleButtonPressed, navigationMode, setPosition, setScale, updateViewportCenter]);
 
 
     // Mouse Move tracking for drag vs click

@@ -54,7 +54,9 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
         onPositionChange,
         onPositionCommit,
         onSelect,
-        onTap: () => onOpenEditor(),
+        onTap: () => {
+            onOpenEditor();
+        },
     });
 
     return (

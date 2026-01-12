@@ -1,17 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot } from '@/core/api/canvasApi';
-import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
-import { ImageUpload } from '@/core/types/canvas';
-import { CanvasAppState, CanvasAppSetters, Connector } from '@/modules/canvas-app/types';
+import { setCurrentSnapshot as apiSetCurrentSnapshot } from '@/core/api/canvasApi';
+import { CanvasAppState, Connector } from '@/modules/canvas-app/types';
 
 interface UseSnapshotManagerProps {
   projectId: string | null;
   state: CanvasAppState;
-  setters: CanvasAppSetters;
+  isHydrated: boolean;
+  mutationVersion: number;
+  onSnapshotSaved?: (snapshot: { elements: Record<string, any>; metadata: any }) => void;
 }
 
-export function useSnapshotManager({ projectId, state, setters }: UseSnapshotManagerProps) {
+export function useSnapshotManager({ projectId, state, isHydrated, mutationVersion, onSnapshotSaved }: UseSnapshotManagerProps) {
   const persistTimerRef = useRef<number | null>(null);
+  const snapshotInFlight = useRef(false);
+  const snapshotPendingRef = useRef(false);
 
   // Helper: build elements map snapshot from current state
   const buildSnapshotElements = (connectorsOverride?: Connector[]): Record<string, any> => {
@@ -54,7 +56,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
     });
     // Generators (image/video/music)
     state.imageGenerators.forEach((g) => {
-      const metaObj: any = { generatedImageUrl: g.generatedImageUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
+      const metaObj: any = { generatedImageUrl: g.generatedImageUrl || null, sourceImageUrl: (g as any).sourceImageUrl || null, frameWidth: g.frameWidth, frameHeight: g.frameHeight, model: g.model, frame: g.frame, aspectRatio: g.aspectRatio, prompt: g.prompt };
       if (connectionsBySource[g.id] && connectionsBySource[g.id].length) metaObj.connections = connectionsBySource[g.id];
       elements[g.id] = { id: g.id, type: 'image-generator', x: g.x, y: g.y, meta: metaObj };
     });
@@ -93,30 +95,6 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         meta: metaObj,
       };
     });
-    // Upscale generators
-    state.upscaleGenerators.forEach((modal) => {
-      if (!modal || !modal.id) return;
-      const metaObj: any = {
-        upscaledImageUrl: modal.upscaledImageUrl || null,
-        sourceImageUrl: modal.sourceImageUrl || null,
-        localUpscaledImageUrl: modal.localUpscaledImageUrl || null,
-        model: modal.model || 'Crystal Upscaler',
-        scale: modal.scale || 2,
-        frameWidth: modal.frameWidth || 400,
-        frameHeight: modal.frameHeight || 500,
-        isUpscaling: modal.isUpscaling || false,
-      };
-      if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
-        metaObj.connections = connectionsBySource[modal.id];
-      }
-      elements[modal.id] = {
-        id: modal.id,
-        type: 'upscale-plugin',
-        x: modal.x,
-        y: modal.y,
-        meta: metaObj,
-      };
-    });
     // Remove BG generators
     state.removeBgGenerators.forEach((modal) => {
       if (!modal || !modal.id) return;
@@ -131,6 +109,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         frameHeight: modal.frameHeight || 500,
         isRemovingBg: modal.isRemovingBg || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -154,6 +133,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         frameHeight: modal.frameHeight || 500,
         isErasing: modal.isErasing || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -177,6 +157,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         frameHeight: modal.frameHeight || 500,
         isExpanding: modal.isExpanding || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -200,6 +181,7 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         frameHeight: modal.frameHeight || 500,
         isVectorizing: modal.isVectorizing || false,
       };
+      // Attach any connections originating from this element into its meta
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
         metaObj.connections = connectionsBySource[modal.id];
       }
@@ -238,19 +220,12 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
       const backgroundConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-background');
       const propsConnections = storyboardConnections.filter(c => c.toAnchor === 'receive-props');
 
-      console.log(`[useSnapshotManager] Storyboard ${modal.id} connections:`, {
-        totalConnections: storyboardConnections.length,
-        characterConnections: characterConnections.length,
-        characterConnectionsDetails: characterConnections.map(c => ({ from: c.from, to: c.to, toAnchor: c.toAnchor })),
-      });
-
-      // Build character name -> imageUrl map
+      // Build character names map
       if ((modal as any).characterNamesMap) {
         const characterMap: Record<string, string> = {};
         Object.entries((modal as any).characterNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && characterConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = characterConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -277,13 +252,12 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         }
       }
 
-      // Build background name -> imageUrl map
+      // Build background names map
       if ((modal as any).backgroundNamesMap) {
         const backgroundMap: Record<string, string> = {};
         Object.entries((modal as any).backgroundNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && backgroundConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = backgroundConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -310,13 +284,12 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         }
       }
 
-      // Build props name -> imageUrl map
+      // Build props map
       if ((modal as any).propsNamesMap) {
         const propsMap: Record<string, string> = {};
         Object.entries((modal as any).propsNamesMap).forEach(([indexStr, name]) => {
           const index = parseInt(indexStr, 10);
           if (name && propsConnections[index]) {
-            // Connection is FROM image TO storyboard, so imageId is c.from
             const imageId = propsConnections[index].from;
             const imageGen = state.imageGenerators.find(img => img.id === imageId);
             let imageUrl: string | undefined = undefined;
@@ -343,15 +316,8 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
         }
       }
 
-      // Add namedImages to meta if it has any data
       if (Object.keys(namedImages).length > 0) {
         metaObj.namedImages = namedImages;
-        console.log(`[useSnapshotManager] ✅ Added namedImages to storyboard ${modal.id}:`, namedImages);
-      } else {
-        console.warn(`[useSnapshotManager] ⚠️ No namedImages built for storyboard ${modal.id}`, {
-          hasCharacterNamesMap: !!(modal as any).characterNamesMap,
-          characterConnectionsCount: characterConnections.length,
-        });
       }
 
       if (connectionsBySource[modal.id] && connectionsBySource[modal.id].length) {
@@ -378,333 +344,74 @@ export function useSnapshotManager({ projectId, state, setters }: UseSnapshotMan
       if (!c || !c.id) return;
       elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
     });
-    return elements;
+
+    // Fix 4: Strict Snapshot Schema - Filter out garbage
+    const sanitizedElements = Object.fromEntries(
+      Object.entries(elements).filter(([_, el]) => {
+        if (el.type === 'image-generator') {
+          // Keep if it has image, OR if it has prompt (text-to-image setup), OR if it has a model initialized
+          // We only want to discard completely empty/broken nodes
+          return !!(el.meta?.generatedImageUrl || el.meta?.sourceImageUrl || el.meta?.prompt || el.meta?.formattedPrompt);
+        }
+        return true;
+      })
+    );
+
+    return sanitizedElements;
+  };
+
+  // Helper: Persist the current state
+  const saveSnapshot = async () => {
+    if (!projectId) return;
+
+    if (snapshotInFlight.current) {
+      // Mark that we have a pending save request
+      snapshotPendingRef.current = true;
+      return;
+    }
+
+    snapshotInFlight.current = true;
+    snapshotPendingRef.current = false; // We are processing the latest
+
+    try {
+      const elements = buildSnapshotElements();
+      const payload = { elements, metadata: { version: '1.0' } };
+      await apiSetCurrentSnapshot(projectId, payload);
+
+      // Fix 2: Rehydrate after save to ensure single source of truth
+      if (onSnapshotSaved) {
+        onSnapshotSaved(payload);
+      }
+
+      // console.debug('[Snapshot] persisted');
+    } catch (e) {
+      console.warn('Failed to persist snapshot', e);
+    } finally {
+      snapshotInFlight.current = false;
+      // If a new change came in while we were saving, save again immediately
+      if (snapshotPendingRef.current) {
+        // Use setTimeout to yield to event loop
+        setTimeout(saveSnapshot, 0);
+      }
+    }
   };
 
   // Persist full snapshot on every interaction (debounced)
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !isHydrated) return;
+
     if (persistTimerRef.current) {
       window.clearTimeout(persistTimerRef.current);
     }
-    persistTimerRef.current = window.setTimeout(async () => {
-      try {
-        const elements = buildSnapshotElements();
-        await apiSetCurrentSnapshot(projectId, { elements, metadata: { version: '1.0' } });
-        // console.debug('[Snapshot] persisted', Object.keys(elements).length);
-      } catch (e) {
-        console.warn('Failed to persist snapshot', e);
-      }
-    }, 300) as unknown as number;
+
+    persistTimerRef.current = window.setTimeout(saveSnapshot, 500) as unknown as number;
+
     return () => {
       if (persistTimerRef.current) {
         window.clearTimeout(persistTimerRef.current);
       }
     };
-  }, [projectId, state.images, state.imageGenerators, state.videoGenerators, state.musicGenerators, state.textGenerators, state.upscaleGenerators, state.removeBgGenerators, state.eraseGenerators, state.expandGenerators, state.vectorizeGenerators, state.storyboardGenerators, state.scriptFrameGenerators, state.sceneFrameGenerators, state.connectors]);
+  }, [projectId, isHydrated, mutationVersion, state]);
 
-  // Hydrate from current snapshot on project load
-  useEffect(() => {
-    const hydrate = async () => {
-      if (!projectId) return;
-      try {
-        const { snapshot } = await apiGetCurrentSnapshot(projectId);
-        if (snapshot && snapshot.elements) {
-          const elements = snapshot.elements as Record<string, any>;
-          const newImages: ImageUpload[] = [];
-          const newImageGenerators: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
-          const newVideoGenerators: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; taskId?: string; generationId?: string; status?: string }> = [];
-          const newMusicGenerators: Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }> = [];
-          const newUpscaleGenerators: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number }> = [];
-          const newRemoveBgGenerators: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; model?: string; backgroundType?: string; scaleValue?: number }> = [];
-          const newEraseGenerators: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; model?: string }> = [];
-          const newExpandGenerators: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; model?: string }> = [];
-          const newVectorizeGenerators: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string }> = [];
-          const newStoryboardGenerators: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }> = [];
-          const newScriptFrameGenerators: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }> = [];
-          const newSceneFrameGenerators: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }> = [];
-          const newTextGenerators: Array<{ id: string; x: number; y: number; value?: string }> = [];
-          const newConnectors: Array<{ id: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }> = [];
-          // Track connector signatures to prevent duplicates: "from|to|toAnchor"
-          const connectorSignatures = new Set<string>();
-
-          // FIRST PASS: Process connector elements first (they are the source of truth)
-          // This ensures we get the correct IDs and properties before processing meta.connections
-          Object.values(elements).forEach((element: any) => {
-            if (element && element.type === 'connector') {
-              const connector = {
-                id: element.id,
-                from: element.from || element.meta?.from,
-                to: element.to || element.meta?.to,
-                color: element.meta?.color || '#437eb5',
-                fromAnchor: element.meta?.fromAnchor,
-                toAnchor: element.meta?.toAnchor
-              };
-              const signature = `${connector.from}|${connector.to}|${connector.toAnchor || ''}`;
-              if (!connectorSignatures.has(signature)) {
-                connectorSignatures.add(signature);
-                newConnectors.push(connector);
-              }
-            }
-          });
-
-          // SECOND PASS: Process all other elements and restore from meta.connections only if not already restored
-          Object.values(elements).forEach((element: any) => {
-            if (element && element.type) {
-              let imageUrl = element.meta?.url || element.meta?.mediaId || '';
-              if (imageUrl && (imageUrl.includes('zata.ai') || imageUrl.includes('zata'))) {
-                imageUrl = buildProxyResourceUrl(imageUrl);
-              }
-              if (element.type === 'image' || element.type === 'video' || element.type === 'text' || element.type === 'model3d') {
-                const newImage: ImageUpload = {
-                  type: element.type === 'image' ? 'image' : element.type === 'video' ? 'video' : element.type === 'text' ? 'text' : element.type === 'model3d' ? 'model3d' : 'image',
-                  url: imageUrl,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  width: element.width || 400,
-                  height: element.height || 400,
-                  rotation: element.rotation || 0,
-                  ...(element.id && { elementId: element.id }),
-                };
-                newImages.push(newImage);
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'image-generator') {
-                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
-                let aspectRatio = element.meta?.aspectRatio;
-                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
-                  const width = element.meta.frameWidth;
-                  const height = element.meta.frameHeight;
-                  const ratio = width / height;
-                  const tolerance = 0.01;
-                  const commonRatios: Array<{ ratio: number; label: string }> = [
-                    { ratio: 1.0, label: '1:1' },
-                    { ratio: 4 / 3, label: '4:3' },
-                    { ratio: 3 / 4, label: '3:4' },
-                    { ratio: 16 / 9, label: '16:9' },
-                    { ratio: 9 / 16, label: '9:16' },
-                    { ratio: 3 / 2, label: '3:2' },
-                    { ratio: 2 / 3, label: '2:3' },
-                    { ratio: 21 / 9, label: '21:9' },
-                    { ratio: 9 / 21, label: '9:21' },
-                    { ratio: 16 / 10, label: '16:10' },
-                    { ratio: 10 / 16, label: '10:16' },
-                    { ratio: 5 / 4, label: '5:4' },
-                    { ratio: 4 / 5, label: '4:5' },
-                  ];
-                  for (const common of commonRatios) {
-                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
-                      aspectRatio = common.label;
-                      break;
-                    }
-                  }
-                  if (!aspectRatio) {
-                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-                    const divisor = gcd(width, height);
-                    const w = width / divisor;
-                    const h = height / divisor;
-                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
-                  }
-                }
-                newImageGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  generatedImageUrl: element.meta?.generatedImageUrl || null,
-                  sourceImageUrl: element.meta?.sourceImageUrl || null, // CRITICAL: Load sourceImageUrl from snapshot
-                  frameWidth: element.meta?.frameWidth,
-                  frameHeight: element.meta?.frameHeight,
-                  model: element.meta?.model,
-                  frame: element.meta?.frame,
-                  aspectRatio: aspectRatio,
-                  prompt: element.meta?.prompt
-                } as any);
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'connector') {
-                // Skip - already processed in first pass
-              } else if (element.type === 'video-generator') {
-                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
-                let aspectRatio = element.meta?.aspectRatio;
-                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
-                  const width = element.meta.frameWidth;
-                  const height = element.meta.frameHeight;
-                  const ratio = width / height;
-                  const tolerance = 0.01;
-                  const commonRatios: Array<{ ratio: number; label: string }> = [
-                    { ratio: 1.0, label: '1:1' },
-                    { ratio: 4 / 3, label: '4:3' },
-                    { ratio: 3 / 4, label: '3:4' },
-                    { ratio: 16 / 9, label: '16:9' },
-                    { ratio: 9 / 16, label: '9:16' },
-                    { ratio: 3 / 2, label: '3:2' },
-                    { ratio: 2 / 3, label: '2:3' },
-                    { ratio: 21 / 9, label: '21:9' },
-                    { ratio: 9 / 21, label: '9:21' },
-                    { ratio: 16 / 10, label: '16:10' },
-                    { ratio: 10 / 16, label: '10:16' },
-                    { ratio: 5 / 4, label: '5:4' },
-                    { ratio: 4 / 5, label: '4:5' },
-                  ];
-                  for (const common of commonRatios) {
-                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
-                      aspectRatio = common.label;
-                      break;
-                    }
-                  }
-                  if (!aspectRatio) {
-                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-                    const divisor = gcd(width, height);
-                    const w = width / divisor;
-                    const h = height / divisor;
-                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
-                  }
-                }
-                newVideoGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedVideoUrl: element.meta?.generatedVideoUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: aspectRatio, prompt: element.meta?.prompt, duration: element.meta?.duration, taskId: element.meta?.taskId, generationId: element.meta?.generationId, status: element.meta?.status });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'music-generator') {
-                // Calculate aspect ratio from frameWidth/frameHeight if aspectRatio is missing
-                let aspectRatio = element.meta?.aspectRatio;
-                if (!aspectRatio && element.meta?.frameWidth && element.meta?.frameHeight) {
-                  const width = element.meta.frameWidth;
-                  const height = element.meta.frameHeight;
-                  const ratio = width / height;
-                  const tolerance = 0.01;
-                  const commonRatios: Array<{ ratio: number; label: string }> = [
-                    { ratio: 1.0, label: '1:1' },
-                    { ratio: 4 / 3, label: '4:3' },
-                    { ratio: 3 / 4, label: '3:4' },
-                    { ratio: 16 / 9, label: '16:9' },
-                    { ratio: 9 / 16, label: '9:16' },
-                    { ratio: 3 / 2, label: '3:2' },
-                    { ratio: 2 / 3, label: '2:3' },
-                    { ratio: 21 / 9, label: '21:9' },
-                    { ratio: 9 / 21, label: '9:21' },
-                    { ratio: 16 / 10, label: '16:10' },
-                    { ratio: 10 / 16, label: '10:16' },
-                    { ratio: 5 / 4, label: '5:4' },
-                    { ratio: 4 / 5, label: '4:5' },
-                  ];
-                  for (const common of commonRatios) {
-                    if (Math.abs(ratio - common.ratio) < tolerance || Math.abs(ratio - 1 / common.ratio) < tolerance) {
-                      aspectRatio = common.label;
-                      break;
-                    }
-                  }
-                  if (!aspectRatio) {
-                    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-                    const divisor = gcd(width, height);
-                    const w = width / divisor;
-                    const h = height / divisor;
-                    aspectRatio = (w <= 100 && h <= 100) ? `${w}:${h}` : `${Math.round(ratio * 100) / 100}:1`;
-                  }
-                }
-                newMusicGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, generatedMusicUrl: element.meta?.generatedMusicUrl || null, frameWidth: element.meta?.frameWidth, frameHeight: element.meta?.frameHeight, model: element.meta?.model, frame: element.meta?.frame, aspectRatio: aspectRatio, prompt: element.meta?.prompt });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'text-generator') {
-                newTextGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, value: element.meta?.value });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'upscale-plugin') {
-                newUpscaleGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, upscaledImageUrl: element.meta?.upscaledImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localUpscaledImageUrl: element.meta?.localUpscaledImageUrl || null, model: element.meta?.model, scale: element.meta?.scale });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'removebg-plugin') {
-                newRemoveBgGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, removedBgImageUrl: element.meta?.removedBgImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localRemovedBgImageUrl: element.meta?.localRemovedBgImageUrl || null, model: element.meta?.model, backgroundType: element.meta?.backgroundType, scaleValue: element.meta?.scaleValue });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'erase-plugin') {
-                newEraseGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, erasedImageUrl: element.meta?.erasedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localErasedImageUrl: element.meta?.localErasedImageUrl || null, model: element.meta?.model });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'expand-plugin') {
-                newExpandGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, expandedImageUrl: element.meta?.expandedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localExpandedImageUrl: element.meta?.localExpandedImageUrl || null, model: element.meta?.model });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'vectorize-plugin') {
-                newVectorizeGenerators.push({ id: element.id, x: element.x || 0, y: element.y || 0, vectorizedImageUrl: element.meta?.vectorizedImageUrl || null, sourceImageUrl: element.meta?.sourceImageUrl || null, localVectorizedImageUrl: element.meta?.localVectorizedImageUrl || null, mode: element.meta?.mode || 'simple' });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'storyboard-plugin') {
-                newStoryboardGenerators.push({
-                  id: element.id,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  frameWidth: element.meta?.frameWidth || 400,
-                  frameHeight: element.meta?.frameHeight || 500,
-                  scriptText: element.meta?.scriptText || null,
-                  characterNamesMap: element.meta?.characterNamesMap || {},
-                  propsNamesMap: element.meta?.propsNamesMap || {},
-                  backgroundNamesMap: element.meta?.backgroundNamesMap || {},
-                  stitchedImageUrl: element.meta?.stitchedImageUrl || undefined,
-                  namedImages: element.meta?.namedImages || undefined,
-                } as any); // Type assertion needed due to optional fields
-                // NOTE: Storyboard connections are NOT stored in storyboard.meta.connections
-                // They are stored in the image elements' meta.connections (as outgoing connections)
-                // OR as top-level connector elements. We'll restore them from connector elements below.
-                // Do NOT restore connections from storyboard.meta.connections as that would create duplicates.
-              } else if (element.type === 'script-frame') {
-                newScriptFrameGenerators.push({ id: element.id, pluginId: element.meta?.pluginId || '', x: element.x || 0, y: element.y || 0, frameWidth: element.meta?.frameWidth || 400, frameHeight: element.meta?.frameHeight || 300, text: element.meta?.text || '' });
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              } else if (element.type === 'scene-frame') {
-                newSceneFrameGenerators.push({
-                  id: element.id,
-                  scriptFrameId: element.meta?.scriptFrameId || '',
-                  sceneNumber: element.meta?.sceneNumber || 0,
-                  x: element.x || 0,
-                  y: element.y || 0,
-                  frameWidth: element.meta?.frameWidth || 350,
-                  frameHeight: element.meta?.frameHeight || 300,
-                  content: element.meta?.content || '',
-                  characterIds: element.meta?.characterIds || undefined,
-                  locationId: element.meta?.locationId || undefined,
-                  mood: element.meta?.mood || undefined,
-                  characterNames: element.meta?.characterNames || undefined,
-                  locationName: element.meta?.locationName || undefined,
-                } as any); // Type assertion needed due to optional fields
-                // Skip restoring connections from element.meta.connections
-                // Top-level connector elements are the source of truth and are already processed in the first pass.
-                // Restoring from meta.connections would create duplicates.
-              }
-            }
-          });
-          setters.setImages(newImages);
-          setters.setImageGenerators(newImageGenerators);
-          setters.setVideoGenerators(newVideoGenerators);
-          setters.setMusicGenerators(newMusicGenerators);
-          setters.setUpscaleGenerators(newUpscaleGenerators);
-          setters.setRemoveBgGenerators(newRemoveBgGenerators);
-          setters.setEraseGenerators(newEraseGenerators);
-          setters.setExpandGenerators(newExpandGenerators);
-          setters.setVectorizeGenerators(newVectorizeGenerators);
-          setters.setStoryboardGenerators(newStoryboardGenerators);
-          setters.setScriptFrameGenerators(newScriptFrameGenerators);
-          setters.setSceneFrameGenerators(newSceneFrameGenerators);
-          setters.setTextGenerators(newTextGenerators);
-          setters.setConnectors(newConnectors);
-
-        }
-      } catch (e) {
-        console.warn('No current snapshot to hydrate or failed to fetch', e);
-      }
-    };
-    hydrate();
-  }, [projectId, setters]);
-
-  return { buildSnapshotElements };
+  return { buildSnapshotElements, saveSnapshot };
 }
-

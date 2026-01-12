@@ -290,7 +290,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 onSetIsDurationDropdownOpen(false);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              title={isFirstLastMode ? 'Only Veo 3.1 models support connected frames' : undefined}
+              title={(isFirstLastMode || hasSingleFrame) ? 'Only Veo 3.1 and Seedance models support connected frames' : undefined}
               style={{
                 width: '100%',
                 padding: `${10 * scale}px ${28 * scale}px ${10 * scale}px ${14 * scale}px`,
@@ -321,7 +321,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                   position: 'absolute',
                   top: '100%',
                   left: 0,
-                  minWidth: `${400 * scale}px`,
+                  minWidth: `${150 * scale}px`,
                   width: 'max-content',
                   marginTop: `${4 * scale}px`,
                   backgroundColor: dropdownBg,
@@ -334,7 +334,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${4 * scale}px`, padding: `${4 * scale}px` }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: `${4 * scale}px`, padding: `${4 * scale}px` }}>
                   {availableModelOptions.map((model) => (
                     <div
                       key={model}
@@ -724,110 +724,74 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             )}
           </div>
 
-          {isVeo31Model && (hasSingleFrame || isFirstLastMode) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: `${6 * scale}px`, marginTop: `${6 * scale}px` }}>
-              <div style={{ fontSize: `${11 * scale}px`, fontWeight: 500, color: labelText, transition: 'color 0.3s ease' }}>
-                {isFirstLastMode
-                  ? 'First & Last Frame (auto-filled when two image nodes are connected)'
-                  : 'First Frame (auto-filled when an image node is connected)'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: `${10 * scale}px`, flexWrap: 'wrap' }}>
-                {[
-                  { label: 'First Frame', url: displayFirstFrameUrl, placeholder: 'Connect an image node for the first frame.' },
-                  { label: 'Last Frame', url: displayLastFrameUrl, placeholder: 'Connect another image node for the last frame.' },
-                ].map((slot, idx) => (
-                  <Fragment key={`${slot.label}-${isFrameOrderSwapped}-${slot.url || 'empty'}`}>
-                    <div
-                      style={{
-                        flex: '0 1 auto',
-                        width: `${110 * scale}px`,
-                        borderRadius: `${10 * scale}px`,
-                        padding: `${6 * scale}px`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: `${4 * scale}px`,
-                        backgroundColor: slot.url ? 'rgba(67, 126, 181, 0.07)' : 'transparent',
-                      }}
-                    >
-                      <span style={{ fontSize: `${11 * scale}px`, fontWeight: 600, color: labelText, transition: 'color 0.3s ease' }}>{slot.label}</span>
-                      <div
-                        style={{
-                          position: 'relative',
-                          width: '100%',
-                          height: `${70 * scale}px`,
-                          borderRadius: `${8 * scale}px`,
-                          overflow: 'hidden',
-                          border: slot.url ? 'none' : `1px solid ${dropdownBorderColor}`,
-                          backgroundColor: slot.url ? '#f8fafc' : '#f9fafb',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          textAlign: 'center',
-                          fontSize: `${10.5 * scale}px`,
-                          color: '#6b7280',
-                        }}
-                      >
-                        {slot.url ? (
-                          <img
-                            key={`${slot.label}-img-${isFrameOrderSwapped}-${slot.url}`}
-                            src={toPreviewImageUrl(slot.url)}
-                            alt={slot.label}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                            }}
-                          />
-                        ) : (
-                          <span style={{ padding: `${6 * scale}px` }}>{slot.placeholder}</span>
-                        )}
-                      </div>
-                    </div>
-                    {idx === 0 && isFirstLastMode && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          onSetIsFrameOrderSwapped(!isFrameOrderSwapped);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        style={{
-                          width: `${34 * scale}px`,
-                          height: `${34 * scale}px`,
-                          borderRadius: '50%',
-                          border: 'none',
-                          backgroundColor: isFirstLastMode ? firstLastBg : (isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.15)'),
-                          transition: 'background-color 0.3s ease, transform 0.15s ease',
-                          color: '#fff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: isFirstLastMode ? 'pointer' : 'not-allowed',
-                          boxShadow: isFirstLastMode ? `0 ${3 * scale}px ${9 * scale}px rgba(0,0,0,0.25)` : 'none',
-                          alignSelf: 'center',
-                        }}
-                        title={isFirstLastMode ? 'Swap first and last frame images' : 'Connect two image nodes to enable swapping'}
-                      >
-                        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 7H7l3-3" />
-                          <path d="M7 17h10l-3 3" />
-                        </svg>
-                      </button>
+          {(isVeo31Model || selectedModel.toLowerCase().includes('seedance')) && (hasSingleFrame || isFirstLastMode) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: `${6 * scale}px` }}>
+              {[
+                { label: 'First Frame', url: displayFirstFrameUrl, placeholder: '1st' },
+                { label: 'Last Frame', url: displayLastFrameUrl, placeholder: 'Last' },
+              ].map((slot, idx) => (
+                <Fragment key={`${slot.label}-${isFrameOrderSwapped}-${slot.url || 'empty'}`}>
+                  {/* Slot */}
+                  <div
+                    title={slot.label}
+                    style={{
+                      position: 'relative',
+                      width: `${42 * scale}px`,
+                      height: `${42 * scale}px`,
+                      borderRadius: `${10 * scale}px`,
+                      overflow: 'hidden',
+                      border: slot.url ? 'none' : `1px solid ${dropdownBorderColor}`,
+                      backgroundColor: slot.url ? '#f8fafc' : dropdownBg,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {slot.url ? (
+                      <img
+                        src={toPreviewImageUrl(slot.url)}
+                        alt={slot.label}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: `${10 * scale}px`, color: iconColor }}>{slot.placeholder}</span>
                     )}
-                  </Fragment>
-                ))}
-              </div>
-              <div style={{ fontSize: `${11 * scale}px`, color: iconColor, transition: 'color 0.3s ease' }}>
-                {isFirstLastMode
-                  ? 'Two frames detected — Veo will run in first/last frame mode. Use the swap button to switch frame order.'
-                  : hasSingleFrame
-                    ? 'Single frame detected — Veo will run in image-to-video mode.'
-                    : 'No frames connected — Veo will run as pure text-to-video.'}
-              </div>
+                  </div>
+
+                  {/* Swap Button (only between slots) */}
+                  {idx === 0 && isFirstLastMode && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSetIsFrameOrderSwapped(!isFrameOrderSwapped);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        width: `${24 * scale}px`,
+                        height: `${24 * scale}px`,
+                        borderRadius: '50%',
+                        border: 'none',
+                        backgroundColor: isFirstLastMode ? firstLastBg : 'transparent',
+                        color: isDark ? '#fff' : '#4b5563',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        padding: 0,
+                        opacity: 0.8,
+                      }}
+                      title="Swap Frames"
+                    >
+                      <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 16V4M7 4L3 8M7 4L11 8" />
+                        <path d="M17 8v12M17 20l4-4M17 20l-4-4" transform="rotate(90 12 12)" />
+                      </svg>
+                    </button>
+                  )}
+                </Fragment>
+              ))}
             </div>
           )}
         </div>

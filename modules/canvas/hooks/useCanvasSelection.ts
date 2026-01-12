@@ -35,6 +35,9 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const [selectedVideoEditorModalId, setSelectedVideoEditorModalId] = useState<string | null>(null);
     const [selectedVideoEditorModalIds, setSelectedVideoEditorModalIds] = useState<string[]>([]);
 
+    const [selectedImageEditorModalId, setSelectedImageEditorModalId] = useState<string | null>(null);
+    const [selectedImageEditorModalIds, setSelectedImageEditorModalIds] = useState<string[]>([]);
+
     const [selectedMusicModalId, setSelectedMusicModalId] = useState<string | null>(null);
     const [selectedMusicModalIds, setSelectedMusicModalIds] = useState<string[]>([]);
 
@@ -75,12 +78,17 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
 
     // Rich Text Selection (with fallback)
     const [localSelectedRichTextId, setLocalSelectedRichTextId] = useState<string | null>(null);
+    const [localSelectedRichTextIds, setLocalSelectedRichTextIds] = useState<string[]>([]);
+
     const effectiveSelectedRichTextId = props.selectedRichTextId !== undefined ? props.selectedRichTextId : localSelectedRichTextId;
     const effectiveSetSelectedRichTextId = props.setSelectedRichTextId ?? setLocalSelectedRichTextId;
+    const effectiveSelectedRichTextIds = props.selectedRichTextIds !== undefined ? props.selectedRichTextIds : localSelectedRichTextIds;
+    const effectiveSetSelectedRichTextIds = props.setSelectedRichTextIds ?? setLocalSelectedRichTextIds;
 
     // Selection Box State
     const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
     const [selectionTightRect, setSelectionTightRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    const [selectionTransformerRect, setSelectionTransformerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
     const [isDragSelection, setIsDragSelection] = useState(false);
 
     // Context Menu State (often tied to selection)
@@ -102,6 +110,8 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         setSelectedVideoModalIds([]);
         setSelectedVideoEditorModalId(null);
         setSelectedVideoEditorModalIds([]);
+        setSelectedImageEditorModalId(null);
+        setSelectedImageEditorModalIds([]);
         setSelectedMusicModalId(null);
         setSelectedMusicModalIds([]);
         setSelectedUpscaleModalId(null);
@@ -128,6 +138,7 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         setSelectedSceneFrameModalIds([]);
         setSelectedGroupIds([]);
         effectiveSetSelectedRichTextId(null);
+        effectiveSetSelectedRichTextIds([]);
 
         // Clear canvas text selection
         effectiveSetSelectedCanvasTextId(null);
@@ -141,6 +152,7 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         if (clearSelectionBoxes) {
             setSelectionBox(null);
             setSelectionTightRect(null);
+            setSelectionTransformerRect(null);
             setIsDragSelection(false);
         }
 
@@ -149,7 +161,7 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         } catch (err) {
             // ignore
         }
-    }, [effectiveSetSelectedCanvasTextId, effectiveSetSelectedCanvasTextIds, effectiveSetSelectedRichTextId]);
+    }, [effectiveSetSelectedCanvasTextId, effectiveSetSelectedCanvasTextIds, effectiveSetSelectedRichTextId, effectiveSetSelectedRichTextIds]);
 
     const getDimensions = useCallback((type: string, id: string | number) => {
         return getComponentDimensions(type, id, canvasItemsData);
@@ -167,6 +179,8 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedVideoModalIds, setSelectedVideoModalIds,
         selectedVideoEditorModalId, setSelectedVideoEditorModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds,
+        selectedImageEditorModalId, setSelectedImageEditorModalId,
+        selectedImageEditorModalIds, setSelectedImageEditorModalIds,
         selectedMusicModalId, setSelectedMusicModalId,
         selectedMusicModalIds, setSelectedMusicModalIds,
         selectedUpscaleModalId, setSelectedUpscaleModalId,
@@ -202,10 +216,13 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         // Rich Text Selection
         selectedRichTextId: effectiveSelectedRichTextId,
         setSelectedRichTextId: effectiveSetSelectedRichTextId,
+        selectedRichTextIds: effectiveSelectedRichTextIds,
+        setSelectedRichTextIds: effectiveSetSelectedRichTextIds,
 
         // Selection Box
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
+        selectionTransformerRect, setSelectionTransformerRect,
         isDragSelection, setIsDragSelection,
 
         // Context Menu

@@ -1282,6 +1282,7 @@ Create a `.env.local` file:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://api-gateway-services-wildmind.onrender.com
+NEXT_PUBLIC_EDITOR_VIDEO_URL=https://editor-video.wildmindai.com
 ```
 
 ## 📊 Key Features

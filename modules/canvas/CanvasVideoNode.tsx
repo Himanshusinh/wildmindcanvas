@@ -65,6 +65,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
         let mounted = true;
         const rawUrl = videoState.generatedVideoUrl;
         // Apply proxy utility to allow loading from external sources/CORS
+        // Robustly handles unwrapping of existing proxies to prevent double-proxying
         const url = rawUrl ? buildProxyMediaUrl(rawUrl) : null;
 
         if (url) {
@@ -104,10 +105,8 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 setVideoElement(video);
                 videoRef.current = video;
 
-                // Force refresh
-                setTimeout(() => {
-                    imageRef.current?.getLayer()?.batchDraw();
-                }, 100);
+                // imageRef is null here because we haven't rendered with videoElement yet
+                // The animation loop effect will pick it up once rendered
             };
 
             // Also handle oncanplay in case metadata loaded doesn't fire for some cached videos
@@ -115,7 +114,6 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 if (!videoElement && mounted) {
                     setVideoElement(video);
                     videoRef.current = video;
-                    imageRef.current?.getLayer()?.batchDraw();
                 }
             }
 
@@ -132,7 +130,17 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
             };
 
             video.onerror = (e) => {
-                console.error('[CanvasVideoNode] Video load error', e, url);
+                if (!mounted) return;
+                const errorDetail = video.error ? {
+                    code: video.error.code,
+                    message: video.error.message
+                } : 'unknown';
+                console.error('[CanvasVideoNode] Video load error:', {
+                    id: videoState.id,
+                    url: url,
+                    errorDetail,
+                    // nativeEvent: e // serializing event often results in {}
+                });
             };
 
             return () => {

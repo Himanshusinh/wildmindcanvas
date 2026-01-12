@@ -48,6 +48,15 @@ export interface VideoEditorGenerator {
   color?: string;
 }
 
+export interface ImageEditorGenerator {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+}
+
 export interface MusicGenerator {
   id: string;
   x: number;
@@ -261,6 +270,7 @@ export interface CanvasAppState {
   imageGenerators: ImageGenerator[];
   videoGenerators: VideoGenerator[];
   videoEditorGenerators: VideoEditorGenerator[];
+  imageEditorGenerators: ImageEditorGenerator[];
   musicGenerators: MusicGenerator[];
   upscaleGenerators: UpscaleGenerator[];
   multiangleCameraGenerators: MultiangleCameraGenerator[];
@@ -287,6 +297,7 @@ export interface CanvasAppSetters {
   setImageGenerators: React.Dispatch<React.SetStateAction<ImageGenerator[]>>;
   setVideoGenerators: React.Dispatch<React.SetStateAction<VideoGenerator[]>>;
   setVideoEditorGenerators: React.Dispatch<React.SetStateAction<VideoEditorGenerator[]>>;
+  setImageEditorGenerators: React.Dispatch<React.SetStateAction<ImageEditorGenerator[]>>;
   setMusicGenerators: React.Dispatch<React.SetStateAction<MusicGenerator[]>>;
   setUpscaleGenerators: React.Dispatch<React.SetStateAction<UpscaleGenerator[]>>;
   setMultiangleCameraGenerators: React.Dispatch<React.SetStateAction<MultiangleCameraGenerator[]>>;
@@ -314,5 +325,11 @@ export interface ViewportCenter {
   x: number;
   y: number;
   scale: number;
+}
+
+export interface SnapshotActions {
+  createElement: (element: import('@/lib/snapshot/currentSnapshot').CanvasElement) => void;
+  updateElement: (id: string, updates: Partial<import('@/lib/snapshot/currentSnapshot').CanvasElement>) => void;
+  deleteElement: (id: string) => void;
 }
 

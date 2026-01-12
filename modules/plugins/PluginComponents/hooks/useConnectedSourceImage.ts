@@ -43,9 +43,9 @@ export function useConnectedSourceImage(args: {
     }
 
     // From canvas image
-    const canvasImage = images.find((img) => {
+    const canvasImage = images.find((img, idx) => {
       const imgId = img.elementId || (img as any).id;
-      return imgId === conn.from;
+      return imgId === conn.from || `canvas-image-${idx}` === conn.from;
     });
     if (canvasImage?.url || canvasImage?.originalUrl) {
       // Use originalUrl for processing (original format), fallback to url (AVIF)
@@ -77,9 +77,9 @@ export function useConnectedSourceImages(args: {
         if (u) out.push(u);
         continue;
       }
-      const canvasImage = images.find((img) => {
+      const canvasImage = images.find((img, idx) => {
         const imgId = img.elementId || (img as any).id;
-        return imgId === c.from;
+        return imgId === c.from || `canvas-image-${idx}` === c.from;
       });
       if (canvasImage?.url || canvasImage?.originalUrl) {
         // Use originalUrl for processing (original format), fallback to url (AVIF)

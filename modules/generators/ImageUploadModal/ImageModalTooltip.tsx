@@ -28,7 +28,7 @@ export const ImageModalTooltip: React.FC<ImageModalTooltipProps> = ({
     <div
       style={{
         position: 'absolute',
-        top: `${-32 * scale}px`,
+        top: `${-30 * scale}px`,
         left: 0,
         width: `${600 * scale}px`,
         maxWidth: '90vw',

@@ -16,10 +16,15 @@ export interface CanvasProps {
     onImageDelete?: (index: number) => void;
     onImageDownload?: (index: number) => void;
     onImageDuplicate?: (index: number) => void;
+    onBackgroundClick?: () => void;
     initialCenter?: { x: number; y: number };
     initialScale?: number;
     onImagesDrop?: (files: File[]) => void;
     onLibraryMediaDrop?: (media: { id: string; url: string; type: 'image' | 'video' | 'music' | 'uploaded'; thumbnail?: string; prompt?: string; model?: string; createdAt?: string; storagePath?: string; mediaId?: string }, x: number, y: number) => void;
+    undo?: () => void;
+    redo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
     selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text';
     onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text') => void;
     onTextCreate?: (text: string, x: number, y: number) => void;
@@ -58,6 +63,7 @@ export interface CanvasProps {
     externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>;
     externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     externalVideoEditorModals?: Array<{ id: string; x: number; y: number }>;
+    externalImageEditorModals?: Array<{ id: string; x: number; y: number }>;
     externalMusicModals?: MusicGenerator[];
     externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
     externalMultiangleCameraModals?: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }>;
@@ -81,6 +87,10 @@ export interface CanvasProps {
     onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
     onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
     onOpenVideoEditor?: () => void;
+    onPersistImageEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
+    onPersistImageEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+    onPersistImageEditorModalDelete?: (id: string) => void | Promise<void>;
+    onOpenImageEditor?: () => void;
     onPersistMusicModalCreate?: (modal: MusicGenerator) => void | Promise<void>;
     onPersistMusicModalMove?: (id: string, updates: Partial<MusicGenerator>) => void | Promise<void>;
     onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
@@ -136,8 +146,9 @@ export interface CanvasProps {
     onPersistTextModalDelete?: (id: string) => void | Promise<void>;
     // Group persistence callbacks
     onPersistGroupCreate?: (group: GroupContainerState) => void | Promise<void>;
-    onPersistGroupUpdate?: (id: string, updates: Partial<GroupContainerState>, prev?: GroupContainerState) => void | Promise<void>;
-    onPersistGroupDelete?: (group: GroupContainerState) => void | Promise<void>;
+    onPersistGroupDelete?: (groupId: string) => void | Promise<void>;
+    onPersistGroupUpdate?: (groupId: string, updates: Partial<GroupContainerState> | { meta: Record<string, any> }, group?: GroupContainerState) => void | Promise<void>;
+    onBulkDelete?: (elementIds: string[]) => void | Promise<void>;
     // Allow initial groups to be provided from parent snapshot hydration
     initialGroupContainerStates?: GroupContainerState[];
     // Compare plugin persistence callbacks
@@ -146,14 +157,14 @@ export interface CanvasProps {
     selectedCompareModalId?: string | null;
     selectedCompareModalIds?: string[];
     setSelectedCompareModalId?: (id: string | null) => void;
-    setSelectedCompareModalIds?: (ids: string[]) => void;
+    setSelectedCompareModalIds?: React.Dispatch<React.SetStateAction<string[]>>;
 
     canvasTextStates?: CanvasTextState[];
     setCanvasTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
     selectedCanvasTextId?: string | null;
     selectedCanvasTextIds?: string[];
     setSelectedCanvasTextId?: (id: string | null) => void;
-    setSelectedCanvasTextIds?: (ids: string[]) => void;
+    setSelectedCanvasTextIds?: React.Dispatch<React.SetStateAction<string[]>>;
     effectiveSelectedCanvasTextIds?: string[];
     onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
     onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
@@ -164,7 +175,7 @@ export interface CanvasProps {
     selectedRichTextId?: string | null;
     selectedRichTextIds?: string[];
     setSelectedRichTextId?: (id: string | null) => void;
-    setSelectedRichTextIds?: (ids: string[]) => void;
+    setSelectedRichTextIds?: React.Dispatch<React.SetStateAction<string[]>>;
     onPersistRichTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
     onPersistRichTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
     onPersistRichTextDelete?: (id: string) => void | Promise<void>;
@@ -196,6 +207,7 @@ export interface CanvasItemsData {
     imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>;
     videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     videoEditorModalStates: Array<{ id: string; x: number; y: number }>;
+    imageEditorModalStates?: Array<{ id: string; x: number; y: number }>;
     musicModalStates: MusicGenerator[];
     upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>;
     multiangleCameraModalStates: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>;

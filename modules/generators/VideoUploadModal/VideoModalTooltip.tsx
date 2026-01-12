@@ -26,7 +26,7 @@ export const VideoModalTooltip: React.FC<VideoModalTooltipProps> = ({
     <div
       style={{
         position: 'absolute',
-        top: `${-32 * scale}px`,
+        top: `${-30 * scale}px`,
         left: 0,
         width: `${600 * scale}px`,
         maxWidth: '90vw',

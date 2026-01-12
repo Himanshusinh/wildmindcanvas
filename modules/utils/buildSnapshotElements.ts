@@ -14,9 +14,25 @@ export function buildSnapshotElements(
   connectorsToUse.forEach((c) => {
     if (!c || !c.id) return;
     const src = c.from;
-    if (!src) return;
-    connectionsBySource[src] = connectionsBySource[src] || [];
-    connectionsBySource[src].push({ id: c.id, to: c.to, color: c.color, fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+
+    // Add to connectionsBySource for embedding in nodes (legacy/meta support)
+    if (src) {
+      connectionsBySource[src] = connectionsBySource[src] || [];
+      connectionsBySource[src].push({ id: c.id, to: c.to, color: c.color, fromAnchor: c.fromAnchor, toAnchor: c.toAnchor });
+    }
+
+    // CRITICAL: Add as toplevel element so hydration finds it!
+    elements[c.id] = {
+      id: c.id,
+      type: 'connector',
+      from: c.from,
+      to: c.to,
+      meta: {
+        color: c.color,
+        fromAnchor: c.fromAnchor,
+        toAnchor: c.toAnchor
+      }
+    };
   });
 
   // Uploaded media and text/models
@@ -82,6 +98,12 @@ export function buildSnapshotElements(
     const connections = connectionsBySource[g.id]?.length ? connectionsBySource[g.id] : undefined;
     const metaObj = { ...(connections ? { connections } : {}) };
     elements[g.id] = { id: g.id, type: 'video-editor-trigger', x: g.x, y: g.y, bounds: { width: 64, height: 64 }, meta: metaObj };
+  });
+
+  state.imageEditorGenerators.forEach((g) => {
+    const connections = connectionsBySource[g.id]?.length ? connectionsBySource[g.id] : undefined;
+    const metaObj = { ...(connections ? { connections } : {}) };
+    elements[g.id] = { id: g.id, type: 'image-editor-trigger', x: g.x, y: g.y, bounds: { width: 64, height: 64 }, meta: metaObj };
   });
 
   state.musicGenerators.forEach((g) => {
@@ -727,6 +749,9 @@ export function buildSnapshotElements(
     if (!c || !c.id) return;
     elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
   });
+
+  // DIAGNOSTIC LOG (USER REQUESTED) - FINAL
+  console.log('[buildSnapshotElements] FINAL SNAPSHOT IDS:', Object.keys(elements));
 
   return elements;
 }

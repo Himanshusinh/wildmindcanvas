@@ -110,6 +110,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isPinned = false,
   onTogglePin,
 }) => {
+  // Fix 3: Strict Guard - Prevent rendering invalid modals
+  if (!id) return null;
+
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const processedImageRef = useRef<string | null>(null);
@@ -131,6 +134,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageCount, setImageCount] = useState<number>(initialCount ?? 1);
   const [selectedResolution, setSelectedResolution] = useState<string>('1024'); // Default to 1024px
+
+  const [gptQuality, setGptQuality] = useState<'low' | 'medium' | 'high' | 'auto'>('auto');
+  const [gptBackground, setGptBackground] = useState<'auto' | 'transparent' | 'opaque'>('auto');
+  const [gptModeration, setGptModeration] = useState<'auto' | 'low'>('auto');
 
   // Check if this is a scene image and detect auto-reference
   const relatedScene = useMemo(() => {
@@ -287,7 +294,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // 2. Model is NOT a generation model AND there's an image but no prompt (fallback for uploaded media)
   // Priority: Explicit model check first, then fallback detection
   // Priority: Explicit model check first, then fallback detection
-  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
+  const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle Camera'];
   const isCompareResult = initialFrame === 'Compare' || selectedFrame === 'Compare';
   const isUploadedImage =
     initialModel === 'Library Image' ||
@@ -340,6 +347,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Seedream v4 4K',
     'Seedream 4.5',
+    'ChatGPT 1.5',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo'
   ];
@@ -356,6 +364,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
+    'ChatGPT 1.5',
     // 'Seedream v4 4K',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo',
@@ -694,6 +703,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             id: targetModalId,
             x: targetX,
             y: targetY,
+            width: frameWidth,
+            height: frameHeight,
             generatedImageUrl: null as string | null,
             isGenerating: true,
             frameWidth,
@@ -717,6 +728,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               id: targetModalId,
               x: targetX,
               y: targetY,
+              width: frameWidth,
+              height: frameHeight,
               generatedImageUrl: null as string | null,
               isGenerating: true,
               frameWidth,
@@ -744,6 +757,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             id: newModalId,
             x: newX,
             y: newY,
+            width: frameWidth,
+            height: frameHeight,
             generatedImageUrl: null as string | null,
             isGenerating: true, // Mark as generating to show loading
             frameWidth,
@@ -979,6 +994,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
         });
 
+        // Collect model-specific options
+        const generationOptions: Record<string, any> = { style: undefined };
+
+        // Add ChatGPT 1.5 specific options
+        if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+          generationOptions.quality = gptQuality;
+          generationOptions.background = gptBackground;
+          generationOptions.moderation = gptModeration;
+        }
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
@@ -989,7 +1014,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           finalSourceImageUrlParam,
           width,
           height,
-          { style: undefined } // Pass style options (placeholder until UI is added)
+          generationOptions
         );
         console.log(`[Image Generation] Completed generation, received ${result?.images?.length || 0} images`);
 
@@ -1301,6 +1326,15 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       ];
     }
 
+    // ChatGPT 1.5 supports: 1:1, 3:2, 2:3
+    if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+      return [
+        { value: '1:1', label: '1:1' },
+        { value: '3:2', label: '3:2' },
+        { value: '2:3', label: '2:3' },
+      ];
+    }
+
     // FAL models (Google Nano Banana, Seedream v4, Imagen) support: 1:1, 16:9, 9:16, 3:4, 4:3
     return [
       { value: '1:1', label: '1:1' },
@@ -1397,6 +1431,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
     if (modelLower.includes('p-image') && !modelLower.includes('p-image-edit')) {
       return 'P-Image';
+    }
+
+    // For ChatGPT 1.5, use as-is but normalized
+    if (modelLower.includes('chatgpt 1.5') || modelLower.includes('chat-gpt-1.5')) {
+      return 'ChatGPT 1.5';
     }
 
     // For Google Nano Banana Pro, append resolution
@@ -1650,6 +1689,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedImageUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={!isUploadedImage ? handleGenerate : undefined}
+        />
         <ImageModalFrame
           id={id}
           scale={scale}
@@ -1954,6 +2003,12 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onSetIsModelDropdownOpen={setIsModelDropdownOpen}
             onSetIsAspectRatioDropdownOpen={setIsAspectRatioDropdownOpen}
             onSetIsResolutionDropdownOpen={setIsResolutionDropdownOpen}
+            gptQuality={gptQuality}
+            gptBackground={gptBackground}
+            gptModeration={gptModeration}
+            onGptQualityChange={setGptQuality}
+            onGptBackgroundChange={setGptBackground}
+            onGptModerationChange={setGptModeration}
           />
 
           {/* Invisible Hover Trigger Zone for Bottom Approach */}

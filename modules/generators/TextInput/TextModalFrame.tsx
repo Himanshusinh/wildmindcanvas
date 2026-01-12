@@ -115,45 +115,35 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   }, [autoFocusInput]);
 
 
-  const inputBg = isDark ? '#121212' : '#ffffff';
-  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
-  const inputText = isDark ? '#ffffff' : '#1f2937';
-  const handleBg = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.3)';
+  // Determine placeholder color based on theme
+  const placeholderColor = isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.4)';
 
   return (
     <div
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
     >
-      {/* Drag handle header */}
+      {/* Invisible Drag Area at Top */}
       <div
-        className="text-input-header"
+        className="text-input-header" // Keep class for drag detection in parent
         style={{
-          height: `${16 * scale}px`,
+          height: `${24 * scale}px`,
           cursor: 'grab',
-          display: 'flex',
-          alignItems: 'center',
-          padding: `${8 * scale}px ${4 * scale}px`,
-          marginBottom: `${4 * scale}px`,
+          width: '100%',
+          flexShrink: 0,
         }}
         onMouseDown={(e) => {
           e.stopPropagation();
           onMouseDown(e);
         }}
-      >
-        <div
-          style={{
-            width: `${40 * scale}px`,
-            height: `${4 * scale}px`,
-            backgroundColor: handleBg,
-            borderRadius: `${2 * scale}px`,
-            margin: '0 auto',
-            transition: 'background-color 0.3s ease',
-          }}
-        />
-      </div>
+      />
 
-      <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box', flex: 1, padding: `${6 * scale}px ${16 * scale}px ${16 * scale}px ${16 * scale}px` }}>
         <textarea
           ref={inputRef}
           value={text}
@@ -225,7 +215,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           }}
           onBlur={() => {
             onTextBlur();
-            // Delay hiding suggestions to allow click event
             setTimeout(() => setShowSuggestions(false), 200);
           }}
           onKeyDown={(e) => {
@@ -245,7 +234,6 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
                   const newText = text.slice(0, lastAtSymbol) + '@' + selectedName + ' ' + text.slice(cursorPosition);
                   onTextChange(newText);
                   setShowSuggestions(false);
-                  // Need to update cursor position manually if possible, but React state update might make it tricky
                 }
               } else if (e.key === 'Escape') {
                 setShowSuggestions(false);
@@ -255,60 +243,51 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             }
           }}
           placeholder="Enter text here..."
-          onMouseDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            // Allow event to bubble to parent for selection, but prevent event for other things if needed
+            // e.stopPropagation(); // REMOVED: sticky selection bug fix
+          }}
           style={{
-            background: inputBg,
-            border: `${1 * scale}px solid ${inputBorder}`,
-            borderRadius: `${8 * scale}px`,
-            padding: `${10 * scale}px`,
-            color: inputText,
-            fontSize: `${16 * scale}px`,
-            fontFamily: 'Arial, sans-serif',
+            background: 'transparent',
+            border: 'none',
             outline: 'none',
             resize: 'none',
+            color: isDark ? '#ffffff' : '#111827',
+            caretColor: isDark ? '#3b82f6' : '#2563eb', // Nice caret color
+            fontSize: `${16 * scale}px`,
+            lineHeight: '1.5',
+            fontFamily: 'Inter, sans-serif',
             minHeight: `${80 * scale}px`,
             height: `${textareaHeight * scale}px`,
             width: '100%',
-            minWidth: 0,
-            maxWidth: '100%',
             boxSizing: 'border-box',
-            cursor: isTextFocused ? 'text' : 'default',
-            transition: 'background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease',
-            overflow: 'auto',
-          }}
-          onFocus={(e) => {
-            onTextFocus();
-            // Keep border color the same on focus (prevent blue border)
-            e.currentTarget.style.border = `${1 * scale}px solid ${inputBorder}`;
-            e.currentTarget.style.borderColor = inputBorder;
+            cursor: 'text',
           }}
         />
 
-        {/* Custom Resize Handle (3 refined dots) */}
+        {/* Placeholder styling hack if needed, but native is usually fine.
+             Let's use ::placeholder CSS in global or just rely on transparency.
+             Inline styles for ::placeholder aren't possible directly in React style prop.
+          */}
+
+        {/* Resize Handle - Minimal Corner */}
         <div
           onMouseDown={handleResizeMouseDown}
           style={{
             position: 'absolute',
-            bottom: `${8 * scale}px`,
-            right: `${8 * scale}px`,
-            width: `${16 * scale}px`,
-            height: `${16 * scale}px`,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-            alignItems: 'flex-end',
-            gap: `${2 * scale}px`,
+            bottom: `${2 * scale}px`,
+            right: `${2 * scale}px`,
+            width: `${12 * scale}px`,
+            height: `${12 * scale}px`,
             cursor: 'ns-resize',
             zIndex: 10,
-            opacity: isHovered || isResizing ? 0.8 : 0,
+            opacity: isHovered || isResizing ? 0.6 : 0,
             transition: 'opacity 0.2s ease',
           }}
         >
-          <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
-          <div style={{ display: 'flex', gap: `${2 * scale}px` }}>
-            <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
-            <div style={{ width: `${2 * scale}px`, height: `${2 * scale}px`, backgroundColor: handleBg, borderRadius: '50%' }} />
-          </div>
+          <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
+            <path d="M10.5 4.5L10.5 10.5L4.5 10.5" stroke={isDark ? "white" : "black"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
       </div>
 
@@ -317,16 +296,16 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: `${cursorPosition > 0 ? 40 * scale : 0}px`, // Rough positioning, could be improved with textarea-caret library
-            left: `${12 * scale}px`,
+            top: `${cursorPosition > 0 ? 80 * scale : 40 * scale}px`, // Simple fallback
+            left: `${16 * scale}px`,
             zIndex: 3000,
             backgroundColor: isDark ? '#1f2937' : '#ffffff',
             border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
             borderRadius: `${8 * scale}px`,
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-            maxHeight: `${150 * scale}px`,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            maxHeight: `${160 * scale}px`,
             overflowY: 'auto',
-            minWidth: `${120 * scale}px`,
+            minWidth: `${140 * scale}px`,
           }}
         >
           {suggestions.map((suggestion, index) => (
@@ -340,11 +319,12 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
                 setShowSuggestions(false);
               }}
               style={{
-                padding: `${6 * scale}px ${12 * scale}px`,
+                padding: `${8 * scale}px ${12 * scale}px`,
                 cursor: 'pointer',
                 backgroundColor: index === suggestionIndex ? (isDark ? '#374151' : '#f3f4f6') : 'transparent',
                 color: isDark ? '#e5e7eb' : '#374151',
-                fontSize: `${14 * scale}px`,
+                fontSize: `${13 * scale}px`,
+                fontWeight: index === suggestionIndex ? 500 : 400,
               }}
               onMouseEnter={() => setSuggestionIndex(index)}
             >

@@ -379,6 +379,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           scale={scale}
           position={position}
           textInputStates={textInputStates}
+          onPersistVideoModalCreate={onPersistVideoModalCreate}
         />
       ))}
       {contextMenu && (

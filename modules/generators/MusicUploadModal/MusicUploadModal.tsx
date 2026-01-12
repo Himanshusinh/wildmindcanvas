@@ -96,6 +96,7 @@ interface MusicUploadModalProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  onPersistMusicModalCreate?: (modal: any) => void | Promise<void>;
 }
 
 export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
@@ -150,6 +151,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   onContextMenu,
   isPinned = false,
   onTogglePin,
+  onPersistMusicModalCreate,
 }) => {
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'MiniMax Music 2');
@@ -390,6 +392,50 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
 
     if (onGenerate && (canGenerateDialogue || canGenerateOther) && !isGenerating) {
       setGeneratingState(true);
+
+      if (onPersistMusicModalCreate) {
+        const fw = 600;
+        const fh = 300;
+        const persistData = {
+          id: id,
+          x: x,
+          y: y,
+          width: fw,
+          height: fh,
+          frameWidth: fw,
+          frameHeight: fh,
+          generatedMusicUrl: generatedMusicUrl || null,
+          model: modelToUse,
+          frame: selectedFrame,
+          aspectRatio: selectedAspectRatio,
+          prompt: promptToUse,
+          activeCategory: activeCategory,
+          lyrics: lyricsToUse,
+          sampleRate: sampleRate,
+          bitrate: bitrate,
+          audioFormat: audioFormat,
+          voiceId: voiceId,
+          stability: stability,
+          similarityBoost: similarityBoost,
+          style: style,
+          speed: speed,
+          exaggeration: exaggeration,
+          temperature: temperature,
+          cfgScale: cfgScale,
+          voicePrompt: voicePrompt,
+          topP: topP,
+          maxTokens: maxTokens,
+          repetitionPenalty: repetitionPenalty,
+          dialogueInputs: dialogueInputs,
+          useSpeakerBoost: useSpeakerBoost,
+          filename: filename,
+          duration: duration,
+          promptInfluence: promptInfluence,
+          loop: loop
+        };
+        await Promise.resolve(onPersistMusicModalCreate(persistData));
+      }
+
       onGenerate(
         promptToUse,
         modelToUse,
@@ -871,6 +917,16 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       />
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned || isAutoPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedMusicUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={handleGenerate}
+        />
         <MusicModalFrame
           id={id}
           scale={scale}

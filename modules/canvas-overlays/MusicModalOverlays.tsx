@@ -394,6 +394,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
               Promise.resolve(onPersistMusicModalCreate(duplicated)).catch(console.error);
             }
           }}
+          onPersistMusicModalCreate={onPersistMusicModalCreate}
           isSelected={selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id)}
           x={modalState.x}
           y={modalState.y}

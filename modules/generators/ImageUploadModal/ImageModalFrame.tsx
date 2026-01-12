@@ -43,7 +43,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   const isDark = useIsDarkTheme();
 
   const frameBorderColor = isSelected
-    ? '#437eb5'
+    ? '#4C83FF'
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const frameBg = isDark ? '#121212' : '#ffffff';
@@ -71,12 +71,12 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         height: height ? `${height * scale}px` : undefined,
         minHeight: `${(height || 400) * scale}px`,
         backgroundColor: frameBg,
-        borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${20 * scale}px`,
+        borderRadius: (isHovered || isPinned) ? '0px' : `${20 * scale}px`,
         // keep top/left/right borders, but remove bottom border when controls are hovered (only for generated images)
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) && !isUploadedImage ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -111,7 +111,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             height: '100%',
             objectFit: 'cover',
             pointerEvents: 'none',
-            borderRadius: (isHovered || isPinned) && !isUploadedImage ? '0px' : `${17 * scale}px`,
+            borderRadius: (isHovered || isPinned) ? '0px' : `${17 * scale}px`,
           }}
           draggable={false}
         />

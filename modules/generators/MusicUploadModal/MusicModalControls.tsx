@@ -376,10 +376,11 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
         gap: `${16 * scale}px`,
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
         overflow: 'visible',
-        zIndex: 3,
+        zIndex: 1,
         borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}

@@ -11,7 +11,7 @@ interface CanvasImageProps {
   imageData: ImageUpload;
   index: number;
   onUpdate?: (updates: Partial<ImageUpload>) => void;
-  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
+  onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
   isSelected?: boolean;
   onDelete?: () => void;
   stageRef?: React.RefObject<any>;
@@ -72,12 +72,19 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       const incomingX = imageData.x || 50;
       const incomingY = imageData.y || 50;
 
+      // CRITICAL: Check if this incoming position is one we already processed OR one we just sent
+      const lastSent = lastSentPositionRef.current;
+      if (lastSent && Math.abs(lastSent.x - incomingX) < 0.1 && Math.abs(lastSent.y - incomingY) < 0.1) {
+        // This is a reflected update from our own drag, ignore it if we are already there
+        return;
+      }
+
       // Check if this is a new position from parent (different from what we last received)
       const lastReceived = lastReceivedPositionRef.current;
-      if (!lastReceived || lastReceived.x !== incomingX || lastReceived.y !== incomingY) {
-        // Only update if it's different from current position
+      if (!lastReceived || Math.abs(lastReceived.x - incomingX) > 0.1 || Math.abs(lastReceived.y - incomingY) > 0.1) {
+        // Only update if it's actually different from our current local state
         const current = currentPositionRef.current;
-        if (incomingX !== current.x || incomingY !== current.y) {
+        if (Math.abs(incomingX - current.x) > 0.1 || Math.abs(incomingY - current.y) > 0.1) {
           setCurrentX(incomingX);
           setCurrentY(incomingY);
           currentPositionRef.current = { x: incomingX, y: incomingY };
@@ -477,9 +484,10 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           });
           // Allow sync after a short delay to let parent update
           // Use setTimeout to ensure parent has time to process the update
+          // Increased to 500ms to better handle busy canvases/slower persistence
           setTimeout(() => {
             justFinishedDragRef.current = false;
-          }, 100);
+          }, 500);
         }}
         onDragMove={(e) => {
           // Update drag position ref and state during move
@@ -564,16 +572,30 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           node.scaleY(1);
           onUpdate?.({ width: newWidth, height: newHeight, rotation: newRotation });
         }}
-        onClick={(e) => {
+        onMouseDown={(e) => {
           e.cancelBubble = true;
           setIsSelected(true);
           if (onSelect) {
-            // Pass event info for multi-select support
             onSelect({
               ctrlKey: e.evt.ctrlKey,
               metaKey: e.evt.metaKey,
+              shiftKey: e.evt.shiftKey,
             });
           }
+        }}
+        onTouchStart={(e) => {
+          e.cancelBubble = true;
+          setIsSelected(true);
+          if (onSelect) {
+            onSelect({
+              ctrlKey: e.evt.ctrlKey,
+              metaKey: e.evt.metaKey,
+              shiftKey: e.evt.shiftKey,
+            });
+          }
+        }}
+        onClick={(e) => {
+          e.cancelBubble = true;
           // Context menu removed - icons are now shown at top-right corner of image
           // Don't play/pause when showing context menu
           // Video play/pause is handled by the center button on hover

@@ -56,6 +56,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
   const iconColor = isDark ? '#cccccc' : '#4b5563';
 
+  const buttonHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -77,29 +79,28 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         position: 'absolute',
         top: '100%',
         left: `${-frameBorderWidth * scale}px`,
-        width: `${400 * scale}px`,
+        right: `${-frameBorderWidth * scale}px`, // Span full width
         padding: `${12 * scale}px`,
-        paddingTop: `${16 * scale}px`,
-        paddingBottom: `${16 * scale}px`,
+        paddingTop: `${8 * scale}px`,
+        paddingBottom: `${12 * scale}px`,
         backgroundColor: controlsBg,
-
-        border: 'none',
+        borderBottomLeftRadius: `${16 * scale}px`,
+        borderBottomRightRadius: `${16 * scale}px`,
         borderTop: 'none',
-        borderRadius: `0 0 ${12 * scale}px ${12 * scale}px`,
-        boxShadow: 'none',
-        transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
-        opacity: (isHovered || isPinned) ? 1 : 0,
-        maxHeight: (isHovered || isPinned) ? '400px' : '0px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: `${12 * scale}px`,
-        pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
-        overflow: 'visible',
-        zIndex: 1,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease',
+        transform: (isHovered || isPinned) ? 'translateY(0)' : `translateY(-100%)`,
+        opacity: (isHovered || isPinned) ? 1 : 0,
+        maxHeight: (isHovered || isPinned) ? `${400 * scale}px` : '0px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: `${10 * scale}px`,
+        pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+        overflow: 'visible',
+        zIndex: 1,
+        transition: 'background-color, border-color, opacity, max-height',
+        marginTop: `${-1 * scale}px`, // Pull up to overlap border
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -117,11 +118,11 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             style={{
               width: '100%',
-              padding: `${14 * scale}px ${28 * scale}px ${14 * scale}px ${14 * scale}px`,
-              minHeight: `${40 * scale}px`,
-              backgroundColor: controlsBg,
+              padding: `${8 * scale}px ${12 * scale}px`,
+              minHeight: `${32 * scale}px`,
+              backgroundColor: 'transparent', // Cleaner look
               border: `1px solid ${dropdownBorderColor}`,
-              borderRadius: `${9999 * scale}px`,
+              borderRadius: `${8 * scale}px`,
               fontSize: controlFontSize,
               fontWeight: '500',
               color: dropdownText,
@@ -131,12 +132,14 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
               alignItems: 'center',
               justifyContent: 'space-between',
               textAlign: 'left',
-              transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+              transition: 'background-color, border-color, color',
             }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = buttonHoverBg}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{selectedModel}</span>
-            <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-              <path d="M2 4L6 8L10 4" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, marginLeft: `${8 * scale}px`, transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.6 }}>
+              <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
 
@@ -150,13 +153,13 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
                 marginTop: `${4 * scale}px`,
                 backgroundColor: controlsBg,
                 border: `1px solid ${dropdownBorderColor}`,
-                borderRadius: `${12 * scale}px`,
-                boxShadow: isDark ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)`,
+                borderRadius: `${8 * scale}px`,
+                boxShadow: isDark ? `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.4)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.1)`,
                 maxHeight: `${200 * scale}px`,
                 overflowY: 'auto',
                 zIndex: 3003,
-                padding: `${4 * scale}px 0`,
-                transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+                padding: `${4 * scale}px`,
+                transition: 'background-color, border-color, box-shadow',
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -169,19 +172,19 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
                     onSetIsModelDropdownOpen(false);
                   }}
                   style={{
-                    padding: `${8 * scale}px ${16 * scale}px`,
+                    padding: `${6 * scale}px ${8 * scale}px`,
                     fontSize: controlFontSize,
                     color: dropdownText,
                     cursor: 'pointer',
+                    borderRadius: `${4 * scale}px`,
                     display: 'flex',
                     alignItems: 'center',
                     backgroundColor: selectedModel === model ? selectedBg : 'transparent',
-                    borderLeft: selectedModel === model ? `3px solid ${dropdownBorderColor}` : '3px solid transparent',
-                    transition: 'background-color 0.3s ease, color 0.3s ease',
+                    transition: 'background-color 0.2s ease, color 0.2s ease',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedModel !== model) {
-                      e.currentTarget.style.backgroundColor = dropdownHoverBg;
+                      e.currentTarget.style.backgroundColor = buttonHoverBg;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -191,11 +194,9 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
                   }}
                 >
                   {selectedModel === model && (
-                    <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke={dropdownBorderColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: `${8 * scale}px`, flexShrink: 0 }}>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <div style={{ width: `${6 * scale}px`, height: `${6 * scale}px`, borderRadius: '50%', backgroundColor: isDark ? '#3b82f6' : '#2563eb', marginRight: `${8 * scale}px` }} />
                   )}
-                  <span>{model}</span>
+                  <span style={{ fontWeight: selectedModel === model ? 500 : 400 }}>{model}</span>
                 </div>
               ))}
             </div>
@@ -212,38 +213,43 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
           onMouseDown={(e) => e.stopPropagation()}
           title={isEnhancing ? enhanceStatus || 'Enhancing...' : 'Enhance prompt'}
           style={{
-            width: `${30 * scale}px`,
-            height: `${30 * scale}px`,
+            height: `${32 * scale}px`,
+            padding: `0 ${12 * scale}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: `${6 * scale}px`,
             background: isEnhancing
-              ? 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.4) 100%)'
-              : 'linear-gradient(135deg, rgba(168,85,247,0.35) 0%, rgba(168,85,247,0.6) 100%)',
-            border: `${1 * scale}px solid rgba(168,85,247,0.65)`,
-            borderRadius: `${12 * scale}px`,
-            color: '#6d28d9',
+              ? 'rgba(168,85,247,0.1)'
+              : 'transparent',
+            border: `1px solid ${isEnhancing ? 'rgba(168,85,247,0.5)' : dropdownBorderColor}`,
+            borderRadius: `${8 * scale}px`,
+            color: isEnhancing ? '#a855f7' : iconColor,
             cursor: isEnhancing || !text.trim() ? 'not-allowed' : 'pointer',
-            boxShadow: `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`,
-            padding: 0,
-            transition: 'none',
+            boxShadow: 'none',
             opacity: isEnhancing || !text.trim() ? 0.6 : 1,
             flexShrink: 0,
+            fontSize: controlFontSize,
+            fontWeight: 500,
           }}
           disabled={!text.trim() || isEnhancing}
           onMouseEnter={(e) => {
             if (!isEnhancing && text.trim()) {
-              (e.currentTarget as HTMLElement).style.boxShadow = `0 ${10 * scale}px ${24 * scale}px rgba(168,85,247,0.45)`;
+              e.currentTarget.style.backgroundColor = buttonHoverBg;
+              e.currentTarget.style.color = isDark ? '#ffffff' : '#000000';
             }
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(168,85,247,0.35)`;
+            if (!isEnhancing) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = iconColor;
+            }
           }}
         >
           {isEnhancing ? (
             <svg
-              width={20 * scale}
-              height={20 * scale}
+              width={16 * scale}
+              height={16 * scale}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -252,23 +258,23 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
               strokeLinejoin="round"
               style={{
                 animation: 'spin 1s linear infinite',
-                transformOrigin: 'center',
               }}
             >
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
           ) : (
-            <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v4" />
-              <path d="M12 17v4" />
-              <path d="M3 12h4" />
-              <path d="M17 12h4" />
-              <path d="M5.6 5.6l2.8 2.8" />
-              <path d="M15.6 15.6l2.8 2.8" />
-              <path d="M18.4 5.6l-2.8 2.8" />
-              <path d="M8.4 15.6l-2.8 2.8" />
+            <svg width={16 * scale} height={16 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v4" />
+              <path d="M12 18v4" />
+              <path d="M4.93 4.93l2.83 2.83" />
+              <path d="M16.24 16.24l2.83 2.83" />
+              <path d="M2 12h4" />
+              <path d="M18 12h4" />
+              <path d="M4.93 19.07l2.83-2.83" />
+              <path d="M16.24 7.76l2.83-2.83" />
             </svg>
           )}
+          <span>Enhance</span>
         </button>
 
 

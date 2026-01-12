@@ -140,6 +140,28 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     };
   }, [isOpen, fetchMediaLibrary]);
 
+  // Handle click outside to close
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Use a small timeout to avoid closing immediately if the click that opened the sidebar
+    // is also caught by this listener (in case of event bubbling)
+    const timeoutId = setTimeout(() => {
+      window.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
   const handleScroll = () => {
     if (scrollContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
@@ -168,7 +190,16 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     isDraggingRef.current = true;
     // Store media data in drag event
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/json', JSON.stringify(media));
+
+    // Add AVIF preview URL for the drag process if it's an image
+    const dragData = {
+      ...media,
+      avifUrl: (media.url && (media.url.includes('zata.ai') || media.url.includes('zata')))
+        ? buildProxyThumbnailUrl(media.url, 512, 80, 'avif')
+        : undefined
+    };
+
+    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
     e.dataTransfer.setData('text/plain', media.url || '');
     // Add a visual indicator
     if (e.currentTarget instanceof HTMLElement) {
@@ -188,15 +219,14 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   };
 
   const getMediaUrl = (media: MediaItem, useThumbnail = true) => {
-    let url = media.url || media.thumbnail || '';
-    if (url && (url.includes('zata.ai') || url.includes('zata'))) {
-      if (useThumbnail) {
-        // Use optimized AVIF thumbnail for grid previews (512px width is plenty for sidebar)
-        return buildProxyThumbnailUrl(url, 512, 80, 'avif');
-      }
-      return buildProxyResourceUrl(url);
+    const url = media.url || media.thumbnail || '';
+    if (!url) return '';
+
+    // Use thumbnails for performance and proxy all external images for CORS safety
+    if (useThumbnail) {
+      return buildProxyThumbnailUrl(url, 512, 80, 'avif');
     }
-    return url;
+    return buildProxyResourceUrl(url);
   };
 
   const renderMediaGrid = (items: MediaItem[]) => {
@@ -217,9 +247,9 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
           {items.map((item, idx) => {
-            const mediaUrl = getMediaUrl(item);
-            const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
-            const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
+            const isVideo = item.type === 'video';
+            const isMusic = item.type === 'music';
+            const displayUrl = getMediaUrl(item, true); // Always use thumbnails in grid for speed
 
             return (
               <div
@@ -270,7 +300,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                   </div>
                 ) : (
                   <img
-                    src={mediaUrl}
+                    src={displayUrl}
                     alt={item.prompt || 'Media'}
                     loading="lazy"
                     decoding="async"
@@ -279,13 +309,13 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                       height: '100%',
                       objectFit: 'cover',
                       opacity: 0,
-                      animation: 'fadeIn 0.3s ease forwards'
+                      transition: 'opacity 0.4s ease-out'
                     }}
                     onLoad={(e) => {
                       (e.target as HTMLImageElement).style.opacity = '1';
                     }}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).style.opacity = '0.2';
                     }}
                   />
                 )}

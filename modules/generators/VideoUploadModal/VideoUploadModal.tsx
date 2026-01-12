@@ -73,6 +73,7 @@ interface VideoUploadModalProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  onPersistVideoModalCreate?: (modal: any) => void | Promise<void>;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -110,6 +111,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   onContextMenu,
   isPinned = false,
   onTogglePin,
+  onPersistVideoModalCreate,
 }) => {
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -242,7 +244,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const isFirstLastMode = frameCount >= 2 && Boolean(firstFrameUrl && lastFrameUrl);
   const hasSingleFrame = frameCount === 1 && Boolean(firstFrameUrl);
   const availableModelOptions = (isFirstLastMode || hasSingleFrame)
-    ? ['Veo 3.1', 'Veo 3.1 Fast']
+    ? ['Veo 3.1', 'Veo 3.1 Fast', 'Seedance 1.0 Pro', 'Seedance 1.0 Lite']
     : VIDEO_MODEL_OPTIONS;
   const isVeo31Model = selectedModel.toLowerCase().includes('veo 3.1');
   const displayFirstFrameUrl = isFrameOrderSwapped ? lastFrameUrl : firstFrameUrl;
@@ -263,8 +265,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       return;
     }
 
-    const isCurrentVeo31 = selectedModel.toLowerCase().includes('veo 3.1');
-    const targetModel = isCurrentVeo31 ? selectedModel : 'Veo 3.1';
+    const isCurrentValid = selectedModel.toLowerCase().includes('veo 3.1') ||
+      selectedModel.toLowerCase().includes('seedance');
+    const targetModel = isCurrentValid ? selectedModel : 'Veo 3.1';
     const defaultAspectRatio = getModelDefaultAspectRatio(targetModel);
     const defaultDuration = getModelDefaultDuration(targetModel);
     const defaultResolution = getModelDefaultResolution(targetModel);
@@ -323,6 +326,27 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const promptToUse = effectivePrompt;
     if (onGenerate && promptToUse.trim() && !isGenerating) {
       setIsGenerating(true);
+
+      if (onPersistVideoModalCreate) {
+        const defaultDim = 512;
+        const persistData = {
+          id: id,
+          x: x,
+          y: y,
+          width: defaultDim,
+          height: defaultDim,
+          frameWidth: defaultDim,
+          frameHeight: defaultDim,
+          generatedVideoUrl: generatedVideoUrl || null,
+          model: selectedModel,
+          aspectRatio: selectedAspectRatio,
+          prompt: promptToUse,
+          duration: typeof selectedDuration === 'string' ? parseFloat(selectedDuration) : selectedDuration,
+          resolution: selectedResolution
+        };
+        await Promise.resolve(onPersistVideoModalCreate(persistData));
+      }
+
       try {
         // Pass first_frame_url and last_frame_url if 2 images are connected
         const generationFirstFrame = isFirstLastMode && isFrameOrderSwapped
@@ -568,6 +592,16 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       />
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={!!isSelected}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          onDownload={generatedVideoUrl ? onDownload : undefined}
+          onTogglePin={onTogglePin}
+          onRegenerate={!isUploadedVideo ? handleGenerate : undefined}
+        />
         <VideoModalFrame
           id={id}
           scale={scale}

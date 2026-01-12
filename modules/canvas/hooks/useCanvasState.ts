@@ -1,11 +1,12 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { CanvasProps } from '../types';
-import { useCanvasHistory, CanvasHistoryState } from '@/core/hooks/useCanvasHistory';
 import { ImageUpload } from '@/core/types/canvas';
 import { CanvasTextState, CompareModalState, ScriptFrameModalState } from '@/modules/canvas-overlays/types';
 import { GroupContainerState } from '@/core/types/groupContainer';
 import { StoryWorld } from '@/core/types/storyWorld';
+import { setCurrentSnapshot } from '@/core/api/canvasApi';
+import { buildSnapshotElements } from '@/modules/utils/buildSnapshotElements';
+import { CanvasAppState } from '@/modules/canvas-app/types';
 
 export function useCanvasState(props: CanvasProps) {
     const {
@@ -18,6 +19,7 @@ export function useCanvasState(props: CanvasProps) {
         externalImageModals,
         externalVideoModals,
         externalVideoEditorModals,
+        externalImageEditorModals,
         externalMusicModals,
         externalUpscaleModals,
         externalMultiangleCameraModals,
@@ -32,6 +34,9 @@ export function useCanvasState(props: CanvasProps) {
         externalSceneFrameModals,
         externalTextModals,
         initialGroupContainerStates,
+        projectId,
+        richTextStates, // Added from props
+        setRichTextStates, // Added from props
     } = props;
 
     // Local state for canvas text (fallback if props not provided)
@@ -46,28 +51,27 @@ export function useCanvasState(props: CanvasProps) {
     const effectiveSelectedCanvasTextId = selectedCanvasTextId;
     const effectiveSetSelectedCanvasTextId = setSelectedCanvasTextId;
 
-    // Local state for rich text
+    // Local state for rich text (fallback if props not provided)
     const [localRichTextStates, setLocalRichTextStates] = useState<CanvasTextState[]>([]);
-    const effectiveRichTextStates = props.richTextStates ?? localRichTextStates;
-    const effectiveSetRichTextStates = props.setRichTextStates ?? setLocalRichTextStates;
-
-    const [localSelectedRichTextId, setLocalSelectedRichTextId] = useState<string | null>(null);
-    const effectiveSelectedRichTextId = props.selectedRichTextId !== undefined ? props.selectedRichTextId : localSelectedRichTextId;
-    const effectiveSetSelectedRichTextId = props.setSelectedRichTextId ?? setLocalSelectedRichTextId;
+    const effectiveRichTextStates = richTextStates ?? localRichTextStates;
+    const effectiveSetRichTextStates = setRichTextStates ?? setLocalRichTextStates;
 
     const handleCanvasTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
         effectiveSetCanvasTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetCanvasTextStates]);
 
-    const handleRichTextUpdate = useCallback((id: string, updates: Partial<CanvasTextState>) => {
-        effectiveSetRichTextStates((prev: CanvasTextState[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    const handleRichTextUpdate = useCallback((id: string, updates: any) => {
+        effectiveSetRichTextStates((prev: any[]) => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     }, [effectiveSetRichTextStates]);
+
+
 
     const [patternImage, setPatternImage] = useState<HTMLImageElement | null>(null);
     const [textInputStates, setTextInputStates] = useState<Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>>([]);
     const [imageModalStates, setImageModalStates] = useState<Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>>([]);
     const [videoModalStates, setVideoModalStates] = useState<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>>([]);
     const [videoEditorModalStates, setVideoEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
+    const [imageEditorModalStates, setImageEditorModalStates] = useState<Array<{ id: string; x: number; y: number }>>([]);
     const [musicModalStates, setMusicModalStates] = useState<import('../types').MusicGenerator[]>([]);
     const [upscaleModalStates, setUpscaleModalStates] = useState<Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>>([]);
     const [multiangleCameraModalStates, setMultiangleCameraModalStates] = useState<Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>>([]);
@@ -92,6 +96,7 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalImageModals) setImageModalStates(externalImageModals as any); }, [externalImageModals]);
     useEffect(() => { if (externalVideoModals) setVideoModalStates(externalVideoModals as any); }, [externalVideoModals]);
     useEffect(() => { if (externalVideoEditorModals) setVideoEditorModalStates(externalVideoEditorModals); }, [externalVideoEditorModals]);
+    useEffect(() => { if (externalImageEditorModals) setImageEditorModalStates(externalImageEditorModals as any); }, [externalImageEditorModals]);
     useEffect(() => { if (externalMusicModals) setMusicModalStates(externalMusicModals as any); }, [externalMusicModals]);
     useEffect(() => { if (externalUpscaleModals) setUpscaleModalStates(externalUpscaleModals as any); }, [externalUpscaleModals]);
     useEffect(() => { if (externalMultiangleCameraModals) setMultiangleCameraModalStates(externalMultiangleCameraModals as any); }, [externalMultiangleCameraModals]);
@@ -105,127 +110,10 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalScriptFrameModals) setScriptFrameModalStates(externalScriptFrameModals); }, [externalScriptFrameModals]);
     useEffect(() => { if (externalSceneFrameModals) setSceneFrameModalStates(externalSceneFrameModals as any); }, [externalSceneFrameModals]);
     useEffect(() => { if (externalTextModals) setTextInputStates(externalTextModals as any); }, [externalTextModals]);
-    useEffect(() => { if (props.richTextStates) setLocalRichTextStates(props.richTextStates); }, [props.richTextStates]);
+
     useEffect(() => { if (initialGroupContainerStates) setGroupContainerStates(initialGroupContainerStates); }, [initialGroupContainerStates]);
 
     // --- EFFECTIVE STATES (No longer needed to mask, but we'll use local state as source of truth now) ---
-
-    // --- HISTORY MANAGEMENT ---
-    const isRestoring = useRef(false);
-
-    const getCurrentState = useCallback((): CanvasHistoryState => ({
-        images: images || [],
-        canvasTextStates: effectiveCanvasTextStates,
-        richTextStates: effectiveRichTextStates,
-        textInputStates: textInputStates as any,
-        imageModalStates: imageModalStates as any,
-        videoModalStates: videoModalStates as any,
-        musicModalStates: musicModalStates as any,
-        storyboardModalStates,
-        scriptFrameModalStates,
-        sceneFrameModalStates: sceneFrameModalStates as any,
-        groupContainerStates,
-        connections: connections || [],
-        upscaleModalStates: upscaleModalStates as any,
-        multiangleCameraModalStates: multiangleCameraModalStates as any,
-        removeBgModalStates: removeBgModalStates as any,
-        eraseModalStates: eraseModalStates as any,
-        expandModalStates: expandModalStates as any,
-        vectorizeModalStates: vectorizeModalStates as any,
-        nextSceneModalStates: nextSceneModalStates as any,
-        videoEditorModalStates,
-        storyWorldStates,
-    }), [
-        images, effectiveCanvasTextStates, effectiveRichTextStates, textInputStates, imageModalStates,
-        videoModalStates, musicModalStates, storyboardModalStates,
-        scriptFrameModalStates, sceneFrameModalStates, groupContainerStates, connections,
-        upscaleModalStates, multiangleCameraModalStates, removeBgModalStates,
-        eraseModalStates, expandModalStates, vectorizeModalStates,
-        nextSceneModalStates, videoEditorModalStates, storyWorldStates
-    ]);
-
-    const handleRestore = useCallback((state: CanvasHistoryState) => {
-        isRestoring.current = true;
-
-        // Restore local states
-        effectiveSetCanvasTextStates(state.canvasTextStates || []);
-        effectiveSetRichTextStates((state as any).richTextStates || []);
-        setImageModalStates(state.imageModalStates || []);
-        setVideoModalStates(state.videoModalStates || []);
-        setMusicModalStates(state.musicModalStates || []);
-        setTextInputStates(state.textInputStates || []);
-        setStoryboardModalStates(state.storyboardModalStates || []);
-        setScriptFrameModalStates(state.scriptFrameModalStates || []);
-        setSceneFrameModalStates(state.sceneFrameModalStates || []);
-        setGroupContainerStates(state.groupContainerStates || []);
-        setUpscaleModalStates(state.upscaleModalStates || []);
-        setRemoveBgModalStates(state.removeBgModalStates || []);
-        setEraseModalStates(state.eraseModalStates || []);
-        setExpandModalStates(state.expandModalStates || []);
-        setVectorizeModalStates(state.vectorizeModalStates || []);
-        setNextSceneModalStates(state.nextSceneModalStates || []);
-        setVideoEditorModalStates(state.videoEditorModalStates || []);
-        setStoryWorldStates(state.storyWorldStates || []);
-
-        if (onConnectionsChange && state.connections) {
-            onConnectionsChange(state.connections);
-        }
-
-        // Reconcile 'images' prop - skipped for now due to type mismatch
-        // (Existing logic commented out in Canvas.tsx)
-
-        // Reset restoring flag after a tick
-        setTimeout(() => {
-            isRestoring.current = false;
-        }, 100);
-    }, [effectiveSetCanvasTextStates, onConnectionsChange]);
-
-    const { record, undo, redo, canUndo, canRedo } = useCanvasHistory(
-        {
-            images: images || [],
-            canvasTextStates: effectiveCanvasTextStates,
-            richTextStates: effectiveRichTextStates,
-            textInputStates,
-            imageModalStates,
-            videoModalStates,
-            musicModalStates,
-            storyboardModalStates,
-            scriptFrameModalStates,
-            sceneFrameModalStates,
-            groupContainerStates,
-            connections: connections || [],
-            upscaleModalStates,
-            multiangleCameraModalStates,
-            removeBgModalStates,
-            eraseModalStates,
-            expandModalStates,
-            vectorizeModalStates,
-            nextSceneModalStates,
-            videoEditorModalStates,
-            storyWorldStates
-        },
-        handleRestore
-    );
-
-    // Auto-record history on state changes
-    useEffect(() => {
-        if (!isRestoring.current) {
-            const timer = setTimeout(() => {
-                if (!isRestoring.current) {
-                    record(getCurrentState());
-                }
-            }, 300); // 300ms debounce
-            return () => clearTimeout(timer);
-        }
-    }, [
-        images, effectiveCanvasTextStates, effectiveRichTextStates, textInputStates, imageModalStates,
-        videoModalStates, musicModalStates, storyboardModalStates,
-        scriptFrameModalStates, sceneFrameModalStates, connections,
-        upscaleModalStates, removeBgModalStates, eraseModalStates,
-        expandModalStates, vectorizeModalStates, nextSceneModalStates,
-        videoEditorModalStates, storyWorldStates,
-        record, getCurrentState
-    ]);
 
     return {
         // Props Proxies
@@ -238,6 +126,7 @@ export function useCanvasState(props: CanvasProps) {
         imageModalStates: imageModalStates as any, setImageModalStates,
         videoModalStates: videoModalStates as any, setVideoModalStates,
         videoEditorModalStates, setVideoEditorModalStates,
+        imageEditorModalStates, setImageEditorModalStates,
         musicModalStates: musicModalStates as any, setMusicModalStates,
         upscaleModalStates: upscaleModalStates as any, setUpscaleModalStates,
         multiangleCameraModalStates: multiangleCameraModalStates as any, setMultiangleCameraModalStates,
@@ -252,6 +141,10 @@ export function useCanvasState(props: CanvasProps) {
         groupContainerStates, setGroupContainerStates,
         compareModalStates, setCompareModalStates,
         storyWorldStates, setStoryWorldStates,
+        richTextStates: effectiveRichTextStates,
+        setRichTextStates: effectiveSetRichTextStates,
+        effectiveRichTextStates,
+        effectiveSetRichTextStates,
 
         // Canvas Text (Effective)
         effectiveCanvasTextStates,
@@ -261,17 +154,8 @@ export function useCanvasState(props: CanvasProps) {
         effectiveSelectedCanvasTextId,
         effectiveSetSelectedCanvasTextId,
         handleCanvasTextUpdate,
+        handleRichTextUpdate,
         isTextInteracting,
         setIsTextInteracting,
-
-        // Rich Text
-        effectiveRichTextStates,
-        effectiveSetRichTextStates,
-        selectedRichTextId: effectiveSelectedRichTextId,
-        setSelectedRichTextId: effectiveSetSelectedRichTextId,
-        handleRichTextUpdate,
-
-        // History
-        record, undo, redo, canUndo, canRedo, getCurrentState
     };
 }

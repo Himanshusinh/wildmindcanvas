@@ -104,7 +104,7 @@ export interface CanvasProject {
 }
 
 export interface CanvasOp {
-  type: 'create' | 'update' | 'delete' | 'move' | 'resize' | 'select' | 'connect';
+  type: 'create' | 'update' | 'delete' | 'move' | 'resize' | 'select' | 'connect' | 'bulk-create' | 'generator.delete' | 'media.delete';
   elementId?: string;
   elementIds?: string[];
   data: Record<string, any>;

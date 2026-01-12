@@ -331,6 +331,8 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                                 fontStyle={`${data.fontWeight || 'normal'} ${data.fontStyle || 'normal'}`.trim()}
                                 textDecoration={data.textDecoration}
                                 align={data.textAlign}
+                                stroke="transparent"
+                                strokeWidth={0}
                             />
                         )}
 
@@ -349,7 +351,15 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
             {isSelected && (
                 <Transformer
                     ref={trRef}
-                    rotateEnabled
+                    rotateEnabled={true}
+                    anchorSize={8}
+                    anchorFill="#4C83FF"
+                    anchorStroke="#ffffff"
+                    anchorCornerRadius={0}
+                    borderStroke="#4C83FF"
+                    borderStrokeWidth={1}
+                    borderDash={[4, 4]}
+                    padding={0}
                     boundBoxFunc={(oldBox, newBox) => {
                         if (newBox.width < 30) return oldBox;
                         return newBox;

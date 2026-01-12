@@ -13,6 +13,7 @@ import { CanvasStage } from './components/CanvasStage';
 import { CanvasOverlays } from './components/CanvasOverlays';
 import { CanvasProps } from './types';
 import AvatarButton from './AvatarButton';
+import { ChatPanel } from '../chat/ChatPanel';
 
 export const Canvas: React.FC<CanvasProps> = (props) => {
   const {
@@ -20,7 +21,6 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setImages,
     onImageUpdate,
     onImageDelete,
-    onImageDownload,
     onImageDuplicate,
     onImagesDrop,
     onLibraryMediaDrop,
@@ -32,6 +32,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     externalImageModals,
     externalVideoModals,
     externalVideoEditorModals,
+    externalImageEditorModals,
     externalMusicModals,
     externalUpscaleModals,
     externalMultiangleCameraModals,
@@ -58,6 +59,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistVectorizeModalMove,
     onPersistNextSceneModalMove,
     onPersistStoryboardModalMove,
+    setGenerationQueue,
     onPersistScriptFrameModalMove,
     onPersistSceneFrameModalMove,
     onPersistCompareModalMove,
@@ -83,6 +85,12 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRichTextCreate,
     onPersistRichTextMove,
     onPersistRichTextDelete,
+    onBackgroundClick,
+    onBulkDelete,
+    undo = () => { },
+    redo = () => { },
+    canUndo = false,
+    canRedo = false,
   } = props;
 
   // Refs
@@ -105,6 +113,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     externalImageModals,
     externalVideoModals,
     externalVideoEditorModals,
+    externalImageEditorModals,
     externalMusicModals,
     externalUpscaleModals,
     externalMultiangleCameraModals,
@@ -147,6 +156,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     imageModalStates,
     videoModalStates,
     videoEditorModalStates,
+    imageEditorModalStates,
     musicModalStates,
     upscaleModalStates,
     multiangleCameraModalStates,
@@ -199,6 +209,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     imageModalStates,
     videoModalStates,
     videoEditorModalStates,
+    imageEditorModalStates,
     musicModalStates,
     upscaleModalStates,
     multiangleCameraModalStates,
@@ -272,8 +283,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   const effectiveScriptFrameModalStates = groupLogic.getEffectiveStates(scriptFrameModalStates, 'script-frame');
   const effectiveSceneFrameModalStates = groupLogic.getEffectiveStates(sceneFrameModalStates, 'scene-frame');
   const effectiveVideoEditorModalStates = groupLogic.getEffectiveStates(videoEditorModalStates, 'video-editor-modal');
+  const effectiveImageEditorModalStates = groupLogic.getEffectiveStates(imageEditorModalStates, 'image-editor-modal');
   const effectiveCompareModalStates = groupLogic.getEffectiveStates(compareModalStates, 'compare-modal');
   const effectiveCanvasTextStates = groupLogic.getEffectiveStates(canvasState.effectiveCanvasTextStates, 'canvas-text');
+  const effectiveRichTextStates = groupLogic.getEffectiveStates(richTextStates || [], 'rich-text');
 
   const effectiveCanvasState = {
     ...canvasState,
@@ -293,8 +306,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     scriptFrameModalStates: effectiveScriptFrameModalStates,
     sceneFrameModalStates: effectiveSceneFrameModalStates,
     videoEditorModalStates: effectiveVideoEditorModalStates,
+    imageEditorModalStates: effectiveImageEditorModalStates,
     compareModalStates: effectiveCompareModalStates,
     effectiveCanvasTextStates,
+    effectiveRichTextStates,
   };
 
   const handleFitView = useCallback(() => {
@@ -469,10 +484,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   useKeyboardShortcuts({
     onFitView: handleFitView,
     // Undo/Redo
-    canUndo: canvasState.canUndo,
-    canRedo: canvasState.canRedo,
-    undo: canvasState.undo,
-    redo: canvasState.redo,
+    // Undo/Redo
+    canUndo: canUndo,
+    canRedo: canRedo,
+    undo: undo,
+    redo: redo,
 
     // Keys
     setIsSpacePressed: events.setIsShiftPressed, // Note: events returns setIsShiftPressed, need to verify isSpacePressed is exposed
@@ -594,6 +610,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRemoveBgModalDelete: props.onPersistRemoveBgModalDelete,
 
     // Erase Deletion
+    // Erase Deletion
     selectedEraseModalIds: canvasSelection.selectedEraseModalIds,
     selectedEraseModalId: canvasSelection.selectedEraseModalId,
     eraseModalStates: canvasState.eraseModalStates,
@@ -601,6 +618,15 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedEraseModalId: canvasSelection.setSelectedEraseModalId,
     setSelectedEraseModalIds: canvasSelection.setSelectedEraseModalIds,
     onPersistEraseModalDelete: props.onPersistEraseModalDelete,
+
+    // Expand deletion
+    selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
+    selectedExpandModalId: canvasSelection.selectedExpandModalId,
+    expandModalStates: canvasState.expandModalStates,
+    setExpandModalStates: canvasState.setExpandModalStates,
+    setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
+    setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
+    onPersistExpandModalDelete: props.onPersistExpandModalDelete,
 
     // Vectorize Deletion
     selectedVectorizeModalIds: canvasSelection.selectedVectorizeModalIds,
@@ -611,14 +637,14 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedVectorizeModalIds: canvasSelection.setSelectedVectorizeModalIds,
     onPersistVectorizeModalDelete: props.onPersistVectorizeModalDelete,
 
-    // Expand Deletion
-    selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
-    selectedExpandModalId: canvasSelection.selectedExpandModalId,
-    expandModalStates: canvasState.expandModalStates,
-    setExpandModalStates: canvasState.setExpandModalStates,
-    setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
-    setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
-    onPersistExpandModalDelete: props.onPersistExpandModalDelete,
+    // Next Scene Deletion
+    selectedNextSceneModalIds: canvasSelection.selectedNextSceneModalIds,
+    selectedNextSceneModalId: canvasSelection.selectedNextSceneModalId,
+    nextSceneModalStates: canvasState.nextSceneModalStates,
+    setNextSceneModalStates: canvasState.setNextSceneModalStates,
+    setSelectedNextSceneModalId: canvasSelection.setSelectedNextSceneModalId,
+    setSelectedNextSceneModalIds: canvasSelection.setSelectedNextSceneModalIds,
+    onPersistNextSceneModalDelete: props.onPersistNextSceneModalDelete,
 
     // Storyboard Deletion
     selectedStoryboardModalIds: canvasSelection.selectedStoryboardModalIds,
@@ -632,25 +658,20 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     // Script Frame Deletion
     selectedScriptFrameModalIds: canvasSelection.selectedScriptFrameModalIds,
     selectedScriptFrameModalId: canvasSelection.selectedScriptFrameModalId,
-    handleDeleteScriptFrame: (id) => {/* Impl or pass from logic */ },
+    scriptFrameModalStates: canvasState.scriptFrameModalStates,
+    setScriptFrameModalStates: canvasState.setScriptFrameModalStates,
     setSelectedScriptFrameModalId: canvasSelection.setSelectedScriptFrameModalId,
     setSelectedScriptFrameModalIds: canvasSelection.setSelectedScriptFrameModalIds,
+    onPersistScriptFrameModalDelete: props.onPersistScriptFrameModalDelete,
 
     // Scene Frame Deletion
     selectedSceneFrameModalIds: canvasSelection.selectedSceneFrameModalIds,
     selectedSceneFrameModalId: canvasSelection.selectedSceneFrameModalId,
-    handleDeleteSceneFrame: (id) => {/* Impl or pass from logic */ },
+    sceneFrameModalStates: canvasState.sceneFrameModalStates,
+    setSceneFrameModalStates: canvasState.setSceneFrameModalStates,
     setSelectedSceneFrameModalId: canvasSelection.setSelectedSceneFrameModalId,
     setSelectedSceneFrameModalIds: canvasSelection.setSelectedSceneFrameModalIds,
-
-    // Next Scene Deletion
-    selectedNextSceneModalIds: canvasSelection.selectedNextSceneModalIds,
-    selectedNextSceneModalId: canvasSelection.selectedNextSceneModalId,
-    nextSceneModalStates: canvasState.nextSceneModalStates,
-    setNextSceneModalStates: canvasState.setNextSceneModalStates,
-    setSelectedNextSceneModalId: canvasSelection.setSelectedNextSceneModalId,
-    setSelectedNextSceneModalIds: canvasSelection.setSelectedNextSceneModalIds,
-    onPersistNextSceneModalDelete: props.onPersistNextSceneModalDelete,
+    onPersistSceneFrameModalDelete: props.onPersistSceneFrameModalDelete,
 
     // Compare Deletion
     selectedCompareModalIds: canvasSelection.selectedCompareModalIds,
@@ -661,12 +682,17 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedCompareModalIds: canvasSelection.setSelectedCompareModalIds,
     onPersistCompareModalDelete: props.onPersistCompareModalDelete,
 
+    // Bulk Delete
+    onBulkDelete: onBulkDelete,
+
+
     // Group Deletion
     selectedGroupIds: canvasSelection.selectedGroupIds,
     groupContainerStates,
     setGroupContainerStates,
     setSelectedGroupIds: canvasSelection.setSelectedGroupIds,
     onPersistGroupDelete: props.onPersistGroupDelete,
+
 
     images,
     textInputStates: canvasState.textInputStates,
@@ -685,12 +711,33 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
 
   // Handle window resize
+  // Handle container resize
   useEffect(() => {
-    const handleResize = () => {
-      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Ensure we don't set zero or invalid sizes which can happen during initial layout
+        if (width > 0 && height > 0) {
+          setViewportSize({ width, height });
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    // Initial check (fallback)
+    if (containerRef.current) {
+      const { offsetWidth, offsetHeight } = containerRef.current;
+      if (offsetWidth > 0 && offsetHeight > 0) {
+        setViewportSize({ width: offsetWidth, height: offsetHeight });
+      }
+    }
+
+    return () => {
+      resizeObserver.disconnect();
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const layerRef = useRef<Konva.Layer | null>(null);
@@ -754,6 +801,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         scale={scale}
         selectedGroupIds={canvasSelection.selectedGroupIds}
         isDarkTheme={isDarkTheme}
+        handleRichTextUpdate={canvasState.handleRichTextUpdate}
       />
 
       <CanvasOverlays
@@ -771,14 +819,25 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         setIsSettingsOpen={setIsSettingsOpen}
         activeGenerationCount={0}
         onFitView={handleFitView}
+        setGenerationQueue={setGenerationQueue}
       />
 
       {!isUIHidden && (
-        <AvatarButton
-          scale={1}
-          onClick={() => setIsSettingsOpen(true)}
-          isHidden={isUIHidden}
-        />
+        <>
+          <AvatarButton
+            scale={1}
+            onClick={() => setIsSettingsOpen(true)}
+            isHidden={isUIHidden}
+          />
+          <ChatPanel
+            canvasState={effectiveCanvasState as any}
+            canvasSelection={canvasSelection}
+            props={props}
+            viewportSize={viewportSize}
+            position={position}
+            scale={scale}
+          />
+        </>
       )}
     </div>
   );

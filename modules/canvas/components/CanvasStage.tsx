@@ -11,7 +11,8 @@ import { usePatternImage } from '../hooks/usePatternImage';
 import { CanvasImage } from '../CanvasImage';
 import { CanvasVideoNode } from '../CanvasVideoNode';
 import { CanvasTextNode } from '../CanvasTextNode';
-import { RichText } from '../RichText';
+import { RichTextNode } from '../RichText/RichTextNode';
+
 import { TextElements } from '../TextElements';
 import { SelectionBox } from '../SelectionBox';
 import { GroupContainerOverlay } from '../GroupContainerOverlay';
@@ -32,6 +33,7 @@ interface CanvasStageProps {
     scale: number;
     selectedGroupIds?: string[];
     isDarkTheme?: boolean;
+    handleRichTextUpdate?: (id: string, updates: any) => void;
 }
 
 export const CanvasStage: React.FC<CanvasStageProps> = ({
@@ -45,7 +47,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     position,
     scale,
     selectedGroupIds = [],
-    isDarkTheme = true
+    isDarkTheme = true,
+    handleRichTextUpdate,
 }) => {
     const {
         images,
@@ -54,7 +57,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         effectiveSelectedCanvasTextId,
         handleCanvasTextUpdate,
         effectiveRichTextStates,
-        handleRichTextUpdate,
+        // handleRichTextUpdate, // Removed duplicate
         videoModalStates,
         groupContainerStates, setGroupContainerStates,
         setIsTextInteracting,
@@ -84,8 +87,9 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         clearAllSelections,
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
+        selectionTransformerRect, setSelectionTransformerRect,
         isDragSelection, setIsDragSelection,
-        // selectedGroupIds,
+        setSelectedGroupIds,
         // Pass selection states
         selectedTextInputIds, setSelectedTextInputIds,
         selectedImageModalIds, setSelectedImageModalIds,
@@ -105,6 +109,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         effectiveSelectedCanvasTextIds,
         selectedRichTextId, setSelectedRichTextId,
+        selectedRichTextIds, setSelectedRichTextIds,
     } = canvasSelection;
 
     const {
@@ -226,20 +231,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     })()}
                 </>
 
-                {selectionTightRect && (
-                    <Rect
-                        x={selectionTightRect.x}
-                        y={selectionTightRect.y}
-                        width={selectionTightRect.width}
-                        height={selectionTightRect.height}
-                        fill="rgba(100,149,237,0.15)"
-                        stroke="#6495ED"
-                        strokeWidth={4}
-                        dash={[6, 6]}
-                        listening={false}
-                        cornerRadius={0}
-                    />
-                )}
 
                 {videoModalStates.map((videoState: any, index: number) => (
                     <CanvasVideoNode
@@ -256,18 +247,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     />
                 ))}
 
-                {effectiveRichTextStates.map((richText: any) => (
-                    <RichText
-                        key={richText.id}
-                        data={richText}
-                        isSelected={selectedRichTextId === richText.id}
-                        onSelect={setSelectedRichTextId}
-                        onChange={handleRichTextUpdate}
-                        onInteractionStart={() => setIsTextInteracting(true)}
-                        onInteractionEnd={() => setIsTextInteracting(false)}
-                        isDarkTheme={isDarkTheme}
-                    />
-                ))}
+
 
                 {images
                     .filter((img) => img.type !== 'model3d' && img.type !== 'text')
@@ -282,12 +262,21 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                             isDraggable={true} // helper
                             isSelected={selectedImageIndices.includes(index)}
                             onSelect={(e) => {
-                                // Logic for selection with ctrl/shift?
-                                // Maybe extract this logic to event hook or helper?
-                                // "handleImageSelect"?
-                                // For now, assume passed function handles it.
-                                // Canvas.tsx had inline logic 7841+
-                                // We should probably extract handleImageSelect(index, event) to event hook.
+                                const isMulti = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                                if (isMulti) {
+                                    if (selectedImageIndices.includes(index)) {
+                                        setSelectedImageIndices(prev => prev.filter(i => i !== index));
+                                        if (selectedImageIndex === index) setSelectedImageIndex(null);
+                                    } else {
+                                        setSelectedImageIndices(prev => [...prev, index]);
+                                        setSelectedImageIndex(index);
+                                    }
+                                } else {
+                                    // Exclusive select
+                                    clearAllSelections(false); // don't clear boxes yet if needed, but here we want to clear other selections
+                                    setSelectedImageIndices([index]);
+                                    setSelectedImageIndex(index);
+                                }
                             }}
                             onUpdate={(updates) => {
                                 groupLogic.handleImageUpdateWithGroup(index, updates)
@@ -299,6 +288,43 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                             }}
                         />
                     ))}
+
+                {effectiveRichTextStates?.map((textState: any) => {
+                    const isMultiSelect = (selectedRichTextIds?.length || 0) +
+                        (selectedImageIndices?.length || 0) +
+                        (selectedTextInputIds?.length || 0) +
+                        (selectedImageModalIds?.length || 0) +
+                        (selectedVideoModalIds?.length || 0) +
+                        (selectedGroupIds?.length || 0) > 1;
+                    return (
+                        <RichTextNode
+                            key={textState.id}
+                            {...textState}
+                            scale={scale}
+                            suppressTransformer={isMultiSelect}
+                            isSelected={selectedRichTextId === textState.id || (selectedRichTextIds && selectedRichTextIds.includes(textState.id))}
+                            onSelect={(e: any) => {
+                                const isMulti = e?.evt?.ctrlKey || e?.evt?.metaKey || e?.evt?.shiftKey;
+                                if (isMulti) {
+                                    if (selectedRichTextIds.includes(textState.id)) {
+                                        setSelectedRichTextIds(prev => prev.filter(id => id !== textState.id));
+                                        if (selectedRichTextId === textState.id) setSelectedRichTextId(null);
+                                    } else {
+                                        setSelectedRichTextIds(prev => [...prev, textState.id]);
+                                        setSelectedRichTextId(textState.id);
+                                    }
+                                } else {
+                                    clearAllSelections(false);
+                                    setSelectedRichTextId(textState.id);
+                                    setSelectedRichTextIds([textState.id]);
+                                }
+                            }}
+                            onChange={(newAttrs: any) => {
+                                handleRichTextUpdate?.(textState.id, newAttrs);
+                            }}
+                        />
+                    );
+                })}
 
 
 
@@ -315,7 +341,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 />
 
                 <SelectionBox
-                    isGroupSelected={selectedGroupIds.length > 0}
+                    isGroupSelected={selectedGroupIds.length === 1}
+                    onUngroup={() => {
+                        if (selectedGroupIds.length === 1) {
+                            groupLogic.handleUngroup(selectedGroupIds);
+                        }
+                    }}
+                    scale={scale}
                     isSelecting={isSelecting}
                     {...canvasSelection}
                     {...canvasState}
@@ -323,6 +355,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     handleImageUpdateWithGroup={groupLogic.handleImageUpdateWithGroup}
                     selectionDragOriginRef={React.useRef<{ x: number, y: number } | null>(null)}
                     onCreateGroup={groupLogic.handleCreateGroup}
+                    setCanvasTextStates={canvasState.effectiveSetCanvasTextStates}
+                    layerRef={layerRef}
                 />
 
                 <GroupContainerOverlay
@@ -333,8 +367,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     onUngroup={(id) => groupLogic.handleUngroup([id])}
                     onGroupMove={groupLogic.handleGroupMove}
                     onGroupDrag={groupLogic.handleGroupDrag}
-                    onGroupNameChange={(id, name) => {
-                        setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, meta: { ...g.meta, name } } : g));
+                    onGroupUpdate={groupLogic.handleGroupUpdate}
+                    onGroupSelect={(id) => {
+                        clearAllSelections(false);
+                        setSelectedGroupIds([id]);
                     }}
                     getItemBounds={() => null}
                     images={images}

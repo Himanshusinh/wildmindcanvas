@@ -40,21 +40,48 @@ export function extractZataPath(url: string): string | null {
 }
 
 /**
+ * Strips any existing /api/proxy/ wrappers from a URL to get the actual target URL or path.
+ */
+export function unwrapProxyUrl(url: string): string {
+  if (!url || typeof url !== 'string') return url;
+
+  // Pattern to match /api/proxy/[type]/[encodedPath]
+  const proxyMatch = url.match(/\/api\/proxy\/(?:resource|thumb|media)\/([^?#]+)/);
+  if (proxyMatch && proxyMatch[1]) {
+    try {
+      return decodeURIComponent(proxyMatch[1]);
+    } catch (e) {
+      console.warn('[proxyUtils] Failed to decode proxied URL:', proxyMatch[1]);
+      return proxyMatch[1];
+    }
+  }
+  return url;
+}
+
+/**
  * Build proxy download URL
  * @param resourceUrl - Original resource URL (Zata URL or external URL)
  * @returns Proxy download URL
  */
 export function buildProxyDownloadUrl(resourceUrl: string): string {
-  // Check if it's a Zata URL
-  if (resourceUrl.includes('zata.ai') || resourceUrl.includes('zata')) {
-    const zataPath = extractZataPath(resourceUrl);
+  if (!resourceUrl) return '';
+  const actualUrl = unwrapProxyUrl(resourceUrl);
+
+  // Check if it's a Zata URL (or already a path from unwrap)
+  if (actualUrl.includes('zata.ai') || actualUrl.includes('zata')) {
+    const zataPath = extractZataPath(actualUrl);
     if (zataPath) {
       return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(zataPath)}`;
     }
   }
 
+  // If it's a relative path (e.g. from a previous unwrap), re-proxy it
+  if (!actualUrl.startsWith('http') && actualUrl.includes('/')) {
+    return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(actualUrl)}`;
+  }
+
   // For external URLs, use the full URL as the path
-  return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(resourceUrl)}`;
+  return `${API_BASE_URL}/api/proxy/download/${encodeURIComponent(actualUrl)}`;
 }
 
 /**
@@ -63,16 +90,23 @@ export function buildProxyDownloadUrl(resourceUrl: string): string {
  * @returns Proxy resource URL
  */
 export function buildProxyResourceUrl(resourceUrl: string): string {
+  if (!resourceUrl) return '';
+  const actualUrl = unwrapProxyUrl(resourceUrl);
+
   // Check if it's a Zata URL
-  if (resourceUrl.includes('zata.ai') || resourceUrl.includes('zata')) {
-    const zataPath = extractZataPath(resourceUrl);
+  if (actualUrl.includes('zata.ai') || actualUrl.includes('zata')) {
+    const zataPath = extractZataPath(actualUrl);
     if (zataPath) {
       return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(zataPath)}`;
     }
   }
 
+  if (!actualUrl.startsWith('http') && actualUrl.includes('/')) {
+    return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(actualUrl)}`;
+  }
+
   // For external URLs, use the full URL as the path
-  return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(resourceUrl)}`;
+  return `${API_BASE_URL}/api/proxy/resource/${encodeURIComponent(actualUrl)}`;
 }
 
 /**
@@ -81,16 +115,23 @@ export function buildProxyResourceUrl(resourceUrl: string): string {
  * @returns Proxy media URL
  */
 export function buildProxyMediaUrl(resourceUrl: string): string {
+  if (!resourceUrl) return '';
+  const actualUrl = unwrapProxyUrl(resourceUrl);
+
   // Check if it's a Zata URL
-  if (resourceUrl.includes('zata.ai') || resourceUrl.includes('zata')) {
-    const zataPath = extractZataPath(resourceUrl);
+  if (actualUrl.includes('zata.ai') || actualUrl.includes('zata')) {
+    const zataPath = extractZataPath(actualUrl);
     if (zataPath) {
       return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(zataPath)}`;
     }
   }
 
+  if (!actualUrl.startsWith('http') && actualUrl.includes('/')) {
+    return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(actualUrl)}`;
+  }
+
   // For external URLs, use the full URL as the path
-  return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(resourceUrl)}`;
+  return `${API_BASE_URL}/api/proxy/media/${encodeURIComponent(actualUrl)}`;
 }
 
 /**

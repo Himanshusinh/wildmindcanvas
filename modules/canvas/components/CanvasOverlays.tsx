@@ -28,6 +28,7 @@ interface CanvasOverlaysProps {
     setIsSettingsOpen: (isOpen: boolean) => void;
     activeGenerationCount: number;
     onFitView: () => void;
+    setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -44,7 +45,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     isSettingsOpen,
     setIsSettingsOpen,
     activeGenerationCount,
-    onFitView
+    onFitView,
+    setGenerationQueue
 }) => {
     const {
         images,
@@ -52,6 +54,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         imageModalStates, setImageModalStates,
         videoModalStates, setVideoModalStates,
         videoEditorModalStates, setVideoEditorModalStates,
+        imageEditorModalStates, setImageEditorModalStates,
         musicModalStates, setMusicModalStates,
         upscaleModalStates, setUpscaleModalStates,
         multiangleCameraModalStates, setMultiangleCameraModalStates,
@@ -73,6 +76,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedImageModalIds, setSelectedImageModalIds, setSelectedImageModalId, selectedImageModalId,
         selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds, setSelectedVideoEditorModalId, selectedVideoEditorModalId,
+        selectedImageEditorModalIds, setSelectedImageEditorModalIds, setSelectedImageEditorModalId, selectedImageEditorModalId,
         selectedMusicModalIds, setSelectedMusicModalIds, setSelectedMusicModalId, selectedMusicModalId,
         selectedUpscaleModalIds, setSelectedUpscaleModalIds, setSelectedUpscaleModalId, selectedUpscaleModalId,
         selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalId, selectedMultiangleCameraModalId,
@@ -92,6 +96,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         onPersistImageModalCreate, onPersistImageModalMove, onPersistImageModalDelete,
         onPersistVideoModalCreate, onPersistVideoModalMove, onPersistVideoModalDelete,
         onPersistVideoEditorModalMove,
+        onPersistImageEditorModalMove,
         onPersistMusicModalCreate, onPersistMusicModalMove, onPersistMusicModalDelete,
         onPersistCompareModalCreate, onPersistCompareModalMove, onPersistCompareModalDelete,
         onPersistMultiangleCameraModalCreate, onPersistMultiangleCameraModalMove, onPersistMultiangleCameraModalDelete,
@@ -134,6 +139,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 imageModalStates={imageModalStates}
                 videoModalStates={videoModalStates}
                 videoEditorModalStates={videoEditorModalStates}
+                imageEditorModalStates={imageEditorModalStates}
                 musicModalStates={musicModalStates}
                 upscaleModalStates={upscaleModalStates}
                 isComponentDraggable={isComponentDraggable}
@@ -183,6 +189,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 selectedVideoModalIds={selectedVideoModalIds}
                 selectedVideoEditorModalId={selectedVideoEditorModalId}
                 selectedVideoEditorModalIds={selectedVideoEditorModalIds}
+                selectedImageEditorModalId={selectedImageEditorModalId}
+                selectedImageEditorModalIds={selectedImageEditorModalIds}
                 selectedMusicModalId={selectedMusicModalId}
                 selectedMusicModalIds={selectedMusicModalIds}
                 selectedUpscaleModalId={selectedUpscaleModalId}
@@ -214,6 +222,9 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 setVideoEditorModalStates={setVideoEditorModalStates}
                 setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
                 setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
+                setImageEditorModalStates={setImageEditorModalStates}
+                setSelectedImageEditorModalId={setSelectedImageEditorModalId}
+                setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
                 setMusicModalStates={setMusicModalStates}
                 setSelectedMusicModalId={setSelectedMusicModalId}
                 setSelectedMusicModalIds={setSelectedMusicModalIds}
@@ -252,6 +263,11 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistVideoEditorModalCreate={props.onPersistVideoEditorModalCreate}
                 onPersistVideoEditorModalMove={props.onPersistVideoEditorModalMove}
                 onPersistVideoEditorModalDelete={props.onPersistVideoEditorModalDelete}
+                onPersistImageEditorModalCreate={props.onPersistImageEditorModalCreate}
+                onPersistImageEditorModalMove={props.onPersistImageEditorModalMove}
+                onPersistImageEditorModalDelete={props.onPersistImageEditorModalDelete}
+                onOpenVideoEditor={props.onOpenVideoEditor}
+                onOpenImageEditor={props.onOpenImageEditor}
                 onPersistMusicModalCreate={props.onPersistMusicModalCreate}
                 onPersistMusicModalMove={props.onPersistMusicModalMove}
                 onPersistMusicModalDelete={props.onPersistMusicModalDelete}
@@ -279,6 +295,14 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistTextModalCreate={props.onPersistTextModalCreate}
                 onPersistTextModalMove={props.onPersistTextModalMove}
                 onPersistTextModalDelete={props.onPersistTextModalDelete}
+                richTextStates={props.richTextStates}
+                selectedRichTextId={props.selectedRichTextId}
+                selectedRichTextIds={props.selectedRichTextIds}
+                setSelectedRichTextId={props.setSelectedRichTextId}
+                setSelectedRichTextIds={props.setSelectedRichTextIds}
+                onPersistRichTextCreate={props.onPersistRichTextCreate}
+                onPersistRichTextMove={props.onPersistRichTextMove}
+                onPersistRichTextDelete={props.onPersistRichTextDelete}
                 onPersistScriptFrameModalCreate={props.onPersistScriptFrameModalCreate}
                 onPersistScriptFrameModalMove={props.onPersistScriptFrameModalMove}
                 onPersistScriptFrameModalDelete={props.onPersistScriptFrameModalDelete}
@@ -303,6 +327,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
 
                 projectId={props.projectId}
                 isUIHidden={props.isUIHidden}
+                setGenerationQueue={setGenerationQueue}
             />
 
             {isSettingsOpen && (

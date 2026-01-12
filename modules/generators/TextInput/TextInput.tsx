@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
-import { TextModalTooltip } from './TextModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
+import { TextModalTooltip } from './TextModalTooltip';
 import { TextModalFrame } from './TextModalFrame';
 import { TextModalNodes } from './TextModalNodes';
 import { TextModalControls } from './TextModalControls';
@@ -17,6 +17,7 @@ interface TextInputProps {
   onConfirm: (text: string, model?: string) => void;
   onCancel: () => void;
   onPositionChange?: (x: number, y: number) => void;
+  onPositionCommit?: (x: number, y: number) => void;
   onSelect?: () => void;
   onDelete?: () => void;
   onDuplicate?: () => void;
@@ -44,6 +45,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   onConfirm,
   onCancel,
   onPositionChange,
+  onPositionCommit,
   onSelect,
   onDelete,
   onDuplicate,
@@ -142,7 +144,8 @@ export const TextInput: React.FC<TextInputProps> = ({
 
     // Call onSelect when clicking on the text input container
     // Don't select if clicking on buttons, controls, inputs, or action icons
-    if (onSelect && !isInput && !isButton && !isControls && !isActionIcons) {
+    // Call onSelect when clicking anywhere on the component to select it (and deselect others)
+    if (onSelect) {
       console.log('[TextInput] Calling onSelect');
       onSelect();
     }
@@ -162,6 +165,13 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const lastPositionRef = useRef({ x, y });
+
+  // Update ref when props change (in case unmounting/remounting affects it, though usually drag drives it)
+  useEffect(() => {
+    lastPositionRef.current = { x, y };
+  }, [x, y]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDragging) return;
@@ -178,10 +188,14 @@ export const TextInput: React.FC<TextInputProps> = ({
       const newCanvasY = (newScreenY - position.y) / scale;
 
       onPositionChange(newCanvasX, newCanvasY);
+      lastPositionRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      if (onPositionCommit) {
+        onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -192,7 +206,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDragging, dragOffset, scale, position, onPositionChange]);
+  }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit]);
 
   const handleConfirm = () => {
     if (text.trim()) {
@@ -378,16 +392,14 @@ export const TextInput: React.FC<TextInputProps> = ({
         zIndex: isHovered || isSelected ? 2001 : 2000,
         display: 'flex',
         flexDirection: 'column',
-        gap: `${1 * scale}px`,
-        padding: `${20 * scale}px ${12 * scale}px`,
-        paddingTop: `${24 * scale}px`,
-        paddingBottom: `${24 * scale}px`,
+        gap: `${0 * scale}px`, // Removed gap as header is merging
+        padding: 0, // Remove padding, let internal components handle spacing
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: `${12 * scale}px`,
+        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`, // Increased radius slightly
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'border 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
@@ -407,6 +419,18 @@ export const TextInput: React.FC<TextInputProps> = ({
 
 
       <div style={{ position: 'relative' }}>
+        <ModalActionIcons
+          scale={scale}
+          isSelected={Boolean(isSelected)}
+          isPinned={isPinned}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+          // Text Input doesn't usually produce downloadable content in the same way, but props exist.
+          // If onDownload is passed, use it.
+          onDownload={onDownload}
+          onTogglePin={onTogglePin}
+          onRegenerate={handleEnhance}
+        />
         <TextModalFrame
           id={id}
           scale={scale}

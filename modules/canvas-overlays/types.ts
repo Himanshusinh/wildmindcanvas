@@ -25,6 +25,7 @@ export interface ImageModalState {
   aspectRatio?: string;
   prompt?: string;
   imageCount?: number;
+  resolution?: string;
   isGenerating?: boolean;
   isPinned?: boolean;
 }
@@ -51,6 +52,15 @@ export interface VideoModalState {
 }
 
 export interface VideoEditorModalState {
+  id: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  color?: string;
+}
+
+export interface ImageEditorModalState {
   id: string;
   x: number;
   y: number;
@@ -317,6 +327,7 @@ export interface ModalOverlaysProps {
   imageModalStates: ImageModalState[];
   videoModalStates: VideoModalState[];
   videoEditorModalStates?: VideoEditorModalState[];
+  imageEditorModalStates?: ImageEditorModalState[];
   musicModalStates: MusicModalState[];
   upscaleModalStates?: UpscaleModalState[];
   removeBgModalStates?: RemoveBgModalState[];
@@ -359,6 +370,8 @@ export interface ModalOverlaysProps {
   selectedVideoModalIds: string[];
   selectedVideoEditorModalId?: string | null;
   selectedVideoEditorModalIds?: string[];
+  selectedImageEditorModalId?: string | null;
+  selectedImageEditorModalIds?: string[];
   selectedMusicModalId: string | null;
   selectedMusicModalIds: string[];
   selectedUpscaleModalId?: string | null;
@@ -389,6 +402,9 @@ export interface ModalOverlaysProps {
   setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
   setSelectedVideoEditorModalId?: (id: string | null) => void;
   setSelectedVideoEditorModalIds?: (ids: string[]) => void;
+  setImageEditorModalStates?: React.Dispatch<React.SetStateAction<ImageEditorModalState[]>>;
+  setSelectedImageEditorModalId?: (id: string | null) => void;
+  setSelectedImageEditorModalIds?: (ids: string[]) => void;
   setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
   setSelectedMusicModalId: (id: string | null) => void;
   setSelectedMusicModalIds: (ids: string[]) => void;
@@ -453,6 +469,10 @@ export interface ModalOverlaysProps {
   onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
   onOpenVideoEditor?: () => void;
+  onPersistImageEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
+  onPersistImageEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistImageEditorModalDelete?: (id: string) => void | Promise<void>;
+  onOpenImageEditor?: () => void;
   onPersistMusicModalCreate?: (modal: MusicModalState) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<MusicModalState>) => void | Promise<void>;
   onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
@@ -523,6 +543,17 @@ export interface ModalOverlaysProps {
   onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
   onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
   onPersistCanvasTextDelete?: (id: string) => void | Promise<void>;
+
+  // Rich Text
+  richTextStates?: CanvasTextState[];
+  setRichTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
+  selectedRichTextId?: string | null;
+  selectedRichTextIds?: string[];
+  setSelectedRichTextId?: (id: string | null) => void;
+  setSelectedRichTextIds?: (ids: string[]) => void;
+  onPersistRichTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
+  onPersistRichTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
+  onPersistRichTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;

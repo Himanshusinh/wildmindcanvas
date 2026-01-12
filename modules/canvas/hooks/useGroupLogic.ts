@@ -1,5 +1,5 @@
 
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from './useCanvasState';
 import { useCanvasSelection } from './useCanvasSelection';
@@ -50,6 +50,14 @@ export function useGroupLogic(
         effectiveCanvasTextStates,
     } = canvasState;
 
+    const { richTextStates, selectedRichTextIds } = props; // Access from props
+
+    // Use a Ref to hold the latest selection state to avoid stale closures in move wrappers
+    const selectionRef = useRef(canvasSelection);
+    useEffect(() => {
+        selectionRef.current = canvasSelection;
+    }, [canvasSelection]);
+
     const {
         selectedImageIndices,
         selectedImageModalIds,
@@ -95,7 +103,8 @@ export function useGroupLogic(
         onPersistScriptFrameModalMove,
         onPersistSceneFrameModalMove,
         onPersistVideoEditorModalMove,
-        onPersistCompareModalMove
+        onPersistCompareModalMove,
+        onPersistRichTextMove // Added
     } = props;
 
     // We need current canvas data for bounds calculation
@@ -125,6 +134,7 @@ export function useGroupLogic(
             ...selectedCompareModalIds,
             ...selectedNextSceneModalIds,
             ...(selectedCanvasTextIds || []),
+            ...(selectedRichTextIds || []), // Added
         ] as string[];
 
         console.log('[Canvas] Creating group with', allSelectedIds.length, 'items:', allSelectedIds);
@@ -291,6 +301,9 @@ export function useGroupLogic(
                             if (idx !== -1) {
                                 onImageUpdate(idx, { x: absX, y: absY });
                             }
+                        } else if (onPersistImageModalMove) {
+                            // Fallback if onImageUpdate is not available, though images are usually regular ImageUpload
+                            onPersistImageModalMove(child.id, { x: absX, y: absY });
                         }
                         break;
                     case 'image-modal':
@@ -366,7 +379,7 @@ export function useGroupLogic(
             });
 
             if (onPersistGroupDelete) {
-                onPersistGroupDelete(group);
+                onPersistGroupDelete(group.id);
             }
         });
 
@@ -391,8 +404,11 @@ export function useGroupLogic(
 
     // Movement Logic
     const moveSelectedItems = (dx: number, dy: number, excludeType?: string, excludeId?: string | number) => {
+        // Retrieve LATEST selection from Ref to avoid stale closures
+        const selection = selectionRef.current;
+
         // 1. Move Images
-        selectedImageIndices.forEach(idx => {
+        selection.selectedImageIndices.forEach(idx => {
             if (excludeType === 'image' && excludeId === idx) return;
             const img = images?.[idx];
             if (img && props.onImageUpdate) {
@@ -404,16 +420,13 @@ export function useGroupLogic(
         });
 
         // 2. Move Canvas Text
-        if (selectedCanvasTextIds && selectedCanvasTextIds.length > 0) {
-            selectedCanvasTextIds.forEach(id => {
+        if (selection.effectiveSelectedCanvasTextIds && selection.effectiveSelectedCanvasTextIds.length > 0) {
+            selection.effectiveSelectedCanvasTextIds.forEach(id => {
                 if (excludeType === 'canvas-text' && excludeId === id) return;
                 const m = effectiveCanvasTextStates.find(m => m.id === id);
                 if (m && (props as any).onPersistCanvasTextMove) (props as any).onPersistCanvasTextMove(id, { x: m.x + dx, y: m.y + dy });
             });
         }
-        // Simplified Logic: The implementation in Canvas.tsx used specific props.
-        // We should just expose 'moveSelectedItems' and let it use props provided.
-        // But implementing full moveSelectedItems here is huge.
 
         // Let's implement helper for modals
         const moveModalGroup = (
@@ -431,34 +444,37 @@ export function useGroupLogic(
             });
         };
 
-        moveModalGroup(selectedImageModalIds, imageModalStates, props.onPersistImageModalMove, 'image-modal');
-        moveModalGroup(selectedVideoModalIds, videoModalStates, props.onPersistVideoModalMove, 'video-modal');
-        moveModalGroup(selectedMusicModalIds, musicModalStates, props.onPersistMusicModalMove, 'music-modal');
-        moveModalGroup(selectedTextInputIds, textInputStates, props.onPersistTextModalMove, 'text-input');
-        moveModalGroup(selectedUpscaleModalIds, upscaleModalStates, props.onPersistUpscaleModalMove, 'upscale');
-        moveModalGroup(selectedMultiangleCameraModalIds, multiangleCameraModalStates, props.onPersistMultiangleCameraModalMove, 'multiangle-camera');
-        moveModalGroup(selectedRemoveBgModalIds, removeBgModalStates, props.onPersistRemoveBgModalMove, 'removebg');
-        moveModalGroup(selectedEraseModalIds, eraseModalStates, props.onPersistEraseModalMove, 'erase');
-        moveModalGroup(selectedExpandModalIds, expandModalStates, props.onPersistExpandModalMove, 'expand');
-        moveModalGroup(selectedVectorizeModalIds, vectorizeModalStates, props.onPersistVectorizeModalMove, 'vectorize');
-        moveModalGroup(selectedStoryboardModalIds, storyboardModalStates, props.onPersistStoryboardModalMove, 'storyboard');
-        moveModalGroup(selectedScriptFrameModalIds, scriptFrameModalStates, props.onPersistScriptFrameModalMove, 'script-frame');
-        moveModalGroup(selectedSceneFrameModalIds, sceneFrameModalStates, props.onPersistSceneFrameModalMove, 'scene-frame');
-        moveModalGroup(selectedCompareModalIds, compareModalStates, props.onPersistCompareModalMove, 'compare');
-        moveModalGroup(selectedNextSceneModalIds, nextSceneModalStates, props.onPersistNextSceneModalMove, 'next-scene');
-        moveModalGroup(selectedVideoEditorModalIds, videoEditorModalStates, props.onPersistVideoEditorModalMove, 'video-editor');
+        moveModalGroup(selection.selectedImageModalIds, imageModalStates, props.onPersistImageModalMove, 'image-modal');
+        moveModalGroup(selection.selectedVideoModalIds, videoModalStates, props.onPersistVideoModalMove, 'video-modal');
+        moveModalGroup(selection.selectedMusicModalIds, musicModalStates, props.onPersistMusicModalMove, 'music-modal');
+        moveModalGroup(selection.selectedTextInputIds, textInputStates, props.onPersistTextModalMove, 'text-input');
+        moveModalGroup(selection.selectedUpscaleModalIds, upscaleModalStates, props.onPersistUpscaleModalMove, 'upscale');
+        moveModalGroup(selection.selectedMultiangleCameraModalIds, multiangleCameraModalStates, props.onPersistMultiangleCameraModalMove, 'multiangle-camera');
+        moveModalGroup(selection.selectedRemoveBgModalIds, removeBgModalStates, props.onPersistRemoveBgModalMove, 'removebg');
+        moveModalGroup(selection.selectedEraseModalIds, eraseModalStates, props.onPersistEraseModalMove, 'erase');
+        moveModalGroup(selection.selectedExpandModalIds, expandModalStates, props.onPersistExpandModalMove, 'expand');
+        moveModalGroup(selection.selectedVectorizeModalIds, vectorizeModalStates, props.onPersistVectorizeModalMove, 'vectorize');
+        moveModalGroup(selection.selectedStoryboardModalIds, storyboardModalStates, props.onPersistStoryboardModalMove, 'storyboard');
+        moveModalGroup(selection.selectedScriptFrameModalIds, scriptFrameModalStates, props.onPersistScriptFrameModalMove, 'script-frame');
+        moveModalGroup(selection.selectedSceneFrameModalIds, sceneFrameModalStates, props.onPersistSceneFrameModalMove, 'scene-frame');
+        moveModalGroup(selection.selectedCompareModalIds, compareModalStates, props.onPersistCompareModalMove, 'compare');
+        moveModalGroup(selection.selectedNextSceneModalIds, nextSceneModalStates, props.onPersistNextSceneModalMove, 'next-scene');
+        moveModalGroup(selection.selectedVideoEditorModalIds, videoEditorModalStates, props.onPersistVideoEditorModalMove, 'video-editor');
     };
 
     const createMoveWrapper = (
         type: string,
-        selectionIds: string[],
+        selectionField: keyof ReturnType<typeof useCanvasSelection>,
         states: any[],
         originalHandler?: (id: string, updates: any) => void | Promise<void>
     ) => {
         return (id: string, updates: any) => {
             if (originalHandler) originalHandler(id, updates);
 
-            if ((updates.x !== undefined || updates.y !== undefined) && selectionIds.includes(id)) {
+            // Access latest selection state via Ref
+            const currentSelection: any = selectionRef.current[selectionField] || [];
+
+            if ((updates.x !== undefined || updates.y !== undefined) && Array.isArray(currentSelection) && currentSelection.includes(id)) {
                 const current = states.find(s => s.id === id);
                 if (current) {
                     const newX = updates.x !== undefined ? updates.x : current.x;
@@ -475,22 +491,22 @@ export function useGroupLogic(
     };
 
     // Wrappers
-    const handleImageModalMove = createMoveWrapper('image-modal', selectedImageModalIds, imageModalStates, props.onPersistImageModalMove);
-    const handleVideoModalMove = createMoveWrapper('video-modal', selectedVideoModalIds, videoModalStates, props.onPersistVideoModalMove);
-    const handleMusicModalMove = createMoveWrapper('music-modal', selectedMusicModalIds, musicModalStates, props.onPersistMusicModalMove);
-    const handleTextModalMove = createMoveWrapper('text-input', selectedTextInputIds, textInputStates, props.onPersistTextModalMove);
-    const handleUpscaleModalMove = createMoveWrapper('upscale', selectedUpscaleModalIds, upscaleModalStates, props.onPersistUpscaleModalMove);
-    const handleMultiangleCameraModalMove = createMoveWrapper('multiangle-camera', selectedMultiangleCameraModalIds, multiangleCameraModalStates, props.onPersistMultiangleCameraModalMove);
-    const handleRemoveBgModalMove = createMoveWrapper('removebg', selectedRemoveBgModalIds, removeBgModalStates, props.onPersistRemoveBgModalMove);
-    const handleEraseModalMove = createMoveWrapper('erase', selectedEraseModalIds, eraseModalStates, props.onPersistEraseModalMove);
-    const handleExpandModalMove = createMoveWrapper('expand', selectedExpandModalIds, expandModalStates, props.onPersistExpandModalMove);
-    const handleVectorizeModalMove = createMoveWrapper('vectorize', selectedVectorizeModalIds, vectorizeModalStates, props.onPersistVectorizeModalMove);
-    const handleStoryboardModalMove = createMoveWrapper('storyboard', selectedStoryboardModalIds, storyboardModalStates, props.onPersistStoryboardModalMove);
-    const handleScriptFrameModalMove = createMoveWrapper('script-frame', selectedScriptFrameModalIds, scriptFrameModalStates, props.onPersistScriptFrameModalMove);
-    const handleSceneFrameModalMove = createMoveWrapper('scene-frame', selectedSceneFrameModalIds, sceneFrameModalStates, props.onPersistSceneFrameModalMove);
-    const handleCompareModalMove = createMoveWrapper('compare', selectedCompareModalIds, compareModalStates, props.onPersistCompareModalMove);
-    const handleNextSceneModalMove = createMoveWrapper('next-scene', selectedNextSceneModalIds, nextSceneModalStates, props.onPersistNextSceneModalMove);
-    const handleVideoEditorModalMove = createMoveWrapper('video-editor', selectedVideoEditorModalIds, videoEditorModalStates, props.onPersistVideoEditorModalMove);
+    const handleImageModalMove = createMoveWrapper('image-modal', 'selectedImageModalIds', imageModalStates, props.onPersistImageModalMove);
+    const handleVideoModalMove = createMoveWrapper('video-modal', 'selectedVideoModalIds', videoModalStates, props.onPersistVideoModalMove);
+    const handleMusicModalMove = createMoveWrapper('music-modal', 'selectedMusicModalIds', musicModalStates, props.onPersistMusicModalMove);
+    const handleTextModalMove = createMoveWrapper('text-input', 'selectedTextInputIds', textInputStates, props.onPersistTextModalMove);
+    const handleUpscaleModalMove = createMoveWrapper('upscale', 'selectedUpscaleModalIds', upscaleModalStates, props.onPersistUpscaleModalMove);
+    const handleMultiangleCameraModalMove = createMoveWrapper('multiangle-camera', 'selectedMultiangleCameraModalIds', multiangleCameraModalStates, props.onPersistMultiangleCameraModalMove);
+    const handleRemoveBgModalMove = createMoveWrapper('removebg', 'selectedRemoveBgModalIds', removeBgModalStates, props.onPersistRemoveBgModalMove);
+    const handleEraseModalMove = createMoveWrapper('erase', 'selectedEraseModalIds', eraseModalStates, props.onPersistEraseModalMove);
+    const handleExpandModalMove = createMoveWrapper('expand', 'selectedExpandModalIds', expandModalStates, props.onPersistExpandModalMove);
+    const handleVectorizeModalMove = createMoveWrapper('vectorize', 'selectedVectorizeModalIds', vectorizeModalStates, props.onPersistVectorizeModalMove);
+    const handleStoryboardModalMove = createMoveWrapper('storyboard', 'selectedStoryboardModalIds', storyboardModalStates, props.onPersistStoryboardModalMove);
+    const handleScriptFrameModalMove = createMoveWrapper('script-frame', 'selectedScriptFrameModalIds', scriptFrameModalStates, props.onPersistScriptFrameModalMove);
+    const handleSceneFrameModalMove = createMoveWrapper('scene-frame', 'selectedSceneFrameModalIds', sceneFrameModalStates, props.onPersistSceneFrameModalMove);
+    const handleCompareModalMove = createMoveWrapper('compare', 'selectedCompareModalIds', compareModalStates, props.onPersistCompareModalMove);
+    const handleNextSceneModalMove = createMoveWrapper('next-scene', 'selectedNextSceneModalIds', nextSceneModalStates, props.onPersistNextSceneModalMove);
+    const handleVideoEditorModalMove = createMoveWrapper('video-editor', 'selectedVideoEditorModalIds', videoEditorModalStates, props.onPersistVideoEditorModalMove);
 
     const handleGroupMove = useCallback((id: string, x: number, y: number) => {
         setGroupContainerStates(prev => {
@@ -511,9 +527,45 @@ export function useGroupLogic(
         setGroupContainerStates(prev => prev.map(g => g.id === id ? { ...g, x, y } : g));
     }, [setGroupContainerStates]);
 
+    const handleGroupUpdate = useCallback((id: string, updates: Record<string, any>) => {
+        setGroupContainerStates(prev => {
+            const group = prev.find(g => g.id === id);
+            if (!group) return prev;
+
+            // If updates contains 'meta', use it directly (it's already structured correctly from overlay)
+            // Otherwise, if it contains top-level properties like 'name' or 'color', merge them into meta (legacy support)
+            let newMeta = group.meta;
+
+            if (updates.meta) {
+                newMeta = { ...group.meta, ...updates.meta };
+            } else if (updates.name !== undefined || updates.color !== undefined) {
+                newMeta = { ...group.meta, ...updates };
+            }
+
+            // Construct full updates object for persistence
+            // We strip out the meta keys from the root to keep the payload clean if they were top-level
+            const { name, color, meta, ...otherUpdates } = updates;
+
+            const fullUpdates = {
+                ...otherUpdates,
+                meta: newMeta
+            };
+
+            // Defer persistence
+            if (onPersistGroupUpdate) {
+                setTimeout(() => {
+                    onPersistGroupUpdate(id, fullUpdates, group);
+                }, 0);
+            }
+
+            return prev.map(g => g.id === id ? { ...g, meta: newMeta } : g);
+        });
+    }, [setGroupContainerStates, onPersistGroupUpdate]);
+
     const handleImageUpdateWithGroup = useCallback((index: number, updates: any) => {
         const isMoving = updates.x !== undefined || updates.y !== undefined;
-        const isSelected = selectedImageIndices.includes(index);
+        // Use Ref for selected indices
+        const isSelected = selectionRef.current.selectedImageIndices.includes(index);
 
         if (isMoving && isSelected && images?.[index]) {
             const currentImage = images[index];
@@ -530,7 +582,7 @@ export function useGroupLogic(
         if (props.onImageUpdate) {
             props.onImageUpdate(index, updates);
         }
-    }, [selectedImageIndices, images, moveSelectedItems, props.onImageUpdate]);
+    }, [images, moveSelectedItems, props.onImageUpdate]);
 
     // Helper to calculate effective positions for grouped items
     const getEffectiveStates = useCallback(<T extends { id?: string, elementId?: string, x?: number, y?: number }>(states: T[], type: string): T[] => {
@@ -586,6 +638,7 @@ export function useGroupLogic(
         handleVideoEditorModalMove,
         getEffectiveStates,
         handleGroupMove,
-        handleGroupDrag
+        handleGroupDrag,
+        handleGroupUpdate
     };
 }
