@@ -87,6 +87,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         clearAllSelections,
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
+        selectionTransformerRect, setSelectionTransformerRect,
         isDragSelection, setIsDragSelection,
         setSelectedGroupIds,
         // Pass selection states
@@ -108,6 +109,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         effectiveSelectedCanvasTextIds,
         selectedRichTextId, setSelectedRichTextId,
+        selectedRichTextIds, setSelectedRichTextIds,
     } = canvasSelection;
 
     const {
@@ -229,20 +231,6 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     })()}
                 </>
 
-                {selectionTightRect && (
-                    <Rect
-                        x={selectionTightRect.x}
-                        y={selectionTightRect.y}
-                        width={selectionTightRect.width}
-                        height={selectionTightRect.height}
-                        fill="rgba(100,149,237,0.15)"
-                        stroke="#6495ED"
-                        strokeWidth={4}
-                        dash={[6, 6]}
-                        listening={false}
-                        cornerRadius={0}
-                    />
-                )}
 
                 {videoModalStates.map((videoState: any, index: number) => (
                     <CanvasVideoNode
@@ -301,21 +289,42 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         />
                     ))}
 
-                {effectiveRichTextStates?.map((textState: any) => (
-                    <RichTextNode
-                        key={textState.id}
-                        {...textState}
-                        scale={scale}
-                        isSelected={selectedRichTextId === textState.id} // or check explicit IDs list
-                        onSelect={() => {
-                            clearAllSelections(false);
-                            setSelectedRichTextId(textState.id);
-                        }}
-                        onChange={(newAttrs: any) => {
-                            handleRichTextUpdate?.(textState.id, newAttrs);
-                        }}
-                    />
-                ))}
+                {effectiveRichTextStates?.map((textState: any) => {
+                    const isMultiSelect = (selectedRichTextIds?.length || 0) +
+                        (selectedImageIndices?.length || 0) +
+                        (selectedTextInputIds?.length || 0) +
+                        (selectedImageModalIds?.length || 0) +
+                        (selectedVideoModalIds?.length || 0) +
+                        (selectedGroupIds?.length || 0) > 1;
+                    return (
+                        <RichTextNode
+                            key={textState.id}
+                            {...textState}
+                            scale={scale}
+                            suppressTransformer={isMultiSelect}
+                            isSelected={selectedRichTextId === textState.id || (selectedRichTextIds && selectedRichTextIds.includes(textState.id))}
+                            onSelect={(e: any) => {
+                                const isMulti = e?.evt?.ctrlKey || e?.evt?.metaKey || e?.evt?.shiftKey;
+                                if (isMulti) {
+                                    if (selectedRichTextIds.includes(textState.id)) {
+                                        setSelectedRichTextIds(prev => prev.filter(id => id !== textState.id));
+                                        if (selectedRichTextId === textState.id) setSelectedRichTextId(null);
+                                    } else {
+                                        setSelectedRichTextIds(prev => [...prev, textState.id]);
+                                        setSelectedRichTextId(textState.id);
+                                    }
+                                } else {
+                                    clearAllSelections(false);
+                                    setSelectedRichTextId(textState.id);
+                                    setSelectedRichTextIds([textState.id]);
+                                }
+                            }}
+                            onChange={(newAttrs: any) => {
+                                handleRichTextUpdate?.(textState.id, newAttrs);
+                            }}
+                        />
+                    );
+                })}
 
 
 
@@ -346,6 +355,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     handleImageUpdateWithGroup={groupLogic.handleImageUpdateWithGroup}
                     selectionDragOriginRef={React.useRef<{ x: number, y: number } | null>(null)}
                     onCreateGroup={groupLogic.handleCreateGroup}
+                    setCanvasTextStates={canvasState.effectiveSetCanvasTextStates}
+                    layerRef={layerRef}
                 />
 
                 <GroupContainerOverlay

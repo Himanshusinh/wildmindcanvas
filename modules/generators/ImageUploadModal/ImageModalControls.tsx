@@ -262,8 +262,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
               </svg>
             ) : (
               <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 12h9" />
-                <path d="M13 6l6 6-6 6" />
+                <path d="M12 2L14.4 9.1L22 12L14.4 14.9L12 22L9.6 14.9L2 12L9.6 9.1L12 2Z" />
               </svg>
             )}
           </button>

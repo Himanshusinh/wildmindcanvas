@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Rect, Group } from 'react-konva';
+import { Rect, Group, Transformer } from 'react-konva';
 import { Html } from 'react-konva-utils';
 import { Group as GroupIcon, LayoutGrid } from 'lucide-react';
 import Konva from 'konva';
+import { RichTextToolbar } from './RichText/RichTextToolbar';
 import { getClientRect } from '@/core/canvas/canvasHelpers';
 import { ImageUpload } from '@/core/types/canvas';
 import { ScriptFrameModalState, SceneFrameModalState } from '@/modules/canvas-overlays/types';
@@ -131,8 +132,17 @@ interface SelectionBoxProps {
   selectedCanvasTextIds?: string[];
   effectiveCanvasTextStates?: any[];
   selectedGroupIds?: string[];
+  selectedRichTextIds?: string[];
+  setSelectedRichTextIds?: (ids: string[]) => void;
+  richTextStates?: any[];
+  setRichTextStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  onPersistRichTextMove?: (id: string, updates: Partial<{ x: number; y: number; width: number; fontSize: number }>) => void | Promise<void>;
   // Canvas scale for UI scaling
   scale?: number;
+  setCanvasTextStates?: React.Dispatch<React.SetStateAction<any[]>>;
+  layerRef?: React.RefObject<Konva.Layer>;
+  selectionTransformerRect?: { x: number; y: number; width: number; height: number } | null;
+  setSelectionTransformerRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
 }
 
 export const SelectionBox: React.FC<SelectionBoxProps> = ({
@@ -232,9 +242,18 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   isGroupSelected,
   onUngroup,
   effectiveCanvasTextStates = [],
+  richTextStates = [],
   selectedCanvasTextIds = [],
   selectedGroupIds = [],
+  selectedRichTextIds = [],
+  setSelectedRichTextIds,
+  setRichTextStates,
+  onPersistRichTextMove,
   scale = 1,
+  setCanvasTextStates,
+  layerRef,
+  selectionTransformerRect,
+  setSelectionTransformerRect,
 }) => {
   // Calculate UI scale based on canvas scale (inverse scaling)
   const MAX_UI_SCALE = 3;
@@ -244,23 +263,24 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
   // Store original positions of all components when drag starts
   const originalPositionsRef = React.useRef<{
-    images: Map<number, { x: number; y: number }>;
-    textInputs: Map<string, { x: number; y: number }>;
-    imageModals: Map<string, { x: number; y: number }>;
-    videoModals: Map<string, { x: number; y: number }>;
-    videoEditorModals: Map<string, { x: number; y: number }>;
-    musicModals: Map<string, { x: number; y: number }>;
-    upscaleModals: Map<string, { x: number; y: number }>;
-    multiangleCameraModals: Map<string, { x: number; y: number }>;
-    removeBgModals: Map<string, { x: number; y: number }>;
-    eraseModals: Map<string, { x: number; y: number }>;
-    expandModals: Map<string, { x: number; y: number }>;
-    vectorizeModals: Map<string, { x: number; y: number }>;
-    nextSceneModals: Map<string, { x: number; y: number }>;
-    compareModals: Map<string, { x: number; y: number }>;
-    storyboardModals: Map<string, { x: number; y: number }>;
-    scriptFrameModals: Map<string, { x: number; y: number }>;
-    sceneFrameModals: Map<string, { x: number; y: number }>;
+    images: Map<number, { x: number; y: number; width: number; height: number }>;
+    textInputs: Map<string, { x: number; y: number; width: number; height: number }>;
+    imageModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    videoModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    videoEditorModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    musicModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    upscaleModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    multiangleCameraModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    removeBgModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    eraseModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    expandModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    vectorizeModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    nextSceneModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    compareModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    storyboardModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    scriptFrameModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    sceneFrameModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    richTexts: Map<string, { x: number; y: number; width: number; height: number; fontSize: number }>;
   } | null>(null);
 
   // Store original tight rect position
@@ -268,7 +288,6 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
   // Ref for the selection box group (for Transformer)
   const selectionGroupRef = React.useRef<Konva.Group>(null);
-  const transformerRef = React.useRef<Konva.Transformer>(null);
 
   const arrangeStateRef = useRef<{ selectionKey: string; order: string[]; bounds?: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null);
   const arrangeAnimationFrameRef = useRef<number | null>(null);
@@ -303,7 +322,149 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedScriptFrameModalIds.length +
     selectedSceneFrameModalIds.length +
     selectedCanvasTextIds.length +
+    selectedRichTextIds.length +
     selectedGroupIds.length;
+
+  const isOnlyRichText = selectedRichTextIds.length > 0 && selectedRichTextIds.length === totalSelected;
+  const hasRichText = selectedRichTextIds.length > 0;
+  const hasCanvasText = selectedCanvasTextIds.length > 0;
+
+  const isOnlyText = (hasRichText || hasCanvasText) &&
+    (selectedRichTextIds.length + selectedCanvasTextIds.length === totalSelected);
+
+  const handleMultiTextChange = (updates: any) => {
+    if (setRichTextStates && selectedRichTextIds.length > 0) {
+      setRichTextStates(prev => prev.map(t =>
+        selectedRichTextIds.includes(t.id) ? { ...t, ...updates } : t
+      ));
+    }
+    if (setCanvasTextStates && selectedCanvasTextIds.length > 0) {
+      setCanvasTextStates(prev => prev.map(t =>
+        selectedCanvasTextIds.includes(t.id) ? { ...t, ...updates } : t
+      ));
+    }
+  };
+
+  const transformerRef = React.useRef<Konva.Transformer>(null);
+
+  useEffect(() => {
+    if (!transformerRef.current || !layerRef?.current) return;
+
+    // Determine nodes to attach to the collective transformer
+    let nodesToTransform: Konva.Node[] = [];
+
+    // 1. Text Items (CanvasText) - EXCLUDE RichText
+    if (selectedCanvasTextIds.length > 0) {
+      const selectedTextNodes = layerRef.current.find((node: Konva.Node) => {
+        return node.getAttr('data-type') === 'text' && selectedCanvasTextIds.includes(String(node.id()));
+      });
+      nodesToTransform = [...nodesToTransform, ...selectedTextNodes];
+    }
+
+    // 2. Groups
+    if (selectedGroupIds.length > 0) {
+      const selectedGroupNodes = layerRef.current.find((node: Konva.Node) => {
+        return node.name().startsWith('group-container-') && selectedGroupIds.includes(node.name().replace('group-container-', ''));
+      });
+      nodesToTransform = [...nodesToTransform, ...selectedGroupNodes];
+    }
+
+    // 3. Collective Selection Logic
+    if (totalSelected > 1) {
+      if (!hasRichText) {
+        // No RichText -> use the selection group for performance/legacy scaling
+        if (selectionGroupRef.current) {
+          nodesToTransform = [selectionGroupRef.current];
+        }
+      } else {
+        // Mixed or purely RichText -> attach to components INDIVIDUALLY
+        // We've already added CanvasText and Groups above.
+        // We also need to add Images, Modals, and RichText
+
+        const others = layerRef.current.find((node: Konva.Node) => {
+          const id = String(node.id());
+          const name = node.name();
+
+          // Exclude background only (RichText is now included)
+          if (name === 'background-rect') return false;
+
+          // Rich Text
+          if (name === 'rich-text-node' && selectedRichTextIds.includes(id)) return true;
+
+          // Check if it's in our selection IDs
+          if (name.startsWith('canvas-image-')) {
+            const idx = parseInt(name.replace('canvas-image-', ''));
+            return selectedImageIndices.includes(idx);
+          }
+
+          // Modals
+          if (selectedImageModalIds.includes(id)) return true;
+          if (selectedVideoModalIds.includes(id)) return true;
+
+          return false;
+        });
+        nodesToTransform = [...nodesToTransform, ...others];
+      }
+    }
+
+    transformerRef.current.nodes(nodesToTransform);
+    transformerRef.current.getLayer()?.batchDraw();
+  }, [totalSelected, selectionTransformerRect, selectedRichTextIds, selectedCanvasTextIds, isOnlyText, hasRichText, hasCanvasText, selectionGroupRef.current, isOnlyRichText, selectedImageIndices, selectedImageModalIds, selectedVideoModalIds]);
+
+  // Handle Transform End for Normalization (prevent text scaling distortion)
+  const handleTransformEnd = () => {
+    if (transformerRef.current) {
+      const nodes = transformerRef.current.nodes();
+      const updatesRichText: any[] = [];
+      const updatesCanvasText: any[] = [];
+
+      nodes.forEach(node => {
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+
+        // Only normalize if it's a text node (double check safety)
+        if (node.getAttr('data-type') === 'text') {
+          // Update width/fontSize based on scale
+          // User requested: node.width(node.width() * scaleX); node.scaleX(1);
+
+          // We need to sync with state.
+          const newWidth = node.width() * scaleX;
+          // Actually for Text, usually we scale font size or width.
+          // User prompt: "node.width(node.width() * scaleX)"
+
+          node.width(newWidth);
+          node.scaleX(1);
+          node.scaleY(1);
+
+          // Identify which state to update
+          const id = String(node.id());
+          if (selectedRichTextIds.includes(id)) {
+            // For RichText, we might want to update font size or just width? 
+            // RichTextNode transform handler updates width.
+            // Let's update width.
+            updatesRichText.push({ id, width: newWidth, rotation: node.rotation(), x: node.x(), y: node.y() });
+          } else if (selectedCanvasTextIds.includes(id)) {
+            // CanvasText
+            updatesCanvasText.push({ id, width: newWidth, rotation: node.rotation(), x: node.x(), y: node.y() });
+          }
+        }
+      });
+
+      // Batch update states
+      if (updatesRichText.length > 0 && setRichTextStates) {
+        setRichTextStates(prev => prev.map(t => {
+          const update = updatesRichText.find(u => u.id === t.id);
+          return update ? { ...t, ...update } : t;
+        }));
+      }
+      if (updatesCanvasText.length > 0 && setCanvasTextStates) {
+        setCanvasTextStates(prev => prev.map(t => {
+          const update = updatesCanvasText.find(u => u.id === t.id);
+          return update ? { ...t, ...update } : t;
+        }));
+      }
+    }
+  };
 
 
   // Keyboard handler for "G" key to trigger arrange
@@ -367,6 +528,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       `scriptFrameModal:${serializeStrings(selectedScriptFrameModalIds)}`,
       `sceneFrameModal:${serializeStrings(selectedSceneFrameModalIds)}`,
       `canvasText:${serializeStrings(selectedCanvasTextIds)}`,
+      `richText:${serializeStrings(selectedRichTextIds)}`,
     ].join('|');
   };
 
@@ -653,6 +815,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       });
     });
 
+    selectedRichTextIds.forEach((id) => {
+      const text = richTextStates.find((t: any) => t.id === id);
+      if (!text) return;
+      components.push({
+        type: 'text' as any, // Reusing 'text'
+        id,
+        key: `richText-${id}`,
+        width: text.width || 200,
+        height: text.height || 100,
+        x: text.x || 0,
+        y: text.y || 0,
+      });
+    });
+
     return components;
   };
 
@@ -833,6 +1009,26 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       );
     }
 
+    if (setRichTextStates && richTextStates.length > 0) {
+      const richTextUpdates = new Map<string, { x: number; y: number }>();
+      targets.forEach((target) => {
+        if (target.key.startsWith('richText-')) {
+          const currentX = target.from.x + (target.to.x - target.from.x) * progress;
+          const currentY = target.from.y + (target.to.y - target.from.y) * progress;
+          richTextUpdates.set(target.id as string, { x: currentX, y: currentY });
+        }
+      });
+
+      if (richTextUpdates.size > 0) {
+        setRichTextStates((prev) =>
+          prev.map((text) => {
+            const update = richTextUpdates.get(text.id);
+            return update ? { ...text, ...update } : text;
+          })
+        );
+      }
+    }
+
     if (scriptFrameModalUpdates.size) {
       setScriptFrameModalStates((prev) =>
         prev.map((modal) => {
@@ -954,10 +1150,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     }
     if (onPersistTextModalMove) {
       targets
-        .filter((t) => t.type === 'text')
+        .filter((t) => t.type === 'text' && !t.key.startsWith('richText-'))
         .forEach((target) => {
           Promise.resolve(
             onPersistTextModalMove(target.id as string, { x: target.to.x, y: target.to.y })
+          ).catch(console.error);
+        });
+    }
+
+    if (onPersistRichTextMove) {
+      targets
+        .filter((t: any) => t.key.startsWith('richText-'))
+        .forEach((target) => {
+          Promise.resolve(
+            onPersistRichTextMove(target.id as string, { x: target.to.x, y: target.to.y })
           ).catch(console.error);
         });
     }
@@ -1139,8 +1345,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             y={Math.min(selectionBox.startY, selectionBox.currentY)}
             width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
             height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-            fill="rgba(100,149,237,0.08)"
-            stroke="#6495ED"
+            fill={hasRichText ? "transparent" : "rgba(100,149,237,0.08)"}
+            stroke="#4C83FF"
             strokeWidth={3}
             dash={[8, 6]}
             listening={false}
@@ -1159,30 +1365,58 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
             // Store original positions of all components
             const originalPositions = {
-              images: new Map<number, { x: number; y: number }>(),
-              textInputs: new Map<string, { x: number; y: number }>(),
-              imageModals: new Map<string, { x: number; y: number }>(),
-              videoModals: new Map<string, { x: number; y: number }>(),
-              videoEditorModals: new Map<string, { x: number; y: number }>(),
-              musicModals: new Map<string, { x: number; y: number }>(),
-              upscaleModals: new Map<string, { x: number; y: number }>(),
-              multiangleCameraModals: new Map<string, { x: number; y: number }>(),
-              removeBgModals: new Map<string, { x: number; y: number }>(),
-              eraseModals: new Map<string, { x: number; y: number }>(),
-              expandModals: new Map<string, { x: number; y: number }>(),
-              vectorizeModals: new Map<string, { x: number; y: number }>(),
-              nextSceneModals: new Map<string, { x: number; y: number }>(),
-              compareModals: new Map<string, { x: number; y: number }>(),
-              storyboardModals: new Map<string, { x: number; y: number }>(),
-              scriptFrameModals: new Map<string, { x: number; y: number }>(),
-              sceneFrameModals: new Map<string, { x: number; y: number }>(),
+              images: new Map<number, { x: number; y: number; width: number; height: number }>(),
+              textInputs: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              imageModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              videoModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              videoEditorModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              musicModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              upscaleModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              multiangleCameraModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              removeBgModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              eraseModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              expandModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              vectorizeModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              nextSceneModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              compareModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              storyboardModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              scriptFrameModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              sceneFrameModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              richTexts: new Map<string, { x: number; y: number; width: number; height: number; fontSize: number }>(),
             };
+
+            const canvasData: CanvasItemsData = {
+              images,
+              canvasTextStates: effectiveCanvasTextStates,
+              textInputStates,
+              richTextStates,
+              imageModalStates,
+              videoModalStates,
+              musicModalStates,
+              upscaleModalStates,
+              multiangleCameraModalStates,
+              removeBgModals: removeBgModalStates,
+              eraseModals: eraseModalStates,
+              expandModals: expandModalStates,
+              vectorizeModals: vectorizeModalStates,
+              nextSceneModalStates,
+              compareModals: compareModalStates,
+              storyboardModalStates,
+              scriptFrameModals: scriptFrameModalStates,
+              sceneFrameModals: sceneFrameModalStates,
+              videoEditorModalStates,
+            } as any;
 
             // Store original image positions
             selectedImageIndices.forEach(idx => {
               const it = images[idx];
               if (it) {
-                originalPositions.images.set(idx, { x: it.x || 0, y: it.y || 0 });
+                originalPositions.images.set(idx, {
+                  x: it.x || 0,
+                  y: it.y || 0,
+                  width: it.width || 100,
+                  height: it.height || 100
+                });
               }
             });
 
@@ -1190,7 +1424,21 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedTextInputIds.forEach(textId => {
               const textState = textInputStates.find(t => t.id === textId);
               if (textState) {
-                originalPositions.textInputs.set(textId, { x: textState.x, y: textState.y });
+                originalPositions.textInputs.set(textId, { x: textState.x, y: textState.y, width: 400, height: 140 });
+              }
+            });
+
+            // Store original rich text positions
+            selectedRichTextIds.forEach(textId => {
+              const textState = richTextStates.find(t => t.id === textId);
+              if (textState) {
+                originalPositions.richTexts.set(textId, {
+                  x: textState.x,
+                  y: textState.y,
+                  width: textState.width || 200,
+                  height: 100, // height is dynamic but we store a base
+                  fontSize: textState.fontSize || 20
+                });
               }
             });
 
@@ -1198,7 +1446,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedImageModalIds.forEach(modalId => {
               const modalState = imageModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.imageModals.set(modalId, { x: modalState.x, y: modalState.y });
+                const { width, height } = getComponentDimensions('imageModal', modalId, canvasData);
+                originalPositions.imageModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1206,7 +1455,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedVideoModalIds.forEach(modalId => {
               const modalState = videoModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.videoModals.set(modalId, { x: modalState.x, y: modalState.y });
+                const { width, height } = getComponentDimensions('videoModal', modalId, canvasData);
+                originalPositions.videoModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1214,7 +1464,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedVideoEditorModalIds.forEach(modalId => {
               const modalState = videoEditorModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.videoEditorModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.videoEditorModals.set(modalId, { x: modalState.x, y: modalState.y, width: 100, height: 120 });
               }
             });
 
@@ -1222,7 +1472,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedMusicModalIds.forEach(modalId => {
               const modalState = musicModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.musicModals.set(modalId, { x: modalState.x, y: modalState.y });
+                const { width, height } = getComponentDimensions('musicModal', modalId, canvasData);
+                originalPositions.musicModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1230,7 +1481,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedUpscaleModalIds.forEach(modalId => {
               const modalState = upscaleModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.upscaleModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.upscaleModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1238,7 +1494,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedMultiangleCameraModalIds.forEach(modalId => {
               const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y, width: 100, height: 100 });
               }
             });
 
@@ -1246,7 +1502,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedRemoveBgModalIds.forEach(modalId => {
               const modalState = removeBgModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.removeBgModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.removeBgModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1254,7 +1515,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedEraseModalIds.forEach(modalId => {
               const modalState = eraseModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.eraseModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.eraseModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1262,7 +1528,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedExpandModalIds.forEach(modalId => {
               const modalState = expandModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.expandModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.expandModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1270,7 +1541,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedVectorizeModalIds.forEach(modalId => {
               const modalState = vectorizeModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.vectorizeModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.vectorizeModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1278,7 +1554,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedNextSceneModalIds.forEach(modalId => {
               const modalState = nextSceneModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.nextSceneModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.nextSceneModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 600,
+                  height: modalState.frameHeight || 400
+                });
               }
             });
 
@@ -1286,7 +1567,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedCompareModalIds.forEach(modalId => {
               const modalState = compareModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.compareModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.compareModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.isExpanded ? (modalState.width || 500) : 100,
+                  height: modalState.isExpanded ? (modalState.height || 600) : 100
+                });
               }
             });
 
@@ -1294,7 +1580,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedStoryboardModalIds.forEach(modalId => {
               const modalState = storyboardModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.storyboardModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.storyboardModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 400,
+                  height: modalState.frameHeight || 500
+                });
               }
             });
 
@@ -1302,7 +1593,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedScriptFrameModalIds.forEach(modalId => {
               const modalState = scriptFrameModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.scriptFrameModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.scriptFrameModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 360,
+                  height: modalState.frameHeight || 260
+                });
               }
             });
 
@@ -1310,11 +1606,152 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedSceneFrameModalIds.forEach(modalId => {
               const modalState = sceneFrameModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.sceneFrameModals.set(modalId, { x: modalState.x, y: modalState.y });
+                originalPositions.sceneFrameModals.set(modalId, {
+                  x: modalState.x,
+                  y: modalState.y,
+                  width: modalState.frameWidth || 350,
+                  height: modalState.frameHeight || 300
+                });
               }
             });
 
             originalPositionsRef.current = originalPositions;
+          }}
+          onTransform={(e) => {
+            const node = e.target as Konva.Group;
+            const originalPositions = originalPositionsRef.current;
+            const origin = originalTightRectRef.current;
+            if (!originalPositions || !origin) return;
+
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+            const groupX = node.x();
+            const groupY = node.y();
+
+            // Proportional scale factor for font size
+            const fontScale = Math.sqrt(scaleX * scaleY);
+
+            // Update Rich Texts
+            selectedRichTextIds.forEach(id => {
+              const orig = originalPositions.richTexts.get(id);
+              if (orig && setRichTextStates) {
+                const relX = orig.x - origin.x;
+                const relY = orig.y - origin.y;
+                setRichTextStates(prev => prev.map(t => t.id === id ? {
+                  ...t,
+                  x: groupX + relX * scaleX,
+                  y: groupY + relY * scaleY,
+                  width: orig.width * scaleX,
+                  fontSize: Math.round(orig.fontSize * fontScale)
+                } : t));
+              }
+            });
+
+            // Update Images
+            selectedImageIndices.forEach(idx => {
+              const orig = originalPositions.images.get(idx);
+              if (orig) {
+                const relX = orig.x - origin.x;
+                const relY = orig.y - origin.y;
+                handleImageUpdateWithGroup(idx, {
+                  x: groupX + relX * scaleX,
+                  y: groupY + relY * scaleY,
+                  width: orig.width * scaleX,
+                  height: orig.height * scaleY
+                });
+              }
+            });
+
+            // For other components, just update position for now
+            const updateOtherPositions = (ids: string[], originalMap: Map<string, any>, stateSetter: any) => {
+              ids.forEach(id => {
+                const orig = originalMap.get(id);
+                if (orig) {
+                  const relX = orig.x - origin.x;
+                  const relY = orig.y - origin.y;
+                  stateSetter((prev: any[]) => prev.map(s => s.id === id ? {
+                    ...s,
+                    x: groupX + relX * scaleX,
+                    y: groupY + relY * scaleY
+                  } : s));
+                }
+              });
+            };
+
+            updateOtherPositions(selectedTextInputIds, originalPositions.textInputs, setTextInputStates);
+            updateOtherPositions(selectedImageModalIds, originalPositions.imageModals, setImageModalStates);
+            updateOtherPositions(selectedVideoModalIds, originalPositions.videoModals, setVideoModalStates);
+            updateOtherPositions(selectedVideoEditorModalIds, originalPositions.videoEditorModals, setVideoEditorModalStates);
+            updateOtherPositions(selectedMusicModalIds, originalPositions.musicModals, setMusicModalStates);
+
+            // Sync Tight Rect
+            if (selectionTightRect) {
+              setSelectionTightRect({
+                ...selectionTightRect,
+                x: groupX,
+                y: groupY,
+                width: selectionTightRect.width * scaleX,
+                height: selectionTightRect.height * scaleY
+              } as any);
+            }
+          }}
+          onTransformEnd={(e) => {
+            const node = e.target as Konva.Group;
+            const originalPositions = originalPositionsRef.current;
+            const origin = originalTightRectRef.current;
+            if (!originalPositions || !origin) return;
+
+            const scaleX = node.scaleX();
+            const scaleY = node.scaleY();
+            const groupX = node.x();
+            const groupY = node.y();
+            const fontScale = Math.sqrt(scaleX * scaleY);
+
+            // Reset scale for node
+            node.scaleX(1);
+            node.scaleY(1);
+
+            // Persist final values
+            selectedRichTextIds.forEach(id => {
+              const orig = originalPositions.richTexts.get(id);
+              if (orig && onPersistRichTextMove) {
+                const relX = orig.x - origin.x;
+                const relY = orig.y - origin.y;
+                onPersistRichTextMove(id, {
+                  x: groupX + relX * scaleX,
+                  y: groupY + relY * scaleY,
+                  width: orig.width * scaleX,
+                  fontSize: Math.round(orig.fontSize * fontScale)
+                } as any);
+              }
+            });
+
+            selectedImageIndices.forEach(idx => {
+              const orig = originalPositions.images.get(idx);
+              if (orig && onImageUpdate) {
+                const relX = orig.x - origin.x;
+                const relY = orig.y - origin.y;
+                onImageUpdate(idx, {
+                  x: groupX + relX * scaleX,
+                  y: groupY + relY * scaleY,
+                  width: orig.width * scaleX,
+                  height: orig.height * scaleY
+                });
+              }
+            });
+
+            // Final sync after scale reset
+            if (selectionTightRect) {
+              setSelectionTightRect({
+                ...selectionTightRect,
+                x: groupX,
+                y: groupY,
+                width: selectionTightRect.width * scaleX,
+                height: selectionTightRect.height * scaleY
+              });
+            }
+
+            originalPositionsRef.current = null;
           }}
           onDragMove={(e) => {
             const origin = selectionDragOriginRef.current;
@@ -1346,6 +1783,22 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       : textState
                   )
                 );
+              }
+            });
+
+            // Move all selected rich text nodes by delta in real-time
+            selectedRichTextIds.forEach(textId => {
+              const originalPos = originalPositions.richTexts.get(textId);
+              if (originalPos) {
+                if (setRichTextStates) {
+                  setRichTextStates((prev) =>
+                    prev.map((textState) =>
+                      textState.id === textId
+                        ? { ...textState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                        : textState
+                    )
+                  );
+                }
               }
             });
 
@@ -1734,6 +2187,17 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 }
               });
             }
+
+            // Persist final positions for rich text nodes
+            if (onPersistRichTextMove) {
+              selectedRichTextIds.forEach((textId) => {
+                const originalPos = originalPositions.richTexts.get(textId);
+                if (originalPos) {
+                  Promise.resolve(onPersistRichTextMove(textId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
+                }
+              });
+            }
+
             // Persist final positions for text inputs
             if (onPersistTextModalMove) {
               selectedTextInputIds.forEach((textId) => {
@@ -1767,7 +2231,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             width={selectionTightRect.width}
             height={selectionTightRect.height}
             fill="transparent"
-            stroke="rgba(0,0,0,0.4)"
+            stroke="transparent"
             onClick={(e) => {
               e.cancelBubble = true;
             }}
@@ -1778,7 +2242,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
           {/* Smart selection rectangle is now rendered in Canvas.tsx as background layer */}
           {/* Floating Toolbar for Selection Actions using Html overlay */}
-          {(totalSelected >= 2 || !isGroupSelected) && (
+          {(totalSelected >= 2 || !isGroupSelected) && !isOnlyText && (
             <Html
               divProps={{
                 style: {
@@ -1876,8 +2340,65 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             </Html>
           )}
 
-          {/* Transformer removed - using 4 corner dots for resize instead */}
+          {/* Multi-Text Toolbar */}
+          {isOnlyText && totalSelected > 1 && (
+            <Html
+              divProps={{
+                style: {
+                  pointerEvents: 'none',
+                  zIndex: 2000,
+                }
+              }}
+            >
+              <div style={{ pointerEvents: 'auto' }}>
+                <RichTextToolbar
+                  fontFamily={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.fontFamily) ||
+                    (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.fontFamily) || 'Inter'}
+                  fontSize={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.fontSize) ||
+                    (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.fontSize) || 20}
+                  fill={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.fill) ||
+                    (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.color) || 'white'}
+                  align={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.align) ||
+                    (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.textAlign) || 'left'}
+                  onChange={handleMultiTextChange}
+                  position={{
+                    x: selectionTightRect.width / 2,
+                    y: -60 // Slightly higher to clear handles
+                  }}
+                />
+              </div>
+            </Html>
+          )}
+
         </Group>
+
+        {(totalSelected > 1) && selectionTransformerRect && (
+          <Rect
+            x={selectionTransformerRect.x - 4} // Match Transformer padding
+            y={selectionTransformerRect.y - 4}
+            width={selectionTransformerRect.width + 8}
+            height={selectionTransformerRect.height + 8}
+            fill="rgba(76, 131, 255, 0.12)" // Theme blue with transparency
+            listening={false}
+          />
+        )}
+
+        {(totalSelected > 1) && selectionTransformerRect && (
+          <Transformer
+            ref={transformerRef}
+            rotateEnabled={false} // User wants to remove handles, so rotation is definitely out
+            resizeEnabled={false} // User said "remove 6 scale squares", implying no resizing
+            enabledAnchors={[]} // Remove all scale handles
+            boundBoxFunc={(oldBox: { x: number; y: number; width: number; height: number; rotation: number }, newBox: { x: number; y: number; width: number; height: number; rotation: number }) => {
+              return oldBox; // Prevent any resizing logic just in case
+            }}
+            borderStroke="#4C83FF"
+            borderStrokeWidth={1}
+            borderDash={[4, 4]} // Keep dashed as per "smart selected" typical look
+            padding={4}
+            onTransformEnd={handleTransformEnd}
+          />
+        )}
       </>
     );
   }
@@ -1890,8 +2411,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         y={Math.min(selectionBox.startY, selectionBox.currentY)}
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-        fill="rgba(59, 130, 246, 0.2)"
-        stroke="#2563EB"
+        fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.2)"}
+        stroke={isOnlyText ? "transparent" : "#4C83FF"}
         strokeWidth={2}
         dash={[4, 4]}
         listening={false}
@@ -1901,134 +2422,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     );
   }
 
-  if (selectionBox && !isSelecting) {
-    // After drag completes but before tight rect is calculated, show the selection box with buttons
-    const boxWidth = Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX));
-    const boxHeight = Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY));
-    const boxX = Math.min(selectionBox.startX, selectionBox.currentX);
-    const boxY = Math.min(selectionBox.startY, selectionBox.currentY);
 
-    return (
-      <Group
-        x={boxX}
-        y={boxY}
-      >
-        <Rect
-          x={0}
-          y={0}
-          width={boxWidth}
-          height={boxHeight}
-          fill="rgba(59, 130, 246, 0.2)"
-          stroke="#2563EB"
-          strokeWidth={2}
-          dash={[4, 4]}
-          listening={false}
-          globalCompositeOperation="source-over"
-          cornerRadius={0}
-        />
-
-        {/* Toolbar for initial selection box */}
-        {(totalSelected >= 2 || !isGroupSelected) && (
-          <Html
-            divProps={{
-              style: {
-                pointerEvents: 'none',
-              }
-            }}
-          >
-            <div style={{ pointerEvents: 'auto' }}>
-              {/* Reusing styles defined above would be tricky with scoped Html, but since this is conditionally rendered separately, we need style block here too or globally. 
-                  Ideally we'd duplicate the style block or verify if they can conflict. They are scoped to the portal usually? 
-                  react-konva-utils Html creates a div. <style> inside it applies to document. 
-                  So we should scope the class names or rely on the previous style block if it persists? 
-                  Better to include style block here to be safe and autonomous.
-              */}
-              <style>
-                {`
-                  .selection-toolbar-initial {
-                      position: absolute;
-                      display: flex;
-                      align-items: center;
-                      gap: 6px;
-                      background: rgba(26, 26, 26, 0.95);
-                      backdrop-filter: blur(10px);
-                      -webkit-backdrop-filter: blur(10px);
-                      border: 1px solid rgba(255, 255, 255, 0.1);
-                      border-radius: 10px;
-                      padding: 8px 12px;
-                      z-index: 1000;
-                      box-shadow: 
-                          0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                          0 2px 4px -1px rgba(0, 0, 0, 0.06);
-                      transform: translate(-50%, -100%) scale(${uiScale});
-                      transform-origin: bottom center;
-                      left: ${boxWidth / 2}px;
-                      top: -45px;
-                      min-width: max-content;
-                      animation: fadeIn 0.15s ease-out;
-                  }
-                  /* Reuse keyframes if possible or redefine */
-                  @keyframes fadeIn {
-                      from { opacity: 0; transform: translate(-50%, -90%) scale(${uiScale}); }
-                      to { opacity: 1; transform: translate(-50%, -100%) scale(${uiScale}); }
-                  }
-                  .toolbar-btn {
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      width: 36px;
-                      height: 36px;
-                      border-radius: 8px;
-                      border: 1px solid transparent;
-                      background: transparent;
-                      color: #a1a1aa;
-                      cursor: pointer;
-                      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                  }
-                  .toolbar-btn:hover {
-                      background: rgba(255, 255, 255, 0.1);
-                      color: #fff;
-                      border-color: rgba(255, 255, 255, 0.1);
-                  }
-                  .toolbar-divider {
-                      width: 1px;
-                      height: 20px;
-                      background: rgba(255, 255, 255, 0.15);
-                      margin: 0 4px;
-                  }
-                  `}
-              </style>
-              <div className="selection-toolbar-initial" onMouseDown={(e) => e.stopPropagation()}>
-                {/* Group Button */}
-                {!isGroupSelected && (
-                  <button
-                    className="toolbar-btn"
-                    onClick={() => onCreateGroup?.()}
-                    title="Group Selection"
-                  >
-                    <GroupIcon size={20} />
-                  </button>
-                )}
-
-                {!isGroupSelected && totalSelected >= 2 && <div className="toolbar-divider" />}
-
-                {/* Arrange Button */}
-                {totalSelected >= 2 && (
-                  <button
-                    className="toolbar-btn"
-                    onClick={() => triggerArrange({ x: boxX, y: boxY, width: boxWidth, height: boxHeight })}
-                    title="Arrange Grid"
-                  >
-                    <LayoutGrid size={20} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </Html>
-        )}
-      </Group>
-    );
-  }
 
   return null;
 };

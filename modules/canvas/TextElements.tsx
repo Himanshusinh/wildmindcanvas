@@ -44,6 +44,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
               <Text
                 x={textX}
                 y={textY}
+                data-type="text"
                 text={textData.text || ''}
                 fontSize={fontSize}
                 fontFamily={textData.fontFamily || 'Arial'}
@@ -67,7 +68,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
                   setContextMenuImageIndex(actualIndex);
                   setContextMenuOpen(true);
                 }}
-                stroke={isSelected ? '#60A5FA' : undefined}
+                stroke={isSelected ? '#4C83FF' : undefined}
                 strokeWidth={isSelected ? 4 : 0}
               />
               {/* Delete button removed - now handled by context menu in header */}

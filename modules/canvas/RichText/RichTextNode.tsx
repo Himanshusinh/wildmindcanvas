@@ -15,7 +15,7 @@ interface RichTextNodeProps {
     align?: string;
     isEditing?: boolean; // Global state property
     isSelected: boolean;
-    onSelect: () => void;
+    onSelect: (e?: any) => void;
     onChange: (newAttrs: any) => void;
     backgroundColor?: string;
     fontWeight?: string;
@@ -23,6 +23,7 @@ interface RichTextNodeProps {
     textDecoration?: string;
     draggable?: boolean;
     scale?: number;
+    suppressTransformer?: boolean;
 }
 
 export const RichTextNode: React.FC<RichTextNodeProps> = ({
@@ -45,6 +46,7 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
     onChange,
     draggable = true,
     scale = 1,
+    suppressTransformer = false,
 }) => {
     // Refs
     const textRef = useRef<Konva.Text>(null);
@@ -102,6 +104,8 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                     width={width}
                     height={textRef.current?.height() || fontSize * 1.2}
                     fill={backgroundColor}
+                    stroke="transparent"
+                    strokeWidth={0}
                     cornerRadius={4}
                     rotation={textRef.current?.rotation() || 0}
                     visible={!isEditing}
@@ -110,6 +114,8 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
             <Text
                 id={id}
                 ref={textRef}
+                name="rich-text-node"
+                data-type="text"
                 text={text}
                 x={x}
                 y={y}
@@ -120,11 +126,13 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                 textDecoration={textDecoration}
                 fill={fill}
                 align={align}
+                stroke="transparent"
+                strokeWidth={0}
                 draggable={draggable}
                 onDblClick={handleTextDblClick}
                 onDblTap={handleTextDblClick}
-                onClick={onSelect}
-                onTap={onSelect}
+                onClick={(e) => onSelect?.(e)}
+                onTap={(e) => onSelect?.(e)}
                 onDragEnd={(e) => {
                     onChange({
                         x: e.target.x(),
@@ -157,7 +165,7 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                 />
             )}
 
-            {isSelected && !isEditing && (
+            {isSelected && !isEditing && !suppressTransformer && (
                 <Transformer
                     ref={trRef}
                     rotateEnabled={false}
@@ -165,7 +173,15 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                         'top-left', 'top-right', 'bottom-left', 'bottom-right',
                         'middle-left', 'middle-right'
                     ]}
-                    boundBoxFunc={(oldBox, newBox) => {
+                    anchorSize={6}
+                    anchorFill="#ffffff"
+                    anchorStroke="#4C83FF"
+                    anchorCornerRadius={1}
+                    borderStroke="#4C83FF"
+                    borderStrokeWidth={1}
+                    borderDash={[]}
+                    padding={8}
+                    boundBoxFunc={(oldBox: { x: number; y: number; width: number; height: number; rotation: number }, newBox: { x: number; y: number; width: number; height: number; rotation: number }) => {
                         if (newBox.width < 30) {
                             return oldBox;
                         }

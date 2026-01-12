@@ -25,6 +25,7 @@ export interface ImageModalState {
   aspectRatio?: string;
   prompt?: string;
   imageCount?: number;
+  resolution?: string;
   isGenerating?: boolean;
   isPinned?: boolean;
 }

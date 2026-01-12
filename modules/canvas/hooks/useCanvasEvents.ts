@@ -80,12 +80,14 @@ export function useCanvasEvents(
         scriptFrameModalStates,
         sceneFrameModalStates,
         videoEditorModalStates,
+        richTextStates,
     } = canvasState;
 
     const {
         clearAllSelections,
         selectionBox, setSelectionBox,
         selectionTightRect, setSelectionTightRect,
+        selectionTransformerRect, setSelectionTransformerRect,
         isDragSelection, setIsDragSelection,
         selectedImageIndices, setSelectedImageIndices,
         selectedImageModalIds, setSelectedImageModalIds,
@@ -108,6 +110,7 @@ export function useCanvasEvents(
         effectiveSelectedCanvasTextIds: selectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextIds: setSelectedCanvasTextIds, // Alias
         effectiveSetSelectedCanvasTextId: setSelectedCanvasTextId, // Alias
+        selectedRichTextIds, setSelectedRichTextIds,
     } = canvasSelection;
 
     const { stageRef, containerRef } = refs;
@@ -532,14 +535,25 @@ export function useCanvasEvents(
         }
 
         // Selection Rect Logic
-        if (selectionRectCoords) {
-            const rectWidth = Math.abs(selectionRectCoords.x2 - selectionRectCoords.x1);
-            const rectHeight = Math.abs(selectionRectCoords.y2 - selectionRectCoords.y1);
+        // Fix: Use selectionBox for coordinates as it tracks Drag. selectionRectCoords is often stale.
+        const hasDrag = selectionBox && isSelecting;
+        if (selectionRectCoords || hasDrag) {
+            let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+            if (hasDrag && selectionBox) {
+                x1 = selectionBox.startX; y1 = selectionBox.startY;
+                x2 = selectionBox.currentX; y2 = selectionBox.currentY;
+            } else if (selectionRectCoords) {
+                x1 = selectionRectCoords.x1; y1 = selectionRectCoords.y1;
+                x2 = selectionRectCoords.x2; y2 = selectionRectCoords.y2;
+            }
+
+            const rectWidth = Math.abs(x2 - x1);
+            const rectHeight = Math.abs(y2 - y1);
 
             if (rectWidth >= 5 && rectHeight >= 5) {
                 const selectionRect = {
-                    x: Math.min(selectionRectCoords.x1, selectionRectCoords.x2),
-                    y: Math.min(selectionRectCoords.y1, selectionRectCoords.y2),
+                    x: Math.min(x1, x2),
+                    y: Math.min(y1, y2),
                     width: rectWidth,
                     height: rectHeight,
                 };
@@ -550,6 +564,7 @@ export function useCanvasEvents(
                 // ... initialize all other arrays
                 const newSelectedImageModalIds = isMultiSelect ? [...selectedImageModalIds] : [];
                 const newSelectedTextInputIds = isMultiSelect ? [...selectedTextInputIds] : [];
+                const newSelectedRichTextIds = isMultiSelect ? [...selectedRichTextIds] : [];
                 // (Shortened for brevity, implement logic similarly for all)
 
                 // Helper to check intersection
@@ -569,7 +584,7 @@ export function useCanvasEvents(
                     }
                 });
 
-                // Image Modals
+                // Image Modals 
                 imageModalStates.forEach((modal: any) => {
                     const dims = getComponentDimensions('imageModal', modal.id, canvasState as any);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
@@ -703,6 +718,31 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedCanvasTextIds = isMultiSelect ? [...selectedCanvasTextIds] : [];
+
+                richTextStates.forEach((text: any) => {
+                    const dims = getComponentDimensions('rich-text', text.id, canvasState as any);
+                    // Robust AABB Check (Manual) to fail-safe against rotation/clientRect issues
+                    const textRect = { x: text.x, y: text.y, width: dims.width, height: dims.height };
+                    const intersects = !(
+                        selectionRect.x > textRect.x + textRect.width ||
+                        selectionRect.x + selectionRect.width < textRect.x ||
+                        selectionRect.y > textRect.y + textRect.height ||
+                        selectionRect.y + selectionRect.height < textRect.y
+                    );
+
+                    if (intersects) {
+                        if (!newSelectedRichTextIds.includes(text.id)) newSelectedRichTextIds.push(text.id);
+                    }
+                });
+
+                effectiveCanvasTextStates.forEach((text: any) => {
+                    const dims = getComponentDimensions('text', text.id, canvasState as any);
+                    if (checkIntersection({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 })) {
+                        if (!newSelectedCanvasTextIds.includes(text.id)) newSelectedCanvasTextIds.push(text.id);
+                    }
+                });
+
                 // Update selections
                 setSelectedImageIndices(newSelectedIndices);
                 setSelectedImageModalIds(newSelectedImageModalIds);
@@ -721,12 +761,16 @@ export function useCanvasEvents(
                 setSelectedScriptFrameModalIds(newSelectedScriptFrameModalIds);
                 setSelectedSceneFrameModalIds(newSelectedSceneFrameModalIds);
                 setSelectedGroupIds(newSelectedGroupIds);
+                setSelectedRichTextIds(newSelectedRichTextIds);
+                setSelectedCanvasTextIds(newSelectedCanvasTextIds);
 
                 // Calculate tight bounding box for all selected items
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                let transMinX = Infinity, transMinY = Infinity, transMaxX = -Infinity, transMaxY = -Infinity;
                 let hasSelection = false;
+                let hasTransformerSelection = false;
 
-                const updateBounds = (rect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
+                const updateBounds = (rect: { x: number; y: number; width: number; height: number; rotation?: number }, includeInTransformer: boolean = true) => {
                     // Use getClientRect to account for rotation/transform/shadows
                     hasSelection = true;
                     const client = getClientRect(rect);
@@ -734,6 +778,14 @@ export function useCanvasEvents(
                     minY = Math.min(minY, client.y);
                     maxX = Math.max(maxX, client.x + client.width);
                     maxY = Math.max(maxY, client.y + client.height);
+
+                    if (includeInTransformer) {
+                        hasTransformerSelection = true;
+                        transMinX = Math.min(transMinX, client.x);
+                        transMinY = Math.min(transMinY, client.y);
+                        transMaxX = Math.max(transMaxX, client.x + client.width);
+                        transMaxY = Math.max(transMaxY, client.y + client.height);
+                    }
                 };
 
                 // Check bounds for selected items
@@ -887,21 +939,73 @@ export function useCanvasEvents(
                     }
                 });
 
+                newSelectedRichTextIds.forEach(id => {
+                    const text = richTextStates.find((t: any) => t.id === id);
+                    if (text) {
+                        const dims = getComponentDimensions('rich-text', id, canvasState as any);
+                        // Include RichText in transformer bounds
+                        updateBounds({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 }, true);
+                    }
+                });
+
+                newSelectedCanvasTextIds.forEach(id => {
+                    const text = effectiveCanvasTextStates.find((t: any) => t.id === id);
+                    if (text) {
+                        const dims = getComponentDimensions('text', id, canvasState as any);
+                        updateBounds({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 });
+                    }
+                });
+
                 setSelectionBox(null);
                 setSelectionRectCoords(null);
                 setIsDragSelection(false);
                 setIsSelecting(false);
 
                 if (hasSelection) {
-                    const padding = 20; // Add padding to avoid cutting off borders
+                    const totalCount = newSelectedIndices.length +
+                        newSelectedImageModalIds.length +
+                        newSelectedVideoModalIds.length +
+                        newSelectedVideoEditorModalIds.length +
+                        newSelectedMusicModalIds.length +
+                        newSelectedTextInputIds.length +
+                        newSelectedUpscaleModalIds.length +
+                        newSelectedMultiangleCameraModalIds.length +
+                        newSelectedRemoveBgModalIds.length +
+                        newSelectedEraseModalIds.length +
+                        newSelectedExpandModalIds.length +
+                        newSelectedVectorizeModalIds.length +
+                        newSelectedNextSceneModalIds.length +
+                        newSelectedCompareModalIds.length +
+                        newSelectedStoryboardModalIds.length +
+                        newSelectedScriptFrameModalIds.length +
+                        newSelectedSceneFrameModalIds.length +
+                        newSelectedGroupIds.length +
+                        newSelectedRichTextIds.length +
+                        newSelectedCanvasTextIds.length;
+
+                    const isOnlyTextItems = (newSelectedRichTextIds.length > 0 || newSelectedCanvasTextIds.length > 0) &&
+                        (newSelectedRichTextIds.length + newSelectedCanvasTextIds.length === totalCount);
+                    const padding = isOnlyTextItems ? 0 : 5;
                     setSelectionTightRect({
                         x: minX - padding,
                         y: minY - padding,
                         width: (maxX - minX) + (padding * 2),
                         height: (maxY - minY) + (padding * 2)
                     });
+
+                    if (hasTransformerSelection) {
+                        setSelectionTransformerRect({
+                            x: transMinX - padding,
+                            y: transMinY - padding,
+                            width: (transMaxX - transMinX) + (padding * 2),
+                            height: (transMaxY - transMinY) + (padding * 2)
+                        });
+                    } else {
+                        setSelectionTransformerRect(null);
+                    }
                 } else {
                     setSelectionTightRect(null);
+                    setSelectionTransformerRect(null);
                 }
             } else {
                 // Cleared because too small

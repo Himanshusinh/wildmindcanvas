@@ -13,6 +13,7 @@ import { CanvasStage } from './components/CanvasStage';
 import { CanvasOverlays } from './components/CanvasOverlays';
 import { CanvasProps } from './types';
 import AvatarButton from './AvatarButton';
+import { ChatPanel } from '../chat/ChatPanel';
 
 export const Canvas: React.FC<CanvasProps> = (props) => {
   const {
@@ -816,11 +817,21 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       />
 
       {!isUIHidden && (
-        <AvatarButton
-          scale={1}
-          onClick={() => setIsSettingsOpen(true)}
-          isHidden={isUIHidden}
-        />
+        <>
+          <AvatarButton
+            scale={1}
+            onClick={() => setIsSettingsOpen(true)}
+            isHidden={isUIHidden}
+          />
+          <ChatPanel
+            canvasState={effectiveCanvasState as any}
+            canvasSelection={canvasSelection}
+            props={props}
+            viewportSize={viewportSize}
+            position={position}
+            scale={scale}
+          />
+        </>
       )}
     </div>
   );

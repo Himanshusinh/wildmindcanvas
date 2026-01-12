@@ -152,14 +152,14 @@ export interface CanvasProps {
     selectedCompareModalId?: string | null;
     selectedCompareModalIds?: string[];
     setSelectedCompareModalId?: (id: string | null) => void;
-    setSelectedCompareModalIds?: (ids: string[]) => void;
+    setSelectedCompareModalIds?: React.Dispatch<React.SetStateAction<string[]>>;
 
     canvasTextStates?: CanvasTextState[];
     setCanvasTextStates?: React.Dispatch<React.SetStateAction<CanvasTextState[]>>;
     selectedCanvasTextId?: string | null;
     selectedCanvasTextIds?: string[];
     setSelectedCanvasTextId?: (id: string | null) => void;
-    setSelectedCanvasTextIds?: (ids: string[]) => void;
+    setSelectedCanvasTextIds?: React.Dispatch<React.SetStateAction<string[]>>;
     effectiveSelectedCanvasTextIds?: string[];
     onPersistCanvasTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
     onPersistCanvasTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
@@ -170,7 +170,7 @@ export interface CanvasProps {
     selectedRichTextId?: string | null;
     selectedRichTextIds?: string[];
     setSelectedRichTextId?: (id: string | null) => void;
-    setSelectedRichTextIds?: (ids: string[]) => void;
+    setSelectedRichTextIds?: React.Dispatch<React.SetStateAction<string[]>>;
     onPersistRichTextCreate?: (modal: CanvasTextState) => void | Promise<void>;
     onPersistRichTextMove?: (id: string, updates: Partial<CanvasTextState>) => void | Promise<void>;
     onPersistRichTextDelete?: (id: string) => void | Promise<void>;

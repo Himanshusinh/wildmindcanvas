@@ -32,7 +32,8 @@ export function getComponentDimensions(
         storyboardModalStates,
         scriptFrameModalStates,
         sceneFrameModalStates,
-        videoEditorModalStates
+        videoEditorModalStates,
+        richTextStates
     } = data;
 
     switch (type) {
@@ -175,12 +176,15 @@ export function getComponentDimensions(
             return modal ? { width: modal.frameWidth || 300, height: modal.frameHeight || 400 } : { width: 0, height: 0 };
         }
 
-        case 'text': {
-            const textState = canvasTextStates.find(t => t.id === id);
+        case 'text':
+        case 'rich-text': {
+            const isRichText = type === 'rich-text';
+            const states = isRichText ? richTextStates : canvasTextStates;
+            const textState = states.find(t => t.id === id);
             if (!textState) return { width: 0, height: 0 };
 
             const estimatedWidth = textState.width ?? (textState.text ? textState.text.length * (textState.fontSize || 16) * 0.6 : 200);
-            const height = textState.height || (textState.fontSize || 16) * 1.2;
+            const height = textState.height || (textState.fontSize || 16) * 1.5; // Slightly more height for rich text to be safe
 
             return { width: estimatedWidth, height };
         }
