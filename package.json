@@ -37,7 +37,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/hls.js": "^0.13.3",
-    "@types/lodash": "^4.17.21",
+    "@types/lodash": "^4.17.22",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

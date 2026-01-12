@@ -81,6 +81,12 @@ const PluginSidebar: React.FC<PluginSidebarProps> = ({
       icon: '/pluginimages/vectorize.png',
     },
     {
+      id: 'image-editor',
+      name: 'Image Editor',
+      description: 'Open the full Image Editor',
+      icon: '/icons/layer.png',
+    },
+    {
       id: 'next-scene',
       name: 'Next Scene',
       description: 'Generate next scene based on current scene',

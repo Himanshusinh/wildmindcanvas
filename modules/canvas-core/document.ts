@@ -13,6 +13,7 @@ export type NodeType =
     | "image-generator"
     | "video-generator"
     | "video-editor-plugin"
+    | "image-editor-plugin"
     | "music-generator"
     | "upscale-plugin"
     | "multiangle-camera-plugin"

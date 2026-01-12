@@ -33,7 +33,11 @@ export function getComponentDimensions(
         scriptFrameModalStates,
         sceneFrameModalStates,
         videoEditorModalStates,
+<<<<<<< HEAD
         richTextStates
+=======
+        imageEditorModalStates
+>>>>>>> 9626783a055e917f3e2f90a048ad4fea9671cfea
     } = data;
 
     switch (type) {
@@ -88,6 +92,13 @@ export function getComponentDimensions(
             // Video editor typically has a fixed or default size if not found
             if ((modal as any)?.isExpanded) return { width: 1000, height: 600 };
             return { width: 100, height: 130 }; // Collapsed icon size
+        }
+
+        case 'imageEditorModal':
+        case 'image-editor-modal': {
+            const modal = imageEditorModalStates?.find(m => m.id === id);
+            if ((modal as any)?.isExpanded) return { width: 1000, height: 600 };
+            return { width: 100, height: 130 };
         }
 
         case 'musicModal':

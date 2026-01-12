@@ -25,7 +25,6 @@ import { createImageHandlers } from '@/modules/handlers/imageHandlers';
 import { createPluginHandlers } from '@/modules/handlers/pluginHandlers';
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/modules/canvas-app/types';
 import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/modules/canvas-overlays/types';
-import VideoEditorPluginModal from '@/modules/plugins/VideoEditorPluginModal';
 import { MobileRestrictionScreen } from '@/modules/ui-global/MobileRestrictionScreen';
 import { useCanvasStore } from '@/modules/canvas-core/useCanvasStore';
 import { SetNodesCommand } from '@/modules/canvas-core/commands';
@@ -88,6 +87,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     imageGenerators, setImageGenerators,
     videoGenerators, setVideoGenerators,
     videoEditorGenerators, setVideoEditorGenerators,
+    imageEditorGenerators, setImageEditorGenerators,
     musicGenerators, setMusicGenerators,
     upscaleGenerators, setUpscaleGenerators,
     multiangleCameraGenerators, setMultiangleCameraGenerators,
@@ -112,7 +112,35 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Use UI visibility hook
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
-  const [isVideoEditorOpen, setIsVideoEditorOpen] = useState(false);
+  const openExternalVideoEditor = useCallback(() => {
+    try {
+      const externalBase = process.env.NEXT_PUBLIC_EDITOR_VIDEO_URL || 'https://editor-video.wildmindai.com';
+      const safeBaseUrl = externalBase.startsWith('http://') || externalBase.startsWith('https://')
+        ? externalBase
+        : `https://${externalBase}`;
+      const url = new URL(safeBaseUrl);
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    } catch {
+      try {
+        window.open('https://editor-video.wildmindai.com', '_blank', 'noopener,noreferrer');
+      } catch { }
+    }
+  }, []);
+
+  const openExternalImageEditor = useCallback(() => {
+    try {
+      const externalBase = process.env.NEXT_PUBLIC_EDITOR_IMAGE_URL || 'https://editor-image.wildmindai.com';
+      const safeBaseUrl = externalBase.startsWith('http://') || externalBase.startsWith('https://')
+        ? externalBase
+        : `https://${externalBase}`;
+      const url = new URL(safeBaseUrl);
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    } catch {
+      try {
+        window.open('https://editor-image.wildmindai.com', '_blank', 'noopener,noreferrer');
+      } catch { }
+    }
+  }, []);
 
 
 
@@ -134,6 +162,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     imageGenerators,
     videoGenerators,
     videoEditorGenerators,
+    imageEditorGenerators,
     musicGenerators,
     upscaleGenerators,
     multiangleCameraGenerators,
@@ -205,6 +234,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setImageGenerators(prev => prev.filter(e => !ids.has(e.id)));
     setVideoGenerators(prev => prev.filter(e => !ids.has(e.id)));
     setVideoEditorGenerators(prev => prev.filter(e => !ids.has(e.id)));
+    setImageEditorGenerators(prev => prev.filter(e => !ids.has(e.id)));
     setMusicGenerators(prev => prev.filter(e => !ids.has(e.id)));
     setUpscaleGenerators(prev => prev.filter(e => !ids.has(e.id)));
     setMultiangleCameraGenerators(prev => prev.filter(e => !ids.has(e.id)));
@@ -810,8 +840,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
     };
 
     switch (pluginId) {
+      case 'image-editor':
+        addGen(setImageEditorGenerators as any, 'image-editor-plugin');
+        break;
       case 'video-editor':
-        setIsVideoEditorOpen(true);
+        addGen(setVideoEditorGenerators as any, 'video-editor-plugin');
         break;
       case 'upscale':
         addGen(setUpscaleGenerators, 'upscale-plugin');
@@ -1260,6 +1293,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               externalImageModals={imageGenerators}
               externalVideoModals={videoGenerators}
               externalVideoEditorModals={videoEditorGenerators}
+              externalImageEditorModals={imageEditorGenerators}
               externalMusicModals={musicGenerators}
               externalUpscaleModals={upscaleGenerators}
               externalMultiangleCameraModals={multiangleCameraGenerators}
@@ -1382,7 +1416,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onPersistVideoEditorModalCreate={pluginHandlers.onPersistVideoEditorModalCreate}
               onPersistVideoEditorModalMove={pluginHandlers.onPersistVideoEditorModalMove}
               onPersistVideoEditorModalDelete={pluginHandlers.onPersistVideoEditorModalDelete}
-              onOpenVideoEditor={() => setIsVideoEditorOpen(true)}
+              onOpenVideoEditor={openExternalVideoEditor}
+
+              onPersistImageEditorModalCreate={pluginHandlers.onPersistImageEditorModalCreate}
+              onPersistImageEditorModalMove={pluginHandlers.onPersistImageEditorModalMove}
+              onPersistImageEditorModalDelete={pluginHandlers.onPersistImageEditorModalDelete}
+              onOpenImageEditor={openExternalImageEditor}
 
               onPersistTextModalCreate={async (modal) => {
                 setTextGenerators(prev => [...prev, {
@@ -1454,11 +1493,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
         }}
         scale={1}
         viewportCenter={viewportCenterRef.current}
-      />
-      {/* Video Editor Modal */}
-      <VideoEditorPluginModal
-        isOpen={isVideoEditorOpen}
-        onClose={() => setIsVideoEditorOpen(false)}
       />
     </main>
   );

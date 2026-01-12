@@ -51,7 +51,13 @@ export function convertLegacySnapshot(elements: Record<string, any>): Record<str
                 ...(e.meta || e.props || {})
             };
 
-            node = nodeFromItem(exploded, e.type as NodeType);
+            const mappedType: NodeType = (e.type === 'video-editor-trigger')
+                ? 'video-editor-plugin'
+                : (e.type === 'image-editor-trigger')
+                    ? 'image-editor-plugin'
+                    : (e.type as NodeType);
+
+            node = nodeFromItem(exploded, mappedType);
         }
 
         if (node) {

@@ -100,6 +100,12 @@ export function buildSnapshotElements(
     elements[g.id] = { id: g.id, type: 'video-editor-trigger', x: g.x, y: g.y, bounds: { width: 64, height: 64 }, meta: metaObj };
   });
 
+  state.imageEditorGenerators.forEach((g) => {
+    const connections = connectionsBySource[g.id]?.length ? connectionsBySource[g.id] : undefined;
+    const metaObj = { ...(connections ? { connections } : {}) };
+    elements[g.id] = { id: g.id, type: 'image-editor-trigger', x: g.x, y: g.y, bounds: { width: 64, height: 64 }, meta: metaObj };
+  });
+
   state.musicGenerators.forEach((g) => {
     const connections = connectionsBySource[g.id]?.length ? connectionsBySource[g.id] : undefined;
     const metaObj = {

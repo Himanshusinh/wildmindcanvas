@@ -7,7 +7,7 @@ import { saveSnapshot, loadSnapshot } from './persistence';
 import { nodeFromItem, itemFromNode, imageToNode, nodeToImage } from './adapters';
 import {
     CanvasAppState, CanvasAppSetters,
-    ImageGenerator, VideoGenerator, VideoEditorGenerator, MusicGenerator,
+    ImageGenerator, VideoGenerator, VideoEditorGenerator, ImageEditorGenerator, MusicGenerator,
     UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator,
     EraseGenerator, ExpandGenerator, VectorizeGenerator,
     NextSceneGenerator, CompareGenerator, StoryboardGenerator,
@@ -84,6 +84,7 @@ export function useCanvasStore(projectId: string | null) {
     const imageGenerators = useMemo(() => nodesArray.filter(n => n.type === 'image-generator').map(n => itemFromNode<ImageGenerator>(n)), [nodesArray]);
     const videoGenerators = useMemo(() => nodesArray.filter(n => n.type === 'video-generator').map(n => itemFromNode<VideoGenerator>(n)), [nodesArray]);
     const videoEditorGenerators = useMemo(() => nodesArray.filter(n => n.type === 'video-editor-plugin').map(n => itemFromNode<VideoEditorGenerator>(n)), [nodesArray]);
+    const imageEditorGenerators = useMemo(() => nodesArray.filter(n => n.type === 'image-editor-plugin').map(n => itemFromNode<ImageEditorGenerator>(n)), [nodesArray]);
     const musicGenerators = useMemo(() => nodesArray.filter(n => n.type === 'music-generator').map(n => itemFromNode<MusicGenerator>(n)), [nodesArray]);
     const upscaleGenerators = useMemo(() => nodesArray.filter(n => n.type === 'upscale-plugin').map(n => itemFromNode<UpscaleGenerator>(n)), [nodesArray]);
     const multiangleCameraGenerators = useMemo(() => nodesArray.filter(n => n.type === 'multiangle-camera-plugin').map(n => itemFromNode<MultiangleCameraGenerator>(n)), [nodesArray]);
@@ -180,6 +181,7 @@ export function useCanvasStore(projectId: string | null) {
         imageGenerators,
         videoGenerators,
         videoEditorGenerators,
+        imageEditorGenerators,
         musicGenerators,
         upscaleGenerators,
         multiangleCameraGenerators,
@@ -204,6 +206,7 @@ export function useCanvasStore(projectId: string | null) {
         setImageGenerators: createSetter('image-generator', imageGenerators),
         setVideoGenerators: createSetter('video-generator', videoGenerators),
         setVideoEditorGenerators: createSetter('video-editor-plugin', videoEditorGenerators),
+        setImageEditorGenerators: createSetter('image-editor-plugin', imageEditorGenerators),
         setMusicGenerators: createSetter('music-generator', musicGenerators),
         setUpscaleGenerators: createSetter('upscale-plugin', upscaleGenerators),
         setMultiangleCameraGenerators: createSetter('multiangle-camera-plugin', multiangleCameraGenerators),

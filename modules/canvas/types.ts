@@ -63,6 +63,7 @@ export interface CanvasProps {
     externalImageModals?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }>;
     externalVideoModals?: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     externalVideoEditorModals?: Array<{ id: string; x: number; y: number }>;
+    externalImageEditorModals?: Array<{ id: string; x: number; y: number }>;
     externalMusicModals?: MusicGenerator[];
     externalUpscaleModals?: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean }>;
     externalMultiangleCameraModals?: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null }>;
@@ -86,6 +87,10 @@ export interface CanvasProps {
     onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
     onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
     onOpenVideoEditor?: () => void;
+    onPersistImageEditorModalCreate?: (modal: { id: string; x: number; y: number }) => void | Promise<void>;
+    onPersistImageEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+    onPersistImageEditorModalDelete?: (id: string) => void | Promise<void>;
+    onOpenImageEditor?: () => void;
     onPersistMusicModalCreate?: (modal: MusicGenerator) => void | Promise<void>;
     onPersistMusicModalMove?: (id: string, updates: Partial<MusicGenerator>) => void | Promise<void>;
     onPersistMusicModalDelete?: (id: string) => void | Promise<void>;
@@ -202,6 +207,7 @@ export interface CanvasItemsData {
     imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>;
     videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     videoEditorModalStates: Array<{ id: string; x: number; y: number }>;
+    imageEditorModalStates?: Array<{ id: string; x: number; y: number }>;
     musicModalStates: MusicGenerator[];
     upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>;
     multiangleCameraModalStates: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>;
