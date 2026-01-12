@@ -219,15 +219,14 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   };
 
   const getMediaUrl = (media: MediaItem, useThumbnail = true) => {
-    let url = media.url || media.thumbnail || '';
-    if (url && (url.includes('zata.ai') || url.includes('zata'))) {
-      if (useThumbnail) {
-        // Use optimized AVIF thumbnail for grid previews (512px width is plenty for sidebar)
-        return buildProxyThumbnailUrl(url, 512, 80, 'avif');
-      }
-      return buildProxyResourceUrl(url);
+    const url = media.url || media.thumbnail || '';
+    if (!url) return '';
+
+    // Use thumbnails for performance and proxy all external images for CORS safety
+    if (useThumbnail) {
+      return buildProxyThumbnailUrl(url, 512, 80, 'avif');
     }
-    return url;
+    return buildProxyResourceUrl(url);
   };
 
   const renderMediaGrid = (items: MediaItem[]) => {
@@ -248,9 +247,9 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
           {items.map((item, idx) => {
-            const mediaUrl = getMediaUrl(item, false); // Use original URL for grid display as requested
-            const isVideo = item.type === 'video' || mediaUrl.match(/\.(mp4|webm|mov)$/i);
-            const isMusic = item.type === 'music' || mediaUrl.match(/\.(mp3|wav|ogg)$/i);
+            const isVideo = item.type === 'video';
+            const isMusic = item.type === 'music';
+            const displayUrl = getMediaUrl(item, true); // Always use thumbnails in grid for speed
 
             return (
               <div
@@ -301,7 +300,7 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                   </div>
                 ) : (
                   <img
-                    src={mediaUrl}
+                    src={displayUrl}
                     alt={item.prompt || 'Media'}
                     loading="lazy"
                     decoding="async"
@@ -310,13 +309,13 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
                       height: '100%',
                       objectFit: 'cover',
                       opacity: 0,
-                      animation: 'fadeIn 0.3s ease forwards'
+                      transition: 'opacity 0.4s ease-out'
                     }}
                     onLoad={(e) => {
                       (e.target as HTMLImageElement).style.opacity = '1';
                     }}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).style.opacity = '0.2';
                     }}
                   />
                 )}

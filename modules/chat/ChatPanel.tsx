@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, X, MessageSquare, ChevronDown, Check, Trash2, Zap } from 'lucide-react';
+import { Send, Sparkles, X, MessageSquare, ChevronDown, Check, Trash2, Zap, Mic, MicOff, RefreshCcw } from 'lucide-react';
 import { useChatEngine, ChatMessage } from './useChatEngine';
 import { useIntentExecutor } from './useIntentExecutor';
+import { useSpeechToText } from './useSpeechToText';
 
 interface ChatPanelProps {
     canvasState: any;
@@ -32,6 +33,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         viewportSize,
         position,
         scale,
+    });
+
+    const { isListening, toggleListening, isSupported } = useSpeechToText({
+        onTranscriptChange: (text) => setInputValue(text),
+        continuous: false,
+        interimResults: true
     });
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -104,6 +111,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             }}
                         />
 
+                        {/* Refresh/Clear Button */}
+                        <div className="absolute top-4 right-4 z-20">
+                            <button
+                                onClick={() => chatEngine.clearMessages()}
+                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/20 hover:text-white/60 border border-white/5 transition-all group/refresh"
+                                title="Clear history & refresh context"
+                            >
+                                <RefreshCcw size={14} className="group-hover/refresh:rotate-180 transition-transform duration-500" />
+                            </button>
+                        </div>
+
                         <div
                             ref={scrollRef}
                             className="h-full overflow-y-auto p-4 pt-4 space-y-4 custom-scrollbar"
@@ -173,16 +191,30 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                placeholder="Enter system command..."
-                                className="w-full bg-white/5 border border-white/10 focus:border-blue-500/30 rounded-2xl py-3.5 pl-4 pr-12 text-[12px] text-white placeholder-white/10 outline-none transition-all focus:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)]"
+                                placeholder={isListening ? "Listening..." : "Enter system command..."}
+                                className={`w-full bg-white/5 border ${isListening ? 'border-blue-500/50 shadow-[0_0_15px_-5px_rgba(59,130,246,0.3)]' : 'border-white/10'} focus:border-blue-500/30 rounded-2xl py-3.5 pl-4 pr-20 text-[12px] text-white placeholder-white/10 outline-none transition-all focus:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)]`}
                             />
-                            <button
-                                onClick={handleSend}
-                                disabled={!inputValue.trim()}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-transparent hover:bg-white/5 text-white/10 hover:text-blue-400 disabled:opacity-0 transition-all"
-                            >
-                                <Send size={16} />
-                            </button>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                {isSupported && (
+                                    <button
+                                        onClick={toggleListening}
+                                        className={`p-2 rounded-xl transition-all ${isListening
+                                            ? 'bg-blue-500/20 text-blue-400 animate-pulse'
+                                            : 'bg-transparent hover:bg-white/5 text-white/20 hover:text-white/60'
+                                            }`}
+                                        title={isListening ? "Stop listening" : "Start voice input"}
+                                    >
+                                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleSend}
+                                    disabled={!inputValue.trim() || isListening}
+                                    className="p-2 rounded-xl bg-transparent hover:bg-white/5 text-white/10 hover:text-blue-400 disabled:opacity-0 transition-all font-medium"
+                                >
+                                    <Send size={16} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

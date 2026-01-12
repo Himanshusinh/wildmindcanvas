@@ -736,7 +736,7 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
         models: {
             'upscale': {
                 id: 'upscale',
-                name: 'Upscale',
+                name: 'Crystal Upscaler',
                 inputType: 'image', // Requires image input
                 outputType: 'image',
                 supports: { textToContent: false, contentToContent: true },
@@ -744,7 +744,7 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 aspectRatios: [],
                 maxBatch: 1,
                 isDefault: true,
-                isHighRes: true,
+                isHighRes: true,    
                 isTurbo: false
             },
             'crystal-upscaler': {

@@ -236,6 +236,164 @@ export function useIntentExecutor({
                 if (props.onPersistVideoModalCreate) await props.onPersistVideoModalCreate(newModal);
                 break;
             }
+
+            case 'GENERATE_PLUGIN': {
+                const { pluginId, targetNodeId } = payload;
+                const newId = `${pluginId}-${uuidv4()}`;
+
+                // Position plugin node to the right of the target or at center
+                const posX = targetPos.x + 200;
+                const posY = targetPos.y;
+
+                // Look up source image URL from targetNodeId
+                let sourceImageUrl = payload.sourceImageUrl || null;
+                if (!sourceImageUrl && targetNodeId) {
+                    // Try generation modals first
+                    const imageModals = (canvasState.imageModalStates || []) as any[];
+                    const targetImageModal = imageModals.find((m: any) => m.id === targetNodeId);
+                    if (targetImageModal) {
+                        sourceImageUrl = targetImageModal.generatedImageUrl || targetImageModal.sourceImageUrl;
+                    } else {
+                        // Fallback to uploaded images
+                        const images = (canvasState.images || []) as any[];
+                        const targetImage = images.find((img: any, idx: number) =>
+                            img.elementId === targetNodeId ||
+                            `canvas-image-${idx}` === targetNodeId
+                        );
+                        if (targetImage) {
+                            sourceImageUrl = targetImage.url;
+                        }
+                    }
+                }
+
+                // 1. Create Connection if target exists
+                if (targetNodeId) {
+                    const newConn = {
+                        id: `conn-${uuidv4()}`,
+                        from: targetNodeId,
+                        to: newId,
+                        color: '#555555'
+                    };
+                    if (props.onPersistConnectorCreate) await props.onPersistConnectorCreate(newConn);
+                }
+
+                // 2. Create the Plugin Node based on ID
+                switch (pluginId) {
+                    case 'upscale': {
+                        let model = payload.model || 'Crystal Upscaler';
+                        if (model === 'Upscale') model = 'Crystal Upscaler';
+
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            model,
+                            scale: 2,
+                            frameWidth: 400,
+                            frameHeight: 300,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setUpscaleModalStates) {
+                            canvasState.setUpscaleModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistUpscaleModalCreate) await props.onPersistUpscaleModalCreate(newModal);
+                        }
+                        break;
+                    }
+                    case 'remove-bg': {
+                        let model = payload.model || 'Fast Remove BG';
+                        if (model === 'Remove BG') model = 'Fast Remove BG';
+
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            model,
+                            frameWidth: 400,
+                            frameHeight: 300,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setRemoveBgModalStates) {
+                            canvasState.setRemoveBgModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistRemoveBgModalCreate) await props.onPersistRemoveBgModalCreate(newModal);
+                        }
+                        break;
+                    }
+                    case 'vectorize':
+                    case 'vectorize-image': {
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            mode: 'detailed',
+                            frameWidth: 400,
+                            frameHeight: 300,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setVectorizeModalStates) {
+                            canvasState.setVectorizeModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistVectorizeModalCreate) await props.onPersistVectorizeModalCreate(newModal);
+                        }
+                        break;
+                    }
+                    case 'erase':
+                    case 'erase-replace': {
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            model: 'Flux-1.1-Pro-Fill',
+                            frameWidth: 500,
+                            frameHeight: 400,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setEraseModalStates) {
+                            canvasState.setEraseModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistEraseModalCreate) await props.onPersistEraseModalCreate(newModal);
+                        }
+                        break;
+                    }
+                    case 'expand':
+                    case 'expand-image':
+                    case 'outpaint': {
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            model: 'Flux-1.1-Pro-Fill',
+                            frameWidth: 500,
+                            frameHeight: 400,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setExpandModalStates) {
+                            canvasState.setExpandModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistExpandModalCreate) await props.onPersistExpandModalCreate(newModal);
+                        }
+                        break;
+                    }
+                    case 'camera':
+                    case 'multiangle':
+                    case 'multiangle-camera': {
+                        const newModal = {
+                            id: newId,
+                            x: posX,
+                            y: posY,
+                            sourceImageUrl,
+                            isExpanded: true,
+                        };
+                        if (canvasState.setMultiangleCameraModalStates) {
+                            canvasState.setMultiangleCameraModalStates((prev: any) => [...prev, newModal]);
+                            if (props.onPersistMultiangleCameraModalCreate) await props.onPersistMultiangleCameraModalCreate(newModal);
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
         }
     }, [getViewportCenter, canvasState, canvasSelection, props]);
 

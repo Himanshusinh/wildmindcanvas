@@ -172,6 +172,10 @@ RULES:
    - Do NOT try to split the video into clips. Just report the total duration.
 2. For Music Video: Set intent="MUSIC_VIDEO" (if schema allows) or goal="MUSIC_VIDEO".
 3. For Workflows: Just report the GOAL (e.g. "Create story about X"). Do NOT design the workflow.
+4. For Plugins (Upscale, Remove BG, etc.): 
+   - Set capability="PLUGIN".
+   - Use the specific model ID (e.g. "upscale", "remove-bg").
+   - VERY IMPORTANT: If the user refers to "this", "that", "the selection", or you see relevant node IDs in the context, ensure they are listed in the "references" array.
 
 Example:
 User: "Create a 1 minute video of Ramayan, cinematic style"
@@ -205,6 +209,11 @@ CHAIN-OF-THOUGHT RULES:
    - For Long Videos (>10s): PREFER models with high 'contextWindow' (e.g. Veo, Sora).
    - For Character Consistency: PREFER models like Seedance.
    - For Upscaling: Use 'upscale' plugin.
+   - For Removing Background: Use 'remove-bg' plugin.
+   - For Removing Objects/Text/Chat/Watermarks: Use 'erase-replace' plugin.
+   - For Expanding/Outpainting: Use 'expand-image' plugin.
+   - For Vectorizing (Image to SVG): Use 'vectorize' plugin.
+   - For Multiangle Camera: Use 'multiangle-camera' plugin.
 
 4. **Layout & Coordinates**:
    - Use 'pos: { x, y }' purely as a hint; the system will auto-layout.
@@ -259,6 +268,12 @@ CHAIN-OF-THOUGHT RULES:
         else if (lowerText.match(/video|vid|movie/i)) capability = 'VIDEO';
         else if (lowerText.match(/text|note|write/i)) capability = 'TEXT';
         else if (lowerText.match(/music|song|audio/i)) capability = 'MUSIC';
+        else if (lowerText.match(/upscale|enhance|crystal|topaz|res/i)) capability = 'PLUGIN';
+        else if (lowerText.match(/remove.*bg|bg.*remove|transparent|background/i)) capability = 'PLUGIN';
+        else if (lowerText.match(/erase|replace|inpaint/i)) capability = 'PLUGIN';
+        else if (lowerText.match(/expand|outpaint/i)) capability = 'PLUGIN';
+        else if (lowerText.match(/vectorize|svg/i)) capability = 'PLUGIN';
+        else if (lowerText.match(/camera|angle|tilt|rotate/i)) capability = 'PLUGIN';
 
         // Extract preferences locally (Deterministic)
         const quality = lowerText.match(/high|best|quality|fidelity|ultra/i) ? 'high' : lowerText.match(/fast|quick|turbo|speed/i) ? 'fast' : undefined;
@@ -298,7 +313,27 @@ CHAIN-OF-THOUGHT RULES:
             'imagen 4': 'imagen-4',
             'imagen 4 ultra': 'imagen-4-ultra',
             'imagen fast': 'imagen-4-fast',
-            'chatgpt': 'chatgpt-1.5'
+            'chatgpt': 'chatgpt-1.5',
+            'upscale': 'upscale',
+            'enhance': 'upscale',
+            'crystal': 'upscale',
+            'topaz': 'upscale',
+            'remove bg': 'remove-bg',
+            'remove-bg': 'remove-bg',
+            'background': 'remove-bg',
+            'rembg': 'remove-bg',
+            'erase': 'erase-replace',
+            'replace': 'erase-replace',
+            'inpaint': 'erase-replace',
+            'clean': 'erase-replace',
+            'remove': 'erase-replace',
+            'delete': 'erase-replace',
+            'expand': 'expand-image',
+            'outpaint': 'expand-image',
+            'vectorize': 'vectorize-image',
+            'svg': 'vectorize-image',
+            'camera': 'multiangle-camera',
+            'multiangle': 'multiangle-camera'
         };
 
         for (const [key, id] of Object.entries(modelKeywords)) {

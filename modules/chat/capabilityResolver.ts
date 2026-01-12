@@ -62,19 +62,32 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
         config.pluginId = selectedModel.id; // upscale or remove-bg
 
         // TARGET RESOLUTION LOGIC
-        // 1. Explicit reference from Intent (LLM extraction)
+        // 1. Explicit reference from Intent (passed from UI selection)
         let targetId = intent.references?.[0];
 
-        // 2. Selection Context (From usage context)
-        if (!targetId && context?.selection?.length > 0) {
-            targetId = context.selection[0];
+        // 2. Selection Context (Deep check into canvasSelection)
+        if (!targetId && context?.canvasSelection) {
+            const sel = context.canvasSelection;
+            targetId = sel.selectedImageModalIds?.[0] ||
+                sel.selectedVideoModalIds?.[0] ||
+                sel.selectedRichTextIds?.[0];
+
+            if (!targetId && sel.selectedImageIndices?.length > 0) {
+                const idx = sel.selectedImageIndices[0];
+                const img = context.canvasState?.images?.[idx];
+                if (img) {
+                    targetId = img.elementId || `canvas-image-${idx}`;
+                }
+            }
         }
 
         // 3. Fallback: Recent Image Nodes (Smart Default)
         if (!targetId) {
-            // Look for latest image in canvasState if available
-            const recentImage = context?.canvasState?.imageModalStates?.slice(-1)[0];
-            if (recentImage) targetId = recentImage.id;
+            // Check imageModalStates for latest image
+            const imageModals = context?.canvasState?.imageModalStates || [];
+            if (imageModals.length > 0) {
+                targetId = imageModals[imageModals.length - 1].id;
+            }
         }
 
         if (!targetId) {
