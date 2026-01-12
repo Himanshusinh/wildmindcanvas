@@ -15,6 +15,7 @@ export interface AbstractIntent {
         aspectRatio?: string;
         count?: number;
         preferredModel?: string;
+        [key: string]: any; // Allow custom parameters like moveForward, rotateDegrees
     };
     explanation?: string;
 }

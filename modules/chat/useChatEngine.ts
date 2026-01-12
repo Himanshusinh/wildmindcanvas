@@ -63,12 +63,34 @@ CAPABILITY REGISTRY (Available Models):
         if (CAPABILITY_REGISTRY.IMAGE && CAPABILITY_REGISTRY.IMAGE.models) {
             Object.values(CAPABILITY_REGISTRY.IMAGE.models).forEach((m: any) => {
                 prompt += `- ID: "${m.id}" | Name: "${m.name}" | Batch: ${m.maxBatch} | Res: ${m.resolutions.join(',')} | AR: ${m.aspectRatios.join(',')}\n`;
+                if (m.parameters) {
+                    prompt += `  Params: ${JSON.stringify(m.parameters)}\n`;
+                }
             });
         }
 
 
         // Serialize other capabilities similarly...
+        prompt += `\nTYPE: PLUGIN\n`;
+        if (CAPABILITY_REGISTRY.PLUGIN && CAPABILITY_REGISTRY.PLUGIN.models) {
+            Object.values(CAPABILITY_REGISTRY.PLUGIN.models).forEach((m: any) => {
+                prompt += `- ID: "${m.id}" | Name: "${m.name}" | Supports: ${JSON.stringify(m.supports)}\n`;
+                if (m.parameters) {
+                    prompt += `  Params: ${JSON.stringify(m.parameters)}\n`;
+                }
+            });
+        }
+
         prompt += `\nTYPE: VIDEO (Default: seedance-1.0-pro)\n`;
+        if (CAPABILITY_REGISTRY.VIDEO && CAPABILITY_REGISTRY.VIDEO.models) {
+            Object.values(CAPABILITY_REGISTRY.VIDEO.models).forEach((m: any) => {
+                prompt += `- ID: "${m.id}" | Name: "${m.name}" | Supports: ${JSON.stringify(m.supports)}\n`;
+                if (m.parameters) {
+                    prompt += `  Params: ${JSON.stringify(m.parameters)}\n`;
+                }
+            });
+        }
+
         prompt += `TYPE: TEXT (Standard/Rich)\n`;
         prompt += `TYPE: MUSIC (suno-v3)\n`;
 
@@ -82,7 +104,8 @@ OUTPUT SCHEMA:
     "count": number (respect maxBatch),
     "aspectRatio": "16:9" | "1:1" | "9:16",
     "resolution": "1024" | "4K",
-    "preferredModel": "exact-model-id-from-registry"
+    "preferredModel": "exact-model-id-from-registry",
+    "[customParam]": "value matching Params schema"
   },
   "explanation": "brief confirmation of action"
 }
