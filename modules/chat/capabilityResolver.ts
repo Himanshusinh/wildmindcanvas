@@ -1,6 +1,6 @@
-
 import { AbstractIntent, ResolvedAction, CapabilityType } from './intentSchemas';
 import { CAPABILITY_REGISTRY, ModelConstraint } from './capabilityRegistry';
+import { compileGoalToPlan } from './compiler/instructionCompiler';
 
 export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAction {
     // 1. Capability Safety
@@ -9,24 +9,27 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
 
     // 2. Model Selection Logic (Deterministic)
     const modelList = Object.values(capability.models) as ModelConstraint[];
-    let selectedModel: ModelConstraint;
+    let selectedModel: ModelConstraint | undefined;
 
-    // Filter models based on task
-    // Filter models based on task
-    if (intent.references && intent.references.length > 0) {
-        selectedModel = modelList.find(m => m.supports.contentToContent) || modelList.find(m => m.isDefault) || modelList[0];
-    } else if (intent.preferences?.preferredModel) {
-        // Try strict ID match or loose name match
-        selectedModel = modelList.find(m => m.id === intent.preferences?.preferredModel || m.name.toLowerCase().includes(intent.preferences?.preferredModel?.toLowerCase() || ''))
-            || modelList.find(m => m.isDefault)
-            || modelList[0];
-    } else if (intent.preferences?.quality === 'high') {
-        selectedModel = modelList.find(m => m.isHighRes) || modelList.find(m => m.isDefault) || modelList[0];
-    } else if (intent.preferences?.quality === 'fast') {
-        selectedModel = modelList.find(m => m.isTurbo) || modelList.find(m => m.isDefault) || modelList[0];
-    } else {
-        selectedModel = modelList.find(m => m.isDefault) || modelList[0];
+    // A. Priority: Explicit User Preference
+    if (intent.preferences?.preferredModel) {
+        selectedModel = modelList.find(m =>
+            m.id === intent.preferences?.preferredModel ||
+            m.name.toLowerCase().includes(intent.preferences?.preferredModel?.toLowerCase() || '')
+        );
     }
+
+    // B. Fallback: Content-aware or Default selection
+    if (!selectedModel) {
+        if (intent.references && intent.references.length > 0) {
+            selectedModel = modelList.find(m => m.supports.contentToContent) || modelList.find(m => m.isDefault) || modelList[0];
+        } else {
+            selectedModel = modelList.find(m => m.isDefault) || modelList[0];
+        }
+    }
+
+    // Safety fallback (should never happen with modelList[0])
+    if (!selectedModel) selectedModel = modelList[0];
 
     // 3. Parameter Resolution
     const config: any = {
@@ -57,11 +60,91 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
     if (intent.capability === 'PLUGIN') {
         // Plugin specific config
         config.pluginId = selectedModel.id; // upscale or remove-bg
-        config.targetNodeId = intent.references?.[0];
+
+        // TARGET RESOLUTION LOGIC
+        // 1. Explicit reference from Intent (LLM extraction)
+        let targetId = intent.references?.[0];
+
+        // 2. Selection Context (From usage context)
+        if (!targetId && context?.selection?.length > 0) {
+            targetId = context.selection[0];
+        }
+
+        // 3. Fallback: Recent Image Nodes (Smart Default)
+        if (!targetId) {
+            // Look for latest image in canvasState if available
+            const recentImage = context?.canvasState?.imageModalStates?.slice(-1)[0];
+            if (recentImage) targetId = recentImage.id;
+        }
+
+        if (!targetId) {
+            return {
+                intent: 'ERROR',
+                capability: 'PLUGIN',
+                modelId: selectedModel.id,
+                config: { error: "No target image found for plugin." },
+                requiresConfirmation: false,
+                explanation: "I couldn't find an image to apply the plugin to. Please select an image first."
+            };
+        }
+
+        config.targetNodeId = targetId;
+    }
+
+    if (intent.capability === 'WORKFLOW') {
+        config.workflowGraph = intent.preferences?.workflowGraph;
+    }
+
+    // 4. INSTRUCTION COMPILER INTEGRATION
+    // If it's a known Semantic Goal (Video, Music Video, Etc), compile to Plan.
+
+    // Check for explicit VIDEO request with duration
+    const isVideoRequest = capabilityType === 'VIDEO' && (intent.preferences?.duration || 0) > 0;
+
+    // CRITICAL: Intercept hallucinated WORKFLOW intents
+    // If LLM ignores prompt and returns WORKFLOW, we discard its graph and re-compile semantics.
+    const isLegacyWorkflow = (capabilityType as string) === 'WORKFLOW';
+
+    if (isVideoRequest || isLegacyWorkflow) {
+        // Construct Semantic Goal
+        const goal = {
+            goalType: isVideoRequest ? 'VIDEO_REQUEST' : 'UNKNOWN', // Try to infer specific type from intent.goal?
+            needs: ['video'], // Default assumption, compiler might refine
+            constraints: {
+                duration: intent.preferences?.duration,
+                aspectRatio: config.aspectRatio,
+                topic: config.prompt, // Best effort extraction
+                style: intent.preferences?.style
+            },
+            rawInput: config.prompt
+        };
+
+        // If it was a 'WORKFLOW' intent, try to infer real goal
+        if (isLegacyWorkflow) {
+            if (intent.goal?.includes('music')) goal.goalType = 'MUSIC_VIDEO';
+            else if (intent.goal?.includes('video')) goal.goalType = 'VIDEO_REQUEST';
+        }
+
+        // COMPILE
+        const plan = compileGoalToPlan(goal as any); // Cast for strict typing if needed
+
+        // Return PLAN intent
+        return {
+            intent: 'EXECUTE_PLAN',
+            capability: 'WORKFLOW', // Keeps UI happy? Or 'PLAN'? 
+            modelId: selectedModel.id,
+            config: {
+                ...plan // Spread plan into config/payload
+            },
+            requiresConfirmation: true,
+            explanation: `I've compiled a plan: ${plan.summary}`
+        };
     }
 
     return {
-        intent: capabilityType === 'TEXT' ? 'CREATE_TEXT' : `GENERATE_${capabilityType}`,
+        intent: capabilityType === 'TEXT' ? 'CREATE_TEXT' :
+            capabilityType === 'WORKFLOW' ? 'WORKFLOW' :
+                `GENERATE_${capabilityType}`,
         capability: capabilityType,
         modelId: selectedModel.id,
         config: {

@@ -187,7 +187,7 @@ export function getComponentDimensions(
         case 'text':
         case 'rich-text': {
             const isRichText = type === 'rich-text';
-            const states = isRichText ? richTextStates : canvasTextStates;
+            const states = (isRichText ? richTextStates : canvasTextStates) || [];
             const textState = states.find(t => t.id === id);
             if (!textState) return { width: 0, height: 0 };
 

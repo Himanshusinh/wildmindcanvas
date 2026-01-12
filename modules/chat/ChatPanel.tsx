@@ -24,7 +24,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
-    const chatEngine = useChatEngine({ ...canvasState, canvasSelection });
+    const chatEngine = useChatEngine({ canvasState, canvasSelection });
     const executor = useIntentExecutor({
         canvasState,
         canvasSelection,
@@ -54,8 +54,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
     };
 
+    const panelRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const panel = panelRef.current;
+        if (!panel) return;
+        // Stop wheel events from bubbling to the canvas container
+        const stopPropagation = (e: WheelEvent) => {
+            e.stopPropagation();
+        };
+        // Use capture phase or just typical bubbling? 
+        // Bubbling from panel -> container. Panel listener fires first.
+        panel.addEventListener('wheel', stopPropagation, { passive: false });
+        // Also stop pointer events if needed? Canvas usually uses pointer/mouse events.
+        // But the user specifically mentioned scrolling (wheel).
+        // Let's also stop mousedown propagation to prevent canvas selection/deselection when clicking chat
+        const stopPointerPropagation = (e: PointerEvent | MouseEvent) => {
+            e.stopPropagation();
+        };
+        panel.addEventListener('pointerdown', stopPointerPropagation);
+        panel.addEventListener('mousedown', stopPointerPropagation);
+
+        return () => {
+            panel.removeEventListener('wheel', stopPropagation);
+            panel.removeEventListener('pointerdown', stopPointerPropagation);
+            panel.removeEventListener('mousedown', stopPointerPropagation);
+        };
+    }, []);
+
     return (
-        <div className="fixed bottom-6 right-6 z-[10000] flex flex-col items-end">
+        <div
+            ref={panelRef}
+            className="fixed bottom-6 right-6 z-[10000] flex flex-col items-end"
+        >
             {/* Chat Window */}
             {isOpen && (
                 <div
