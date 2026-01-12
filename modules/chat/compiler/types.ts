@@ -27,6 +27,11 @@ export interface CreateNodeAction extends CanvasAction {
         prompt?: string;
         [key: string]: any;
     };
+    batchConfigs?: Array<{
+        prompt?: string;
+        duration?: number;
+        [key: string]: any;
+    }>;
     inputFrom?: string; // ID or reference to a previous step's output
 }
 
@@ -65,6 +70,11 @@ export interface SemanticGoal {
         style?: string;
         mood?: string;
         aspectRatio?: string;
+        strategy?: 'SCRIPT_TO_SCENES' | 'KEYFRAME_I2V' | 'FRAME_LOCK' | 'CHARACTER_SHEET' | 'AUDIO_MONTAGE';
+        scenes?: Array<{
+            prompt: string;
+            duration: number;
+        }>;
         [key: string]: any; // Allow extracted entities like 'topic'
     };
     rawInput?: string;

@@ -600,6 +600,14 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedMultiangleCameraModalIds: canvasSelection.setSelectedMultiangleCameraModalIds,
     onPersistMultiangleCameraModalDelete: props.onPersistMultiangleCameraModalDelete,
 
+    // Rich Text Deletion
+    selectedRichTextId: canvasSelection.selectedRichTextId,
+    selectedRichTextIds: canvasSelection.selectedRichTextIds,
+    richTextStates: canvasState.richTextStates,
+    setSelectedRichTextId: canvasSelection.setSelectedRichTextId,
+    setSelectedRichTextIds: canvasSelection.setSelectedRichTextIds,
+    onPersistRichTextDelete: props.onPersistRichTextDelete,
+
     // RemoveBG Deletion
     selectedRemoveBgModalIds: canvasSelection.selectedRemoveBgModalIds,
     selectedRemoveBgModalId: canvasSelection.selectedRemoveBgModalId,

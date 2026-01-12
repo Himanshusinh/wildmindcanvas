@@ -24,6 +24,7 @@ interface UseKeyboardShortcutsProps {
   selectedMusicModalIds: string[];
   selectedTextInputIds: string[];
   selectedCanvasTextIds?: string[];
+  selectedRichTextIds?: string[];
 
   // Component creation
   lastCreateTimesRef: React.MutableRefObject<{ text?: number; image?: number; video?: number; music?: number; canvasText?: number }>;
@@ -204,12 +205,19 @@ interface UseKeyboardShortcutsProps {
   setSelectedGroupIds?: (ids: string[]) => void;
   onPersistGroupDelete?: (group: any) => void | Promise<void>;
 
+  // Rich Text deletion
+  selectedRichTextId?: string | null;
+  setSelectedRichTextId?: (id: string | null) => void;
+  setSelectedRichTextIds?: (ids: string[]) => void;
+  onPersistRichTextDelete?: (id: string) => void | Promise<void>;
+
   // Select All
   images: ImageUpload[];
   textInputStates: any[];
   imageModalStates: any[];
   videoModalStates: any[];
   musicModalStates: any[];
+  richTextStates?: any[];
 
   // Zoom to selection
   setScale: (scale: number) => void;
@@ -371,6 +379,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setGroupContainerStates,
     setSelectedGroupIds,
     onPersistGroupDelete,
+    richTextStates,
     images,
     textInputStates,
     imageModalStates,
@@ -384,6 +393,11 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     selectedTool,
     onFitView,
     onBulkDelete,
+    selectedRichTextId,
+    selectedRichTextIds = [],
+    setSelectedRichTextId,
+    setSelectedRichTextIds,
+    onPersistRichTextDelete,
   } = props;
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -441,7 +455,9 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           selectedTextInputIds.length > 0 ||
           selectedTextInputId !== null ||
           (selectedCanvasTextIds && selectedCanvasTextIds.length > 0) ||
-          selectedCanvasTextId !== null;
+          selectedCanvasTextId !== null ||
+          (selectedRichTextIds && selectedRichTextIds.length > 0) ||
+          selectedRichTextId !== null;
 
         if (hasSelection) {
           // Dispatch custom event to toggle pin for selected components
@@ -459,6 +475,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
               selectedTextInputId,
               selectedCanvasTextIds: selectedCanvasTextIds || [],
               selectedCanvasTextId,
+              selectedRichTextIds: selectedRichTextIds || [],
+              selectedRichTextId,
             }
           }));
         }
@@ -620,6 +638,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           if (selectedNextSceneModalIds) allIds.push(...selectedNextSceneModalIds);
           if (selectedCompareModalId) allIds.push(selectedCompareModalId);
           if (selectedCompareModalIds) allIds.push(...selectedCompareModalIds);
+          if (selectedRichTextId) allIds.push(selectedRichTextId);
+          if (selectedRichTextIds) allIds.push(...selectedRichTextIds);
 
           const uniqueIds = Array.from(new Set(allIds)).filter(id => !!id);
 
@@ -665,6 +685,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
             if (setSelectedCanvasTextIds) setSelectedCanvasTextIds([]);
             if (effectiveSetSelectedCanvasTextId) effectiveSetSelectedCanvasTextId(null);
+            if (setSelectedRichTextIds) setSelectedRichTextIds([]);
+            if (setSelectedRichTextId) setSelectedRichTextId(null);
             if (setSelectedGroupIds) setSelectedGroupIds([]);
           }
         }
@@ -702,6 +724,12 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         setSelectedVideoModalId(allVideoModalIds.length > 0 ? allVideoModalIds[0] : null);
         setSelectedMusicModalIds(allMusicModalIds);
         setSelectedMusicModalId(allMusicModalIds.length > 0 ? allMusicModalIds[0] : null);
+
+        if (setSelectedRichTextIds) setSelectedRichTextIds(richTextStates?.map((s: any) => s.id) || []);
+        if (setSelectedRichTextId) {
+          const firstId = richTextStates && richTextStates.length > 0 ? richTextStates[0].id : null;
+          setSelectedRichTextId(firstId);
+        }
 
         // Compute tight bounding rect around all selected components so selection visuals show
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

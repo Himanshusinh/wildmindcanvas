@@ -18,6 +18,10 @@ export interface AbstractIntent {
         [key: string]: any; // Allow custom parameters like moveForward, rotateDegrees
     };
     explanation?: string;
+    workflow?: {
+        nodes: WorkflowNode[];
+        connections: WorkflowConnection[];
+    };
 }
 
 /**
@@ -28,17 +32,9 @@ export interface ResolvedAction {
     intent: string; // Internal intent string for executor
     capability: CapabilityType;
     modelId: string;
-    config: any; // Final params like { resolution, aspectRatio, imageCount, etc. }
+    payload: any; // Final params like { resolution, aspectRatio, imageCount, etc. }
     requiresConfirmation: boolean;
     explanation: string;
-}
-
-export interface IntentAction {
-    intent: string;
-    confidence: number;
-    payload: any;
-    requiresConfirmation: boolean;
-    explanation?: string;
 }
 
 // ❌ WORKFLOW / GRAPH intents are BANNED for LLM output.

@@ -55,16 +55,20 @@ export function useIntentExecutor({
                             const posX = currentX + (i * 200); // Inner spacing for batches
                             const posY = currentY;
 
+                            const batchConfig = step.batchConfigs?.[i] || {};
+                            const nodePrompt = batchConfig.prompt || step.configTemplate.prompt;
+                            const nodeDuration = batchConfig.duration || step.configTemplate.duration || 4;
+
                             if (step.nodeType === 'video-generator') {
                                 const newId = `video-${uuidv4()}`;
                                 const newModal = {
                                     id: newId,
                                     x: posX,
                                     y: posY,
-                                    prompt: step.configTemplate.prompt,
+                                    prompt: nodePrompt,
                                     model: step.configTemplate.model,
                                     aspectRatio: step.configTemplate.aspectRatio || '16:9',
-                                    duration: step.configTemplate.duration || 4,
+                                    duration: nodeDuration,
                                     frameWidth: 600,
                                     frameHeight: 400,
                                 };
@@ -78,7 +82,7 @@ export function useIntentExecutor({
                                     id: newId,
                                     x: posX,
                                     y: posY,
-                                    prompt: step.configTemplate.prompt,
+                                    prompt: nodePrompt,
                                     model: step.configTemplate.model,
                                     aspectRatio: step.configTemplate.aspectRatio || '1:1',
                                     imageCount: 1,

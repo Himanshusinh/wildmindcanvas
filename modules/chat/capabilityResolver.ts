@@ -95,7 +95,7 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
                 intent: 'ERROR',
                 capability: 'PLUGIN',
                 modelId: selectedModel.id,
-                config: { error: "No target image found for plugin." },
+                payload: { error: "No target image found for plugin." },
                 requiresConfirmation: false,
                 explanation: "I couldn't find an image to apply the plugin to. Please select an image first."
             };
@@ -125,9 +125,11 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
             needs: ['video'], // Default assumption, compiler might refine
             constraints: {
                 duration: intent.preferences?.duration,
-                aspectRatio: config.aspectRatio,
+                aspectRatio: intent.preferences?.aspectRatio || config.aspectRatio,
                 topic: config.prompt, // Best effort extraction
-                style: intent.preferences?.style
+                style: intent.preferences?.style,
+                strategy: intent.preferences?.videoStrategy,
+                scenes: intent.preferences?.scenes
             },
             rawInput: config.prompt
         };
@@ -146,11 +148,22 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
             intent: 'EXECUTE_PLAN',
             capability: 'WORKFLOW', // Keeps UI happy? Or 'PLAN'? 
             modelId: selectedModel.id,
-            config: {
+            payload: {
                 ...plan // Spread plan into config/payload
             },
             requiresConfirmation: true,
             explanation: `I've compiled a plan: ${plan.summary}`
+        };
+    }
+
+    if (capabilityType === 'TEXT' && intent.goal === 'answer') {
+        return {
+            intent: 'ANSWER',
+            capability: 'TEXT',
+            modelId: 'standard',
+            payload: {},
+            requiresConfirmation: false,
+            explanation: intent.explanation || "No explanation provided."
         };
     }
 
@@ -160,9 +173,10 @@ export function resolveIntent(intent: AbstractIntent, context: any): ResolvedAct
                 `GENERATE_${capabilityType}`,
         capability: capabilityType,
         modelId: selectedModel.id,
-        config: {
+        payload: {
             ...config,
-            model: selectedModel.name
+            model: selectedModel.id,
+            canonicalId: capability.id,
         },
         requiresConfirmation: capabilityType !== 'TEXT',
         explanation: intent.explanation || `I've prepared ${selectedModel.name} for your request.`

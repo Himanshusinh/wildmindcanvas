@@ -36,7 +36,7 @@ export function planVideoExecution(request: PlanVideoRequest): VideoPlan {
         throw new Error(`Video Planner: Model ${model.name} is missing temporal metadata.`);
     }
 
-    const { maxOutputSeconds, stitchable } = model.temporal;
+    const { maxOutputSeconds = 4, stitchable = true } = model.temporal || {};
 
     // 2. Validate Duration vs Capabilities
     if (!stitchable && request.duration > maxOutputSeconds) {
