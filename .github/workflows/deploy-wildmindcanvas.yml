@@ -1,0 +1,29 @@
+name: Deploy Wildcanvas Frontend
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: 22
+          script: |
+            cd wildmind-staging/api-gateway-services-wildmind/deployment || exit 1
+            
+            # Update source code
+            cd ../../wildmindcanvas
+            git pull origin staging
+            
+            # Redeploy
+            cd ../api-gateway-services-wildmind/deployment
+            chmod +x deploy.sh
+            ./deploy.sh wildmindcanvas
