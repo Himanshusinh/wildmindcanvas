@@ -280,7 +280,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         const isProd = typeof window !== 'undefined' &&
           (window.location.hostname === 'wildmindai.com' ||
             window.location.hostname === 'www.wildmindai.com' ||
-            window.location.hostname === 'studio.wildmindai.com');
+            window.location.hostname === 'studio.wildmindai.com' ||
+            window.location.hostname === 'onstaging.wildmindai.com' ||
+            window.location.hostname === 'onstaging-studios.wildmindai.com');
 
         const mainProjectUrl = isProd
           ? 'https://www.wildmindai.com/view/signup'
@@ -342,7 +344,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
         const isProd = typeof window !== 'undefined' &&
           (window.location.hostname === 'wildmindai.com' ||
             window.location.hostname === 'www.wildmindai.com' ||
-            window.location.hostname === 'studio.wildmindai.com');
+            window.location.hostname === 'studio.wildmindai.com' ||
+            window.location.hostname === 'onstaging.wildmindai.com' ||
+            window.location.hostname === 'onstaging-studios.wildmindai.com');
 
         const mainProjectUrl = isProd
           ? 'https://www.wildmindai.com/view/signup'
