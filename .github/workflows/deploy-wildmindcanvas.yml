@@ -22,7 +22,7 @@ jobs:
             # Update source code
             git fetch origin staging
             git reset --hard origin/staging
-            git pull origin stagingdcanvas
+            git pull origin staging
             git pull origin staging
             
             # Redeploy
