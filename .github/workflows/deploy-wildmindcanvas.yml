@@ -20,7 +20,9 @@ jobs:
             cd wildmind-staging/api-gateway-services-wildmind/deployment || exit 1
             
             # Update source code
-            cd ../../wildmindcanvas
+            git fetch origin staging
+            git reset --hard origin/staging
+            git pull origin stagingdcanvas
             git pull origin staging
             
             # Redeploy
