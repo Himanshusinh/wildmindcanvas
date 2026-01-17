@@ -263,7 +263,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderColor = isSelected ? '#4C83FF' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
 
@@ -814,7 +814,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const newConnector = {
                   from: connectedImageSource.id,
                   to: targetModalId,
-                  color: '#437eb5',
+                  color: '#4C83FF',
                   fromX,
                   fromY,
                   toX,
@@ -860,7 +860,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const newConnector = {
                   from: id,
                   to: targetModalId,
-                  color: '#437eb5',
+                  color: '#4C83FF',
                   fromX,
                   fromY,
                   toX,

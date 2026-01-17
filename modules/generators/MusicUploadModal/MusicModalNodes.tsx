@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { MusicCategory } from './MusicModalTabs';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface MusicModalNodesProps {
   id?: string;
@@ -61,7 +62,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
+          backgroundColor: SELECTION_COLOR,
           cursor: 'pointer',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
@@ -104,7 +105,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
             width: `${20 * scale}px`,
             height: `${20 * scale}px`,
             borderRadius: '50%',
-            backgroundColor: '#437eb5',
+            backgroundColor: SELECTION_COLOR,
             cursor: 'pointer',
             border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
             zIndex: 5000,
@@ -125,7 +126,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           if (!id) return;
           e.stopPropagation();
           e.preventDefault();
-          const color = '#437eb5';
+          const color = SELECTION_COLOR;
           const startX = e.clientX;
           const startY = e.clientY;
           const DRAG_THRESHOLD_PX = 1;
@@ -176,7 +177,7 @@ export const MusicModalNodes: React.FC<MusicModalNodesProps> = ({
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
+          backgroundColor: SELECTION_COLOR,
           cursor: 'grab',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,

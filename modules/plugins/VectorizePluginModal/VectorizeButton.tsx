@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface VectorizeButtonProps {
   scale: number;
@@ -24,13 +26,14 @@ export const VectorizeButton: React.FC<VectorizeButtonProps> = ({
       onClick={onVectorize}
       disabled={disabled}
       style={{
-        padding: `${8 * scale}px ${16 * scale}px`,
+        height: `${40 * scale}px`,
+        padding: `0 ${16 * scale}px`,
         fontSize: `${12 * scale}px`,
         fontWeight: 600,
         color: '#ffffff',
-        backgroundColor: disabled ? '#9ca3af' : '#437eb5',
+        backgroundColor: disabled ? '#9ca3af' : SELECTION_COLOR,
         border: 'none',
-        borderRadius: `${8 * scale}px`,
+        borderRadius: `${10 * scale}px`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.3s ease',
         whiteSpace: 'nowrap',
@@ -38,46 +41,25 @@ export const VectorizeButton: React.FC<VectorizeButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: `${6 * scale}px`,
+        boxShadow: disabled ? 'none' : `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`,
       }}
       onMouseEnter={(e) => {
         if (!disabled) {
-          e.currentTarget.style.backgroundColor = '#3b6fa8';
+          e.currentTarget.style.backgroundColor = '#3d6edb';
+          e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
         }
       }}
       onMouseLeave={(e) => {
         if (!disabled) {
-          e.currentTarget.style.backgroundColor = '#437eb5';
+          e.currentTarget.style.backgroundColor = SELECTION_COLOR;
+          e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
         }
       }}
     >
       {isVectorizing || externalIsVectorizing ? (
-        <svg
-          width={16 * scale}
-          height={16 * scale}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12h14" />
-          <path d="M12 5l7 7-7 7" />
-        </svg>
+        <GenerateArrowIcon scale={scale} />
       ) : (
-        <svg
-          width={16 * scale}
-          height={16 * scale}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12h14" />
-          <path d="M12 5l7 7-7 7" />
-        </svg>
+        <GenerateArrowIcon scale={scale} />
       )}
     </button>
   );

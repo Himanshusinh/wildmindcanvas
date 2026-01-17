@@ -747,7 +747,7 @@ export function buildSnapshotElements(
   const connectorsToUseFinal = connectorsOverride ?? state.connectors;
   connectorsToUseFinal.forEach(c => {
     if (!c || !c.id) return;
-    elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
+    elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#4C83FF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
   });
 
   // DIAGNOSTIC LOG (USER REQUESTED) - FINAL

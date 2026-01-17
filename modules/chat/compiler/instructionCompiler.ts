@@ -4,119 +4,70 @@ import {
     SemanticGoal,
     CanvasInstructionPlan,
     CanvasInstructionStep,
-    CreateNodeAction,
-    ConnectSequentiallyAction,
-    GroupNodesAction,
-    ActionType
+    GoalType
 } from './types';
-import { CAPABILITY_REGISTRY, ModelConstraint } from '../capabilityRegistry';
+import { CAPABILITY_REGISTRY } from '../capabilityRegistry';
 
-// Helper to create a unique ID
 const generateId = () => uuidv4();
 
+/**
+ * Universal Instruction Compiler
+ * Transforms high-level SemanticGoal into a deterministic CanvasInstructionPlan.
+ */
 export function compileGoalToPlan(goal: SemanticGoal): CanvasInstructionPlan {
-    const planId = generateId();
     const steps: CanvasInstructionStep[] = [];
-    const summary = `Compiled plan for ${goal.goalType}`;
+    let summary = "";
 
-    // Select Strategy based on Goal Type (Compiler-Driven Branching)
     switch (goal.goalType) {
-        case 'VIDEO_REQUEST':
-            compileVideoRequest(goal, steps);
+        case 'STORY_VIDEO':
+            summary = compileStoryVideo(goal, steps);
+            break;
+        case 'IMAGE_GENERATION':
+            summary = compileImageGeneration(goal, steps);
             break;
         case 'MUSIC_VIDEO':
-            compileMusicVideo(goal, steps);
+            summary = compileMusicVideo(goal, steps);
             break;
-        case 'MOTION_COMIC':
-            // Placeholder for future implementation
+        case 'IMAGE_ANIMATE':
+            summary = compileImageAnimate(goal, steps);
+            break;
+        case 'EXPLAIN_CANVAS':
+            summary = "Explaining canvas contents...";
+            break;
+        case 'CLARIFY':
+            summary = "Requesting clarification...";
             break;
         default:
-            // Fallback: Try to map 'needs' to a linear pipeline
-            // e.g. ["text", "image"] -> Text -> Image
-            // For now, minimal implementation
+            summary = `Creating ${goal.topic || 'production'}`;
             break;
     }
 
     return {
-        id: planId,
-        planType: 'CANVAS_PIPELINE',
+        id: generateId(),
         summary,
         steps,
         metadata: {
             sourceGoal: goal,
             compiledAt: Date.now()
-        }
+        },
+        requiresConfirmation: goal.goalType !== 'EXPLAIN_CANVAS' && goal.goalType !== 'CLARIFY'
     };
 }
 
 /**
- * Strategy: VIDEO_REQUEST
- * Linear: Video Generation (Stitched)
+ * Strategy: STORY_VIDEO
+ * 1. Script -> 2. Sequential Visuals -> 3. Video Segments -> 4. Group
  */
-function compileVideoRequest(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    const strategy = goal.constraints?.strategy || 'SCRIPT_TO_SCENES';
-    const duration = goal.constraints?.duration || 10;
-    const topic = goal.constraints?.topic || "Video";
+function compileStoryVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const topic = goal.topic || "Story";
+    const duration = goal.durationSeconds || 30;
+    const aspectRatio = goal.aspectRatio || '16:9';
 
-    switch (strategy) {
-        case 'SCRIPT_TO_SCENES':
-            compileScriptToScenes(goal, steps);
-            break;
-        case 'KEYFRAME_I2V':
-            compileKeyframeI2V(goal, steps);
-            break;
-        case 'AUDIO_MONTAGE':
-            compileAudioFirst(goal, steps);
-            break;
-        case 'CHARACTER_SHEET':
-            compileCharacterSheet(goal, steps);
-            break;
-        case 'FRAME_LOCK':
-        default:
-            compileStandardVideo(goal, steps);
-            break;
-    }
-}
+    // Auth Rule: Segments are 8s by default for consistency
+    const segmentDuration = 8;
+    const segmentCount = Math.ceil(duration / segmentDuration);
 
-function compileStandardVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    const modelId = 'veo-3.1';
-    const model = CAPABILITY_REGISTRY.VIDEO.models[modelId] as ModelConstraint;
-    const duration = goal.constraints?.duration || 10;
-    const maxOutput = model.temporal?.maxOutputSeconds || 4;
-
-    const videoStepId = generateId();
-    const scenes = goal.constraints?.scenes;
-    const segmentCount = scenes ? scenes.length : Math.ceil(duration / maxOutput);
-
-    steps.push({
-        id: videoStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'video-generator',
-        count: segmentCount,
-        configTemplate: {
-            model: model.name,
-            totalDuration: duration,
-            aspectRatio: goal.constraints?.aspectRatio || '16:9',
-            prompt: goal.constraints?.topic || "Video",
-            continuityMode: goal.constraints?.strategy === 'FRAME_LOCK' ? 'frame-lock' : undefined
-        },
-        batchConfigs: scenes ? scenes.map(s => ({
-            prompt: s.prompt,
-            duration: s.duration
-        })) : undefined
-    });
-
-    steps.push({
-        id: generateId(),
-        action: 'GROUP_NODES',
-        stepIds: [videoStepId],
-        groupType: 'video-sequence',
-        label: `${goal.constraints?.topic || 'Video'} (${duration}s)`
-    });
-}
-
-function compileScriptToScenes(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    // 1. Script Node
+    // 1. CREATE SCRIPT
     const scriptStepId = generateId();
     steps.push({
         id: scriptStepId,
@@ -125,81 +76,122 @@ function compileScriptToScenes(goal: SemanticGoal, steps: CanvasInstructionStep[
         count: 1,
         configTemplate: {
             model: 'standard',
-            text: `Scene Decomposition for: ${goal.constraints?.topic || 'Untitled Video'}\n\n[Scene 1] Introduce the character and setting...\n[Scene 2] Establish the conflict or main action...\n[Scene 3] Resolution and cinematic closing.`,
-            label: "Production Script"
+            prompt: `Script for ${topic} (${duration}s)`,
+            style: 'rich',
+            content: `[Scene 1(${segmentDuration}s)]: Introduction...\n...`
         }
     });
 
-    // 2. Video Sequence (Dependent on Script)
-    const videoStepId = generateId();
-    const modelId = 'veo-3.1';
-    const model = CAPABILITY_REGISTRY.VIDEO.models[modelId] as ModelConstraint;
-    const duration = goal.constraints?.duration || 10;
-    const maxOutput = model.temporal?.maxOutputSeconds || 5; // 5s segments for script decomposition
-    const segmentCount = Math.ceil(duration / maxOutput);
-
-    steps.push({
-        id: videoStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'video-generator',
-        count: segmentCount,
-        inputFrom: scriptStepId,
-        configTemplate: {
-            model: model.name,
-            totalDuration: duration,
-            aspectRatio: goal.constraints?.aspectRatio || '16:9',
-            prompt: `Generate scenes based on script for ${goal.constraints?.topic}`
-        }
-    });
-
-    steps.push({
-        id: generateId(),
-        action: 'GROUP_NODES',
-        stepIds: [scriptStepId, videoStepId],
-        groupType: 'logical-group',
-        label: `Scripted Production: ${goal.constraints?.topic}`
-    });
-}
-
-function compileKeyframeI2V(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    // 1. Keyframe Images
+    // 2. CREATE IMAGES (1 per segment for consistency)
     const imageStepId = generateId();
     steps.push({
         id: imageStepId,
         action: 'CREATE_NODE',
         nodeType: 'image-generator',
-        count: 3, // Start with 3 keyframes
+        count: segmentCount,
+        inputFrom: scriptStepId,
         configTemplate: {
-            model: 'flux-2-pro',
-            prompt: `Keyframe image for ${goal.constraints?.topic}, high consistency`
+            model: 'flux-1.1-pro', // High quality default
+            aspectRatio,
+            prompt: `Consistent cinematic visual for ${topic}`
         }
     });
 
-    // 2. I2V Animation
+    // 3. CREATE VIDEOS
     const videoStepId = generateId();
     steps.push({
         id: videoStepId,
         action: 'CREATE_NODE',
         nodeType: 'video-generator',
-        count: 3,
+        count: segmentCount,
         inputFrom: imageStepId,
         configTemplate: {
-            model: 'luma-dream-machine', // I2V pro model
-            prompt: `Animate keyframe with cinematic motion`
+            model: 'veo-3.1',
+            aspectRatio,
+            duration: segmentDuration,
+            prompt: `Cinematic motion for ${topic}`
         }
     });
 
+    // 4. CONNECT
     steps.push({
         id: generateId(),
-        action: 'GROUP_NODES',
-        stepIds: [imageStepId, videoStepId],
-        groupType: 'story-board',
-        label: `Keyframe Animation: ${goal.constraints?.topic}`
+        action: 'CONNECT_SEQUENTIALLY',
+        fromStepId: imageStepId,
+        toStepId: videoStepId
     });
+
+    // 5. GROUP
+    const groupStepId = generateId();
+    steps.push({
+        id: groupStepId,
+        action: 'GROUP_NODES',
+        stepIds: [scriptStepId, imageStepId, videoStepId],
+        groupType: 'video-sequence',
+        label: `${topic} (${duration}s Video Production)`
+    });
+
+    return `Create a ${duration}s ${topic} video with ${segmentCount} scenes (script, images, video segments).`;
 }
 
-function compileAudioFirst(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    // 1. Audio (Voiceover)
+/**
+ * Strategy: IMAGE_GENERATION
+ */
+function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const topic = goal.topic || "Art";
+    const count = goal.needs.includes('image') ? (goal.references?.length || 1) : 1;
+    const style = goal.style || 'photorealistic';
+
+    // Auth Rule: Model selection logic lives here
+    const model = goal.style?.toLowerCase().includes('fast') || goal.style?.toLowerCase().includes('turbo')
+        ? 'z-image-turbo'
+        : 'flux-1.1-pro';
+
+    steps.push({
+        id: generateId(),
+        action: 'CREATE_NODE',
+        nodeType: 'image-generator',
+        count,
+        configTemplate: {
+            model,
+            aspectRatio: goal.aspectRatio || '1:1',
+            prompt: `${topic} in ${style} style`,
+        }
+    });
+
+    return `Generate ${count} ${style} images of "${topic}" using ${model}.`;
+}
+
+/**
+ * Strategy: IMAGE_ANIMATE
+ */
+function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const count = goal.references?.length || 1;
+
+    const videoStepId = generateId();
+    steps.push({
+        id: videoStepId,
+        action: 'CREATE_NODE',
+        nodeType: 'video-generator',
+        count,
+        configTemplate: {
+            model: 'veo-3.1',
+            prompt: "Animate this image with cinematic motion"
+        }
+    });
+
+    // Connect existing references to new videos if possible
+    // This requires the executor to mapped goal.references to the 'toStepId'
+
+    return `Animate ${count} images into cinematic video loops.`;
+}
+
+/**
+ * Strategy: MUSIC_VIDEO
+ */
+function compileMusicVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const topic = goal.topic || "Song";
+
     const audioStepId = generateId();
     steps.push({
         id: audioStepId,
@@ -208,142 +200,22 @@ function compileAudioFirst(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
         count: 1,
         configTemplate: {
             model: 'udio-v2',
-            prompt: `Narration voiceover for ${goal.constraints?.topic}`,
-            type: 'voice'
+            prompt: `Epic cinematic song about ${topic}`
         }
     });
 
-    // 2. Visual Sequence (Montage)
     const videoStepId = generateId();
     steps.push({
         id: videoStepId,
         action: 'CREATE_NODE',
         nodeType: 'video-generator',
-        count: 5,
+        count: 4, // 4 visuals for a song
         inputFrom: audioStepId,
         configTemplate: {
             model: 'veo-3.1',
-            prompt: `Visual montage matching the audio beats for ${goal.constraints?.topic}`
+            prompt: `Musical visual montage for ${topic}`
         }
     });
 
-    steps.push({
-        id: generateId(),
-        action: 'GROUP_NODES',
-        stepIds: [audioStepId, videoStepId],
-        groupType: 'logical-group',
-        label: `Audio-Visual Production: ${goal.constraints?.topic}`
-    });
-}
-
-function compileCharacterSheet(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    // 1. Character Sheet Assets
-    const assetStepId = generateId();
-    steps.push({
-        id: assetStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'image-generator',
-        count: 1,
-        configTemplate: {
-            model: 'flux-2-pro',
-            prompt: `Character sheet for ${goal.constraints?.topic}: front view, side view, and expressions. White background, cinematic style.`
-        }
-    });
-
-    // 2. Video Sequence (Referencing Assets)
-    const videoStepId = generateId();
-    const modelId = 'veo-3.1';
-    const model = CAPABILITY_REGISTRY.VIDEO.models[modelId] as ModelConstraint;
-    const duration = goal.constraints?.duration || 10;
-    const maxOutput = model.temporal?.maxOutputSeconds || 4;
-    const segmentCount = Math.ceil(duration / maxOutput);
-
-    steps.push({
-        id: videoStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'video-generator',
-        count: segmentCount,
-        inputFrom: assetStepId,
-        configTemplate: {
-            model: model.name,
-            totalDuration: duration,
-            aspectRatio: goal.constraints?.aspectRatio || '16:9',
-            prompt: `Generate scenes for ${goal.constraints?.topic} maintaining consistency with character sheet.`
-        }
-    });
-
-    steps.push({
-        id: generateId(),
-        action: 'GROUP_NODES',
-        stepIds: [assetStepId, videoStepId],
-        groupType: 'logical-group',
-        label: `Character-Driven Production: ${goal.constraints?.topic}`
-    });
-}
-
-/**
- * Strategy: MUSIC_VIDEO
- * Parallel: Music || Image -> Video
- */
-function compileMusicVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]) {
-    // 1. Music Generation
-    const musicStepId = generateId();
-    steps.push({
-        id: musicStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'music-generator',
-        count: 1,
-        configTemplate: {
-            model: 'udio-v2', // Default high quality
-            prompt: `Music about ${goal.constraints?.topic}`
-        }
-    });
-
-    // 2. Image Generation (Parallel)
-    const imageStepId = generateId();
-    steps.push({
-        id: imageStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'image-generator',
-        count: 1, // Or more?
-        configTemplate: {
-            model: 'midjourney-v6',
-            prompt: `Visuals for ${goal.constraints?.topic}`
-        }
-    });
-
-    // 3. Video Generation (Dependent)
-    // Needs audio inputs from Music and image input from Image
-    const videoStepId = generateId();
-    steps.push({
-        id: videoStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'video-generator',
-        count: 1,
-        configTemplate: {
-            model: 'veo-3.1',
-            prompt: 'Music Video animation'
-        },
-        inputFrom: [musicStepId, imageStepId].join(',') // Rough way to signal multiple inputs? 
-        // Our type definition says "inputFrom?: string". 
-        // We might need to handle multiple inputs in the Executor.
-        // For now, let's assume the executor can look up outputs from these steps.
-    });
-
-    // 4. Connections
-    steps.push({
-        id: generateId(),
-        action: 'CONNECT_SEQUENTIALLY', // This type implies A -> B. 
-        // We need explicit connections: Music -> Video, Image -> Video.
-        // 'CONNECT_SEQUENTIALLY' might not be enough for this topology.
-        // We might need 'CONNECT_NODES' { from: step, to: step }
-        fromStepId: musicStepId,
-        toStepId: videoStepId
-    });
-    steps.push({
-        id: generateId(),
-        action: 'CONNECT_SEQUENTIALLY',
-        fromStepId: imageStepId,
-        toStepId: videoStepId
-    });
+    return `Create a music video production: 1 song and a 4-scene visual montage.`;
 }

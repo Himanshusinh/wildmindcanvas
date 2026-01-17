@@ -60,33 +60,37 @@ export type CanvasInstructionStep =
     | GroupNodesAction
     | ApplyPluginAction;
 
-export type GoalType = 'VIDEO_REQUEST' | 'MUSIC_VIDEO' | 'MOTION_COMIC' | 'STORY_BOARD' | 'IMAGE_GENERATION' | 'UNKNOWN';
+
+export type GoalType =
+    | 'IMAGE_GENERATION'
+    | 'STORY_VIDEO'
+    | 'MUSIC_VIDEO'
+    | 'MOTION_COMIC'
+    | 'IMAGE_ANIMATE'
+    | 'EXPLAIN_CANVAS'
+    | 'MODIFY_EXISTING_FLOW'
+    | 'CLARIFY'
+    | 'UNKNOWN';
 
 export interface SemanticGoal {
     goalType: GoalType;
-    needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion'>;
-    constraints?: {
-        duration?: number;
-        style?: string;
-        mood?: string;
-        aspectRatio?: string;
-        strategy?: 'SCRIPT_TO_SCENES' | 'KEYFRAME_I2V' | 'FRAME_LOCK' | 'CHARACTER_SHEET' | 'AUDIO_MONTAGE';
-        scenes?: Array<{
-            prompt: string;
-            duration: number;
-        }>;
-        [key: string]: any; // Allow extracted entities like 'topic'
-    };
+    topic?: string;
+    durationSeconds?: number;
+    style?: string;
+    aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion' | 'plugin'>;
+    references?: string[];
+    explanation?: string; // Conversational response from LLM
     rawInput?: string;
 }
 
 export interface CanvasInstructionPlan {
     id: string;
-    planType: 'CANVAS_PIPELINE' | 'SINGLE_ACTION';
     summary: string;
     steps: CanvasInstructionStep[];
-    metadata?: {
-        sourceGoal?: SemanticGoal; // Reference to Semantic Goal
+    metadata: {
+        sourceGoal: SemanticGoal;
         compiledAt: number;
     };
+    requiresConfirmation: boolean;
 }

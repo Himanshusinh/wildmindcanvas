@@ -171,7 +171,7 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   width: `${nodeSize}px`,
                   height: `${nodeSize}px`,
                   borderRadius: '50%',
-                  backgroundColor: '#437eb5',
+                  backgroundColor: '#4C83FF',
                   cursor: 'pointer',
                   border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
                   zIndex: 5000,
@@ -192,7 +192,7 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) { }
                   e.stopPropagation();
                   e.preventDefault();
-                  const color = '#437eb5';
+                  const color = '#4C83FF';
                   const startX = e.clientX;
                   const startY = e.clientY;
                   const DRAG_THRESHOLD_PX = 1;
@@ -245,7 +245,7 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
                   width: `${nodeSize}px`,
                   height: `${nodeSize}px`,
                   borderRadius: '50%',
-                  backgroundColor: '#437eb5',
+                  backgroundColor: '#4C83FF',
                   boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
                   cursor: 'grab',
                   border: `${2 * scale}px solid rgba(255,255,255,0.95)`,

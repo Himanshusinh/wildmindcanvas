@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { Text, Transformer, Group, Rect } from 'react-konva';
 import { TextEditor } from './TextEditor';
 import Konva from 'konva';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface RichTextNodeProps {
     id: string;
@@ -175,9 +176,9 @@ export const RichTextNode: React.FC<RichTextNodeProps> = ({
                     ]}
                     anchorSize={6}
                     anchorFill="#ffffff"
-                    anchorStroke="#4C83FF"
+                    anchorStroke={SELECTION_COLOR}
                     anchorCornerRadius={1}
-                    borderStroke="#4C83FF"
+                    borderStroke={SELECTION_COLOR}
                     borderStrokeWidth={1}
                     borderDash={[]}
                     padding={8}

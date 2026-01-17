@@ -1,5 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface MusicCategoryProps {
     scale: number;
@@ -113,25 +115,33 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        width: `${36 * scale}px`,
-                        height: `${36 * scale}px`,
+                        width: `${40 * scale}px`,
+                        height: `${40 * scale}px`,
                         padding: 0,
-                        backgroundColor: '#2563eb',
+                        backgroundColor: SELECTION_COLOR,
                         color: '#ffffff',
                         border: 'none',
-                        borderRadius: `${8 * scale}px`,
+                        borderRadius: `${10 * scale}px`,
                         cursor: (isGenerating || !prompt.trim()) ? 'not-allowed' : 'pointer',
                         opacity: (isGenerating || !prompt.trim()) ? 0.7 : 1,
-                        boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                        boxShadow: `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`,
+                        transition: 'all 0.3s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                        if (!isGenerating && prompt.trim()) {
+                            e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (!isGenerating && prompt.trim()) {
+                            e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
+                        }
                     }}
                 >
                     {isGenerating ? (
                         <div className="animate-spin" style={{ width: `${16 * scale}px`, height: `${16 * scale}px`, border: '2px solid #ffffff', borderTopColor: 'transparent', borderRadius: '50%' }} />
                     ) : (
-                        <svg width={20 * scale} height={20 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                            <polyline points="12 5 19 12 12 19"></polyline>
-                        </svg>
+                        <GenerateArrowIcon scale={scale * 1.1} />
                     )}
                 </button>
             </div>
@@ -153,7 +163,7 @@ export const MusicCategoryView: React.FC<MusicCategoryProps> = ({
                                     <div style={{ fontSize: `${12 * scale}px`, color: '#bbb', lineHeight: 1.5 }}>
                                         <div style={{ color: '#fff', fontWeight: '600', marginBottom: `${4 * scale}px` }}>COMPOSITION TIPS</div>
                                         Specify genre (pop, lo-fi), mood (happy, dark), pace, and instruments to fit your scene.
-                                        <div style={{ marginTop: `${8 * scale}px`, color: '#3b82f6', fontWeight: '500' }}>80 credits per track</div>
+                                        <div style={{ marginTop: `${8 * scale}px`, color: SELECTION_COLOR, fontWeight: '500' }}>80 credits per track</div>
                                     </div>
                                 </div>
                             )}

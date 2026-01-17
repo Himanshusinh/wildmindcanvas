@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface MultiangleCameraControlsProps {
   scale: number;
@@ -84,8 +85,8 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
   const textColor = isDark ? '#ffffff' : '#1a1a1a';
   const borderColor = isDark ? '#3a3a3a' : '#d1d5db';
   const inputBg = isDark ? '#2d2d2d' : '#ffffff';
-  const buttonBg = isDark ? '#437eb5' : '#3b82f6';
-  const buttonHoverBg = isDark ? '#5a8fc5' : '#2563eb';
+  const buttonBg = SELECTION_COLOR;
+  const buttonHoverBg = '#3d6edb';
   const buttonDisabledBg = isDark ? '#4a4a4a' : '#9ca3af';
 
   const aspectRatioOptions = [
@@ -151,7 +152,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
               outline: 'none',
               transition: 'border-color 0.2s ease',
             }}
-            onFocus={(e) => e.target.style.borderColor = isDark ? '#5a8fc5' : '#3b82f6'}
+            onFocus={(e) => e.target.style.borderColor = SELECTION_COLOR}
             onBlur={(e) => e.target.style.borderColor = borderColor}
           />
         </div>
@@ -181,7 +182,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                   alignItems: 'center',
                   transition: 'border-color 0.2s ease',
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDark ? '#5a8fc5' : '#3b82f6'}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = SELECTION_COLOR}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
               >
                 <span>{aspectRatioOptions.find(opt => opt.value === aspectRatio)?.label || aspectRatio}</span>
@@ -216,7 +217,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                         width: '100%',
                         padding: `8px 12px`,
                         fontSize: `12px`,
-                        backgroundColor: aspectRatio === option.value ? (isDark ? '#437eb5' : '#3b82f6') : 'transparent',
+                        backgroundColor: aspectRatio === option.value ? SELECTION_COLOR : 'transparent',
                         color: aspectRatio === option.value ? '#ffffff' : textColor,
                         border: 'none',
                         cursor: 'pointer',
@@ -258,7 +259,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onChange={(e) => onLoraScaleChange(parseFloat(e.target.value))}
                 style={{
                   flex: 1,
-                  accentColor: '#437eb5',
+                  accentColor: SELECTION_COLOR,
                 }}
               />
               <input
@@ -308,7 +309,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                 onChange={(e) => onMoveForwardChange(parseFloat(e.target.value))}
                 style={{
                   flex: 1,
-                  accentColor: '#437eb5',
+                  accentColor: SELECTION_COLOR,
                 }}
               />
               <input
@@ -362,7 +363,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                   alignItems: 'center',
                   transition: 'border-color 0.2s ease',
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDark ? '#5a8fc5' : '#3b82f6'}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = SELECTION_COLOR}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
               >
                 <span>{verticalTiltOptions.find(opt => opt.value === verticalTilt)?.label || verticalTilt}</span>
@@ -395,7 +396,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
                         width: '100%',
                         padding: `8px 12px`,
                         fontSize: `12px`,
-                        backgroundColor: verticalTilt === option.value ? (isDark ? '#437eb5' : '#3b82f6') : 'transparent',
+                        backgroundColor: verticalTilt === option.value ? SELECTION_COLOR : 'transparent',
                         color: verticalTilt === option.value ? '#ffffff' : textColor,
                         border: 'none',
                         cursor: 'pointer',
@@ -429,13 +430,13 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
               <span>Rotate Degrees</span>
             </label>
             <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', fontSize: `10px`, color: textColor, opacity: 0.7 }}>
-              <span style={{ color: rotateDegrees < 0 ? (isDark ? '#5a8fc5' : '#3b82f6') : textColor, opacity: rotateDegrees < 0 ? 1 : 0.5 }}>
+              <span style={{ color: rotateDegrees < 0 ? SELECTION_COLOR : textColor, opacity: rotateDegrees < 0 ? 1 : 0.5 }}>
                 Right →
               </span>
-              <span style={{ color: rotateDegrees === 0 ? textColor : (isDark ? '#5a8fc5' : '#3b82f6'), opacity: rotateDegrees === 0 ? 1 : 0.5 }}>
+              <span style={{ color: rotateDegrees === 0 ? textColor : SELECTION_COLOR, opacity: rotateDegrees === 0 ? 1 : 0.5 }}>
                 Center
               </span>
-              <span style={{ color: rotateDegrees > 0 ? (isDark ? '#5a8fc5' : '#3b82f6') : textColor, opacity: rotateDegrees > 0 ? 1 : 0.5 }}>
+              <span style={{ color: rotateDegrees > 0 ? SELECTION_COLOR : textColor, opacity: rotateDegrees > 0 ? 1 : 0.5 }}>
                 ← Left
               </span>
             </div>
@@ -450,7 +451,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
               onChange={(e) => onRotateDegreesChange(parseInt(e.target.value))}
               style={{
                 flex: 1,
-                accentColor: '#437eb5',
+                accentColor: SELECTION_COLOR,
               }}
             />
             <input

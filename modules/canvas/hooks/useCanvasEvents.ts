@@ -80,6 +80,8 @@ export function useCanvasEvents(
         scriptFrameModalStates,
         sceneFrameModalStates,
         videoEditorModalStates,
+        imageEditorModalStates,
+        setImageEditorModalStates,
         richTextStates,
     } = canvasState;
 
@@ -93,6 +95,7 @@ export function useCanvasEvents(
         selectedImageModalIds, setSelectedImageModalIds,
         selectedVideoModalIds, setSelectedVideoModalIds,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds,
+        selectedImageEditorModalIds, setSelectedImageEditorModalIds,
         selectedMusicModalIds, setSelectedMusicModalIds,
         selectedTextInputIds, setSelectedTextInputIds,
         selectedUpscaleModalIds, setSelectedUpscaleModalIds,
@@ -608,6 +611,14 @@ export function useCanvasEvents(
                     }
                 });
 
+                const newSelectedImageEditorModalIds = isMultiSelect ? [...selectedImageEditorModalIds] : [];
+                imageEditorModalStates.forEach((modal: any) => {
+                    const dims = getComponentDimensions('imageEditorModal', modal.id, canvasState as any);
+                    if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
+                        if (!newSelectedImageEditorModalIds.includes(modal.id)) newSelectedImageEditorModalIds.push(modal.id);
+                    }
+                });
+
                 const newSelectedMusicModalIds = isMultiSelect ? [...selectedMusicModalIds] : [];
                 musicModalStates.forEach((modal: any) => {
                     const dims = getComponentDimensions('musicModal', modal.id, canvasState as any);
@@ -748,6 +759,8 @@ export function useCanvasEvents(
                 setSelectedImageModalIds(newSelectedImageModalIds);
                 setSelectedTextInputIds(newSelectedTextInputIds);
                 setSelectedVideoModalIds(newSelectedVideoModalIds);
+                setSelectedVideoEditorModalIds(newSelectedVideoEditorModalIds);
+                setSelectedImageEditorModalIds(newSelectedImageEditorModalIds);
                 setSelectedMusicModalIds(newSelectedMusicModalIds);
                 setSelectedNextSceneModalIds(newSelectedNextSceneModalIds);
                 setSelectedMultiangleCameraModalIds(newSelectedMultiangleCameraModalIds);
@@ -849,6 +862,15 @@ export function useCanvasEvents(
                     const modal = videoEditorModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('videoEditorModal', id, canvasState as any);
+                        const offsetX = (dims.width - 100) / 2;
+                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
+                    }
+                });
+
+                newSelectedImageEditorModalIds.forEach(id => {
+                    const modal = imageEditorModalStates.find((m: any) => m.id === id);
+                    if (modal) {
+                        const dims = getComponentDimensions('imageEditorModal', id, canvasState as any);
                         const offsetX = (dims.width - 100) / 2;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
@@ -966,6 +988,7 @@ export function useCanvasEvents(
                         newSelectedImageModalIds.length +
                         newSelectedVideoModalIds.length +
                         newSelectedVideoEditorModalIds.length +
+                        newSelectedImageEditorModalIds.length +
                         newSelectedMusicModalIds.length +
                         newSelectedTextInputIds.length +
                         newSelectedUpscaleModalIds.length +

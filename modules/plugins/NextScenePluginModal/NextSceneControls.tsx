@@ -5,6 +5,7 @@ import { NextSceneButton } from './NextSceneButton';
 import { ModeSwitch } from './ModeSwitch';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { ChevronDown } from 'lucide-react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface NextSceneControlsProps {
   scale: number;
@@ -231,7 +232,7 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
                     onChange={(e) => onLoraScaleChange?.(parseFloat(e.target.value))}
                     style={{
                       flex: 1,
-                      accentColor: '#437eb5',
+                      accentColor: SELECTION_COLOR,
                     }}
                   />
                   <input
@@ -279,7 +280,7 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
                   onChange={(e) => onTrueGuidanceScaleChange?.(parseFloat(e.target.value))}
                   style={{
                     flex: 1,
-                    accentColor: '#437eb5',
+                    accentColor: '#4C83FF',
                   }}
                 />
                 <input

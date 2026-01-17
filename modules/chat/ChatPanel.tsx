@@ -154,19 +154,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                             {msg.content}
                                         </div>
 
-                                        {/* Action Verification Segment */}
+                                        {/* Action Verification Segment (Layer 9: Preview & Confirmation) */}
                                         {msg.role === 'assistant' && msg.action && (
                                             <div className="mt-3 w-full max-w-[90%] p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3 backdrop-blur-sm">
-                                                <div className="flex items-center gap-2 text-[9px] font-medium text-white/20 uppercase tracking-[0.3em]">
-                                                    <span>Automation Plan</span>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-[9px] font-medium text-white/20 uppercase tracking-[0.3em]">
+                                                        <span>Automation Plan</span>
+                                                    </div>
                                                 </div>
+
+                                                {msg.action.intent === 'EXECUTE_PLAN' && (
+                                                    <div className="text-[11px] text-white/40 font-light leading-relaxed border-l-2 border-blue-500/20 pl-3 py-1">
+                                                        {msg.action.payload.summary}
+                                                    </div>
+                                                )}
 
                                                 <button
                                                     onClick={() => handleExecute(msg)}
-                                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300/80 border border-blue-500/20 transition-all font-medium text-[11px] uppercase tracking-widest"
+                                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300/80 border border-blue-500/20 transition-all font-medium text-[11px] uppercase tracking-widest group/exec"
                                                 >
-                                                    <Zap size={13} className="opacity-50" />
-                                                    Generate
+                                                    <Zap size={13} className="opacity-50 group-hover/exec:fill-current" />
+                                                    Execute Plan
                                                 </button>
                                             </div>
                                         )}

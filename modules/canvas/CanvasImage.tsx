@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Group, Rect, Text, Image as KonvaImage, Circle, Path } from 'react-konva';
 import Konva from 'konva';
 import { ImageUpload } from '@/core/types/canvas';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
 
@@ -427,8 +428,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const frameBorderWidth = 2;
   const framePadding = 0; // No padding, image fills the frame
   const frameBackgroundColor = 'rgba(255, 255, 255, 0.95)';
-  // Use same border color as generation frames: rgba(0, 0, 0, 0.3) when not selected, #60A5FA when selected
-  const frameBorderColor = isSelectedState ? '#60A5FA' : 'rgba(0, 0, 0, 0.3)';
+  // Use centralized selection color: SELECTION_COLOR
+  const frameBorderColor = isSelectedState ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.3)';
   const frameShadowBlur = 32;
   const frameShadowOpacity = 0.15;
 
@@ -666,7 +667,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
             height={50}
             fill="rgba(0, 0, 0, 0.75)"
             cornerRadius={[0, 0, frameBorderRadius, frameBorderRadius]}
-            stroke={isSelectedState ? '#60A5FA' : 'transparent'}
+            stroke={isSelectedState ? SELECTION_COLOR : 'transparent'}
             strokeWidth={isSelectedState ? 4 : 0}
             listening={false}
           />
@@ -726,7 +727,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               y={-2}
               width={(width - 100) * (duration > 0 ? currentTime / duration : 0)}
               height={8}
-              fill="#3b82f6"
+              fill={SELECTION_COLOR}
               cornerRadius={4}
               listening={false}
             />
@@ -753,7 +754,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               <Circle
                 radius={10}
                 fill="#ffffff"
-                stroke="#3b82f6"
+                stroke={SELECTION_COLOR}
                 strokeWidth={3}
                 shadowBlur={8}
                 shadowColor="rgba(0, 0, 0, 0.5)"
@@ -763,7 +764,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
               {/* Inner circle for depth */}
               <Circle
                 radius={6}
-                fill="#3b82f6"
+                fill={SELECTION_COLOR}
               />
             </Group>
           </Group>

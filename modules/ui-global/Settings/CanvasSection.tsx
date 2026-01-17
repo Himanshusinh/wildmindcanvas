@@ -38,7 +38,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.cursorType === 'default' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.cursorType === 'default' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.cursorType === 'default' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -48,7 +48,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Simple Pointer"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'default' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'default' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
               </svg>
             </button>
@@ -59,7 +59,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.cursorType === 'crosshair' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.cursorType === 'crosshair' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.cursorType === 'crosshair' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -69,7 +69,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Gaming Pointer (Crosshair)"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'crosshair' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.cursorType === 'crosshair' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="16" />
                 <line x1="8" y1="12" x2="16" y2="12" />
@@ -88,7 +88,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.navigationMode === 'trackpad' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.navigationMode === 'trackpad' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -99,7 +99,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Pad (Trackpad behavior)"
             >
-              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#437eb5' : textColor, fontWeight: 500 }}>Pad</span>
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : textColor, fontWeight: 500 }}>Pad</span>
             </button>
 
             {/* Standard (Mouse) */}
@@ -108,7 +108,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.navigationMode === 'mouse' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.navigationMode === 'mouse' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -119,7 +119,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Standard (Mouse behavior)"
             >
-              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#437eb5' : textColor, fontWeight: 500 }}>Standard</span>
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : textColor, fontWeight: 500 }}>Standard</span>
             </button>
           </div>
         </div>
@@ -134,7 +134,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.backgroundType === 'dots' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.backgroundType === 'dots' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.backgroundType === 'dots' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -145,15 +145,15 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               title="Dots"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="6" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="12" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="18" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="6" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="12" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="18" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="6" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="12" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
-                <circle cx="18" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#437eb5' : textColor} />
+                <circle cx="6" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="12" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="18" cy="6" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="6" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="12" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="18" cy="12" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="6" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="12" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
+                <circle cx="18" cy="18" r="1.5" fill={canvasSettings.backgroundType === 'dots' ? '#4C83FF' : textColor} />
               </svg>
             </button>
 
@@ -163,7 +163,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.backgroundType === 'none' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.backgroundType === 'none' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.backgroundType === 'none' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -173,7 +173,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="None"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'none' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'none' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
               </svg>
@@ -185,7 +185,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.backgroundType === 'lines-vertical' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.backgroundType === 'lines-vertical' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.backgroundType === 'lines-vertical' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -195,7 +195,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Lines Vertical"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-vertical' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-vertical' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round">
                 <line x1="6" y1="4" x2="6" y2="20" />
                 <line x1="12" y1="4" x2="12" y2="20" />
                 <line x1="18" y1="4" x2="18" y2="20" />
@@ -208,7 +208,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.backgroundType === 'lines-horizontal' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.backgroundType === 'lines-horizontal' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.backgroundType === 'lines-horizontal' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -218,7 +218,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Lines Horizontal"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-horizontal' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'lines-horizontal' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round">
                 <line x1="4" y1="6" x2="20" y2="6" />
                 <line x1="4" y1="12" x2="20" y2="12" />
                 <line x1="4" y1="18" x2="20" y2="18" />
@@ -231,7 +231,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                border: `2px solid ${canvasSettings.backgroundType === 'grid' ? '#437eb5' : borderColor}`,
+                border: `2px solid ${canvasSettings.backgroundType === 'grid' ? '#4C83FF' : borderColor}`,
                 background: canvasSettings.backgroundType === 'grid' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
                 cursor: 'pointer',
                 display: 'flex',
@@ -241,7 +241,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Lines Both (Grid)"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'grid' ? '#437eb5' : textColor} strokeWidth="2" strokeLinecap="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={canvasSettings.backgroundType === 'grid' ? '#4C83FF' : textColor} strokeWidth="2" strokeLinecap="round">
                 <line x1="6" y1="4" x2="6" y2="20" />
                 <line x1="12" y1="4" x2="12" y2="20" />
                 <line x1="18" y1="4" x2="18" y2="20" />

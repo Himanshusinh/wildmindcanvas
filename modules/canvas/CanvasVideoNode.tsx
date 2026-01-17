@@ -210,7 +210,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 image={videoElement}
                 width={videoState.frameWidth || 600}
                 height={videoState.frameHeight || 400} // Default fallback
-                stroke={isSelected ? '#437eb5' : 'transparent'}
+                stroke={isSelected ? '#4C83FF' : 'transparent'}
                 strokeWidth={2}
                 cornerRadius={16} // Match CSS border radius
             />

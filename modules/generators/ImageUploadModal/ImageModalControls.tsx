@@ -1,5 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { ChevronDown } from 'lucide-react';
 
@@ -91,7 +93,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
-  const frameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderColor = isSelected ? SELECTION_COLOR : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
@@ -226,23 +228,23 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: (prompt.trim() && !isGenerating && !isLocked) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: (prompt.trim() && !isGenerating && !isLocked) ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
               border: 'none',
               borderRadius: `${10 * scale}px`,
               cursor: (prompt.trim() && !isGenerating && !isLocked) ? 'pointer' : 'not-allowed',
               color: 'white',
-              boxShadow: (prompt.trim() && !isGenerating && !isLocked) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+              boxShadow: (prompt.trim() && !isGenerating && !isLocked) ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
               padding: 0,
               opacity: (isGenerating || isLocked) ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
               if (prompt.trim() && !isLocked) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (prompt.trim() && !isLocked) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -261,9 +263,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 </path>
               </svg>
             ) : (
-              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L14.4 9.1L22 12L14.4 14.9L12 22L9.6 14.9L2 12L9.6 9.1L12 2Z" />
-              </svg>
+              <GenerateArrowIcon scale={scale} />
             )}
           </button>
         </div>
@@ -738,7 +738,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptQuality === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptQuality === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>
@@ -774,7 +774,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptBackground === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptBackground === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>
@@ -810,7 +810,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptModeration === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptModeration === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>

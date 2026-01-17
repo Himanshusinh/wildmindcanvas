@@ -376,7 +376,7 @@ export function useStoryboardLogic(
                     Promise.resolve(onPersistConnectorCreate({
                         from: storyboardId,
                         to: frame.id,
-                        color: '#437eb5',
+                        color: '#4C83FF',
                     })).catch(console.error);
                 });
             }
@@ -515,7 +515,7 @@ export function useStoryboardLogic(
                         Promise.resolve(onPersistConnectorCreate({
                             from: storyboardId,
                             to: newSceneFrame.id,
-                            color: '#437eb5',
+                            color: '#4C83FF',
                         })).catch(console.error);
                     }
                 }

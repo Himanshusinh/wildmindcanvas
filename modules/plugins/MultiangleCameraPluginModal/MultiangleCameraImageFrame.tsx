@@ -94,13 +94,25 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
             return sourceImageUrl;
           })()}
           alt="Source"
+          onDragStart={(e) => {
+            if (sourceImageUrl) {
+              e.dataTransfer.setData('text/plain', sourceImageUrl);
+              e.dataTransfer.setData('application/json', JSON.stringify({
+                url: sourceImageUrl,
+                type: 'uploaded',
+                id: `drop-${Date.now()}`
+              }));
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
+            cursor: 'grab',
           }}
-          draggable={false}
+          draggable={true}
         />
       ) : (
         <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `20px`, transition: 'color 0.3s ease' }}>

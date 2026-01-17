@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface UpscaleButtonProps {
   scale: number;
@@ -25,13 +27,14 @@ export const UpscaleButton: React.FC<UpscaleButtonProps> = ({
       onClick={onUpscale}
       disabled={isDisabled}
       style={{
-        padding: `${8 * scale}px ${16 * scale}px`,
+        height: `${40 * scale}px`,
+        padding: `0 ${16 * scale}px`,
         fontSize: `${12 * scale}px`,
         fontWeight: 600,
         color: '#ffffff',
-        backgroundColor: isDisabled ? disabledBg : '#437eb5',
+        backgroundColor: isDisabled ? disabledBg : SELECTION_COLOR,
         border: 'none',
-        borderRadius: `${8 * scale}px`,
+        borderRadius: `${10 * scale}px`,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         transition: 'all 0.3s ease',
         whiteSpace: 'nowrap',
@@ -39,32 +42,23 @@ export const UpscaleButton: React.FC<UpscaleButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        boxShadow: isDisabled ? 'none' : `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`,
       }}
       onMouseEnter={(e) => {
         if (!isDisabled) {
-          e.currentTarget.style.backgroundColor = '#3b6fa8';
+          e.currentTarget.style.backgroundColor = '#3d6edb';
+          e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
         }
       }}
       onMouseLeave={(e) => {
         if (!isDisabled) {
-          e.currentTarget.style.backgroundColor = '#437eb5';
+          e.currentTarget.style.backgroundColor = SELECTION_COLOR;
+          e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
         }
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <svg
-        width={16 * scale}
-        height={16 * scale}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M5 12h14" />
-        <path d="M12 5l7 7-7 7" />
-      </svg>
+      <GenerateArrowIcon scale={scale} />
     </button>
   );
 };

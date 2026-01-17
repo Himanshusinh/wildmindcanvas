@@ -2,6 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/modules/ui-global/common/FrameSpinner';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ImageModalFrameProps {
   id?: string;
@@ -43,7 +44,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   const isDark = useIsDarkTheme();
 
   const frameBorderColor = isSelected
-    ? '#4C83FF'
+    ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const frameBg = isDark ? '#121212' : '#ffffff';
@@ -106,14 +107,26 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             return buildProxyResourceUrl(generatedImageUrl);
           })()}
           alt="Generated"
+          onDragStart={(e) => {
+            if (generatedImageUrl) {
+              e.dataTransfer.setData('text/plain', generatedImageUrl);
+              e.dataTransfer.setData('application/json', JSON.stringify({
+                url: generatedImageUrl,
+                type: 'uploaded',
+                id: `drop-${Date.now()}`
+              }));
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             borderRadius: (isHovered || isPinned) ? '0px' : `${17 * scale}px`,
+            cursor: 'grab',
           }}
-          draggable={false}
+          draggable={true}
         />
       ) : (
         <div style={{ textAlign: 'center', color: placeholderColor, transition: 'color 0.3s ease' }}>

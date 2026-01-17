@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { CustomDimensionInput } from './CustomDimensionInput';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ExpandControlsProps {
   aspectPreset: string;
@@ -51,7 +52,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
   // Filter presets that are too small for the image
   const availablePresets = useMemo(() => {
     if (!imageSize) return aspectPresets;
-    
+
     return Object.fromEntries(
       Object.entries(aspectPresets).filter(([key, preset]) => {
         if (key === 'custom') return true; // Always include custom
@@ -67,7 +68,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
   const selectBg = isDark ? '#121212' : 'white';
   const selectText = isDark ? '#ffffff' : '#111827';
   const selectBorder = isDark ? 'rgba(255, 255, 255, 0.2)' : '#e5e7eb';
-  const buttonBg = isDark ? (aspectPreset === 'custom' ? '#437eb5' : '#1a1a1a') : (aspectPreset === 'custom' ? '#437eb5' : 'white');
+  const buttonBg = isDark ? (aspectPreset === 'custom' ? SELECTION_COLOR : '#1a1a1a') : (aspectPreset === 'custom' ? SELECTION_COLOR : 'white');
   const buttonText = isDark ? (aspectPreset === 'custom' ? 'white' : '#cccccc') : (aspectPreset === 'custom' ? 'white' : '#374151');
   const promptInputBg = isDark ? '#121212' : 'white';
   const promptInputText = isDark ? '#ffffff' : '#111827';
@@ -143,7 +144,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
               </option>
             ))}
         </select>
-        
+
         {/* Width Input */}
         <input
           type="number"
@@ -172,7 +173,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         />
-        
+
         {/* Height Input */}
         <input
           type="number"
@@ -201,7 +202,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
           }}
         />
-        
+
         {/* Custom Button */}
         <div ref={customButtonRef} style={{ position: 'relative' }}>
           <button
@@ -235,7 +236,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             />
           )}
         </div>
-        
+
         {/* Prompt Input */}
         <input
           type="text"
@@ -266,7 +267,7 @@ export const ExpandControls: React.FC<ExpandControlsProps> = ({
             padding: '8px 16px',
             borderRadius: '8px',
             border: 'none',
-            backgroundColor: isExpanding || externalIsExpanding || !sourceImageUrl ? '#9ca3af' : '#437eb5',
+            backgroundColor: isExpanding || externalIsExpanding || !sourceImageUrl ? '#9ca3af' : SELECTION_COLOR,
             color: 'white',
             cursor: isExpanding || externalIsExpanding || !sourceImageUrl ? 'not-allowed' : 'pointer',
             fontSize: '14px',

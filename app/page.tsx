@@ -850,6 +850,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         addGen(setUpscaleGenerators, 'upscale-plugin');
         break;
       case 'remove-bg':
+      case 'removebg':
         addGen(setRemoveBgGenerators, 'removebg-plugin');
         break;
       case 'erase':
@@ -862,6 +863,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         addGen(setVectorizeGenerators, 'vectorize-plugin');
         break;
       case 'multiangle':
+      case 'multiangle-camera':
         addGen(setMultiangleCameraGenerators, 'multiangle-camera-plugin');
         break;
       case 'compare':

@@ -2,6 +2,7 @@
 
 import { Group, Text } from 'react-konva';
 import { ImageUpload } from '@/core/types/canvas';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface TextElementsProps {
   images: ImageUpload[];
@@ -68,7 +69,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
                   setContextMenuImageIndex(actualIndex);
                   setContextMenuOpen(true);
                 }}
-                stroke={isSelected ? '#4C83FF' : undefined}
+                stroke={isSelected ? SELECTION_COLOR : undefined}
                 strokeWidth={isSelected ? 4 : 0}
               />
               {/* Delete button removed - now handled by context menu in header */}

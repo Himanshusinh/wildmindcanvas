@@ -8,6 +8,7 @@ import { normalizeCanvasMediaUrl, useCanvasFrameDim, useConnectedSourceImage, us
 import { PluginNodeShell } from '../PluginComponents';
 import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ErasePluginModalProps {
   isOpen: boolean;
@@ -181,7 +182,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
   const isDark = useIsDarkTheme();
 
   const frameBorderColor = isSelected
-    ? '#437eb5'
+    ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 
@@ -422,7 +423,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         const newConnector = {
           from: id,
           to: newModalId,
-          color: '#437eb5',
+          color: SELECTION_COLOR,
           fromX,
           fromY,
           toX,
@@ -597,7 +598,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
         const newConnector = {
           from: id,
           to: newModalId,
-          color: '#437eb5',
+          color: SELECTION_COLOR,
           fromX,
           fromY,
           toX,
@@ -746,7 +747,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
             height: `${100 * scale}px`,
             backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isDark ? '#3a3a3a' : '#a0a0a0'}`,
+            border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1048,7 +1049,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                       padding: '8px 16px',
                       borderRadius: '8px',
                       border: 'none',
-                      backgroundColor: isErasing || externalIsErasing ? '#9ca3af' : '#437eb5',
+                      backgroundColor: isErasing || externalIsErasing ? '#9ca3af' : '#4C83FF',
                       color: 'white',
                       cursor: isErasing || externalIsErasing ? 'not-allowed' : 'pointer',
                       fontSize: '14px',
@@ -1419,7 +1420,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
                   padding: '10px 20px',
                   borderRadius: '999px',
                   border: 'none',
-                  backgroundColor: '#437eb5',
+                  backgroundColor: '#4C83FF',
                   color: '#ffffff',
                   cursor: 'pointer',
                   fontSize: '14px',

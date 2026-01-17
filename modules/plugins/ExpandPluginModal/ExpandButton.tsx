@@ -35,7 +35,7 @@ export const ExpandButton: React.FC<ExpandButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isActive ? '#437eb5' : disabledBg,
+        backgroundColor: isActive ? '#4C83FF' : disabledBg,
         border: 'none',
         borderRadius: `${10 * scale}px`,
         cursor: isActive ? 'pointer' : 'not-allowed',

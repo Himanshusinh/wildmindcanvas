@@ -82,7 +82,7 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     y={modalState.y}
                     scale={scale}
                     position={position}
-                    isSelected={selectedImageEditorModalId === modalState.id}
+                    isSelected={selectedImageEditorModalId === modalState.id || (selectedImageEditorModalIds || []).includes(modalState.id)}
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

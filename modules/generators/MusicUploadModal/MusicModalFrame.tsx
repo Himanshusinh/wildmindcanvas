@@ -4,6 +4,7 @@ import FrameSpinner from '@/modules/ui-global/common/FrameSpinner';
 import { buildProxyMediaUrl } from '@/core/api/proxyUtils';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { MusicModalTabs, MusicCategory } from './MusicModalTabs';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface MusicModalFrameProps {
   id?: string;
@@ -54,7 +55,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
   const placeholderColor = isDark ? '#666666' : '#9ca3af';
   const progressBg = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
   const timeColor = isDark ? (generatedMusicUrl ? '#cccccc' : '#666666') : (generatedMusicUrl ? '#6b7280' : '#9ca3af');
-  const pinBg = isDark ? (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(67, 126, 181, 0.2)' : 'rgba(255, 255, 255, 0.9)');
+  const pinBg = isDark ? (isPinned ? 'rgba(76, 131, 255, 0.2)' : 'rgba(0, 0, 0, 0.9)') : (isPinned ? 'rgba(76, 131, 255, 0.2)' : 'rgba(255, 255, 255, 0.9)');
   const handleBg = isDark ? '#121212' : '#ffffff';
 
   // Fallback: If we have a URL but no category (e.g. legacy data), default to 'music' so player shows
@@ -306,13 +307,13 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
               height: `${32 * scale}px`,
               borderRadius: '50%',
               border: 'none',
-              backgroundColor: generatedMusicUrl ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: generatedMusicUrl ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
               color: generatedMusicUrl ? 'white' : '#9ca3af',
               cursor: generatedMusicUrl ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: generatedMusicUrl ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+              boxShadow: generatedMusicUrl ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
               flexShrink: 0,
               opacity: effectiveCategory ? 1 : 0,
               visibility: effectiveCategory ? 'visible' : 'hidden',
@@ -320,12 +321,12 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
             }}
             onMouseEnter={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
               if (generatedMusicUrl) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
               }
             }}
           >
@@ -366,7 +367,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
                 style={{
                   width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
                   height: '100%',
-                  backgroundColor: generatedMusicUrl ? '#437eb5' : 'rgba(67, 126, 181, 0.3)',
+                  backgroundColor: generatedMusicUrl ? SELECTION_COLOR : 'rgba(76, 131, 255, 0.3)',
                   borderRadius: `${3 * scale}px`,
                   transition: isDraggingProgress ? 'none' : 'width 0s linear',
                   position: 'relative',
@@ -384,7 +385,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
                       height: `${12 * scale}px`,
                       borderRadius: '50%',
                       backgroundColor: handleBg,
-                      border: `${2 * scale}px solid #437eb5`,
+                      border: `${2 * scale}px solid ${SELECTION_COLOR}`,
                       boxShadow: isDark ? `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${2 * scale}px ${4 * scale}px rgba(0, 0, 0, 0.2)`,
                       cursor: 'grab',
 

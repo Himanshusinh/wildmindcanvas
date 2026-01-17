@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface StoryboardControlsProps {
     id?: string;
@@ -201,7 +202,7 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                                         height: `${60 * scale}px`,
                                         borderRadius: `${8 * scale}px`,
                                         overflow: 'hidden',
-                                        border: `2px solid ${selectedCharacterIndex === index ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
+                                        border: `2px solid ${selectedCharacterIndex === index ? SELECTION_COLOR : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
                                         backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -328,7 +329,7 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                                         height: `${60 * scale}px`,
                                         borderRadius: `${8 * scale}px`,
                                         overflow: 'hidden',
-                                        border: `2px solid ${selectedBackgroundIndex === index ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
+                                        border: `2px solid ${selectedBackgroundIndex === index ? '#4C83FF' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
                                         backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -455,7 +456,7 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                                         height: `${60 * scale}px`,
                                         borderRadius: `${8 * scale}px`,
                                         overflow: 'hidden',
-                                        border: `2px solid ${selectedPropsIndex === index ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
+                                        border: `2px solid ${selectedPropsIndex === index ? '#4C83FF' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)')}`,
                                         backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -551,10 +552,10 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                     marginTop: `${12 * scale}px`,
                     padding: `${8 * scale}px`,
                     borderRadius: `${8 * scale}px`,
-                    backgroundColor: isDark ? 'rgba(67, 126, 181, 0.1)' : 'rgba(67, 126, 181, 0.05)',
-                    border: `1px solid rgba(67, 126, 181, 0.3)`,
+                    backgroundColor: isDark ? 'rgba(76, 131, 255, 0.1)' : 'rgba(76, 131, 255, 0.05)',
+                    border: `1px solid rgba(76, 131, 255, 0.3)`,
                 }}>
-                    <label style={{ ...labelStyle, color: '#437eb5' }}>
+                    <label style={{ ...labelStyle, color: SELECTION_COLOR }}>
                         📜 Connected Script
                     </label>
                 </div>
@@ -569,7 +570,7 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                     padding: `${10 * scale}px`,
                     borderRadius: `${8 * scale}px`,
                     border: 'none',
-                    background: '#437eb5',
+                    background: '#4C83FF',
                     color: '#ffffff',
                     fontSize: `${14 * scale}px`,
                     fontWeight: 600,
@@ -577,10 +578,10 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
                     transition: 'background 0.2s ease',
                     marginTop: `${4 * scale}px`,
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#3b6ea0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#437eb5'}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#3d6edb'}
+                onMouseLeave={(e) => e.currentTarget.style.background = SELECTION_COLOR}
             >
-                {hasExistingScenes ? '🔄 Update Storyboard' : '✨ Generate Storyboard'}
+                {hasExistingScenes ? '🔄 Update Storyboard' : 'Generate Storyboard'}
             </button>
         </div>
     );

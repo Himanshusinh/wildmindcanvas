@@ -307,7 +307,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     minHeight: `${cardMinHeight}px`,
                     backgroundColor: isDark ? '#1b1b1b' : '#ffffff',
                     borderRadius: `${cardRadius}px`,
-                    border: isSelected ? `${2 * scale}px solid #437eb5` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
+                    border: isSelected ? `${2 * scale}px solid #4C83FF` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
                     boxShadow: isSelected
                         ? '0 0 0 3px rgba(67, 126, 181, 0.25)'
                         : isDark

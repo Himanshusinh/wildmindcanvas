@@ -108,14 +108,16 @@ export function getComponentDimensions(
         }
 
         case 'upscaleModal':
-        case 'upscale-modal': {
+        case 'upscale-modal':
+        case 'upscale-plugin': {
             const modal = upscaleModalStates.find(m => m.id === id);
             if ((modal as any)?.isExpanded) return { width: modal?.frameWidth || 400, height: modal?.frameHeight || 510 };
             return { width: 100, height: 130 };
         }
 
         case 'multiangleCameraModal':
-        case 'multiangle-camera-modal': {
+        case 'multiangle-camera-modal':
+        case 'multiangle-camera-plugin': {
             const modal = multiangleCameraModalStates.find(m => m.id === id);
             // Base circle is 100x100. If expanded, it has a 400px wide control panel below.
             // Adjust height as needed, for now assuming a reasonable height for controls.
@@ -124,35 +126,40 @@ export function getComponentDimensions(
         }
 
         case 'removeBgModal':
-        case 'remove-bg-modal': {
+        case 'remove-bg-modal':
+        case 'removebg-plugin': {
             const modal = removeBgModalStates.find(m => m.id === id);
             if ((modal as any)?.isExpanded) return { width: 400, height: 400 };
             return { width: 100, height: 130 };
         }
 
         case 'eraseModal':
-        case 'erase-modal': {
+        case 'erase-modal':
+        case 'erase-plugin': {
             const modal = eraseModalStates.find(m => m.id === id);
             if ((modal as any)?.isExpanded) return { width: 400, height: 400 };
             return { width: 100, height: 130 };
         }
 
         case 'expandModal':
-        case 'expand-modal': {
+        case 'expand-modal':
+        case 'expand-plugin': {
             const modal = expandModalStates.find(m => m.id === id);
             if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
             return { width: 100, height: 130 };
         }
 
         case 'vectorizeModal':
-        case 'vectorize-modal': {
+        case 'vectorize-modal':
+        case 'vectorize-plugin': {
             const modal = vectorizeModalStates.find(m => m.id === id);
             if ((modal as any)?.isExpanded) return { width: 400, height: 345 };
             return { width: 100, height: 130 };
         }
 
         case 'nextSceneModal':
-        case 'next-scene-modal': {
+        case 'next-scene-modal':
+        case 'next-scene-plugin': {
             const modal = nextSceneModalStates.find(m => m.id === id);
             // Default circle size is usually smaller than the full modal frameFrameWidth
             if ((modal as any)?.isExpanded) return { width: 400, height: 500 };
@@ -167,7 +174,8 @@ export function getComponentDimensions(
         }
 
         case 'storyboardModal':
-        case 'storyboard-modal': {
+        case 'storyboard-modal':
+        case 'storyboard-plugin': {
             const modal = storyboardModalStates.find(m => m.id === id);
             return modal ? { width: modal.frameWidth || 1000, height: modal.frameHeight || 300 } : { width: 100, height: 130 };
         }

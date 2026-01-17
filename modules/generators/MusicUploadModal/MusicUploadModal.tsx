@@ -10,6 +10,7 @@ import { MusicModalControls } from './MusicModalControls';
 import { MusicModalTabs, MusicCategory } from './MusicModalTabs';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { DialogueInput } from '../../canvas-overlays/types';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface MusicUploadModalProps {
   isOpen: boolean;
@@ -351,7 +352,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
   const frameBorderColor = isSelected
-    ? '#437eb5'
+    ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 

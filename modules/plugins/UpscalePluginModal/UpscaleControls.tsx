@@ -5,6 +5,7 @@ import { ModelDropdown } from './ModelDropdown';
 import { ScaleInput } from './ScaleInput';
 import { UpscaleButton } from './UpscaleButton';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 const TOPAZ_MODELS = [
   'Default',
@@ -189,7 +190,7 @@ export const UpscaleControls: React.FC<UpscaleControlsProps> = ({
               style={{
                 width: `${32 * scale}px`,
                 height: `${18 * scale}px`,
-                backgroundColor: faceEnhance ? '#437eb5' : (isDark ? '#3a3a3a' : '#cccccc'),
+                backgroundColor: faceEnhance ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#cccccc'),
                 borderRadius: `${9 * scale}px`,
                 position: 'relative',
                 cursor: 'pointer',

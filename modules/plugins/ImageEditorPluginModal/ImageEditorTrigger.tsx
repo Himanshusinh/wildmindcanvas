@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { PluginConnectionNodes, PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ImageEditorTriggerProps {
     id: string;
@@ -105,9 +106,8 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
                         height: `${screenHeight}px`,
                         backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
                         borderRadius: '50%',
-                        border: `${1.5 * scale}px solid ${
-                            isSelected ? '#437eb5' : isDark ? '#3a3a3a' : '#a0a0a0'
-                        }`,
+                        border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : isDark ? '#3a3a3a' : '#a0a0a0'
+                            }`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

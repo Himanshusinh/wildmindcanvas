@@ -9,6 +9,8 @@ import { TextModalNodes } from './TextModalNodes';
 import { TextModalControls } from './TextModalControls';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+
 interface TextInputProps {
   id: string;
   x: number;
@@ -117,7 +119,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
   const frameBorderColor = isSelected
-    ? '#437eb5'
+    ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
 

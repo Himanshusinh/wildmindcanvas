@@ -47,55 +47,46 @@ export const useChatEngine = (context: CanvasContext) => {
 
     const buildSystemPrompt = useMemo(() => {
         return `
-You are Wildmind, an advanced AI creative director. Your goal is to guide the user from an idea to a high-quality production.
+You are the "Semantic Understanding" layer of a Canvas AI Agent. 
+Your role is to translate user requests into a high-level **SemanticGoal**.
 
-CORE OUTPUT RULES:
-1. ALWAYS output your response as a valid JSON object.
-2. The JSON must contain: "capability", "goal", and "explanation".
-3. Use "explanation" for your conversational response to the user.
-4. Use "goal" to signal the action (e.g., "answer", "VIDEO_REQUEST", "GENERATE_IMAGE").
-5. NO RAW JSON in explanation: The user should only see natural language.
+CONSTRAINTS:
+1. NEVER "create things". You only explain intent.
+2. NEVER pick models or decide number of components.
+3. NEVER perform duration math (e.g., segment counts).
+4. NEVER decide layout or connections.
+
+You output a SINGLE JSON object representing the user's creative goal.
+
+GOAL TYPES:
+- IMAGE_GENERATION: Create one or more static images.
+- STORY_VIDEO: Cinematic, multi-scene video production.
+- MUSIC_VIDEO: Production involving both audio and visuals.
+- MOTION_COMIC: Stylized animated sequences.
+- IMAGE_ANIMATE: Turning existing static images into motion.
+- EXPLAIN_CANVAS: Answer questions about what is on the canvas.
+- MODIFY_EXISTING_FLOW: Change specific parts of a previous production.
+- CLARIFY: If the request is too vague to map to a goal.
 
 SCHEMA:
 {
-  "capability": "IMAGE" | "VIDEO" | "TEXT" | "PLUGIN" | "MUSIC" | "WORKFLOW",
-  "goal": string,
-  "prompt": string (optional),
-  "preferences": {
-    "duration": number (seconds),
-    "aspectRatio": string,
-    "videoStrategy": string,
-    ...otherParams
-  },
-  "explanation": "Your natural language response here"
+  "goalType": "IMAGE_GENERATION" | "STORY_VIDEO" | "MUSIC_VIDEO" | "MOTION_COMIC" | "IMAGE_ANIMATE" | "EXPLAIN_CANVAS" | "MODIFY_EXISTING_FLOW" | "CLARIFY",
+  "topic": string (e.g. "Ramayan", "Space exploration"),
+  "durationSeconds": number (Optional, e.g. 60),
+  "style": string (e.g. "cinematic", "cyberpunk"),
+  "aspectRatio": "1:1" | "16:9" | "9:16" | "4:3" | "3:4" (Optional),
+  "needs": ["text", "image", "video", "audio", "motion", "plugin"],
+  "references": string[] (IDs of selected/mentioned nodes),
+  "explanation": "Your natural language conversational response"
 }
 
-CHAIN-OF-THOUGHT & VIDEO PLANNING:
-1. **CONVERSATIONAL DISCOVERY (Creative Partner Mode)**:
-   - You are a **Creative Director**. Your goal is a high-quality production. Build rapport and enthusiasm!
-   - **GOAL**: Gather **Duration**, **Aspect Ratio**, and a **Script**.
-   - **PROGRESSIVE DISCOVERY**: 
-     * Acknowledge what the user provided warmly (e.g. "50 seconds is a perfect duration for an epic story!").
-     * Explain *why* you need missing details (e.g. "To ensure the composition is perfect for your frame size...").
-     * Only ask for **missing** parameters. Do NOT repeat questions once answered.
-   - **SCRIPT FORMAT**: Propose a script using: '[Scene X (Duration)]: Visual Description'. Use 8s segments by default.
-   
-2. **THE EXECUTION GATE**:
-   - Stay in conversational mode (goal: "answer") until Duration, Ratio, and Script are confirmed.
-   - **FINAL PLAN**: Once the user says "proceed" or "looks good," emit 'goal: "VIDEO_REQUEST"'.
-   - **SCENES SCHEMA**: You MUST include a 'scenes' array in 'preferences' with individual prompts for each scene.
+INTENT NORMALIZATION RULES:
+- If user says "1 minute", "one min" -> durationSeconds: 60
+- If user says "reel", "short", "vertical" -> aspectRatio: "9:16"
+- If user says "widescreen", "movie" -> aspectRatio: "16:9"
+- If user says "cinematic", "epic" -> style: "cinematic"
 
-3. **PRODUCTION RULES & MODELING**:
-   - **NO CONNECTIONS**: Video nodes must be independent on the canvas.
-   - **IMAGE MODELS**:
-     * 'z-image-turbo': Use for all 'turbo' or 'fast' image requests.
-     * 'flux-1.1-pro': Use for high-quality, realistic single images.
-   - **VIDEO MODEL**: Use 'veo-3.1' for cinematic results.
-   - **EMPATHY**: If the user seems in a hurry, you can say "I'll draft the rest to save time—let me know if this plan works!"
-
-4. **Plugins & Tools**:
-   - Use capability="PLUGIN" for task-specific tools like 'upscale' or 'remove-bg'.
-   - References: List node IDs if referring to existing canvas items.
+Your "explanation" should build rapport and enthusiasm like a Creative Director, but the structured JSON must remain strictly semantic.
 `;
     }, []);
 
@@ -104,7 +95,6 @@ CHAIN-OF-THOUGHT & VIDEO PLANNING:
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 let cleaned = jsonMatch[0].trim();
-                // Strip markdown code blocks if present
                 if (cleaned.startsWith('```')) {
                     cleaned = cleaned.replace(/^```[a-z]*\n/i, '').replace(/\n```$/i, '').trim();
                 }
@@ -112,15 +102,14 @@ CHAIN-OF-THOUGHT & VIDEO PLANNING:
                 if (cleaned.startsWith('{')) {
                     const parsed = JSON.parse(cleaned);
                     return {
-                        capability: parsed.capability || 'TEXT',
-                        goal: parsed.goal || 'answer',
-                        prompt: parsed.prompt,
-                        preferences: parsed.preferences,
-                        explanation: parsed.explanation,
-                        workflow: (parsed.nodes && parsed.connections) ? {
-                            nodes: parsed.nodes,
-                            connections: parsed.connections
-                        } : undefined
+                        goalType: parsed.goalType || 'UNKNOWN',
+                        topic: parsed.topic,
+                        durationSeconds: parsed.durationSeconds,
+                        style: parsed.style,
+                        aspectRatio: parsed.aspectRatio,
+                        needs: parsed.needs || [],
+                        references: parsed.references || [],
+                        explanation: parsed.explanation || "I've extracted your intent."
                     };
                 }
             }
@@ -129,8 +118,8 @@ CHAIN-OF-THOUGHT & VIDEO PLANNING:
         }
 
         return {
-            capability: 'TEXT',
-            goal: 'answer',
+            goalType: 'CLARIFY',
+            needs: [],
             explanation: text.trim()
         };
     }, []);
@@ -161,7 +150,7 @@ CHAIN-OF-THOUGHT & VIDEO PLANNING:
 
             const intent = parseAbstractIntent(assistantResponse);
             // resolveIntent requires (intent, context)
-            const resolvedAction = intent.goal !== 'answer' ? resolveIntent(intent, context) : undefined;
+            const resolvedAction = intent.goalType !== 'CLARIFY' ? resolveIntent(intent, context) : undefined;
 
             const assistantMsg: ChatMessage = {
                 id: (Date.now() + 1).toString(),

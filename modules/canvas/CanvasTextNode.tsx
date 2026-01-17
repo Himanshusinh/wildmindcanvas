@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { Text, Group, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { CanvasTextState } from '@/modules/canvas-overlays/types';
@@ -353,10 +354,10 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                     ref={trRef}
                     rotateEnabled={true}
                     anchorSize={8}
-                    anchorFill="#4C83FF"
+                    anchorFill={SELECTION_COLOR}
                     anchorStroke="#ffffff"
                     anchorCornerRadius={0}
-                    borderStroke="#4C83FF"
+                    borderStroke={SELECTION_COLOR}
                     borderStrokeWidth={1}
                     borderDash={[4, 4]}
                     padding={0}

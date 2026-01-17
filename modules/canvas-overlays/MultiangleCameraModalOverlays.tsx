@@ -158,7 +158,7 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
               Promise.resolve(onPersistMultiangleCameraModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedMultiangleCameraModalId === modalState.id}
+          isSelected={selectedMultiangleCameraModalId === modalState.id || (selectedMultiangleCameraModalIds || []).includes(modalState.id)}
           initialSourceImageUrl={modalState.sourceImageUrl}
           onOptionsChange={(opts) => {
             const hasChanges = Object.keys(opts).some(key => {

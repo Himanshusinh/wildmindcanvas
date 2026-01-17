@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GitCompare, Trash2, X, Check } from 'lucide-react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { generateImageForCanvas } from '@/core/api/api';
@@ -202,7 +203,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                     const newConnector = {
                         from: id,
                         to: newModalId,
-                        color: '#437eb5',
+                        color: SELECTION_COLOR,
                         fromX: x + 100, // Right edge of circular node approx
                         fromY: y + 50, // Center Y
                         toX: targetX,
@@ -344,7 +345,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                         height: `${circleDiameter}px`,
                         backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
                         borderRadius: '50%',
-                        border: `${1.5 * scale}px solid ${isSelected ? '#437eb5' : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
+                        border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -431,8 +432,8 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                                 onClick={handleCompare}
                                 disabled={isGlobalGenerating || !prompt || !selectedModel}
                                 className={`flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isDark
-                                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'
-                                    : 'bg-[rgb(67,126,181)] hover:bg-[rgb(59,111,168)] text-white shadow-blue-500/20'
+                                    ? 'bg-[#4C83FF] hover:bg-[#3d6edb] text-white shadow-blue-900/20'
+                                    : 'bg-[#4C83FF] hover:bg-[#3d6edb] text-white shadow-blue-500/20'
                                     }`}
                                 style={{
                                     width: '36px',

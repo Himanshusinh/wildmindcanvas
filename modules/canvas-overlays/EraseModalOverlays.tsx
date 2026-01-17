@@ -164,7 +164,7 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
               Promise.resolve(onPersistEraseModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedEraseModalId === modalState.id}
+          isSelected={selectedEraseModalId === modalState.id || (selectedEraseModalIds || []).includes(modalState.id)}
           initialModel={modalState.model}
           initialSourceImageUrl={modalState.sourceImageUrl}
           initialLocalErasedImageUrl={modalState.localErasedImageUrl}

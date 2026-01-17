@@ -10,7 +10,7 @@ export function PluginConnectionNodes(props: {
   isSelected: boolean;
   color?: string;
 }) {
-  const { id, scale, isHovered, isSelected, color = '#437eb5' } = props;
+  const { id, scale, isHovered, isSelected, color = '#4C83FF' } = props;
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const isDark = useIsDarkTheme();
 

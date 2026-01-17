@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { MusicCategory } from './MusicModalTabs';
 import { MusicCategoryView } from './categories/MusicCategoryView';
@@ -189,7 +190,7 @@ export const MusicModalControls: React.FC<MusicModalControlsProps> = ({
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
   const inputFontSize = `${12 * scale}px`;
-  const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const controlsFrameBorderColor = isSelected ? SELECTION_COLOR : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
   const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');

@@ -21,6 +21,7 @@ import {
 import { ImageUpload } from '@/core/types/canvas';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { buildProxyMediaUrl } from '@/core/api/proxyUtils';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 const VIDEO_MODEL_OPTIONS = [
   'Sora 2 Pro',
@@ -201,7 +202,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
   const frameBorderColor = isSelected
-    ? '#437eb5'
+    ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const [isFrameOrderSwapped, setIsFrameOrderSwapped] = useState(false);
