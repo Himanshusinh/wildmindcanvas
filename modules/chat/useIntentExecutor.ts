@@ -2,6 +2,7 @@
 import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { IntentAction } from './intentSchemas';
+import { CanvasInstructionPlan } from './compiler/types';
 
 interface IntentExecutorProps {
     canvasState: any;
@@ -35,7 +36,7 @@ export function useIntentExecutor({
 
         // EXECUTION ENGINE: Process CanvasInstructionPlan
         if (action.intent === 'EXECUTE_PLAN') {
-            const plan = action.payload as any; // CanvasInstructionPlan
+            const plan = action.payload as CanvasInstructionPlan;
             const steps = plan.steps;
             const stepToNodeIds: Record<string, string[]> = {};
 
@@ -85,12 +86,12 @@ export function useIntentExecutor({
                                     prompt: nodePrompt,
                                     model: step.configTemplate.model,
                                     aspectRatio: step.configTemplate.aspectRatio || '1:1',
-                                    imageCount: 1,
-                                    initialCount: 1,
+                                    imageCount: step.configTemplate.imageCount || 1,
+                                    initialCount: step.configTemplate.imageCount || 1,
                                     resolution: '1024',
                                     frameWidth: 600,
                                     frameHeight: 400,
-                                    isGenerating: false,
+                                    isGenerating: true, // This needs to be true for auto-start                         };
                                 };
                                 canvasState.setImageModalStates((prev: any) => [...prev, newModal]);
                                 if (props.onPersistImageModalCreate) await props.onPersistImageModalCreate(newModal);
@@ -177,6 +178,126 @@ export function useIntentExecutor({
 
                     case 'GROUP_NODES': {
                         // TODO: Implement Visual Grouping
+                        break;
+                    }
+
+                    case 'DELETE_NODE': {
+                        const targetType = step.targetType; // 'image', 'video', 'text', 'music', 'plugin', 'all'
+                        const targetIds = step.targetIds || [];
+                        const deleteMap: Record<string, boolean> = {};
+                        targetIds.forEach((id: string) => deleteMap[id] = true);
+
+                        // Helper to determine if an individual item should be deleted
+                        const shouldDelete = (id: string, itemType: string) => {
+                            if (targetType === 'all') {
+                                return targetIds.length > 0 ? deleteMap[id] : true;
+                            }
+                            if (targetType === itemType) {
+                                return targetIds.length > 0 ? deleteMap[id] : true;
+                            }
+                            // Plugin subtypes are handled by filtering the handlers list before calling this
+                            return false;
+                        };
+
+                        // Helper to update state AND persist deletion
+                        const processDeletion = (
+                            items: any[],
+                            setter: any,
+                            persistFn: ((id: string) => void) | undefined,
+                            typeTag: string
+                        ) => {
+                            if (!setter) return;
+
+                            const safeItems = items || [];
+                            const idsToDelete: string[] = [];
+
+                            safeItems.forEach((item: any) => {
+                                // If we are targeting specific IDs, we can just check those. 
+                                // But if deleting "all videos", we need to check 'video' type matches.
+                                if (shouldDelete(item.id, typeTag)) {
+                                    idsToDelete.push(item.id);
+                                }
+                            });
+
+                            if (idsToDelete.length > 0) {
+                                // 1. Local State Update
+                                setter((prev: any[]) => prev.filter((item: any) => !idsToDelete.includes(item.id)));
+
+                                // 2. Persistence Call
+                                if (persistFn) {
+                                    idsToDelete.forEach(id => {
+                                        // Fire and forget persistence
+                                        persistFn(id);
+                                    });
+                                }
+                            }
+                        };
+
+                        // Definition of all comprehensive handlers
+                        const handlers = [
+                            // Core Media
+                            { type: 'image', subtype: null, items: canvasState.imageModalStates, setter: canvasState.setImageModalStates, persist: props.onPersistImageModalDelete },
+                            { type: 'video', subtype: null, items: canvasState.videoModalStates, setter: canvasState.setVideoModalStates, persist: props.onPersistVideoModalDelete },
+                            { type: 'music', subtype: null, items: canvasState.musicModalStates, setter: canvasState.setMusicModalStates, persist: props.onPersistMusicModalDelete },
+                            { type: 'text', subtype: null, items: canvasState.richTextStates, setter: canvasState.setRichTextStates, persist: props.onPersistRichTextDelete },
+
+                            // Plugins
+                            { type: 'plugin', subtype: 'upscale', items: canvasState.upscaleModalStates, setter: canvasState.setUpscaleModalStates, persist: props.onPersistUpscaleModalDelete },
+                            { type: 'plugin', subtype: 'multiangle', items: canvasState.multiangleCameraModalStates, setter: canvasState.setMultiangleCameraModalStates, persist: props.onPersistMultiangleCameraModalDelete },
+                            { type: 'plugin', subtype: 'remove-bg', items: canvasState.removeBgModalStates, setter: canvasState.setRemoveBgModalStates, persist: props.onPersistRemoveBgModalDelete },
+                            { type: 'plugin', subtype: 'erase', items: canvasState.eraseModalStates, setter: canvasState.setEraseModalStates, persist: props.onPersistEraseModalDelete },
+                            { type: 'plugin', subtype: 'expand', items: canvasState.expandModalStates, setter: canvasState.setExpandModalStates, persist: props.onPersistExpandModalDelete },
+                            { type: 'plugin', subtype: 'vectorize', items: canvasState.vectorizeModalStates, setter: canvasState.setVectorizeModalStates, persist: props.onPersistVectorizeModalDelete },
+                            { type: 'plugin', subtype: 'next-scene', items: canvasState.nextSceneModalStates, setter: canvasState.setNextSceneModalStates, persist: props.onPersistNextSceneModalDelete },
+                            { type: 'plugin', subtype: 'storyboard', items: canvasState.storyboardModalStates, setter: canvasState.setStoryboardModalStates, persist: props.onPersistStoryboardModalDelete },
+                            { type: 'plugin', subtype: 'compare', items: canvasState.compareModalStates, setter: canvasState.setCompareModalStates, persist: props.onPersistCompareModalDelete },
+                            { type: 'plugin', subtype: 'video-editor', items: canvasState.videoEditorModalStates, setter: canvasState.setVideoEditorModalStates, persist: props.onPersistVideoEditorModalDelete },
+                            { type: 'plugin', subtype: 'image-editor', items: canvasState.imageEditorModalStates, setter: canvasState.setImageEditorModalStates, persist: props.onPersistImageEditorModalDelete },
+                        ];
+
+                        // Execute handlers based on target
+                        handlers.forEach(h => {
+                            // 1. If target is 'all', matches everything.
+                            // 2. If target matches handler type (e.g. 'image').
+                            // 3. If target is 'plugin' and handler is 'plugin':
+                            //    - If step.pluginType is defined, must match handler subtype.
+                            //    - If step.pluginType is undefined, matches all plugins.
+
+                            let isMatch = false;
+                            if (targetType === 'all') {
+                                isMatch = true;
+                            } else if (targetType === h.type) {
+                                if (h.type === 'plugin') {
+                                    // Check granularity
+                                    if (step.pluginType) {
+                                        isMatch = step.pluginType === h.subtype;
+                                    } else {
+                                        isMatch = true; // "Delete all plugins"
+                                    }
+                                } else {
+                                    isMatch = true;
+                                }
+                            }
+
+                            if (isMatch) {
+                                // For 'plugin' type, we pass 'plugin' as typeTag to match the targetType check in shouldDelete,
+                                // OR we pass the specific type if we want to be strict.
+                                // However, shouldDelete checks if (targetType === type).
+                                // If targetType is 'plugin', we should pass 'plugin'.
+                                // If targetType is 'all', we pass whatever.
+                                // Simplification: pass h.type (properties: 'image' or 'plugin').
+                                processDeletion(h.items, h.setter, h.persist, h.type);
+                            }
+                        });
+
+
+                        // 3. Clear Selection if deleted broad
+                        if (targetType === 'all' && targetIds.length === 0) {
+                            if (canvasSelection && canvasSelection.setSelectedIds) {
+                                canvasSelection.setSelectedIds([]);
+                            }
+                        }
+
                         break;
                     }
                 }

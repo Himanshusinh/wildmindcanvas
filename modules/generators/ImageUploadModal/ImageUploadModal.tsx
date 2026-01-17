@@ -127,7 +127,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Google Nano Banana');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState((initialAspectRatio ?? '1:1').replace(/\s+/g, ''));
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -422,7 +422,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
   }, [hasConnectedImage, hasExistingImage, selectedModel, selectedAspectRatio, selectedFrame, prompt, onOptionsChange, isUploadedImage, IMAGE_TO_IMAGE_MODELS]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (countOverride?: number) => {
     // Use effective prompt (connected text or local prompt)
     const promptToUse = effectivePrompt;
     if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
@@ -972,7 +972,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
-        console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
+        console.log(`[Image Generation] Starting generation of ${typeof countOverride === 'number' ? countOverride : imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
         console.log(`[Image Generation] 🔍 About to call onImageGenerate with:`, {
           targetModalId,
           referenceImageUrls: allReferenceImageUrls,
@@ -986,12 +986,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           height,
         });
 
+        // Use countOverride if provided, otherwise default to imageCount
+        const effectiveImageCount = typeof countOverride === 'number' ? countOverride : imageCount;
+
         console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
           'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
           'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
           'finalSourceImageUrlParam truthy': !!finalSourceImageUrlParam,
           'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
+          'imageCount': effectiveImageCount
         });
 
         // Collect model-specific options
@@ -1004,13 +1008,41 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           generationOptions.moderation = gptModeration;
         }
 
+        const permittedRatios = ['21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', 'auto'];
+
+        // Helper to find closest permitted aspect ratio
+        const getClosestAspectRatio = (currentRatio: string): string => {
+          if (permittedRatios.includes(currentRatio)) return currentRatio;
+
+          const [w, h] = currentRatio.split(':').map(Number);
+          if (!w || !h) return '1:1'; // Fallback for invalid format
+
+          const targetVal = w / h;
+          let bestRatio = '1:1';
+          let minDiff = Number.MAX_VALUE;
+
+          permittedRatios.forEach(r => {
+            if (r === 'auto') return;
+            const [rw, rh] = r.split(':').map(Number);
+            const val = rw / rh;
+            const diff = Math.abs(targetVal - val);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestRatio = r;
+            }
+          });
+          return bestRatio;
+        };
+
+        const finalAspectRatio = getClosestAspectRatio(selectedAspectRatio);
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
           selectedFrame,
-          selectedAspectRatio,
+          finalAspectRatio,
           targetModalId,
-          imageCount,
+          typeof countOverride === 'number' ? countOverride : imageCount,
           finalSourceImageUrlParam,
           width,
           height,
@@ -1041,10 +1073,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           console.warn(`[Image Generation] No result returned from API`);
         }
 
-        console.log(`[Image Generation] Final extracted ${imageUrls.length} image URLs (requested ${imageCount})`);
+        console.log(`[Image Generation] Final extracted ${imageUrls.length} image URLs (requested ${effectiveImageCount})`);
 
-        if (imageUrls.length < imageCount) {
-          console.warn(`[Image Generation] WARNING: Requested ${imageCount} images but only got ${imageUrls.length}`);
+        if (imageUrls.length < effectiveImageCount) {
+          console.warn(`[Image Generation] WARNING: Requested ${effectiveImageCount} images but only got ${imageUrls.length}`);
         }
 
         // Update all frames with their respective images
@@ -1083,7 +1115,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
   };
 
-  // Sync internal state from initial props (hydration)
+  // Auto-start generation if requested from parent (e.g. chat intent)
+  useEffect(() => {
+    // Only auto-start if:
+    // 1. External prop says we should be generating
+    // 2. We haven't generated an image yet
+    // 3. We aren't currently generating (local state)
+    // 4. It's not an uploaded image (safety check)
+    if (externalIsGenerating && !generatedImageUrl && !isGenerating && !isUploadedImage) {
+      console.log('[ImageUploadModal] 🚀 Auto-starting generation based on externalIsGenerating prop');
+      // Small timeout to ensure everything is initialized
+      const timer = setTimeout(() => {
+        handleGenerate();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [externalIsGenerating, generatedImageUrl, isGenerating, isUploadedImage]);
+
   useEffect(() => {
     if (typeof initialPrompt === 'string' && initialPrompt !== prompt) setPrompt(initialPrompt);
   }, [initialPrompt]);
@@ -1492,7 +1540,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
 
     // Only allow dragging from the frame, not from controls
-    if (!isInput && !isButton && !isImage && !isControls) {
+    if (!isInput && !isButton && !isControls) {
       setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -1697,7 +1745,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           onDuplicate={onDuplicate}
           onDownload={generatedImageUrl ? onDownload : undefined}
           onTogglePin={onTogglePin}
-          onRegenerate={!isUploadedImage ? handleGenerate : undefined}
+          onRegenerate={!isUploadedImage ? () => handleGenerate(1) : undefined}
         />
         <ImageModalFrame
           id={id}
@@ -1708,7 +1756,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           isUploadedImage={Boolean(isUploadedImage)}
           isSelected={Boolean(isSelected)}
           isDraggingContainer={isDraggingContainer}
-          generatedImageUrl={generatedImageUrl}
+          generatedImageUrl={(!isUploadedImage && connectedImageSource?.url && generatedImageUrl === connectedImageSource.url) ? null : generatedImageUrl}
           isGenerating={isGenerating}
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}

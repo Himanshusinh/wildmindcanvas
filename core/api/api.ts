@@ -414,7 +414,10 @@ export async function generateImageForCanvas(
     }
 
     if (!response.ok) {
-      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      let errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      if (typeof errorMessage === 'object') {
+        errorMessage = JSON.stringify(errorMessage);
+      }
       throw new Error(errorMessage || 'Failed to generate image');
     }
 

@@ -31,6 +31,9 @@ export function compileGoalToPlan(goal: SemanticGoal): CanvasInstructionPlan {
         case 'IMAGE_ANIMATE':
             summary = compileImageAnimate(goal, steps);
             break;
+        case 'DELETE_CONTENT':
+            summary = compileDeleteContent(goal, steps);
+            break;
         case 'EXPLAIN_CANVAS':
             summary = "Explaining canvas contents...";
             break;
@@ -139,27 +142,35 @@ function compileStoryVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): 
  */
 function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
     const topic = goal.topic || "Art";
-    const count = goal.needs.includes('image') ? (goal.references?.length || 1) : 1;
+    // Priority: Explicit Count > Needs Count > Default 1
+    const requestedCount = goal.count || (goal.needs.includes('image') ? (goal.references?.length || 1) : 1);
     const style = goal.style || 'photorealistic';
 
-    // Auth Rule: Model selection logic lives here
-    const model = goal.style?.toLowerCase().includes('fast') || goal.style?.toLowerCase().includes('turbo')
-        ? 'z-image-turbo'
-        : 'flux-1.1-pro';
+    // Model Logic: Explicit Model > Style Inference > Default
+    let model = goal.model;
 
+    if (!model) {
+        model = goal.style?.toLowerCase().includes('fast') || goal.style?.toLowerCase().includes('turbo')
+            ? 'z-image-turbo'
+            : 'Google Nano Banana Pro';
+    }
+
+    // For Image Generation, we create 1 Node with N images (batch mode)
+    // instead of N nodes.
     steps.push({
         id: generateId(),
         action: 'CREATE_NODE',
         nodeType: 'image-generator',
-        count,
+        count: 1, // Only 1 specific tool instance
         configTemplate: {
             model,
             aspectRatio: goal.aspectRatio || '1:1',
             prompt: `${topic} in ${style} style`,
+            imageCount: requestedCount // Pass the batch size here
         }
     });
 
-    return `Generate ${count} ${style} images of "${topic}" using ${model}.`;
+    return `Generate ${requestedCount} ${style} images of "${topic}" using ${model}.`;
 }
 
 /**
@@ -218,4 +229,94 @@ function compileMusicVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): 
     });
 
     return `Create a music video production: 1 song and a 4-scene visual montage.`;
+}
+
+/**
+ * Strategy: DELETE_CONTENT
+ */
+function compileDeleteContent(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const topic = (goal.topic || "").toLowerCase();
+    const needs = goal.needs || [];
+    const references = goal.references || [];
+
+    // Case 1: Delete specific selected items
+    if (references.length > 0) {
+        steps.push({
+            id: generateId(),
+            action: 'DELETE_NODE',
+            targetType: 'all', // The executor will filter by ID regardless of type
+            targetIds: references
+        });
+        return `Delete ${references.length} selected items.`;
+    }
+
+    // Case 2: Broad deletion based on topic/needs
+    const targetTypes: Array<'image' | 'video' | 'text' | 'music' | 'plugin'> = [];
+
+    // Map natural language to types
+    if (topic.includes("image") || needs.includes("image")) targetTypes.push("image");
+    if (topic.includes("video") || needs.includes("video")) targetTypes.push("video");
+    if (topic.includes("text") || needs.includes("text")) targetTypes.push("text");
+    if (topic.includes("music") || topic.includes("audio") || needs.includes("audio")) targetTypes.push("music");
+
+    // Plugin Detection
+    let isPlugin = topic.includes("plugin") || needs.includes("plugin");
+    let specificPluginType: string | undefined;
+
+    const pluginKeywords: Record<string, string> = {
+        'remove bg': 'remove-bg',
+        'remove background': 'remove-bg',
+        'upscale': 'upscale',
+        'erase': 'erase',
+        'expand': 'expand',
+        'vectorize': 'vectorize',
+        'next scene': 'next-scene',
+        'storyboard': 'storyboard',
+        'multiangle': 'multiangle',
+        'video editor': 'video-editor',
+        'image editor': 'image-editor',
+        'compare': 'compare'
+    };
+
+    for (const [keyword, type] of Object.entries(pluginKeywords)) {
+        if (topic.includes(keyword)) {
+            isPlugin = true;
+            specificPluginType = type;
+            break;
+        }
+    }
+
+    if (isPlugin && !targetTypes.includes('plugin')) targetTypes.push("plugin");
+
+    // "Delete all" -> if no specific type mentioned, assume EVERYTHING (dangerous but valid for strict instruction)
+    // However, usually "delete all" implies clearing canvas.
+    // If targetTypes is empty but goal is DELETE_CONTENT, we might default to all if user said "everything".
+
+    if (targetTypes.length === 0) {
+        if (topic.includes("all") || topic.includes("everything") || topic.includes("canvas")) {
+            steps.push({
+                id: generateId(),
+                action: 'DELETE_NODE',
+                targetType: 'all'
+            });
+            return "Clear the entire canvas.";
+        } else {
+            // Fallback: Clarify? Or just default to nothing?
+            // Let's assume they want to delete what current context implies, but safely do nothing if unclear.
+            return "I'm not sure what to delete. Please specify (e.g., 'delete all videos').";
+        }
+    }
+
+    // Create steps for each identified type
+    for (const type of targetTypes) {
+        steps.push({
+            id: generateId(),
+            action: 'DELETE_NODE',
+            targetType: type,
+            pluginType: type === 'plugin' ? specificPluginType : undefined
+        });
+    }
+
+    const typeDesc = specificPluginType ? `${specificPluginType} plugins` : `${targetTypes.join(', ')} components`;
+    return `Delete all ${typeDesc}.`;
 }

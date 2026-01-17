@@ -7,7 +7,7 @@
  * 2. The Execution Engine (Canvas API)
  */
 
-export type ActionType = 'CREATE_NODE' | 'CONNECT_SEQUENTIALLY' | 'GROUP_NODES' | 'APPLY_PLUGIN';
+export type ActionType = 'CREATE_NODE' | 'CONNECT_SEQUENTIALLY' | 'GROUP_NODES' | 'APPLY_PLUGIN' | 'DELETE_NODE';
 
 export interface CanvasAction {
     id: string; // Unique ID for this action step
@@ -54,11 +54,19 @@ export interface ApplyPluginAction extends CanvasAction {
     targetStepId: string; // Apply plugin to output of this step
 }
 
+export interface DeleteNodeAction extends CanvasAction {
+    action: 'DELETE_NODE';
+    targetType: 'image' | 'video' | 'text' | 'music' | 'plugin' | 'all';
+    targetIds?: string[]; // If empty, delete all of targetType
+    pluginType?: string; // Optional, to specify subtype of plugin (e.g. 'upscale')
+}
+
 export type CanvasInstructionStep =
     | CreateNodeAction
     | ConnectSequentiallyAction
     | GroupNodesAction
-    | ApplyPluginAction;
+    | ApplyPluginAction
+    | DeleteNodeAction;
 
 
 export type GoalType =
@@ -70,6 +78,7 @@ export type GoalType =
     | 'EXPLAIN_CANVAS'
     | 'MODIFY_EXISTING_FLOW'
     | 'CLARIFY'
+    | 'DELETE_CONTENT'
     | 'UNKNOWN';
 
 export interface SemanticGoal {
@@ -78,6 +87,8 @@ export interface SemanticGoal {
     durationSeconds?: number;
     style?: string;
     aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    count?: number;
+    model?: string;
     needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion' | 'plugin'>;
     references?: string[];
     explanation?: string; // Conversational response from LLM

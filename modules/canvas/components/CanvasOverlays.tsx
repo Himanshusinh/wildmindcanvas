@@ -399,11 +399,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onMusicCreate={(x, y) => { }}
             /> */}
 
-            {activeGenerationCount > 0 && (
-                <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium z-50">
-                    Generating ({activeGenerationCount})...
-                </div>
-            )}
+
         </>
     );
 };

@@ -543,6 +543,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setIsSelecting: events.setIsSelecting,
     selectionTightRect: canvasSelection.selectionTightRect,
     setSelectionTightRect: canvasSelection.setSelectionTightRect,
+    selectionTransformerRect: canvasSelection.selectionTransformerRect,
+    setSelectionTransformerRect: canvasSelection.setSelectionTransformerRect,
     setIsDragSelection: canvasSelection.setIsDragSelection,
 
     // Image Deletion

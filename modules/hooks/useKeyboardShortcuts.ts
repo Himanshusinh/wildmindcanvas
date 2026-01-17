@@ -49,6 +49,8 @@ interface UseKeyboardShortcutsProps {
   setIsSelecting: (selecting: boolean) => void;
   selectionTightRect: any;
   setSelectionTightRect: (rect: any) => void;
+  selectionTransformerRect?: any;
+  setSelectionTransformerRect?: (rect: any) => void;
   setIsDragSelection: (drag: boolean) => void;
 
   // Canvas Text deletion
@@ -267,6 +269,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setIsSelecting,
     selectionTightRect,
     setSelectionTightRect,
+    selectionTransformerRect,
+    setSelectionTransformerRect,
     setIsDragSelection,
     selectedCanvasTextId,
     effectiveSetCanvasTextStates,
@@ -351,11 +355,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     onPersistStoryboardModalDelete,
     selectedScriptFrameModalIds,
     selectedScriptFrameModalId,
+    scriptFrameModalStates,
+    setScriptFrameModalStates,
     handleDeleteScriptFrame,
     setSelectedScriptFrameModalId,
     setSelectedScriptFrameModalIds,
     selectedSceneFrameModalIds,
     selectedSceneFrameModalId,
+    sceneFrameModalStates,
+    setSceneFrameModalStates,
     handleDeleteSceneFrame,
     setSelectedSceneFrameModalId,
     setSelectedSceneFrameModalIds,
@@ -708,11 +716,28 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Select all text ids
         const allTextIds = textInputStates.map(t => t.id);
+        const allCanvasTextIds = selectedCanvasTextIds || []; // Assuming these are managed elsewhere or passed in? 
+        // Actually we need to select them? effectiveSetSelectedCanvasTextIds?
+        // effectiveSetSelectedCanvasTextIds is not in scope here as a direct array setter equivalent to textInputStates logic?
+        // Wait, props has setSelectedCanvasTextIds.
 
         // Select all modals
         const allImageModalIds = imageModalStates.map(m => m.id);
         const allVideoModalIds = videoModalStates.map(m => m.id);
         const allMusicModalIds = musicModalStates.map(m => m.id);
+        const allUpscaleModalIds = upscaleModalStates.map(m => m.id);
+        const allMultiangleModalIds = multiangleCameraModalStates.map(m => m.id);
+        const allRemoveBgModalIds = removeBgModalStates.map(m => m.id);
+        const allEraseModalIds = eraseModalStates.map(m => m.id);
+        const allExpandModalIds = expandModalStates.map(m => m.id);
+        const allVectorizeModalIds = vectorizeModalStates.map(m => m.id);
+        const allNextSceneModalIds = nextSceneModalStates.map(m => m.id);
+        const allCompareModalIds = compareModalStates.map(m => m.id);
+        const allStoryboardModalIds = storyboardModalStates.map(m => m.id);
+        const allScriptFrameModalIds = scriptFrameModalStates.map(m => m.id);
+        const allSceneFrameModalIds = sceneFrameModalStates.map(m => m.id);
+        const allVideoEditorModalIds = videoEditorModalStates.map(m => m.id);
+        const allRichTextIds = richTextStates ? richTextStates.map((s: any) => s.id) : [];
 
         setSelectedImageIndices(allImageIndices);
         setSelectedImageIndex(allImageIndices.length > 0 ? allImageIndices[0] : null);
@@ -725,11 +750,33 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         setSelectedMusicModalIds(allMusicModalIds);
         setSelectedMusicModalId(allMusicModalIds.length > 0 ? allMusicModalIds[0] : null);
 
-        if (setSelectedRichTextIds) setSelectedRichTextIds(richTextStates?.map((s: any) => s.id) || []);
-        if (setSelectedRichTextId) {
-          const firstId = richTextStates && richTextStates.length > 0 ? richTextStates[0].id : null;
-          setSelectedRichTextId(firstId);
-        }
+        setSelectedUpscaleModalIds(allUpscaleModalIds);
+        setSelectedUpscaleModalId(allUpscaleModalIds[0] || null);
+        setSelectedMultiangleCameraModalIds(allMultiangleModalIds);
+        setSelectedMultiangleCameraModalId(allMultiangleModalIds[0] || null);
+        setSelectedRemoveBgModalIds(allRemoveBgModalIds);
+        setSelectedRemoveBgModalId(allRemoveBgModalIds[0] || null);
+        setSelectedEraseModalIds(allEraseModalIds);
+        setSelectedEraseModalId(allEraseModalIds[0] || null);
+        setSelectedExpandModalIds(allExpandModalIds);
+        setSelectedExpandModalId(allExpandModalIds[0] || null);
+        setSelectedVectorizeModalIds(allVectorizeModalIds);
+        setSelectedVectorizeModalId(allVectorizeModalIds[0] || null);
+        setSelectedNextSceneModalIds(allNextSceneModalIds);
+        setSelectedNextSceneModalId(allNextSceneModalIds[0] || null);
+        setSelectedCompareModalIds(allCompareModalIds);
+        setSelectedCompareModalId(allCompareModalIds[0] || null);
+        setSelectedStoryboardModalIds(allStoryboardModalIds);
+        setSelectedStoryboardModalId(allStoryboardModalIds[0] || null);
+        setSelectedScriptFrameModalIds(allScriptFrameModalIds);
+        setSelectedScriptFrameModalId(allScriptFrameModalIds[0] || null);
+        setSelectedSceneFrameModalIds(allSceneFrameModalIds);
+        setSelectedSceneFrameModalId(allSceneFrameModalIds[0] || null);
+        setSelectedVideoEditorModalIds(allVideoEditorModalIds);
+        setSelectedVideoEditorModalId(allVideoEditorModalIds[0] || null);
+
+        if (setSelectedRichTextIds) setSelectedRichTextIds(allRichTextIds);
+        if (setSelectedRichTextId) setSelectedRichTextId(allRichTextIds[0] || null);
 
         // Compute tight bounding rect around all selected components so selection visuals show
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -759,56 +806,66 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           any = true;
         });
 
-        allImageModalIds.forEach(id => {
-          const m = imageModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 400;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
+        const updateBoundsFromModal = (items: any[], defaultW: number, defaultH: number) => {
+          items.forEach(m => {
+            const w = m.frameWidth ?? (m.width || defaultW);
+            const h = m.frameHeight ?? (m.height || defaultH);
+            minX = Math.min(minX, m.x);
+            minY = Math.min(minY, m.y);
+            maxX = Math.max(maxX, m.x + w);
+            maxY = Math.max(maxY, m.y + h);
+            any = true;
+          });
+        };
 
-        allVideoModalIds.forEach(id => {
-          const m = videoModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 400;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
+        updateBoundsFromModal(imageModalStates, 600, 400);
+        updateBoundsFromModal(videoModalStates, 600, 400);
+        updateBoundsFromModal(musicModalStates, 600, 300);
+        updateBoundsFromModal(upscaleModalStates, 600, 400);
+        updateBoundsFromModal(multiangleCameraModalStates, 600, 400);
+        updateBoundsFromModal(removeBgModalStates, 600, 400);
+        updateBoundsFromModal(eraseModalStates, 600, 400);
+        updateBoundsFromModal(expandModalStates, 600, 400);
+        updateBoundsFromModal(vectorizeModalStates, 600, 400);
+        updateBoundsFromModal(nextSceneModalStates, 600, 400);
+        updateBoundsFromModal(compareModalStates, 500, 600);
+        updateBoundsFromModal(storyboardModalStates, 400, 500);
+        updateBoundsFromModal(scriptFrameModalStates, 360, 260);
+        updateBoundsFromModal(sceneFrameModalStates, 350, 300);
+        updateBoundsFromModal(videoEditorModalStates, 600, 400);
 
-        allMusicModalIds.forEach(id => {
-          const m = musicModalStates.find(mm => mm.id === id);
-          if (!m) return;
-          const width = m.frameWidth ?? 600;
-          const height = m.frameHeight ?? 300;
-          minX = Math.min(minX, m.x);
-          minY = Math.min(minY, m.y);
-          maxX = Math.max(maxX, m.x + width);
-          maxY = Math.max(maxY, m.y + height);
-          any = true;
-        });
+        if (richTextStates) {
+          richTextStates.forEach((t: any) => {
+            minX = Math.min(minX, t.x);
+            minY = Math.min(minY, t.y);
+            maxX = Math.max(maxX, t.x + (t.width || 200));
+            maxY = Math.max(maxY, t.y + (t.height || 100)); // approx
+            any = true;
+          });
+        }
 
         if (any) {
           const width = maxX - minX;
           const height = maxY - minY;
-          setSelectionTightRect({
+          const rect = {
             x: minX,
             y: minY,
             width: Math.max(1, width),
             height: Math.max(1, height)
-          });
+          };
+          setSelectionTightRect(rect);
+          if (setSelectionTransformerRect) {
+            setSelectionTransformerRect(rect);
+          }
           setIsDragSelection(true);
         } else {
           setSelectionTightRect(null);
+          if (setSelectionTransformerRect) {
+            setSelectionTransformerRect(null);
+          }
           setIsDragSelection(false);
         }
+
         return;
       }
 

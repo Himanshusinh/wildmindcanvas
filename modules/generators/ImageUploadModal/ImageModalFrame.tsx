@@ -107,17 +107,6 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             return buildProxyResourceUrl(generatedImageUrl);
           })()}
           alt="Generated"
-          onDragStart={(e) => {
-            if (generatedImageUrl) {
-              e.dataTransfer.setData('text/plain', generatedImageUrl);
-              e.dataTransfer.setData('application/json', JSON.stringify({
-                url: generatedImageUrl,
-                type: 'uploaded',
-                id: `drop-${Date.now()}`
-              }));
-              e.dataTransfer.dropEffect = 'copy';
-            }
-          }}
           style={{
             width: '100%',
             height: '100%',
@@ -125,8 +114,10 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             pointerEvents: 'auto',
             borderRadius: (isHovered || isPinned) ? '0px' : `${17 * scale}px`,
             cursor: 'grab',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
-          draggable={true}
+          draggable={false}
         />
       ) : (
         <div style={{ textAlign: 'center', color: placeholderColor, transition: 'color 0.3s ease' }}>

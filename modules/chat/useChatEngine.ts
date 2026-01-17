@@ -66,15 +66,19 @@ GOAL TYPES:
 - IMAGE_ANIMATE: Turning existing static images into motion.
 - EXPLAIN_CANVAS: Answer questions about what is on the canvas.
 - MODIFY_EXISTING_FLOW: Change specific parts of a previous production.
+- DELETE_CONTENT: Remove items from the canvas (e.g. "delete all plugins", "remove video").
 - CLARIFY: If the request is too vague to map to a goal.
 
 SCHEMA:
 {
-  "goalType": "IMAGE_GENERATION" | "STORY_VIDEO" | "MUSIC_VIDEO" | "MOTION_COMIC" | "IMAGE_ANIMATE" | "EXPLAIN_CANVAS" | "MODIFY_EXISTING_FLOW" | "CLARIFY",
+  "goalType": "IMAGE_GENERATION" | "STORY_VIDEO" | "MUSIC_VIDEO" | "MOTION_COMIC" | "IMAGE_ANIMATE" | "EXPLAIN_CANVAS" | "MODIFY_EXISTING_FLOW" | "DELETE_CONTENT" | "CLARIFY",
+  "topic": string (e.g. "Ramayan", "Space exploration"),
   "topic": string (e.g. "Ramayan", "Space exploration"),
   "durationSeconds": number (Optional, e.g. 60),
   "style": string (e.g. "cinematic", "cyberpunk"),
   "aspectRatio": "1:1" | "16:9" | "9:16" | "4:3" | "3:4" (Optional),
+  "count": number (Optional, quantity of items to generate),
+  "model": string (Optional, specific model name if requested e.g. "seedream-4.5"),
   "needs": ["text", "image", "video", "audio", "motion", "plugin"],
   "references": string[] (IDs of selected/mentioned nodes),
   "explanation": "Your natural language conversational response"
@@ -85,6 +89,8 @@ INTENT NORMALIZATION RULES:
 - If user says "reel", "short", "vertical" -> aspectRatio: "9:16"
 - If user says "widescreen", "movie" -> aspectRatio: "16:9"
 - If user says "cinematic", "epic" -> style: "cinematic"
+- If user says "delete", "remove", "clear" -> goalType: "DELETE_CONTENT"
+- If user says "classic", "tv" -> aspectRatio: "4:3"
 
 Your "explanation" should build rapport and enthusiasm like a Creative Director, but the structured JSON must remain strictly semantic.
 `;
@@ -107,6 +113,8 @@ Your "explanation" should build rapport and enthusiasm like a Creative Director,
                         durationSeconds: parsed.durationSeconds,
                         style: parsed.style,
                         aspectRatio: parsed.aspectRatio,
+                        count: parsed.count,
+                        model: parsed.model,
                         needs: parsed.needs || [],
                         references: parsed.references || [],
                         explanation: parsed.explanation || "I've extracted your intent."
