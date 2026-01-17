@@ -88,7 +88,9 @@ interface ImageModalOverlaysProps {
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
   isComponentDraggable?: (id: string) => boolean;
+  isChatOpen?: boolean;
 }
+
 
 export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   imageModalStates,
@@ -115,6 +117,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   scriptFrameModalStates = [],
   storyboardModalStates = [],
   isComponentDraggable,
+  isChatOpen,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -178,6 +181,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             key={modalState.id}
             isOpen={true}
             id={modalState.id}
+            isAttachedToChat={isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))}
             draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
             onContextMenu={(e) => handleContextMenu(e, modalState.id)}
             isPinned={modalState.isPinned}

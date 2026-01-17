@@ -558,6 +558,7 @@ export interface ModalOverlaysProps {
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
   isUIHidden?: boolean;
+  isChatOpen?: boolean;
 }
 
 export interface CompareModalState {

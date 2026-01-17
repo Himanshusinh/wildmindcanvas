@@ -29,6 +29,7 @@ interface CanvasOverlaysProps {
     activeGenerationCount: number;
     onFitView: () => void;
     setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+    isChatOpen?: boolean;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -46,7 +47,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     setIsSettingsOpen,
     activeGenerationCount,
     onFitView,
-    setGenerationQueue
+    setGenerationQueue,
+    isChatOpen
 }) => {
     const {
         images,
@@ -132,6 +134,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             />
 
             <ModalOverlays
+                isChatOpen={isChatOpen}
                 stageRef={stageRef as any}
                 scale={scale}
                 position={position}

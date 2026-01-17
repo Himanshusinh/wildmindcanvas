@@ -34,6 +34,9 @@ export function compileGoalToPlan(goal: SemanticGoal): CanvasInstructionPlan {
         case 'DELETE_CONTENT':
             summary = compileDeleteContent(goal, steps);
             break;
+        case 'PLUGIN_ACTION':
+            summary = compilePluginAction(goal, steps);
+            break;
         case 'EXPLAIN_CANVAS':
             summary = "Explaining canvas contents...";
             break;
@@ -166,7 +169,8 @@ function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep
             model,
             aspectRatio: goal.aspectRatio || '1:1',
             prompt: `${topic} in ${style} style`,
-            imageCount: requestedCount // Pass the batch size here
+            imageCount: requestedCount, // Pass the batch size here
+            targetIds: goal.references // Pass references for Auto-Connect/Img2Img
         }
     });
 
@@ -319,4 +323,22 @@ function compileDeleteContent(goal: SemanticGoal, steps: CanvasInstructionStep[]
 
     const typeDesc = specificPluginType ? `${specificPluginType} plugins` : `${targetTypes.join(', ')} components`;
     return `Delete all ${typeDesc}.`;
+}
+
+function compilePluginAction(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const pluginType = goal.pluginType || 'upscale';
+
+    steps.push({
+        id: generateId(),
+        action: 'CREATE_NODE',
+        nodeType: 'plugin',
+        count: 1,
+        configTemplate: {
+            model: 'standard',
+            pluginType: pluginType,
+            targetIds: goal.references
+        }
+    });
+
+    return `Applying ${pluginType} plugin...`;
 }

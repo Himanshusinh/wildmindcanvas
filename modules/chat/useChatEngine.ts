@@ -64,16 +64,17 @@ GOAL TYPES:
 - MUSIC_VIDEO: Production involving both audio and visuals.
 - MOTION_COMIC: Stylized animated sequences.
 - IMAGE_ANIMATE: Turning existing static images into motion.
-- EXPLAIN_CANVAS: Answer questions about what is on the canvas.
+- EXPLAIN_CANVAS: Answer questions about canvas content OR explain how to use features (tutorials).
 - MODIFY_EXISTING_FLOW: Change specific parts of a previous production.
 - DELETE_CONTENT: Remove items from the canvas (e.g. "delete all plugins", "remove video").
+- PLUGIN_ACTION: Apply a specific tool or effect (e.g. "upscale", "remove background", "vectorize").
 - CLARIFY: If the request is too vague to map to a goal.
 
 SCHEMA:
 {
-  "goalType": "IMAGE_GENERATION" | "STORY_VIDEO" | "MUSIC_VIDEO" | "MOTION_COMIC" | "IMAGE_ANIMATE" | "EXPLAIN_CANVAS" | "MODIFY_EXISTING_FLOW" | "DELETE_CONTENT" | "CLARIFY",
+  "goalType": "IMAGE_GENERATION" | "STORY_VIDEO" | "MUSIC_VIDEO" | "MOTION_COMIC" | "IMAGE_ANIMATE" | "EXPLAIN_CANVAS" | "MODIFY_EXISTING_FLOW" | "DELETE_CONTENT" | "PLUGIN_ACTION" | "CLARIFY",
   "topic": string (e.g. "Ramayan", "Space exploration"),
-  "topic": string (e.g. "Ramayan", "Space exploration"),
+  "pluginType": string (e.g. "upscale", "remove-bg", "multiangle", "vectorize", "erase"),
   "durationSeconds": number (Optional, e.g. 60),
   "style": string (e.g. "cinematic", "cyberpunk"),
   "aspectRatio": "1:1" | "16:9" | "9:16" | "4:3" | "3:4" (Optional),
@@ -84,12 +85,27 @@ SCHEMA:
   "explanation": "Your natural language conversational response"
 }
 
+UI KNOWLEDGE BASE (For Explanations):
+- To use Plugins (Upscale, Remove BG, etc):
+  1. Select an Image node on the canvas.
+  2. Ask chat "Upscale this" (Automated) OR Drag the Plugin from the sidebar (Manual).
+  3. If Manual: Connect the Image Node output to the Plugin Input.
+  4. Click "Run" on the plugin.
+- To Generate Images/Videos:
+  1. Type "Create an image of..." in chat OR Drag "Image Gen" from sidebar.
+  2. If using sidebar node: Connect a Text node (prompt) to input.
+- Connections: Drag from the right-side handle of a node to the left-side handle of another.
+
 INTENT NORMALIZATION RULES:
 - If user says "1 minute", "one min" -> durationSeconds: 60
 - If user says "reel", "short", "vertical" -> aspectRatio: "9:16"
 - If user says "widescreen", "movie" -> aspectRatio: "16:9"
 - If user says "cinematic", "epic" -> style: "cinematic"
 - If user says "delete", "remove", "clear" -> goalType: "DELETE_CONTENT"
+- If user COMMANDS "upscale", "enhance" -> goalType: "PLUGIN_ACTION", pluginType: "upscale"
+- If user ASKS "how to upscale" -> goalType: "EXPLAIN_CANVAS"
+- If user COMMANDS "remove background" -> goalType: "PLUGIN_ACTION", pluginType: "remove-bg"
+- If user COMMANDS "add to image", "modify", "convert", "turn", "make it", "use this image" -> goalType: "IMAGE_GENERATION", needs: ["image"]
 - If user says "classic", "tv" -> aspectRatio: "4:3"
 
 Your "explanation" should build rapport and enthusiasm like a Creative Director, but the structured JSON must remain strictly semantic.
@@ -115,6 +131,7 @@ Your "explanation" should build rapport and enthusiasm like a Creative Director,
                         aspectRatio: parsed.aspectRatio,
                         count: parsed.count,
                         model: parsed.model,
+                        pluginType: parsed.pluginType,
                         needs: parsed.needs || [],
                         references: parsed.references || [],
                         explanation: parsed.explanation || "I've extracted your intent."

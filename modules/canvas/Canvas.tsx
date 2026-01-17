@@ -175,6 +175,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   } = canvasState;
 
   // --- VIEW STATE ---
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [viewportSize, setViewportSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800
@@ -830,6 +831,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         activeGenerationCount={0}
         onFitView={handleFitView}
         setGenerationQueue={setGenerationQueue}
+        isChatOpen={isChatOpen}
       />
 
       {!isUIHidden && (
@@ -846,6 +848,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
             viewportSize={viewportSize}
             position={position}
             scale={scale}
+            isOpen={isChatOpen}
+            setIsOpen={setIsChatOpen}
           />
         </>
       )}

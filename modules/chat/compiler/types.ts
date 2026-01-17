@@ -79,11 +79,13 @@ export type GoalType =
     | 'MODIFY_EXISTING_FLOW'
     | 'CLARIFY'
     | 'DELETE_CONTENT'
+    | 'PLUGIN_ACTION'
     | 'UNKNOWN';
 
 export interface SemanticGoal {
     goalType: GoalType;
-    topic?: string;
+    topic?: string; // Can be used for pluginType if generic, or prompt context
+    pluginType?: string; // Specific plugin name e.g. 'upscale', 'remove-bg'
     durationSeconds?: number;
     style?: string;
     aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';

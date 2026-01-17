@@ -13,6 +13,8 @@ interface ChatPanelProps {
     viewportSize: { width: number; height: number };
     position: { x: number; y: number };
     scale: number;
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -22,8 +24,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     viewportSize,
     position,
     scale,
+    isOpen,
+    setIsOpen,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
+    // const [isOpen, setIsOpen] = useState(false); // Removed local state
     const [inputValue, setInputValue] = useState('');
     const chatEngine = useChatEngine({ canvasState, canvasSelection });
     const executor = useIntentExecutor({
@@ -34,6 +38,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         position,
         scale,
     });
+
+    const selectedReferences = React.useMemo(() => {
+        const refs: { id: string, url: string }[] = [];
+        const ids = new Set(canvasSelection?.selectedIds || []);
+        if (ids.size === 0) return refs;
+
+        const lookupArrays = [
+            canvasState?.images,
+            canvasState?.imageGenerators,
+            canvasState?.imageModalStates,
+            canvasState?.videoGenerators,
+            canvasState?.videoModalStates
+        ];
+
+        lookupArrays.forEach(arr => {
+            if (Array.isArray(arr)) {
+                arr.forEach((item: any) => {
+                    if (ids.has(item.id)) {
+                        const url = item.sourceImageUrlPreview || item.sourceImageUrl || item.previewUrl || item.url;
+                        if (url && typeof url === 'string') {
+                            refs.push({ id: item.id, url });
+                        }
+                    }
+                });
+            }
+        });
+        return refs;
+    }, [canvasSelection?.selectedIds, canvasState]);
 
     const { isListening, toggleListening, isSupported } = useSpeechToText({
         onTranscriptChange: (text) => setInputValue(text),
@@ -193,6 +225,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                     {/* Input Field - Fully Transparent */}
                     <div className="p-4 bg-transparent mt-auto">
+                        {selectedReferences.length > 0 && (
+                            <div className="flex items-center gap-2 mb-2 px-1 overflow-x-auto custom-scrollbar pb-1">
+                                {selectedReferences.map((ref) => (
+                                    <div key={ref.id} className="relative group/ref shrink-0 animate-in fade-in zoom-in duration-300">
+                                        <div className="w-12 h-12 rounded-xl border border-white/10 overflow-hidden bg-white/5 shadow-lg">
+                                            <img src={ref.url} alt="Reference" className="w-full h-full object-cover opacity-80 group-hover/ref:opacity-100 transition-opacity" />
+                                        </div>
+                                        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-[#0a0a0a] flex items-center justify-center shadow-sm">
+                                            <Check size={8} className="text-white font-bold" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="relative group">
                             <input
                                 type="text"

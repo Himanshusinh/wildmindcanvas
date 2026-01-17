@@ -79,6 +79,40 @@ export function useIntentExecutor({
                             }
                             else if (step.nodeType === 'image-generator') {
                                 const newId = `image-${uuidv4()}`;
+
+                                // Img2Img / Auto-Connect Logic
+                                // Resolve source image to use as reference (and dimensions)
+                                const explicitTargets = step.configTemplate.targetIds;
+                                const targetIds = (explicitTargets && explicitTargets.length > 0)
+                                    ? explicitTargets
+                                    : (canvasSelection.selectedIds || []);
+
+                                let sourceImageConfig = {};
+                                let sourceId: string | null = null;
+
+                                if (targetIds.length > 0) {
+                                    sourceId = targetIds[0];
+                                    // Find source node in ImageModalStates (Generated) or Images (Uploaded)
+                                    const sourceModal = canvasState.imageModalStates?.find((m: any) => m.id === sourceId);
+                                    const sourceUpload = canvasState.images?.find((img: any) => img.elementId === sourceId || img.id === sourceId);
+
+                                    if (sourceModal) {
+                                        sourceImageConfig = {
+                                            frameWidth: sourceModal.frameWidth,
+                                            frameHeight: sourceModal.frameHeight,
+                                            sourceImageUrl: sourceModal.generatedImageUrl || sourceModal.url, // url for uploaded wrapped in modal
+                                            // Maybe preserve aspect ratio?
+                                            aspectRatio: sourceModal.aspectRatio
+                                        };
+                                    } else if (sourceUpload) {
+                                        sourceImageConfig = {
+                                            frameWidth: sourceUpload.width, // Assuming Upload has width/height? Maybe need getDimensions?
+                                            frameHeight: sourceUpload.height,
+                                            sourceImageUrl: sourceUpload.url
+                                        };
+                                    }
+                                }
+
                                 const newModal = {
                                     id: newId,
                                     x: posX,
@@ -91,11 +125,25 @@ export function useIntentExecutor({
                                     resolution: '1024',
                                     frameWidth: 600,
                                     frameHeight: 400,
-                                    isGenerating: true, // This needs to be true for auto-start                         };
+                                    isGenerating: true,
+                                    ...sourceImageConfig // Override defaults with source config
                                 };
                                 canvasState.setImageModalStates((prev: any) => [...prev, newModal]);
                                 if (props.onPersistImageModalCreate) await props.onPersistImageModalCreate(newModal);
                                 newIds.push(newId);
+
+                                // Create Connection if source existed
+                                if (sourceId) {
+                                    const newConn = {
+                                        id: `conn-${uuidv4()}`,
+                                        from: sourceId,
+                                        to: newId,
+                                        color: '#555555'
+                                    };
+                                    if (props.onPersistConnectorCreate) {
+                                        await props.onPersistConnectorCreate(newConn);
+                                    }
+                                }
                             }
                             else if (step.nodeType === 'music-generator') {
                                 const newId = `music-${uuidv4()}`;
@@ -130,6 +178,99 @@ export function useIntentExecutor({
                                     if (props.onPersistRichTextCreate) await props.onPersistRichTextCreate(newText);
                                 }
                                 newIds.push(newId);
+                            }
+                            else if (step.nodeType === 'plugin') {
+                                const pluginType = step.configTemplate.pluginType || 'upscale';
+                                const newId = `${pluginType}-${uuidv4()}`;
+
+                                let setter: any = null;
+                                let persister: any = null;
+
+                                switch (pluginType) {
+                                    case 'upscale':
+                                        setter = canvasState.setUpscaleModalStates;
+                                        persister = props.onPersistUpscaleModalCreate;
+                                        break;
+                                    case 'remove-bg':
+                                        setter = canvasState.setRemoveBgModalStates;
+                                        persister = props.onPersistRemoveBgModalCreate;
+                                        break;
+                                    case 'multiangle':
+                                        setter = canvasState.setMultiangleCameraModalStates;
+                                        persister = props.onPersistMultiangleCameraModalCreate;
+                                        break;
+                                    case 'vectorize':
+                                        setter = canvasState.setVectorizeModalStates;
+                                        persister = props.onPersistVectorizeModalCreate;
+                                        break;
+                                    case 'erase':
+                                        setter = canvasState.setEraseModalStates;
+                                        persister = props.onPersistEraseModalCreate;
+                                        break;
+                                    case 'expand':
+                                        setter = canvasState.setExpandModalStates;
+                                        persister = props.onPersistExpandModalCreate;
+                                        break;
+                                    case 'next-scene':
+                                        setter = canvasState.setNextSceneModalStates;
+                                        persister = props.onPersistNextSceneModalCreate;
+                                        break;
+                                    case 'storyboard':
+                                        setter = canvasState.setStoryboardModalStates;
+                                        persister = props.onPersistStoryboardModalCreate;
+                                        break;
+                                    case 'compare':
+                                        setter = canvasState.setCompareModalStates;
+                                        persister = props.onPersistCompareModalCreate;
+                                        break;
+                                    case 'video-editor':
+                                        setter = canvasState.setVideoEditorModalStates;
+                                        persister = props.onPersistVideoEditorModalCreate;
+                                        break;
+                                    case 'image-editor':
+                                        setter = canvasState.setImageEditorModalStates;
+                                        persister = props.onPersistImageEditorModalCreate;
+                                        break;
+                                }
+
+                                if (setter) {
+                                    const newModal = {
+                                        id: newId,
+                                        x: posX,
+                                        y: posY,
+                                        width: 500,
+                                        height: 500,
+                                        pluginType: pluginType
+                                    };
+
+                                    setter((prev: any) => [...prev, newModal]);
+                                    if (persister) await persister(newModal);
+                                    newIds.push(newId);
+
+                                    // Auto-Connect to Selected Items (Smart Context)
+                                    // If items were selected when this intent was formed, connect them!
+                                    const explicitTargets = step.configTemplate.targetIds;
+                                    const targetIds = (explicitTargets && explicitTargets.length > 0)
+                                        ? explicitTargets
+                                        : (canvasSelection.selectedIds || []);
+
+                                    console.log('[IntentExecutor] Auto-Connecting Plugin to:', targetIds);
+
+                                    for (const targetId of targetIds) {
+                                        // Simple validation: don't connect to self
+                                        if (targetId !== newId) {
+                                            const newConn = {
+                                                id: `conn-${uuidv4()}`,
+                                                from: targetId,
+                                                to: newId,
+                                                color: '#555555'
+                                            };
+                                            if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(newConn);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -307,7 +448,7 @@ export function useIntentExecutor({
 
         // All single actions must now be routed via plans in the Resolver.
         console.warn('[IntentExecutor] Received legacy intent. Please route via EXECUTE_PLAN.', action.intent);
-    }, [getViewportCenter, canvasState, props]);
+    }, [getViewportCenter, canvasState, props, canvasSelection]);
 
     return { executeIntent };
 }

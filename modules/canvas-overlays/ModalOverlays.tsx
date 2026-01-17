@@ -239,6 +239,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onGenerateStoryboard,
   projectId,
   setGenerationQueue,
+  isChatOpen,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
 
@@ -347,6 +348,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         storyboardModalStates={storyboardModalStates ?? []}
         isComponentDraggable={isComponentDraggable}
+        isChatOpen={isChatOpen}
       />
 
       <VideoModalOverlays

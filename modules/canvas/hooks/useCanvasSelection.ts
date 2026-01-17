@@ -207,6 +207,27 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         selectedGroupIds, setSelectedGroupIds,
 
+        selectedIds: [
+            ...selectedImageModalIds,
+            ...selectedVideoModalIds,
+            ...selectedVideoEditorModalIds,
+            ...selectedImageEditorModalIds,
+            ...selectedMusicModalIds,
+            ...selectedUpscaleModalIds,
+            ...selectedMultiangleCameraModalIds,
+            ...selectedRemoveBgModalIds,
+            ...selectedEraseModalIds,
+            ...selectedExpandModalIds,
+            ...selectedVectorizeModalIds,
+            ...selectedNextSceneModalIds,
+            ...selectedStoryboardModalIds,
+            ...selectedScriptFrameModalIds,
+            ...selectedSceneFrameModalIds,
+            ...selectedGroupIds,
+            ...effectiveSelectedCanvasTextIds,
+            ...effectiveSelectedRichTextIds
+        ],
+
         // Effective Canvas Text Selection
         effectiveSelectedCanvasTextId,
         effectiveSetSelectedCanvasTextId,

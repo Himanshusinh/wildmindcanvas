@@ -59,10 +59,12 @@ interface ImageUploadModalProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  isAttachedToChat?: boolean;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isOpen,
+  isAttachedToChat,
   id,
   onClose,
   onGenerate,
@@ -1611,6 +1613,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
+
+      {/* Chat Attachment Indicator */}
+      {isAttachedToChat && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-blue-500/90 text-white/90 text-[10px] font-medium px-3 py-1.5 rounded-full shadow-lg z-50 whitespace-nowrap pointer-events-none backdrop-blur-sm border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          Image attached to chatbox
+        </div>
+      )}
 
       {/* Auto-Reference Indicator */}
       {autoReferenceInfo && (
