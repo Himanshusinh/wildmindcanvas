@@ -110,7 +110,7 @@ export function useCanvasModalDrag({
       if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
         e.nativeEvent.stopImmediatePropagation();
       }
-    } catch {}
+    } catch { }
   };
 
   const endDrag = useCallback((e?: PointerEvent | MouseEvent) => {
@@ -122,7 +122,7 @@ export function useCanvasModalDrag({
       if (el && activePointerIdRef.current !== MOUSE_POINTER_ID && typeof (el as any).releasePointerCapture === 'function') {
         (el as any).releasePointerCapture(activePointerIdRef.current);
       }
-    } catch {}
+    } catch { }
 
     // Remove window listeners
     cleanupListenersRef.current?.();
@@ -137,12 +137,12 @@ export function useCanvasModalDrag({
     setIsDragging(false);
     try {
       document.body.style.cursor = '';
-    } catch {}
+    } catch { }
 
     if (!wasDragging) {
       try {
         onTapRef.current?.();
-      } catch {}
+      } catch { }
     }
 
     if (onPositionCommitRef.current) {
@@ -150,7 +150,7 @@ export function useCanvasModalDrag({
       const finalY = lastCanvasPosRef.current.y;
       try {
         onPositionCommitRef.current(finalX, finalY);
-      } catch {}
+      } catch { }
     }
   }, [containerRef]);
 
@@ -168,7 +168,7 @@ export function useCanvasModalDrag({
       if (!ignore) {
         try {
           onSelectRef.current?.();
-        } catch {}
+        } catch { }
       }
 
       if (ignore) return;
@@ -188,7 +188,7 @@ export function useCanvasModalDrag({
       setIsDragging(true);
       try {
         document.body.style.cursor = 'grabbing';
-      } catch {}
+      } catch { }
 
       // Capture pointer so we keep receiving move/up events
       // Try to capture on the target element (where the event originated) if it supports it
@@ -200,7 +200,7 @@ export function useCanvasModalDrag({
         } else if (typeof (el as any).setPointerCapture === 'function') {
           (el as any).setPointerCapture(e.pointerId);
         }
-      } catch {}
+      } catch { }
 
       const handlePointerMove = (ev: PointerEvent) => {
         if (activePointerIdRef.current == null) return;
@@ -222,7 +222,7 @@ export function useCanvasModalDrag({
         try {
           onPositionChangeRef.current(newCanvasX, newCanvasY);
           lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-        } catch {}
+        } catch { }
       };
 
       const handlePointerUp = (ev: PointerEvent) => {
@@ -258,7 +258,7 @@ export function useCanvasModalDrag({
       if (!ignore) {
         try {
           onSelectRef.current?.();
-        } catch {}
+        } catch { }
       }
 
       if (ignore) return;
@@ -278,7 +278,7 @@ export function useCanvasModalDrag({
       setIsDragging(true);
       try {
         document.body.style.cursor = 'grabbing';
-      } catch {}
+      } catch { }
 
       const handleMouseMove = (ev: MouseEvent) => {
         if (activePointerIdRef.current !== MOUSE_POINTER_ID) return;
@@ -299,7 +299,7 @@ export function useCanvasModalDrag({
         try {
           onPositionChangeRef.current(newCanvasX, newCanvasY);
           lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
-        } catch {}
+        } catch { }
       };
 
       const handleMouseUp = (ev: MouseEvent) => {
@@ -325,7 +325,7 @@ export function useCanvasModalDrag({
       cleanupListenersRef.current = null;
       try {
         document.body.style.cursor = '';
-      } catch {}
+      } catch { }
     };
   }, []);
 

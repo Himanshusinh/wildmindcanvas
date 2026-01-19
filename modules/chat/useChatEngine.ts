@@ -106,6 +106,7 @@ INTENT NORMALIZATION RULES:
 - If user ASKS "how to upscale" -> goalType: "EXPLAIN_CANVAS"
 - If user COMMANDS "remove background" -> goalType: "PLUGIN_ACTION", pluginType: "remove-bg"
 - If user COMMANDS "add to image", "modify", "convert", "turn", "make it", "use this image" -> goalType: "IMAGE_GENERATION", needs: ["image"]
+- If user COMMANDS "animate", "make it move", "make it video", "convert to video", "animate this", "bring to life" -> goalType: "IMAGE_ANIMATE"
 - If user says "classic", "tv" -> aspectRatio: "4:3"
 
 Your "explanation" should build rapport and enthusiasm like a Creative Director, but the structured JSON must remain strictly semantic.

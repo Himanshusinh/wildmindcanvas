@@ -62,6 +62,18 @@ export function useIntentExecutor({
 
                             if (step.nodeType === 'video-generator') {
                                 const newId = `video-${uuidv4()}`;
+
+                                // Img2Vid / Auto-Connect Logic
+                                const explicitTargets = step.configTemplate.targetIds;
+                                const targetIds = (explicitTargets && explicitTargets.length > 0)
+                                    ? explicitTargets
+                                    : (canvasSelection.selectedIds || []);
+
+                                let sourceId: string | null = null;
+                                if (targetIds.length > 0) {
+                                    sourceId = targetIds[0];
+                                }
+
                                 const newModal = {
                                     id: newId,
                                     x: posX,
@@ -76,6 +88,19 @@ export function useIntentExecutor({
                                 canvasState.setVideoModalStates((prev: any) => [...prev, newModal]);
                                 if (props.onPersistVideoModalCreate) await props.onPersistVideoModalCreate(newModal);
                                 newIds.push(newId);
+
+                                // Create Connection if source existed
+                                if (sourceId) {
+                                    const newConn = {
+                                        id: `conn-${uuidv4()}`,
+                                        from: sourceId,
+                                        to: newId,
+                                        color: '#555555'
+                                    };
+                                    if (props.onPersistConnectorCreate) {
+                                        await props.onPersistConnectorCreate(newConn);
+                                    }
+                                }
                             }
                             else if (step.nodeType === 'image-generator') {
                                 const newId = `image-${uuidv4()}`;

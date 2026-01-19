@@ -242,16 +242,28 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         scale={scale}
                         isDraggable={true} // Call helper
                         isSelected={selectedVideoModalIds.includes(videoState.id)}
-                        onSelect={() => { /* logic passing logic? */ }}
+                        onSelect={(e) => {
+                            const isMulti = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                            if (isMulti) {
+                                if (selectedVideoModalIds.includes(videoState.id)) {
+                                    setSelectedVideoModalIds(prev => prev.filter(id => id !== videoState.id));
+                                } else {
+                                    setSelectedVideoModalIds(prev => [...prev, videoState.id]);
+                                }
+                            } else {
+                                clearAllSelections(false);
+                                setSelectedVideoModalIds([videoState.id]);
+                            }
+                        }}
                         onUpdate={(updates) => props.onPersistVideoModalMove?.(videoState.id, updates)}
                     />
                 ))}
 
 
 
-                {images
-                    .filter((img) => img.type !== 'model3d' && img.type !== 'text')
-                    .map((imageData: any, index: number) => (
+                {images.map((imageData: any, index: number) => {
+                    if (imageData.type === 'model3d' || imageData.type === 'text') return null;
+                    return (
                         <CanvasImage
                             key={`${imageData.url}-${index}`}
                             imageData={imageData}
@@ -287,7 +299,8 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                 setSelectedImageIndices([]);
                             }}
                         />
-                    ))}
+                    );
+                })}
 
                 {effectiveRichTextStates?.map((textState: any) => {
                     const isMultiSelect = (selectedRichTextIds?.length || 0) +
@@ -338,7 +351,52 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     setContextMenuOpen={(open) => { /* TODO */ }}
                     // pass context menu setters if needed
                     handleImageUpdateWithGroup={groupLogic.handleImageUpdateWithGroup}
+                    onSelectText={(idOrIndex, e) => {
+                        const isMulti = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                        if (typeof idOrIndex === 'number') {
+                            const index = idOrIndex;
+                            if (isMulti) {
+                                if (selectedImageIndices.includes(index)) {
+                                    setSelectedImageIndices(prev => prev.filter(i => i !== index));
+                                    if (selectedImageIndex === index) setSelectedImageIndex(null);
+                                } else {
+                                    setSelectedImageIndices(prev => [...prev, index]);
+                                    setSelectedImageIndex(index);
+                                }
+                            } else {
+                                clearAllSelections(false);
+                                setSelectedImageIndices([index]);
+                                setSelectedImageIndex(index);
+                            }
+                        }
+                    }}
                 />
+
+                {effectiveCanvasTextStates.map((textState: any) => (
+                    <CanvasTextNode
+                        key={textState.id}
+                        data={textState}
+                        isSelected={effectiveSelectedCanvasTextIds.includes(textState.id)}
+                        onSelect={(id, e) => {
+                            const isMulti = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                            if (isMulti) {
+                                if (effectiveSelectedCanvasTextIds.includes(id)) {
+                                    canvasSelection.effectiveSetSelectedCanvasTextIds(prev => prev.filter(tid => tid !== id));
+                                } else {
+                                    canvasSelection.effectiveSetSelectedCanvasTextIds(prev => [...prev, id]);
+                                }
+                            } else {
+                                clearAllSelections(false);
+                                canvasState.effectiveSetSelectedCanvasTextId(id);
+                                canvasSelection.effectiveSetSelectedCanvasTextIds([id]);
+                            }
+                        }}
+                        onChange={handleCanvasTextUpdate}
+                        stageScale={scale}
+                        onInteractionStart={() => setIsTextInteracting(true)}
+                        onInteractionEnd={() => setIsTextInteracting(false)}
+                    />
+                ))}
 
                 <SelectionBox
                     isGroupSelected={selectedGroupIds.length === 1}

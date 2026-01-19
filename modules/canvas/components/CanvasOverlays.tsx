@@ -93,6 +93,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         contextMenuPosition, contextMenuModalType, contextMenuOpen, setContextMenuOpen,
+        setSelectionOrder,
     } = canvasSelection;
 
     const {
@@ -212,6 +213,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 selectedStoryboardModalId={selectedStoryboardModalId}
                 selectedStoryboardModalIds={selectedStoryboardModalIds}
                 selectedIds={selectedIds}
+                setSelectionOrder={setSelectionOrder}
 
                 clearAllSelections={clearAllSelections}
                 setTextInputStates={setTextInputStates}

@@ -14,6 +14,7 @@ interface TextElementsProps {
   setContextMenuOpen: (open: boolean) => void;
   handleImageUpdateWithGroup: (index: number, updates: Partial<ImageUpload>) => void;
   isComponentDraggable?: (id: string) => boolean;
+  onSelectText?: (id: string | number, e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
 }
 
 export const TextElements: React.FC<TextElementsProps> = ({
@@ -26,6 +27,7 @@ export const TextElements: React.FC<TextElementsProps> = ({
   setContextMenuOpen,
   handleImageUpdateWithGroup,
   isComponentDraggable,
+  onSelectText,
 }) => {
   return (
     <>
@@ -60,11 +62,18 @@ export const TextElements: React.FC<TextElementsProps> = ({
                 }}
                 onClick={(e) => {
                   e.cancelBubble = true;
-                  // Clear all other selections first
-                  clearAllSelections();
-                  // Then set this text as selected
-                  setSelectedImageIndex(actualIndex);
-                  setSelectedImageIndices([actualIndex]);
+                  if (onSelectText) {
+                    onSelectText(actualIndex, {
+                      ctrlKey: e.evt.ctrlKey,
+                      metaKey: e.evt.metaKey,
+                      shiftKey: e.evt.shiftKey,
+                    });
+                  } else {
+                    // Fallback to legacy behavior if prop not provided
+                    clearAllSelections();
+                    setSelectedImageIndex(actualIndex);
+                    setSelectedImageIndices([actualIndex]);
+                  }
                   // Show context menu when text is clicked
                   setContextMenuImageIndex(actualIndex);
                   setContextMenuOpen(true);

@@ -1072,9 +1072,11 @@ export function useCanvasEvents(
         const target = e.target;
         const stage = target.getStage();
         const clickedOnEmpty = target === stage || target.getClassName() === 'Stage' || target.getClassName() === 'Layer' || target.name() === 'background-rect';
+        const isShiftClick = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
 
-        // Modified: only clear on LEFT CLICK (button 0)
-        if (clickedOnEmpty && e.evt.button === 0) {
+        // Modified: only clear on LEFT CLICK (button 0) and NOT when shift/ctrl/cmd is held
+        // Don't clear selection on shift-click as it's used for multi-selection
+        if (clickedOnEmpty && e.evt.button === 0 && !isShiftClick) {
             clearAllSelections();
         }
     };

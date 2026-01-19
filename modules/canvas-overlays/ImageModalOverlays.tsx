@@ -90,6 +90,7 @@ interface ImageModalOverlaysProps {
   isComponentDraggable?: (id: string) => boolean;
   isChatOpen?: boolean;
   selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 }
 
 
@@ -120,6 +121,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   isComponentDraggable,
   isChatOpen,
   selectedIds,
+  setSelectionOrder,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -686,8 +688,22 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
 
                 if (isAlreadySelected) {
                   newIds = currentSelected.filter(id => id !== modalState.id);
+                  // Remove from selection order
+                  if (setSelectionOrder) {
+                    setSelectionOrder(prev => prev.filter(id => id !== modalState.id));
+                  }
                 } else {
                   newIds = [...currentSelected, modalState.id];
+                  // Add to selection order (append to end) - but only if not already in order
+                  if (setSelectionOrder) {
+                    setSelectionOrder(prev => {
+                      // Only add if not already in the order
+                      if (!prev.includes(modalState.id)) {
+                        return [...prev, modalState.id];
+                      }
+                      return prev;
+                    });
+                  }
                 }
 
                 console.log('[ImageModalOverlays] New Multi-Selection:', newIds);
@@ -713,6 +729,10 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 // Then set this modal as selected
                 setSelectedImageModalId(modalState.id);
                 setSelectedImageModalIds([modalState.id]);
+                // Reset selection order to just this item
+                if (setSelectionOrder) {
+                  setSelectionOrder([modalState.id]);
+                }
               }
             }}
             onDelete={() => {

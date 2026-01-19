@@ -181,6 +181,8 @@ function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep
  * Strategy: IMAGE_ANIMATE
  */
 function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
+    const topic = goal.topic || "Visual";
+    const style = goal.style || "cinematic";
     const count = goal.references?.length || 1;
 
     const videoStepId = generateId();
@@ -190,15 +192,14 @@ function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[])
         nodeType: 'video-generator',
         count,
         configTemplate: {
-            model: 'veo-3.1',
-            prompt: "Animate this image with cinematic motion"
+            model: goal.model || 'veo-3.1',
+            aspectRatio: goal.aspectRatio || '16:9',
+            prompt: goal.topic ? `${topic} in ${style} style` : "Animate this image with cinematic motion",
+            targetIds: goal.references
         }
     });
 
-    // Connect existing references to new videos if possible
-    // This requires the executor to mapped goal.references to the 'toStepId'
-
-    return `Animate ${count} images into cinematic video loops.`;
+    return `Animate ${count} images into cinematic video loops showing ${topic}.`;
 }
 
 /**

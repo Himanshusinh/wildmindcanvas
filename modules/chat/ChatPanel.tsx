@@ -56,9 +56,58 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             if (Array.isArray(arr)) {
                 arr.forEach((item: any) => {
                     if (ids.has(item.id)) {
-                        const url = item.sourceImageUrlPreview || item.sourceImageUrl || item.previewUrl || item.url;
-                        if (url && typeof url === 'string') {
-                            refs.push({ id: item.id, url });
+                        // ONLY show generated images/videos, NEVER show reference/source images
+                        // For images: generatedImageUrl > generatedImageUrls[0] > url
+                        // For videos: generatedVideoUrl > previewUrl > url
+                        // NEVER use sourceImageUrl or sourceImageUrlPreview
+                        
+                        let urlToUse: string | null = null;
+                        
+                        // Check if this is a video modal (has generatedVideoUrl)
+                        const isVideo = item.generatedVideoUrl !== undefined;
+                        
+                        if (isVideo) {
+                            // For videos: prioritize generated video URL
+                            if (item.generatedVideoUrl && typeof item.generatedVideoUrl === 'string') {
+                                urlToUse = item.generatedVideoUrl;
+                            }
+                            // Fallback to preview URL for videos
+                            else if (item.previewUrl && typeof item.previewUrl === 'string') {
+                                urlToUse = item.previewUrl;
+                            }
+                            // Last resort: regular URL (but not if it's a reference)
+                            else if (item.url && typeof item.url === 'string') {
+                                if (item.url !== item.sourceImageUrl && item.url !== item.sourceImageUrlPreview) {
+                                    urlToUse = item.url;
+                                }
+                            }
+                        } else {
+                            // For images: First priority - generated image URL
+                            if (item.generatedImageUrl && typeof item.generatedImageUrl === 'string') {
+                                urlToUse = item.generatedImageUrl;
+                            } 
+                            // Second priority: generated image URLs array
+                            else if (item.generatedImageUrls && Array.isArray(item.generatedImageUrls) && item.generatedImageUrls.length > 0) {
+                                urlToUse = item.generatedImageUrls[0];
+                            }
+                            // Third priority: regular image URL (for canvas images that aren't modals)
+                            else if (item.url && typeof item.url === 'string') {
+                                // Only use if it's not a reference image
+                                if (item.url !== item.sourceImageUrl && item.url !== item.sourceImageUrlPreview) {
+                                    urlToUse = item.url;
+                                }
+                            }
+                        }
+                        
+                        // Only add if we have a valid URL and it's definitely NOT a reference image
+                        if (urlToUse && 
+                            typeof urlToUse === 'string' &&
+                            !urlToUse.includes('reference-stitched') &&
+                            urlToUse !== item.sourceImageUrl &&
+                            urlToUse !== item.sourceImageUrlPreview &&
+                            // Additional check: if the item has sourceImageUrl but no generated image/video, skip it
+                            !(item.sourceImageUrl && !item.generatedImageUrl && !item.generatedImageUrls && !item.generatedVideoUrl)) {
+                            refs.push({ id: item.id, url: urlToUse });
                         }
                     }
                 });
@@ -251,7 +300,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                     {/* Input Area */}
                     <div className="p-4 pt-2 z-20 bg-gradient-to-t from-blue-950/80 to-transparent">
-                        {selectedReferences.length > 0 && (
+                        {/* Selected references are hidden from UI but still available for chat functionality */}
+                        {/* {selectedReferences.length > 0 && (
                             <div className="flex items-center gap-2 mb-3 px-1 overflow-x-auto custom-scrollbar pb-2">
                                 {selectedReferences.map((ref) => (
                                     <div key={ref.id} className="relative group/ref shrink-0 animate-in fade-in zoom-in duration-300">
@@ -264,7 +314,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                     </div>
                                 ))}
                             </div>
-                        )}
+                        )} */}
                         <div className="relative group">
                             <input
                                 type="text"

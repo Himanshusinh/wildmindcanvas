@@ -71,6 +71,7 @@ interface VideoModalOverlaysProps {
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
   isChatOpen?: boolean;
   selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 }
 
 export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
@@ -96,6 +97,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   setGenerationQueue,
   isChatOpen,
   selectedIds,
+  setSelectionOrder,
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -357,8 +359,22 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               const currentSelected = selectedVideoModalIdsRef.current;
               if (currentSelected.includes(modalState.id)) {
                 setSelectedVideoModalIds(currentSelected.filter(id => id !== modalState.id));
+                // Remove from selection order
+                if (setSelectionOrder) {
+                  setSelectionOrder(prev => prev.filter(id => id !== modalState.id));
+                }
               } else {
                 setSelectedVideoModalIds([...currentSelected, modalState.id]);
+                // Add to selection order (append to end) - but only if not already in order
+                if (setSelectionOrder) {
+                  setSelectionOrder(prev => {
+                    // Only add if not already in the order
+                    if (!prev.includes(modalState.id)) {
+                      return [...prev, modalState.id];
+                    }
+                    return prev;
+                  });
+                }
               }
               if (!selectedVideoModalIds.includes(modalState.id)) {
                 setSelectedVideoModalId(modalState.id);
@@ -368,6 +384,10 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               clearAllSelections();
               setSelectedVideoModalId(modalState.id);
               setSelectedVideoModalIds([modalState.id]);
+              // Reset selection order to just this item
+              if (setSelectionOrder) {
+                setSelectionOrder([modalState.id]);
+              }
             }
           }}
           onDelete={() => {

@@ -7,7 +7,7 @@ import { CanvasTextState } from '@/modules/canvas-overlays/types';
 interface CanvasTextNodeProps {
     data: CanvasTextState;
     isSelected: boolean;
-    onSelect: (id: string) => void;
+    onSelect: (id: string, e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
     onChange: (id: string, updates: Partial<CanvasTextState>) => void;
     stageScale: number;
     onInteractionStart?: () => void;
@@ -286,6 +286,8 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
         <>
             <Group
                 ref={groupRef}
+                id={data.id}
+                data-type="text"
                 x={data.x}
                 y={data.y}
                 rotation={data.rotation}
@@ -293,11 +295,21 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                 onDblClick={handleDblClick}
                 onDblTap={handleDblClick}
                 onClick={(e) => {
-                    onSelect(data.id);
+                    const evt = e.evt as any;
+                    onSelect(data.id, {
+                        ctrlKey: evt.ctrlKey,
+                        metaKey: evt.metaKey,
+                        shiftKey: evt.shiftKey,
+                    });
                     e.cancelBubble = true;
                 }}
                 onTap={(e) => {
-                    onSelect(data.id);
+                    const evt = e.evt as any;
+                    onSelect(data.id, {
+                        ctrlKey: evt.ctrlKey,
+                        metaKey: evt.metaKey,
+                        shiftKey: evt.shiftKey,
+                    });
                     e.cancelBubble = true;
                 }}
                 onDragStart={() => onInteractionStart?.()}

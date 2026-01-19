@@ -71,7 +71,7 @@ export const ScriptFrameModalOverlays: React.FC<ScriptFrameModalOverlaysProps> =
           onPositionChange={onPositionChange}
           onPositionCommit={onPositionCommit}
           onTextUpdate={onTextUpdate}
-              clearAllSelections={clearAllSelections}
+          clearAllSelections={clearAllSelections}
         />
       ))}
     </>

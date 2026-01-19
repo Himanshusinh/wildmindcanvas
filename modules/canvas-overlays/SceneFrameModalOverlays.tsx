@@ -292,11 +292,11 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                 userSelect: 'none',
                 cursor: isDragging ? 'grabbing' : 'grab',
             }}
-        tabIndex={0}
-        onBlur={(e) => {
-            if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-                setIsSelected(false);
-            }
+            tabIndex={0}
+            onBlur={(e) => {
+                if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+                    setIsSelected(false);
+                }
             }}
         >
             <div
@@ -311,8 +311,8 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     boxShadow: isSelected
                         ? '0 0 0 3px rgba(67, 126, 181, 0.25)'
                         : isDark
-                        ? '0 12px 24px rgba(0,0,0,0.6)'
-                        : '0 12px 24px rgba(15,23,42,0.18)',
+                            ? '0 12px 24px rgba(0,0,0,0.6)'
+                            : '0 12px 24px rgba(15,23,42,0.18)',
                     padding: `${cardPadding}px`,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     transition: 'box-shadow 0.2s ease, border 0.2s ease',
@@ -397,7 +397,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                                 padding: `${12 * scale}px`,
                                 resize: 'vertical',
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
-                        }}
+                            }}
                         />
                         <div style={{ display: 'flex', gap: `${8 * scale}px` }}>
                             <button
@@ -437,16 +437,16 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                                 }}
                             >
                                 Cancel
-                    </button>
-                </div>
+                            </button>
+                        </div>
                     </div>
                 ) : (
-                <SceneFrame
-                    scale={scale}
-                    sceneNumber={frame.sceneNumber}
-                    sceneContent={frame.content}
-                    isDark={isDark}
-                />
+                    <SceneFrame
+                        scale={scale}
+                        sceneNumber={frame.sceneNumber}
+                        sceneContent={frame.content}
+                        isDark={isDark}
+                    />
                 )}
             </div>
         </div>

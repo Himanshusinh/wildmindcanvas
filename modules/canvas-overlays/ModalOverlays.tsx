@@ -89,6 +89,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedStoryboardModalId,
   selectedStoryboardModalIds,
   selectedIds,
+  setSelectionOrder,
 
   // Canvas Text
   canvasTextStates,
@@ -351,6 +352,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         isComponentDraggable={isComponentDraggable}
         isChatOpen={isChatOpen}
         selectedIds={selectedIds}
+        setSelectionOrder={setSelectionOrder}
       />
 
       <VideoModalOverlays
@@ -376,6 +378,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         setGenerationQueue={setGenerationQueue}
         isChatOpen={isChatOpen}
         selectedIds={selectedIds}
+        setSelectionOrder={setSelectionOrder}
       />
 
       <VideoEditorModalOverlays

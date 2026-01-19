@@ -125,6 +125,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Track initial mouse position to distinguish clicks from drags
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Seedance 1.0 Pro');
@@ -502,33 +504,96 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   }, [selectedModel]); // Only run when model changes
 
 
+  // Handle click for shift-selection (fires after mousedown + mouseup)
+  const handleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+    const isButton = target.tagName === 'BUTTON' || target.closest('button');
+    const isControls = target.closest('.controls-overlay');
+    const isShiftClick = e.shiftKey || e.ctrlKey || e.metaKey;
+
+    // Always stop propagation to prevent canvas from handling the click
+    // This is especially important for shift-clicks to preserve selection
+    e.stopPropagation();
+
+    // For shift/ctrl/cmd clicks, ensure selection is handled on click event
+    // This ensures single click (not hold) works properly
+    if (onSelect && !isInput && !isButton && !isControls && isShiftClick) {
+      // Check if mouse actually moved (was it a drag or a click?)
+      let wasClick = true;
+      if (mouseDownPosRef.current) {
+        const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+        const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+        // Only handle as click if mouse didn't move much (was a click, not a drag)
+        wasClick = dx <= 5 && dy <= 5;
+      }
+      
+      if (wasClick) {
+        console.log('[VideoUploadModal] handleClick triggering onSelect for shift-click', {
+          id,
+          shiftKey: e.shiftKey,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+        });
+        onSelect(e);
+        e.preventDefault();
+      }
+    }
+    
+    // Clear the mouseDownPosRef after click event has been processed
+    mouseDownPosRef.current = null;
+  };
+
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isControls = target.closest('.controls-overlay');
+    const isShiftClick = e.shiftKey || e.ctrlKey || e.metaKey;
+    
     // Allow drag even when clicking video/image content so user can still reposition after generation.
     if (draggable === false && !isInput && !isButton && !isControls) {
       return;
     }
-    if (onSelect && !isInput && !isButton && !isControls) {
+
+    // Store initial mouse position
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+
+    // For shift-clicks, we'll handle selection on click event (after mouseup)
+    // So we don't call onSelect here for shift-clicks to avoid double-triggering
+    if (onSelect && !isInput && !isButton && !isControls && !isShiftClick) {
+      console.log('[VideoUploadModal] handleMouseDown triggering onSelect (non-shift)', {
+        id,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+      });
       onSelect(e);
     }
+
+    // For shift/ctrl/cmd clicks, stop propagation and don't start dragging
+    // But don't prevent default - we want the click event to fire
+    if (isShiftClick && !isInput && !isButton && !isControls) {
+      e.stopPropagation();
+      // Don't prevent default - we need the click event to fire for proper selection
+      return; // Don't start dragging for multi-select clicks
+    }
+
     if (!isInput && !isButton && !isControls) {
-      setIsDraggingContainer(true);
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }
       e.preventDefault();
       e.stopPropagation();
+      // Don't set isDraggingContainer immediately - wait to see if mouse moves
     }
   };
 
-  // Handle drag move
+  // Handle drag move - only start dragging if mouse actually moves
   useEffect(() => {
-    if (!isDraggingContainer) return;
+    if (!mouseDownPosRef.current) return;
     let rafId: number | null = null;
     let pendingEvent: MouseEvent | null = null;
     const flush = () => {
@@ -545,18 +610,34 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       rafId = null;
     };
     const handleMouseMove = (e: MouseEvent) => {
-      pendingEvent = e;
-      if (rafId == null) {
-        rafId = requestAnimationFrame(flush);
+      if (!mouseDownPosRef.current) return;
+      
+      // Check if mouse has moved enough to consider it a drag (not just a click)
+      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+      
+      // Only start dragging if mouse moved more than 5 pixels
+      if ((dx > 5 || dy > 5) && !isDraggingContainer) {
+        setIsDraggingContainer(true);
+      }
+
+      // If dragging, update position
+      if (isDraggingContainer) {
+        pendingEvent = e;
+        if (rafId == null) {
+          rafId = requestAnimationFrame(flush);
+        }
       }
     };
     const handleMouseUp = () => {
       if (rafId != null) cancelAnimationFrame(rafId);
       rafId = null;
-      setIsDraggingContainer(false);
-      if (onPositionCommit && lastCanvasPosRef.current) {
+      if (isDraggingContainer && onPositionCommit && lastCanvasPosRef.current) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
+      setIsDraggingContainer(false);
+      // Don't clear mouseDownPosRef here - we need it for the click event
+      // It will be cleared in the click handler after we check it
     };
     window.addEventListener('mousemove', handleMouseMove);
     // Capture so child stopPropagation (e.g. connection nodes) can't block drag end
@@ -576,7 +657,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       data-modal-component="video"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
-      onClick={(e) => e.stopPropagation()}
+      onClick={handleClick}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -591,7 +672,17 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       }}
     >
       {isAttachedToChat && selectionOrder && (
-        <div className="absolute top-0 -left-8 flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-[12px] font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300">
+        <div 
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-8 * scale}px`,
+            width: `${6 * scale}px`,
+            height: `${6 * scale}px`,
+            fontSize: `${12 * scale}px`,
+            minWidth: `${6 * scale}px`,
+            minHeight: `${6 * scale}px`,
+          }}
+        >
           {selectionOrder}
         </div>
       )}

@@ -92,7 +92,7 @@ export async function generateImageFAL(
   // Map frontend model names to backend model names
   let backendModel = model.toLowerCase();
   if (backendModel.includes('google nano banana') || backendModel.includes('nano banana')) {
-    backendModel = 'gemini-25-flash-image';
+    backendModel = 'gemini-2.0-flash-image';
   } else if (backendModel.includes('seedream') && backendModel.includes('4k')) {
     backendModel = 'seedream-v4';
   } else if (backendModel.includes('seedream')) {
@@ -331,20 +331,55 @@ export async function generateImageForCanvas(
     }
   }
 
+  // Validate prompt length (backend requires 1-5000 characters)
+  const trimmedPrompt = prompt?.trim() || '';
+  if (!trimmedPrompt || trimmedPrompt.length === 0) {
+    throw new Error('Prompt is required');
+  }
+  if (trimmedPrompt.length > 5000) {
+    throw new Error(`Prompt is too long (${trimmedPrompt.length} characters). Maximum length is 5000 characters. Please shorten your prompt.`);
+  }
+
   try {
-    const requestBody = {
-      prompt,
+    // Validate aspectRatio format if provided (must match pattern: "width:height" like "16:9")
+    let validatedAspectRatio: string | undefined = aspectRatio;
+    if (aspectRatio && !/^\d+:\d+$/.test(aspectRatio)) {
+      console.warn('[generateImageForCanvas] Invalid aspectRatio format, removing:', aspectRatio);
+      validatedAspectRatio = undefined;
+    }
+
+    // Validate width and height if provided
+    let validatedWidth = width;
+    let validatedHeight = height;
+    if (width !== undefined && (typeof width !== 'number' || width < 64 || width > 4096)) {
+      console.warn('[generateImageForCanvas] Invalid width, removing:', width);
+      validatedWidth = undefined;
+    }
+    if (height !== undefined && (typeof height !== 'number' || height < 64 || height > 4096)) {
+      console.warn('[generateImageForCanvas] Invalid height, removing:', height);
+      validatedHeight = undefined;
+    }
+
+    // Validate imageCount if provided
+    let validatedImageCount = imageCount;
+    if (imageCount !== undefined && (typeof imageCount !== 'number' || imageCount < 1 || imageCount > 4)) {
+      console.warn('[generateImageForCanvas] Invalid imageCount, using default:', imageCount);
+      validatedImageCount = undefined;
+    }
+
+    const requestBody: any = {
+      prompt: trimmedPrompt, // Use validated trimmed prompt
       model,
-      width,
-      height,
-      aspectRatio, // Pass aspectRatio for proper model mapping
-      imageCount, // Pass imageCount to generate multiple images
-      sourceImageUrl: processedSourceImageUrl, // Use processed URL (data URI instead of blob URL)
-      sceneNumber, // Scene number for storyboard generation
-      previousSceneImageUrl: processedPreviousSceneImageUrl, // Use processed URL (data URI instead of blob URL)
-      storyboardMetadata, // Metadata for storyboard (character, background, etc.)
-      seed, // Pass explicit seed if provided
-      options, // Pass options (style, etc.)
+      ...(validatedWidth !== undefined && { width: validatedWidth }),
+      ...(validatedHeight !== undefined && { height: validatedHeight }),
+      ...(validatedAspectRatio && { aspectRatio: validatedAspectRatio }),
+      ...(validatedImageCount !== undefined && { imageCount: validatedImageCount }),
+      ...(processedSourceImageUrl && { sourceImageUrl: processedSourceImageUrl }),
+      ...(sceneNumber !== undefined && { sceneNumber }),
+      ...(processedPreviousSceneImageUrl && { previousSceneImageUrl: processedPreviousSceneImageUrl }),
+      ...(storyboardMetadata && { storyboardMetadata }),
+      ...(seed !== undefined && { seed }),
+      ...(options && { options }),
       meta: {
         source: 'canvas',
         projectId,
@@ -394,6 +429,11 @@ export async function generateImageForCanvas(
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
 
+    // Log raw response for debugging validation errors
+    if (!response.ok) {
+      console.error('[generateImageForCanvas] Raw response text:', text.substring(0, 500));
+    }
+
     if (!text || text.trim() === '') {
       throw new Error('Empty response body from server');
     }
@@ -414,10 +454,87 @@ export async function generateImageForCanvas(
     }
 
     if (!response.ok) {
+      // Extract detailed error message
       let errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      
+      // If it's a validation error, try to extract more details
+      // The error handler returns: { responseStatus: "error", message: "...", data: errors.array() }
+      if (response.status === 422 || response.status === 400) {
+        // Check result.data first (express-validator errors are passed as data in ApiError)
+        if (result?.data && Array.isArray(result.data)) {
+          // express-validator errors format: [{ msg: 'error message', param: 'field', value: 'value' }, ...]
+          const validationErrors = result.data.map((e: any) => {
+            if (typeof e === 'string') return e;
+            // Handle express-validator format
+            const field = e.param || e.field || e.location || 'unknown';
+            const msg = e.msg || e.message || 'validation error';
+            return `${field}: ${msg}`;
+          }).join(', ');
+          errorMessage = `Validation failed: ${validationErrors}`;
+        } else if (result?.errors) {
+          if (Array.isArray(result.errors)) {
+            const validationErrors = result.errors.map((e: any) => {
+              if (typeof e === 'string') return e;
+              // Handle express-validator format
+              const field = e.param || e.field || e.location || 'unknown';
+              const msg = e.msg || e.message || 'validation error';
+              return `${field}: ${msg}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${validationErrors}`;
+          } else if (typeof result.errors === 'object') {
+            // If errors is an object, try to extract field-specific errors
+            const errorFields = Object.entries(result.errors).map(([field, msg]: [string, any]) => {
+              return `${field}: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${errorFields}`;
+          } else {
+            errorMessage = `Validation failed: ${JSON.stringify(result.errors)}`;
+          }
+        } else if (result?.error) {
+          // Check if error is an array (express-validator format)
+          if (Array.isArray(result.error)) {
+            const validationErrors = result.error.map((e: any) => {
+              if (typeof e === 'string') return e;
+              const field = e.param || e.field || e.location || 'unknown';
+              const msg = e.msg || e.message || 'validation error';
+              return `${field}: ${msg}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${validationErrors}`;
+          } else {
+            errorMessage = typeof result.error === 'string' ? result.error : JSON.stringify(result.error);
+          }
+        } else if (result?.message) {
+          errorMessage = result.message;
+        } else {
+          // If result is empty or doesn't have expected fields, log the full result
+          errorMessage = `Validation failed: ${JSON.stringify(result)}`;
+        }
+      } else if (result?.data?.error) {
+        errorMessage = result.data.error;
+      } else if (result?.error?.message) {
+        errorMessage = result.error.message;
+      } else if (result?.error && typeof result.error === 'string') {
+        errorMessage = result.error;
+      }
+      
       if (typeof errorMessage === 'object') {
         errorMessage = JSON.stringify(errorMessage);
       }
+      
+      // Log full error details for debugging
+      console.error('[generateImageForCanvas] Request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        result,
+        resultString: JSON.stringify(result),
+        errorMessage,
+        requestBody: {
+          ...requestBody,
+          prompt: prompt?.substring(0, 100) + '...',
+          sourceImageUrl: processedSourceImageUrl ? 'present' : 'missing',
+        }
+      });
+      
       throw new Error(errorMessage || 'Failed to generate image');
     }
 

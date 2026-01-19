@@ -339,6 +339,7 @@ export interface ModalOverlaysProps {
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
   selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 
   // Compare Plugin
   compareModalStates?: CompareModalState[];
