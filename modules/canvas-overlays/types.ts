@@ -338,6 +338,7 @@ export interface ModalOverlaysProps {
   storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
+  selectedIds?: string[];
 
   // Compare Plugin
   compareModalStates?: CompareModalState[];
@@ -395,10 +396,10 @@ export interface ModalOverlaysProps {
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
   setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
   setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: (ids: string[]) => void;
+  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
   setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: (ids: string[]) => void;
+  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
   setSelectedVideoEditorModalId?: (id: string | null) => void;
   setSelectedVideoEditorModalIds?: (ids: string[]) => void;

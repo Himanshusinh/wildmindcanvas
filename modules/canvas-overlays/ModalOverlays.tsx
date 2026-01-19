@@ -88,6 +88,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedNextSceneModalIds,
   selectedStoryboardModalId,
   selectedStoryboardModalIds,
+  selectedIds,
 
   // Canvas Text
   canvasTextStates,
@@ -349,6 +350,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         storyboardModalStates={storyboardModalStates ?? []}
         isComponentDraggable={isComponentDraggable}
         isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <VideoModalOverlays
@@ -372,6 +374,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         textInputStates={textInputStates}
         isComponentDraggable={isComponentDraggable}
         setGenerationQueue={setGenerationQueue}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <VideoEditorModalOverlays

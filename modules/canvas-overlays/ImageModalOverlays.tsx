@@ -56,7 +56,7 @@ interface ImageModalOverlaysProps {
   clearAllSelections: () => void;
   setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
   setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: (ids: string[]) => void;
+  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onImageGenerate?: (
     prompt: string,
     model: string,
@@ -89,6 +89,7 @@ interface ImageModalOverlaysProps {
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
   isComponentDraggable?: (id: string) => boolean;
   isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 
@@ -118,8 +119,34 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   storyboardModalStates = [],
   isComponentDraggable,
   isChatOpen,
+  selectedIds,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Track Shift key locally for robust multi-selection
+  const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Use ref to access latest selection state inside closures/callbacks
+  const selectedImageModalIdsRef = React.useRef(selectedImageModalIds);
+  React.useEffect(() => {
+    selectedImageModalIdsRef.current = selectedImageModalIds;
+  }, [selectedImageModalIds]);
 
   const handleContextMenu = (e: React.MouseEvent, modalId: string) => {
     e.preventDefault();
@@ -176,12 +203,43 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           modalState.generatedImageUrl === sourceImageUrlForDisplayCheck &&
           modalState.model !== 'Uploaded Image';
 
+        if (isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))) {
+          console.log('[ImageModalOverlays] Render Debug:', {
+            id: modalState.id,
+            selectedIds: selectedIds || 'undefined',
+            selectedImageModalIds,
+            indexInAll: selectedIds ? selectedIds.indexOf(modalState.id) : -1,
+            indexInLocal: selectedImageModalIds.indexOf(modalState.id),
+            isShiftPressed
+          });
+        }
+
         return (
           <ImageUploadModal
             key={modalState.id}
             isOpen={true}
             id={modalState.id}
             isAttachedToChat={isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))}
+            isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
+            selectionOrder={
+              isChatOpen
+                ? (() => {
+                  // 1. Try global selectedIds first (if valid and contains id)
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  // 2. Fallback to specific type list
+                  if (selectedImageModalIds && selectedImageModalIds.includes(modalState.id)) {
+                    return selectedImageModalIds.indexOf(modalState.id) + 1;
+                  }
+                  // 3. Fallback to singular
+                  if (selectedImageModalId === modalState.id) {
+                    return 1;
+                  }
+                  return undefined;
+                })()
+                : undefined
+            }
             draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
             onContextMenu={(e) => handleContextMenu(e, modalState.id)}
             isPinned={modalState.isPinned}
@@ -603,12 +661,59 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               }
             }}
             onAddToCanvas={onAddImageToCanvas}
-            onSelect={() => {
-              // Clear all other selections first
-              clearAllSelections();
-              // Then set this modal as selected
-              setSelectedImageModalId(modalState.id);
-              setSelectedImageModalIds([modalState.id]);
+            onSelect={(e) => {
+              // Robust Shift key detection
+              const nativeEvent = e?.nativeEvent || e;
+              const isShiftNative = nativeEvent ? (nativeEvent.shiftKey || (nativeEvent.getModifierState && nativeEvent.getModifierState('Shift'))) : false;
+              const isShift = isShiftNative || isShiftPressed;
+
+              console.log('[ImageModalOverlays] onSelect Triggered:', {
+                id: modalState.id,
+                isShift,
+                isShiftNative,
+                isShiftPressed,
+                currentSelectedIds: selectedImageModalIds,
+                nativeEventValues: nativeEvent ? { shiftKey: nativeEvent.shiftKey } : 'no-native'
+              });
+
+              if (isShift) {
+                if (e) e.stopPropagation();
+
+                // Calculate new selection based on current props (closure)
+                const currentSelected = selectedImageModalIdsRef.current;
+                const isAlreadySelected = currentSelected.includes(modalState.id);
+                let newIds;
+
+                if (isAlreadySelected) {
+                  newIds = currentSelected.filter(id => id !== modalState.id);
+                } else {
+                  newIds = [...currentSelected, modalState.id];
+                }
+
+                console.log('[ImageModalOverlays] New Multi-Selection:', newIds);
+
+                // Update plural state
+                setSelectedImageModalIds(newIds);
+
+                // Update singular state (primary selection)
+                if (!isAlreadySelected) {
+                  // New addition becomes primary
+                  setSelectedImageModalId(modalState.id);
+                } else if (newIds.length > 0) {
+                  // If removed, fallback to the last one
+                  setSelectedImageModalId(newIds[newIds.length - 1]);
+                } else {
+                  // If empty
+                  setSelectedImageModalId(null);
+                }
+              } else {
+                console.log('[ImageModalOverlays] Single Selection Reset');
+                // Clear all other selections first
+                clearAllSelections();
+                // Then set this modal as selected
+                setSelectedImageModalId(modalState.id);
+                setSelectedImageModalIds([modalState.id]);
+              }
             }}
             onDelete={() => {
               console.log('[ImageModalOverlays] onDelete called', {
@@ -651,7 +756,6 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
               }
             }}
-            isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
             x={modalState.x}
             y={modalState.y}
             onPositionChange={(newX, newY) => {

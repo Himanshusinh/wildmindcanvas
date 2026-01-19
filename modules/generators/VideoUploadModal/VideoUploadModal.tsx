@@ -53,7 +53,7 @@ interface VideoUploadModalProps {
   y: number;
   onPositionChange?: (x: number, y: number) => void;
   onPositionCommit?: (x: number, y: number) => void;
-  onSelect?: () => void;
+  onSelect?: (e?: React.MouseEvent) => void;
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
@@ -75,6 +75,8 @@ interface VideoUploadModalProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   onPersistVideoModalCreate?: (modal: any) => void | Promise<void>;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -98,6 +100,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   isSelected,
   initialModel,
   initialFrame,
+  isAttachedToChat,
+  selectionOrder,
   initialAspectRatio,
   initialPrompt,
   initialDuration,
@@ -509,7 +513,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       return;
     }
     if (onSelect && !isInput && !isButton && !isControls) {
-      onSelect();
+      onSelect(e);
     }
     if (!isInput && !isButton && !isControls) {
       setIsDraggingContainer(true);
@@ -572,6 +576,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       data-modal-component="video"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
+      onClick={(e) => e.stopPropagation()}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -585,6 +590,11 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div className="absolute top-0 -left-8 flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-[12px] font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300">
+          {selectionOrder}
+        </div>
+      )}
       <VideoModalTooltip
         isHovered={isHovered}
         isUploadedVideo={!!isUploadedVideo}

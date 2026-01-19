@@ -676,9 +676,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleImageDelete = imageHandlers.handleImageDelete;
   const handleImageDownload = imageHandlers.handleImageDownload;
   const handleImageDuplicate = imageHandlers.handleImageDuplicate;
-  const handleImageUpload = imageHandlers.handleImageUpload;
-  const handleImagesDrop = imageHandlers.handleImagesDrop;
-  const handleImageSelect = imageHandlers.handleImageSelect;
+  // Use local handlers that have access to processMediaFile
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleMultipleFilesUpload(Array.from(e.target.files));
+    }
+  };
+  const handleImagesDrop = handleMultipleFilesUpload;
+  const handleImageSelect = (file: File) => processMediaFile(file);
   const handleImageGenerate = imageHandlers.handleImageGenerate;
   const handleTextCreate = imageHandlers.handleTextCreate;
   const handleAddImageToCanvas = imageHandlers.handleAddImageToCanvas;

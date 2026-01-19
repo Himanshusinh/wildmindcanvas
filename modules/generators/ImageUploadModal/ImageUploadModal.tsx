@@ -30,7 +30,7 @@ interface ImageUploadModalProps {
   y: number;
   onPositionChange?: (x: number, y: number) => void;
   onPositionCommit?: (x: number, y: number) => void;
-  onSelect?: () => void;
+  onSelect?: (e?: React.MouseEvent) => void;
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
@@ -60,11 +60,13 @@ interface ImageUploadModalProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isOpen,
   isAttachedToChat,
+  selectionOrder,
   id,
   onClose,
   onGenerate,
@@ -126,6 +128,20 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const imageAreaRef = useRef<HTMLDivElement>(null);
   // Track if resolution change was user-initiated to prevent useEffect from overriding it
   const userInitiatedResolutionChangeRef = useRef(false);
+  // Debug Selection Props
+  useEffect(() => {
+    if (isAttachedToChat || isSelected || selectionOrder) {
+      console.log('[ImageUploadModal] Selection Props Received:', {
+        id,
+        isAttachedToChat,
+        isSelected,
+        selectionOrder,
+        selectionOrderType: typeof selectionOrder,
+        renderBadgeCondition: !!isAttachedToChat
+      });
+    }
+  }, [id, isAttachedToChat, isSelected, selectionOrder]);
+
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Google Nano Banana');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
@@ -1525,6 +1541,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isLocked) {
+      return;
+    }
     const target = e.target as HTMLElement;
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
@@ -1538,7 +1557,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     // Call onSelect when clicking on the modal (this will trigger context menu)
     if (onSelect && !isInput && !isButton && !isControls) {
-      onSelect();
+      console.log('[ImageUploadModal] handleMouseDown triggering onSelect', {
+        id,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+      });
+      onSelect(e);
     }
 
     // Only allow dragging from the frame, not from controls
@@ -1600,6 +1625,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       data-modal-component="image"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
+      onClick={(e) => e.stopPropagation()}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -1614,10 +1640,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }}
     >
 
-      {/* Chat Attachment Indicator */}
-      {isAttachedToChat && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-blue-500/90 text-white/90 text-[10px] font-medium px-3 py-1.5 rounded-full shadow-lg z-50 whitespace-nowrap pointer-events-none backdrop-blur-sm border border-white/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          Image attached to chatbox
+      {isAttachedToChat && selectionOrder && (
+        <div className="absolute top-0 -left-8 flex items-center justify-center w-6 h-6 bg-blue-500 text-white text-[12px] font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300">
+          {selectionOrder}
         </div>
       )}
 
