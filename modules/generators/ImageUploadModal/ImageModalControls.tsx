@@ -617,9 +617,9 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
               minWidth: `${28 * scale}px`,
               textAlign: 'center',
               fontWeight: 600,
-              fontSize: `${13 * scale}px`,
+              fontSize: controlFontSize,
               color: countText,
-              transition: 'color 0.3s ease'
+              transition: 'color 0.3s ease',
             }}>{imageCount}</div>
             <button
               onClick={(e) => { e.stopPropagation(); onImageCountChange(Math.min(4, imageCount + 1)); }}

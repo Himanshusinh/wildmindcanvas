@@ -184,6 +184,8 @@ function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[])
     const topic = goal.topic || "Visual";
     const style = goal.style || "cinematic";
     const count = goal.references?.length || 1;
+    // Use durationSeconds from goal, default to 6 seconds if not specified
+    const duration = goal.durationSeconds || 6;
 
     const videoStepId = generateId();
     steps.push({
@@ -194,6 +196,7 @@ function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[])
         configTemplate: {
             model: goal.model || 'veo-3.1',
             aspectRatio: goal.aspectRatio || '16:9',
+            duration: duration,
             prompt: goal.topic ? `${topic} in ${style} style` : "Animate this image with cinematic motion",
             targetIds: goal.references
         }

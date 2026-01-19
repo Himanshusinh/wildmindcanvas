@@ -1738,12 +1738,13 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         <div 
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
-            left: `${-8 * scale}px`,
-            width: `${6 * scale}px`,
-            height: `${6 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            minWidth: `${6 * scale}px`,
-            minHeight: `${6 * scale}px`,
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
           }}
         >
           {selectionOrder}
