@@ -197,6 +197,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistUpscaleModalDelete,
   onUpscale,
   onMultiangleCamera,
+  onQwenMultipleAngles,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
   onPersistRemoveBgModalDelete,
@@ -559,6 +560,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
         onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
         onMultiangleCamera={onMultiangleCamera}
+        onQwenMultipleAngles={onQwenMultipleAngles}
         onPersistImageModalCreate={onPersistImageModalCreate}
         onPersistImageModalMove={onPersistImageModalMove}
         connections={externalConnections ?? []}

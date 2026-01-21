@@ -22,17 +22,11 @@ interface NextSceneControlsProps {
   onAspectRatioChange?: (ratio: string) => void;
   onLoraScaleChange?: (scale: number) => void;
   onTrueGuidanceScaleChange?: (scale: number) => void;
-  onResolutionChange?: (resolution: '1K' | '2K' | '4K') => void;
-  onModelChange?: (model: string) => void;
   prompt: string;
   aspectRatio: string;
   loraScale: number;
   trueGuidanceScale?: number;
-  resolution?: '1K' | '2K' | '4K';
-  model?: string;
   extraTopPadding?: number;
-  category?: string;
-  onCategoryChange?: (category: string) => void;
 }
 
 export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
@@ -55,12 +49,6 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
   loraScale,
   trueGuidanceScale,
   onTrueGuidanceScaleChange,
-  resolution = '2K',
-  onResolutionChange,
-  model = 'Google nano banana pro',
-  onModelChange,
-  category = 'human',
-  onCategoryChange,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -112,8 +100,8 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
             selectedMode={mode}
             scale={scale} // ModeSwitch might strictly need scale if it processes it internally, keeping as is
             onModeChange={onModeChange}
-            modes={['scene', 'nextscene', 'multiangle']}
-            labels={{ scene: 'Single scene', nextscene: 'MultiScene', multiangle: 'Multi angle' }}
+            modes={['scene', 'nextscene']}
+            labels={{ scene: 'Single scene', nextscene: 'MultiScene' }}
             actionSlot={(
               <NextSceneButton
                 scale={scale} // NextSceneButton uses scale internally, we might want to fix it too, but kept as is for now
@@ -132,52 +120,8 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
               {/* ...scene content... */}
             </div>
           )}
-          {mode === 'multiangle' && (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {/* Category Selector (only for multiangle) */}
-              <div style={{ marginBottom: '12px' }}>
-                <div style={labelStyle}>Category</div>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={category}
-                    onChange={e => onCategoryChange?.(e.target.value)}
-                    style={{
-                      width: '100%',
-                      appearance: 'none',
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                      color: isDark ? '#ffffff' : '#000000',
-                      border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <option value="human">Human</option>
-                    <option value="product">Product</option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      pointerEvents: 'none',
-                      color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'
-                    }}
-                  />
-                </div>
-              </div>
 
-            </div>
-          )}
-        </>
-
-        {mode !== 'multiangle' && (
-          <>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
               {/* Aspect Ratio Selector */}
               <div style={{ flex: 1 }}>
                 <div style={labelStyle}>Aspect Ratio</div>
@@ -311,140 +255,7 @@ export const NextSceneControls: React.FC<NextSceneControlsProps> = ({
               </div>
             </div>
           </>
-        )}
-
-        {mode === 'multiangle' && (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {/* Model Selector */}
-            <div style={inputContainerStyle}>
-              <div style={labelStyle}>Model</div>
-              <div style={{ position: 'relative' }}>
-                <select
-                  value={model}
-                  onChange={(e) => onModelChange?.(e.target.value)}
-                  style={{
-                    width: '100%',
-                    appearance: 'none',
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                    color: isDark ? '#ffffff' : '#000000',
-                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="Google nano banana pro">Google nano banana pro</option>
-                  <option value="Google Nano Banana">Google Nano Banana</option>
-                  <option value="Seedream 4.5">Seedream 4.5</option>
-                  <option value="P-Image">P-Image</option>
-                </select>
-                <ChevronDown
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Aspect Ratio Selector */}
-            <div style={inputContainerStyle}>
-              <div style={labelStyle}>Aspect Ratio</div>
-              <div style={{ position: 'relative' }}>
-                <select
-                  value={aspectRatio}
-                  onChange={(e) => onAspectRatioChange?.(e.target.value)}
-                  style={{
-                    width: '100%',
-                    appearance: 'none',
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                    color: isDark ? '#ffffff' : '#000000',
-                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {['1:1', '16:9', '9:16', '4:3', '3:4', '21:9'].map(ratio => (
-                    <option key={ratio} value={ratio}>{ratio}</option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Resolution Selector - Only show for Google nano banana pro */}
-            {model === 'Google nano banana pro' && (
-              <div style={inputContainerStyle}>
-                <div style={labelStyle}>Resolution</div>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={resolution}
-                    onChange={(e) => onResolutionChange?.(e.target.value as '1K' | '2K' | '4K')}
-                    style={{
-                      width: '100%',
-                      appearance: 'none',
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                      color: isDark ? '#ffffff' : '#000000',
-                      border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {['1K', '2K', '4K'].map(res => (
-                      <option key={res} value={res}>{res}</option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      pointerEvents: 'none',
-                      color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div style={{
-              fontSize: '11px',
-              color: isDark ? '#888' : '#666',
-              marginTop: '8px',
-              padding: '8px',
-              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)',
-              borderRadius: '6px'
-            }}>
-              Multi-angle mode will generate 9 different camera angles from the input image.
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
     </>
   );
 };

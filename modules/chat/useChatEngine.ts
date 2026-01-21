@@ -78,6 +78,7 @@ SCHEMA:
   "durationSeconds": number (Optional, e.g. 60),
   "style": string (e.g. "cinematic", "cyberpunk"),
   "aspectRatio": "1:1" | "16:9" | "9:16" | "4:3" | "3:4" (Optional),
+  "resolution": string (Optional, video resolution e.g. "720p", "1080p", "480p"),
   "count": number (Optional, quantity of items to generate),
   "model": string (Optional, specific model name if requested e.g. "seedream-4.5"),
   "needs": ["text", "image", "video", "audio", "motion", "plugin"],
@@ -109,6 +110,27 @@ INTENT NORMALIZATION RULES:
 - If user COMMANDS "animate", "make it move", "make it video", "convert to video", "animate this", "bring to life" -> goalType: "IMAGE_ANIMATE"
 - If user says "classic", "tv" -> aspectRatio: "4:3"
 
+MODEL SELECTION AND PARAMETER EXTRACTION (for video generation):
+- Auto-select model based on duration if not specified:
+  * 4, 6, or 8 seconds -> Use "Veo 3.1 Fast" or "Veo 3.1" (they support 4, 6, 8s)
+  * 9-12 seconds -> Use "Seedance 1.0 Pro" or "Seedance 1.0 Lite" (they support up to 12s)
+- Model name variations to recognize (if explicitly mentioned):
+  * "veo 3.1 fast", "veo3.1 fast", "veo-3.1-fast", "veo3.1fast" -> "Veo 3.1 Fast"
+  * "veo 3.1", "veo3.1", "veo-3.1" -> "Veo 3.1"
+  * "seedance 1.0 pro", "seedance1.0pro", "seedance-1.0-pro" -> "Seedance 1.0 Pro"
+  * "seedance 1.0 lite", "seedance1.0lite", "seedance-1.0-lite" -> "Seedance 1.0 Lite"
+- Resolution extraction:
+  * Extract resolution from messages like "720p", "1080p", "480p", "720", "1080"
+  * Set in "resolution" field
+  * Veo 3.1 / Veo 3.1 Fast support: 720p, 1080p
+  * Seedance 1.0 Pro/Lite support: 480p, 720p, 1080p
+- Examples:
+  * "convert this to video in veo 3.1 fast at 1080p" -> model: "Veo 3.1 Fast", resolution: "1080p"
+  * "make this a 6 second video" -> model: "Veo 3.1 Fast" (auto-selected for 6s), durationSeconds: 6
+  * "create a 10 second video at 720p" -> model: "Seedance 1.0 Pro" (auto-selected for 10s), durationSeconds: 10, resolution: "720p"
+  * "animate this with seedance in 1080p" -> model: "Seedance 1.0 Pro", resolution: "1080p"
+  * "convert to video at 720p resolution" -> model: "Veo 3.1 Fast" (default), resolution: "720p"
+
 Your "explanation" should build rapport and enthusiasm like a Creative Director, but the structured JSON must remain strictly semantic.
 `;
     }, []);
@@ -130,6 +152,7 @@ Your "explanation" should build rapport and enthusiasm like a Creative Director,
                         durationSeconds: parsed.durationSeconds,
                         style: parsed.style,
                         aspectRatio: parsed.aspectRatio,
+                        resolution: parsed.resolution,
                         count: parsed.count,
                         model: parsed.model,
                         pluginType: parsed.pluginType,

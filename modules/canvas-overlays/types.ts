@@ -363,6 +363,7 @@ export interface ModalOverlaysProps {
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
   onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+  onQwenMultipleAngles?: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
 
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];

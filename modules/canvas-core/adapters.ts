@@ -14,8 +14,8 @@ export const nodeFromItem = (item: any, type: NodeType): CanvasNode => {
     return {
         id: id || elementId,
         type,
-        x: x || 0,
-        y: y || 0,
+        x: x !== undefined && x !== null ? x : 0,
+        y: y !== undefined && y !== null ? y : 0,
         width: width || 0,
         height: height || 0,
         rotation: rotation || 0,

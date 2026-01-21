@@ -44,7 +44,7 @@ export const VIDEO_MODEL_CONFIGS: Record<string, VideoModelConfig> = {
   'Veo 3.1 Fast': {
     model: 'Veo 3.1 Fast',
     durations: [4, 6, 8],
-    defaultDuration: 4,
+    defaultDuration: 6, // Changed from 4 to 6 seconds for image-to-video default
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],

@@ -265,24 +265,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                                         {/* Action Verification Segment */}
                                         {msg.role === 'assistant' && msg.action && (
-                                            <div className="mt-2 w-full max-w-[95%] p-3 rounded-xl bg-blue-950/30 border border-blue-500/10 space-y-3 backdrop-blur-sm">
+                                            <div className="mt-2 w-full max-w-[95%] p-4 rounded-xl bg-blue-950/30 border border-blue-500/10 space-y-4 backdrop-blur-sm">
                                                 <div className="flex items-center gap-2 text-[9px] font-medium text-blue-300/40 uppercase tracking-[0.2em]">
                                                     <Zap size={10} />
                                                     <span>Action Plan</span>
                                                 </div>
 
                                                 {msg.action.intent === 'EXECUTE_PLAN' && (
-                                                    <div className="text-[11px] text-white/60 font-light leading-relaxed pl-2 border-l border-blue-500/30">
-                                                        {msg.action.payload.summary}
+                                                    <div className="space-y-2">
+                                                        <div className="text-[11px] text-white/70 font-medium mb-2">Summary:</div>
+                                                        <div className="text-[11px] text-white/80 font-light leading-relaxed pl-3 border-l-2 border-blue-500/40 space-y-1.5">
+                                                            {msg.action.payload.summary.split('\n').map((line: string, idx: number) => (
+                                                                <div key={idx} className="flex items-start gap-2">
+                                                                    <span className="text-blue-400/60 mt-0.5">•</span>
+                                                                    <span>{line}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
 
-                                                <button
-                                                    onClick={() => handleExecute(msg)}
-                                                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300/90 border border-blue-500/20 transition-all font-medium text-[10px] uppercase tracking-wider hover:shadow-lg hover:shadow-blue-500/10"
-                                                >
-                                                    Execute
-                                                </button>
+                                                <div className="pt-2 border-t border-blue-500/10">
+                                                    <div className="text-[10px] text-blue-300/60 mb-3 text-center">
+                                                        Click "Proceed" to start generating, or type any changes below.
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleExecute(msg)}
+                                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-500/30 transition-all font-medium text-[10px] uppercase tracking-wider hover:shadow-lg hover:shadow-blue-500/10"
+                                                    >
+                                                        <Check size={12} />
+                                                        Proceed
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

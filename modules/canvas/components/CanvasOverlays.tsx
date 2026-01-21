@@ -185,6 +185,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
                 onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
                 onMultiangleCamera={props.onMultiangleCamera}
+                onQwenMultipleAngles={props.onQwenMultipleAngles}
 
                 selectedTextInputId={selectedTextInputId}
                 selectedTextInputIds={selectedTextInputIds}

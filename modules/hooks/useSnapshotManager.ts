@@ -193,6 +193,23 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         meta: metaObj,
       };
     });
+    // Multiangle Camera generators
+    state.multiangleCameraGenerators.forEach((modal) => {
+      if (!modal || !modal.id) return;
+      const connections = connectionsBySource[modal.id]?.length ? connectionsBySource[modal.id] : undefined;
+      const metaObj = {
+        sourceImageUrl: modal.sourceImageUrl || null,
+        ...(connections ? { connections } : {})
+      };
+      elements[modal.id] = {
+        id: modal.id,
+        type: 'multiangle-camera-plugin',
+        x: modal.x,
+        y: modal.y,
+        bounds: { width: 400, height: 500 }, // Default dimensions
+        meta: metaObj,
+      };
+    });
     // Storyboard generators
     state.storyboardGenerators.forEach((modal) => {
       if (!modal || !modal.id) return;

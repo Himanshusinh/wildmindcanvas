@@ -3,15 +3,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { Camera3DControl } from './Camera3DControl';
+import { ChevronDown } from 'lucide-react';
 
 interface MultiangleCameraControlsProps {
   scale: number;
+  category: string; // 'view-morph' or 'multiview'
   sourceImageUrl: string | null;
   frameBorderColor: string;
   frameBorderWidth: number;
   onHoverChange: (hovered: boolean) => void;
   extraTopPadding?: number;
-  // Parameters
+  onCategoryChange: (category: string) => void;
+  /** When true, this component is rendered inside the full-screen popup sidebar */
+  embeddedInPopup?: boolean;
+  /** When true, hides the bottom "Generate" button (so parent can render a sticky footer) */
+  hideGenerateButton?: boolean;
+  // Parameters (MultiView - Multiangle)
   prompt: string;
   loraScale: number;
   aspectRatio: string;
@@ -19,8 +27,15 @@ interface MultiangleCameraControlsProps {
   verticalTilt: number;
   rotateDegrees: number;
   useWideAngle: boolean;
+  multiangleCategory: string; // 'human' or 'product'
+  multiangleModel: string;
+  multiangleResolution: '1K' | '2K' | '4K';
+  // Parameters (View Morph)
+  horizontalAngle: number;
+  verticalAngle: number;
+  zoom: number;
   isGenerating: boolean;
-  // Callbacks
+  // Callbacks (MultiView - Multiangle)
   onPromptChange: (prompt: string) => void;
   onLoraScaleChange: (loraScale: number) => void;
   onAspectRatioChange: (aspectRatio: string) => void;
@@ -28,16 +43,25 @@ interface MultiangleCameraControlsProps {
   onVerticalTiltChange: (verticalTilt: number) => void;
   onRotateDegreesChange: (rotateDegrees: number) => void;
   onUseWideAngleChange: (useWideAngle: boolean) => void;
+  onMultiangleCategoryChange: (category: string) => void;
+  onMultiangleModelChange: (model: string) => void;
+  onMultiangleResolutionChange: (resolution: '1K' | '2K' | '4K') => void;
+  // Callbacks (View Morph)
+  onHorizontalAngleChange: (horizontalAngle: number) => void;
+  onVerticalAngleChange: (verticalAngle: number) => void;
+  onZoomChange: (zoom: number) => void;
   onGenerate: () => void;
 }
 
 export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> = ({
   scale,
+  category,
   sourceImageUrl,
   frameBorderColor,
   frameBorderWidth,
   onHoverChange,
   extraTopPadding,
+  onCategoryChange,
   prompt,
   loraScale,
   aspectRatio,
@@ -45,6 +69,12 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
   verticalTilt,
   rotateDegrees,
   useWideAngle,
+  multiangleCategory,
+  multiangleModel,
+  multiangleResolution,
+  horizontalAngle,
+  verticalAngle,
+  zoom,
   isGenerating,
   onPromptChange,
   onLoraScaleChange,
@@ -53,7 +83,15 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
   onVerticalTiltChange,
   onRotateDegreesChange,
   onUseWideAngleChange,
+  onMultiangleCategoryChange,
+  onMultiangleModelChange,
+  onMultiangleResolutionChange,
+  onHorizontalAngleChange,
+  onVerticalAngleChange,
+  onZoomChange,
   onGenerate,
+  embeddedInPopup = false,
+  hideGenerateButton = false,
 }) => {
   const isDark = useIsDarkTheme();
   // Base values for fixed-width UI elements (parent handles scaling)
@@ -62,8 +100,15 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
 
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const [isVerticalTiltDropdownOpen, setIsVerticalTiltDropdownOpen] = useState(false);
+  const [isMultiangleCategoryDropdownOpen, setIsMultiangleCategoryDropdownOpen] = useState(false);
+  const [isMultiangleModelDropdownOpen, setIsMultiangleModelDropdownOpen] = useState(false);
+  const [isMultiangleResolutionDropdownOpen, setIsMultiangleResolutionDropdownOpen] = useState(false);
+  // Removed viewMorphTab state - no longer using slider controls
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const verticalTiltDropdownRef = useRef<HTMLDivElement>(null);
+  const multiangleCategoryDropdownRef = useRef<HTMLDivElement>(null);
+  const multiangleModelDropdownRef = useRef<HTMLDivElement>(null);
+  const multiangleResolutionDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -74,13 +119,34 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
       if (verticalTiltDropdownRef.current && !verticalTiltDropdownRef.current.contains(event.target as Node)) {
         setIsVerticalTiltDropdownOpen(false);
       }
+      if (multiangleCategoryDropdownRef.current && !multiangleCategoryDropdownRef.current.contains(event.target as Node)) {
+        setIsMultiangleCategoryDropdownOpen(false);
+      }
+      if (multiangleModelDropdownRef.current && !multiangleModelDropdownRef.current.contains(event.target as Node)) {
+        setIsMultiangleModelDropdownOpen(false);
+      }
+      if (multiangleResolutionDropdownRef.current && !multiangleResolutionDropdownRef.current.contains(event.target as Node)) {
+        setIsMultiangleResolutionDropdownOpen(false);
+      }
     };
 
-    if (isAspectRatioDropdownOpen || isVerticalTiltDropdownOpen) {
+    if (
+      isAspectRatioDropdownOpen ||
+      isVerticalTiltDropdownOpen ||
+      isMultiangleCategoryDropdownOpen ||
+      isMultiangleModelDropdownOpen ||
+      isMultiangleResolutionDropdownOpen
+    ) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isAspectRatioDropdownOpen, isVerticalTiltDropdownOpen]);
+  }, [
+    isAspectRatioDropdownOpen,
+    isVerticalTiltDropdownOpen,
+    isMultiangleCategoryDropdownOpen,
+    isMultiangleModelDropdownOpen,
+    isMultiangleResolutionDropdownOpen,
+  ]);
 
   const textColor = isDark ? '#ffffff' : '#1a1a1a';
   const borderColor = isDark ? '#3a3a3a' : '#d1d5db';
@@ -88,6 +154,48 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
   const buttonBg = SELECTION_COLOR;
   const buttonHoverBg = '#3d6edb';
   const buttonDisabledBg = isDark ? '#4a4a4a' : '#9ca3af';
+  const inputCommonStyle: React.CSSProperties = {
+    width: '100%',
+    appearance: 'none',
+    backgroundColor: inputBg,
+    color: textColor,
+    border: `1px solid ${borderColor}`,
+    borderRadius: '10px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    outline: 'none',
+    cursor: 'pointer',
+    // Helps native dropdown match theme (supported in modern browsers)
+    colorScheme: isDark ? ('dark' as any) : ('light' as any),
+  };
+
+  // Ensure category dropdown can stack above model dropdown
+  const themedDropdownBaseZ = 3000;
+  const themedDropdownCategoryZ = 3100;
+  const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
+  const dropdownBg = isDark ? '#121212' : '#ffffff';
+  const dropdownText = isDark ? '#ffffff' : '#1f2937';
+  const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
+  const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const selectedText = isDark ? '#60a5fa' : '#3b82f6';
+
+  const MultiangleCategoryOptions: Array<{ value: string; label: string }> = [
+    { value: 'human', label: 'Human' },
+    { value: 'product', label: 'Product' },
+  ];
+
+  const MultiangleModelOptions: Array<{ value: string; label: string }> = [
+    { value: 'Google nano banana pro', label: 'Google nano banana pro' },
+    { value: 'Google Nano Banana', label: 'Google Nano Banana' },
+    { value: 'Seedream 4.5', label: 'Seedream 4.5' },
+    // NOTE: P-Image removed per request
+  ];
+
+  const MultiangleResolutionOptions: Array<{ value: '1K' | '2K' | '4K'; label: string }> = [
+    { value: '1K', label: '1K' },
+    { value: '2K', label: '2K' },
+    { value: '4K', label: '4K' },
+  ];
 
   const aspectRatioOptions = [
     { value: 'match_input_image', label: 'Match Input' },
@@ -109,402 +217,403 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
       className="controls-overlay"
       style={{
         position: 'relative',
-        width: '400px', // Fixed width
-        maxWidth: '90vw',
-        backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: '16px 16px 0 0',
+        width: embeddedInPopup ? '100%' : '400px',
+        maxWidth: embeddedInPopup ? '100%' : '90vw',
+        backgroundColor: embeddedInPopup ? 'transparent' : (isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)'),
+        backdropFilter: embeddedInPopup ? undefined : 'blur(20px)',
+        WebkitBackdropFilter: embeddedInPopup ? undefined : 'blur(20px)',
+        borderRadius: embeddedInPopup ? 0 : '16px 16px 0 0',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
         overflow: 'visible',
         zIndex: 10,
-        borderLeft: `${frameBorderWidth}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth}px solid ${frameBorderColor}`,
-        borderTop: `${frameBorderWidth}px solid ${frameBorderColor}`,
-        padding: `${basePadding}px`,
-        paddingTop: `${computedTopPadding}px`,
+        borderLeft: embeddedInPopup ? 'none' : `${frameBorderWidth}px solid ${frameBorderColor}`,
+        borderRight: embeddedInPopup ? 'none' : `${frameBorderWidth}px solid ${frameBorderColor}`,
+        borderTop: embeddedInPopup ? 'none' : `${frameBorderWidth}px solid ${frameBorderColor}`,
+        padding: embeddedInPopup ? 0 : `${basePadding}px`,
+        paddingTop: embeddedInPopup ? 0 : `${computedTopPadding}px`,
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-        {/* Prompt Input */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: 500, color: textColor }}>
-            Prompt
-          </label>
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            placeholder="Enter prompt (optional)"
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              fontSize: '13px',
-              backgroundColor: inputBg,
-              border: `1px solid ${borderColor}`,
-              borderRadius: '8px',
-              color: textColor,
-              outline: 'none',
-              transition: 'border-color 0.2s ease',
-            }}
-            onFocus={(e) => e.target.style.borderColor = SELECTION_COLOR}
-            onBlur={(e) => e.target.style.borderColor = borderColor}
-          />
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+        {/* View Morph Controls */}
+        {category === 'view-morph' && (
+          <>
+            {/* View Morph content - controls are shown in sidebar */}
+            
+          </>
+        )}
 
-        {/* Row 1: Aspect Ratio + Lora Scale */}
-        <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Aspect Ratio Dropdown */}
-          <div style={{ flex: 1, minWidth: `140px` }}>
-            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'block' }}>
-              Aspect Ratio
-            </label>
-            <div ref={aspectRatioDropdownRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => setIsAspectRatioDropdownOpen(!isAspectRatioDropdownOpen)}
-                style={{
-                  width: '100%',
-                  padding: `8px 12px`,
-                  fontSize: `12px`,
-                  backgroundColor: inputBg,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: `8px`,
-                  color: textColor,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  transition: 'border-color 0.2s ease',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = SELECTION_COLOR}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
-              >
-                <span>{aspectRatioOptions.find(opt => opt.value === aspectRatio)?.label || aspectRatio}</span>
-                <span style={{ fontSize: `10px` }}>▼</span>
-              </button>
-              {isAspectRatioDropdownOpen && (
-                <div
+        {/* MultiView Controls (Multiangle) */}
+        {category === 'multiview' && (
+          <>
+            {/* Category Selector (only for multiangle) */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 500, color: textColor, marginBottom: '4px' }}>Category</div>
+              <div ref={multiangleCategoryDropdownRef} style={{ position: 'relative', zIndex: themedDropdownCategoryZ, overflow: 'visible' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMultiangleCategoryDropdownOpen((v) => !v);
+                    setIsMultiangleModelDropdownOpen(false);
+                    setIsMultiangleResolutionDropdownOpen(false);
+                    setIsAspectRatioDropdownOpen(false);
+                    setIsVerticalTiltDropdownOpen(false);
+                  }}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: `4px`,
-                    backgroundColor: inputBg,
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: `8px`,
-                    zIndex: 1000,
-                    boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    maxHeight: `200px`,
-                    overflowY: 'auto',
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: dropdownBg,
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    color: dropdownText,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    whiteSpace: 'nowrap',
+                    transition: 'background-color 0.2s ease, border-color 0.2s ease',
                   }}
                 >
-                  {aspectRatioOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        onAspectRatioChange(option.value);
-                        setIsAspectRatioDropdownOpen(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: `8px 12px`,
-                        fontSize: `12px`,
-                        backgroundColor: aspectRatio === option.value ? SELECTION_COLOR : 'transparent',
-                        color: aspectRatio === option.value ? '#ffffff' : textColor,
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'background-color 0.2s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (aspectRatio !== option.value) {
-                          e.currentTarget.style.backgroundColor = isDark ? '#3a3a3a' : '#f3f4f6';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (aspectRatio !== option.value) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+                  <span>
+                    {(MultiangleCategoryOptions.find((o) => o.value === multiangleCategory)?.label) ?? multiangleCategory}
+                  </span>
+                  <ChevronDown size={16} color={isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} />
+                </button>
+                {isMultiangleCategoryDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '6px',
+                      backgroundColor: dropdownBg,
+                      border: `1px solid ${dropdownBorderColor}`,
+                      borderRadius: '10px',
+                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.55)' : '0 10px 30px rgba(0,0,0,0.18)',
+                      zIndex: themedDropdownCategoryZ + 1,
+                      padding: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    {MultiangleCategoryOptions.map((opt) => {
+                      const selected = multiangleCategory === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            onMultiangleCategoryChange(opt.value);
+                            setIsMultiangleCategoryDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            backgroundColor: selected ? selectedBg : 'transparent',
+                            color: selected ? selectedText : dropdownText,
+                            fontSize: '14px',
+                            transition: 'background-color 0.15s ease, color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = dropdownHoverBg;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          {opt.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Lora Scale Input */}
-          <div style={{ flex: 1, minWidth: `120px` }}>
-            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'flex', justifyContent: 'space-between' }}>
-              <span>LoRA Scale</span>
-              <span>{loraScale.toFixed(2)}</span>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
-              <input
-                type="range"
-                min="0"
-                max="4"
-                step="0.05"
-                value={loraScale}
-                onChange={(e) => onLoraScaleChange(parseFloat(e.target.value))}
-                style={{
-                  flex: 1,
-                  accentColor: SELECTION_COLOR,
-                }}
-              />
-              <input
-                type="number"
-                min="0"
-                max="4"
-                step="0.1"
-                value={loraScale}
-                onChange={(e) => {
-                  let val = parseFloat(e.target.value);
-                  if (isNaN(val)) val = 0;
-                  if (val > 4) val = 4;
-                  if (val < 0) val = 0;
-                  onLoraScaleChange(val);
-                }}
-                style={{
-                  width: `50px`,
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                  color: isDark ? '#ffffff' : '#000000',
-                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                  borderRadius: `4px`,
-                  padding: `4px`,
-                  fontSize: `12px`,
-                  textAlign: 'center',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: Move Forward + Vertical Tilt */}
-        <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Move Forward Slider */}
-          <div style={{ flex: 1, minWidth: `140px` }}>
-            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'flex', justifyContent: 'space-between' }}>
-              <span>Move Forward</span>
-              <span>{moveForward.toFixed(1)}</span>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
-              <input
-                type="range"
-                min="0"
-                max="10"
-                step="0.1"
-                value={moveForward}
-                onChange={(e) => onMoveForwardChange(parseFloat(e.target.value))}
-                style={{
-                  flex: 1,
-                  accentColor: SELECTION_COLOR,
-                }}
-              />
-              <input
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
-                value={moveForward}
-                onChange={(e) => {
-                  let val = parseFloat(e.target.value);
-                  if (isNaN(val)) val = 0;
-                  if (val > 10) val = 10;
-                  if (val < 0) val = 0;
-                  onMoveForwardChange(val);
-                }}
-                style={{
-                  width: `50px`,
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                  color: isDark ? '#ffffff' : '#000000',
-                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                  borderRadius: `4px`,
-                  padding: `4px`,
-                  fontSize: `12px`,
-                  textAlign: 'center',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Vertical Tilt Dropdown */}
-          <div style={{ flex: 1, minWidth: `120px` }}>
-            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor, marginBottom: `4px`, display: 'block' }}>
-              Vertical Tilt
-            </label>
-            <div ref={verticalTiltDropdownRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => setIsVerticalTiltDropdownOpen(!isVerticalTiltDropdownOpen)}
-                style={{
-                  width: '100%',
-                  padding: `8px 12px`,
-                  fontSize: `12px`,
-                  backgroundColor: inputBg,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: `8px`,
-                  color: textColor,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  transition: 'border-color 0.2s ease',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = SELECTION_COLOR}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = borderColor}
-              >
-                <span>{verticalTiltOptions.find(opt => opt.value === verticalTilt)?.label || verticalTilt}</span>
-                <span style={{ fontSize: `10px` }}>▼</span>
-              </button>
-              {isVerticalTiltDropdownOpen && (
-                <div
+            {/* Model Selector */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 500, color: textColor, marginBottom: '4px' }}>Model</div>
+              <div ref={multiangleModelDropdownRef} style={{ position: 'relative', zIndex: themedDropdownBaseZ, overflow: 'visible' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMultiangleModelDropdownOpen((v) => !v);
+                    setIsMultiangleCategoryDropdownOpen(false);
+                    setIsMultiangleResolutionDropdownOpen(false);
+                    setIsAspectRatioDropdownOpen(false);
+                    setIsVerticalTiltDropdownOpen(false);
+                  }}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: `4px`,
-                    backgroundColor: inputBg,
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: `8px`,
-                    zIndex: 1000,
-                    boxShadow: isDark ? '0 4px 12px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: dropdownBg,
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    color: dropdownText,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    whiteSpace: 'nowrap',
+                    transition: 'background-color 0.2s ease, border-color 0.2s ease',
                   }}
                 >
-                  {verticalTiltOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        onVerticalTiltChange(option.value);
-                        setIsVerticalTiltDropdownOpen(false);
-                      }}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {(MultiangleModelOptions.find((o) => o.value === multiangleModel)?.label) ?? multiangleModel}
+                  </span>
+                  <ChevronDown size={16} color={isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} />
+                </button>
+                {isMultiangleModelDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '6px',
+                      backgroundColor: dropdownBg,
+                      border: `1px solid ${dropdownBorderColor}`,
+                      borderRadius: '10px',
+                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.55)' : '0 10px 30px rgba(0,0,0,0.18)',
+                      zIndex: themedDropdownBaseZ + 1,
+                      padding: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    {MultiangleModelOptions.map((opt) => {
+                      const selected = multiangleModel === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            onMultiangleModelChange(opt.value);
+                            setIsMultiangleModelDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            backgroundColor: selected ? selectedBg : 'transparent',
+                            color: selected ? selectedText : dropdownText,
+                            fontSize: '14px',
+                            transition: 'background-color 0.15s ease, color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = dropdownHoverBg;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          {opt.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Aspect Ratio Selector */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 500, color: textColor, marginBottom: '4px' }}>Aspect Ratio</div>
+              <div ref={aspectRatioDropdownRef} style={{ position: 'relative', zIndex: 3200, overflow: 'visible' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAspectRatioDropdownOpen((v) => !v);
+                    setIsMultiangleCategoryDropdownOpen(false);
+                    setIsMultiangleModelDropdownOpen(false);
+                    setIsMultiangleResolutionDropdownOpen(false);
+                    setIsVerticalTiltDropdownOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: dropdownBg,
+                    border: `1px solid ${dropdownBorderColor}`,
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    color: dropdownText,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    whiteSpace: 'nowrap',
+                    transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                  }}
+                >
+                  <span>
+                    {(aspectRatioOptions.find((o) => o.value === aspectRatio)?.label) ?? aspectRatio}
+                  </span>
+                  <ChevronDown size={16} color={isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} />
+                </button>
+                {isAspectRatioDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '6px',
+                      backgroundColor: dropdownBg,
+                      border: `1px solid ${dropdownBorderColor}`,
+                      borderRadius: '10px',
+                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.55)' : '0 10px 30px rgba(0,0,0,0.18)',
+                      zIndex: 3201,
+                      padding: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    {aspectRatioOptions.map((opt) => {
+                      const selected = aspectRatio === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => {
+                            onAspectRatioChange(opt.value);
+                            setIsAspectRatioDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            backgroundColor: selected ? selectedBg : 'transparent',
+                            color: selected ? selectedText : dropdownText,
+                            fontSize: '14px',
+                            transition: 'background-color 0.15s ease, color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = dropdownHoverBg;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          {opt.label}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Resolution Selector - Only show for Google nano banana pro */}
+            {multiangleModel === 'Google nano banana pro' && (
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 500, color: textColor, marginBottom: '4px' }}>Resolution</div>
+                <div ref={multiangleResolutionDropdownRef} style={{ position: 'relative', zIndex: themedDropdownBaseZ, overflow: 'visible' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMultiangleResolutionDropdownOpen((v) => !v);
+                      setIsMultiangleCategoryDropdownOpen(false);
+                      setIsMultiangleModelDropdownOpen(false);
+                      setIsAspectRatioDropdownOpen(false);
+                      setIsVerticalTiltDropdownOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: dropdownBg,
+                      border: `1px solid ${dropdownBorderColor}`,
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: dropdownText,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      whiteSpace: 'nowrap',
+                      transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                    }}
+                  >
+                    <span>{multiangleResolution}</span>
+                    <ChevronDown size={16} color={isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} />
+                  </button>
+
+                  {isMultiangleResolutionDropdownOpen && (
+                    <div
                       style={{
-                        width: '100%',
-                        padding: `8px 12px`,
-                        fontSize: `12px`,
-                        backgroundColor: verticalTilt === option.value ? SELECTION_COLOR : 'transparent',
-                        color: verticalTilt === option.value ? '#ffffff' : textColor,
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'background-color 0.2s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (verticalTilt !== option.value) {
-                          e.currentTarget.style.backgroundColor = isDark ? '#3a3a3a' : '#f3f4f6';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (verticalTilt !== option.value) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '6px',
+                        backgroundColor: dropdownBg,
+                        border: `1px solid ${dropdownBorderColor}`,
+                        borderRadius: '10px',
+                        boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.55)' : '0 10px 30px rgba(0,0,0,0.18)',
+                        zIndex: themedDropdownBaseZ + 1,
+                        padding: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
                       }}
                     >
-                      {option.label}
-                    </button>
-                  ))}
+                      {MultiangleResolutionOptions.map((opt) => {
+                        const selected = multiangleResolution === opt.value;
+                        return (
+                          <div
+                            key={opt.value}
+                            onClick={() => {
+                              onMultiangleResolutionChange(opt.value);
+                              setIsMultiangleResolutionDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              backgroundColor: selected ? selectedBg : 'transparent',
+                              color: selected ? selectedText : dropdownText,
+                              fontSize: '14px',
+                              transition: 'background-color 0.15s ease, color 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = dropdownHoverBg;
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!selected) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {opt.label}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
+
+            <div style={{
+              fontSize: '11px',
+              color: isDark ? '#888' : '#666',
+              marginTop: '8px',
+              padding: '8px',
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)',
+              borderRadius: '6px'
+            }}>
+              Multi-angle mode will generate 9 different camera angles from the input image.
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
-        {/* Row 3: Rotate Degrees Slider */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: `4px` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: `11px`, fontWeight: 500, color: textColor }}>
-              <span>Rotate Degrees</span>
-            </label>
-            <div style={{ display: 'flex', gap: `8px`, alignItems: 'center', fontSize: `10px`, color: textColor, opacity: 0.7 }}>
-              <span style={{ color: rotateDegrees < 0 ? SELECTION_COLOR : textColor, opacity: rotateDegrees < 0 ? 1 : 0.5 }}>
-                Right →
-              </span>
-              <span style={{ color: rotateDegrees === 0 ? textColor : SELECTION_COLOR, opacity: rotateDegrees === 0 ? 1 : 0.5 }}>
-                Center
-              </span>
-              <span style={{ color: rotateDegrees > 0 ? SELECTION_COLOR : textColor, opacity: rotateDegrees > 0 ? 1 : 0.5 }}>
-                ← Left
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
-            <input
-              type="range"
-              min="-90"
-              max="90"
-              step="1"
-              value={rotateDegrees}
-              onChange={(e) => onRotateDegreesChange(parseInt(e.target.value))}
-              style={{
-                flex: 1,
-                accentColor: SELECTION_COLOR,
-              }}
-            />
-            <input
-              type="number"
-              min="-90"
-              max="90"
-              step="1"
-              value={rotateDegrees}
-              onChange={(e) => {
-                let val = parseInt(e.target.value);
-                if (isNaN(val)) val = 0;
-                if (val > 90) val = 90;
-                if (val < -90) val = -90;
-                onRotateDegreesChange(val);
-              }}
-              style={{
-                width: `60px`,
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                color: isDark ? '#ffffff' : '#000000',
-                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-                borderRadius: `4px`,
-                padding: `4px`,
-                fontSize: `12px`,
-                textAlign: 'center',
-                outline: 'none'
-              }}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: `9px`, color: textColor, opacity: 0.6 }}>
-            <span>-90°</span>
-            <span>0°</span>
-            <span>+90°</span>
-          </div>
-        </div>
-
-        {/* Row 4: Wide Angle Checkbox */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: `8px` }}>
-          <input
-            type="checkbox"
-            checked={useWideAngle}
-            onChange={(e) => onUseWideAngleChange(e.target.checked)}
-            style={{
-              width: `16px`,
-              height: `16px`,
-              cursor: 'pointer',
-            }}
-          />
-          <label style={{ fontSize: `12px`, color: textColor, cursor: 'pointer' }}>
-            Use Wide Angle
-          </label>
-        </div>
-
-        {/* Generate Button */}
+        {/* Generate Button - Only for MultiView */}
+        {category === 'multiview' && !hideGenerateButton && (
         <button
           type="button"
           onClick={onGenerate}
@@ -535,6 +644,7 @@ export const MultiangleCameraControls: React.FC<MultiangleCameraControlsProps> =
         >
           {isGenerating ? 'Generating...' : 'Generate Multiangle'}
         </button>
+        )}
       </div>
     </div>
   );

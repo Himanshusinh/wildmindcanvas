@@ -1958,8 +1958,23 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
       }
 
       return null;
-    } catch (error) {
-      console.error('Error fetching user info:', error);
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      // Dev convenience: if API gateway isn't running / reachable, return null quietly.
+      if (
+        msg === 'Failed to fetch' ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('ERR_CONNECTION_REFUSED') ||
+        msg.includes('NetworkError')
+      ) {
+        console.warn('[getCurrentUser] API unreachable - returning null', {
+          api: `${API_GATEWAY_URL}/auth/me`,
+          error: msg,
+        });
+        return null;
+      }
+
+      console.error('[getCurrentUser] Error fetching user info:', error);
       return null;
     }
   })();
@@ -2369,5 +2384,128 @@ export async function generateMusicForCanvas(
     }
 
     throw new Error('Failed to generate music. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Generate multiple camera angles using Qwen Image Edit Multiple Angles (FAL API)
+ */
+export async function qwenMultipleAnglesForCanvas(
+  imageUrls: string[],
+  projectId: string,
+  horizontalAngle?: number,
+  verticalAngle?: number,
+  zoom?: number,
+  additionalPrompt?: string,
+  loraScale?: number,
+  imageSize?: string | { width: number; height: number },
+  guidanceScale?: number,
+  numInferenceSteps?: number,
+  negativePrompt?: string,
+  seed?: number,
+  numImages?: number
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const requestBody: any = {
+      image_urls: imageUrls,
+      meta: {
+        source: 'canvas',
+        projectId,
+      },
+    };
+
+    // Add optional parameters
+    if (horizontalAngle !== undefined) requestBody.horizontal_angle = horizontalAngle;
+    if (verticalAngle !== undefined) requestBody.vertical_angle = verticalAngle;
+    if (zoom !== undefined) requestBody.zoom = zoom;
+    if (additionalPrompt) requestBody.additional_prompt = additionalPrompt;
+    if (loraScale !== undefined) requestBody.lora_scale = loraScale;
+    if (imageSize) requestBody.image_size = imageSize;
+    if (guidanceScale !== undefined) requestBody.guidance_scale = guidanceScale;
+    if (numInferenceSteps !== undefined) requestBody.num_inference_steps = numInferenceSteps;
+    if (negativePrompt) requestBody.negative_prompt = negativePrompt;
+    if (seed !== undefined) requestBody.seed = seed;
+    if (numImages !== undefined) requestBody.num_images = numImages;
+
+    const response = await fetch(`${API_GATEWAY_URL}/fal/qwen/multiple-angles`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify(requestBody),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+        console.log('[qwenMultipleAnglesForCanvas] 📥 Parsed response:', {
+          status: response.status,
+          responseStatus: result.responseStatus,
+          hasData: !!result.data,
+          resultKeys: Object.keys(result)
+        });
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate multiple angles');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate multiple angles');
+    }
+
+    // FAL API returns images array - get first image
+    const images = result.data?.images || [];
+    if (images.length === 0) {
+      throw new Error('No images returned from Qwen Multiple Angles API');
+    }
+
+    // Return the first image (similar structure to multiangleImageForCanvas)
+    const firstImage = images[0];
+    return {
+      url: firstImage.url || firstImage.publicUrl || '',
+      originalUrl: firstImage.originalUrl || firstImage.url || '',
+      storagePath: firstImage.storagePath || firstImage.key || '',
+      mediaId: firstImage.id || firstImage.mediaId,
+      generationId: result.data?.historyId || result.historyId,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Multiple angles generation is taking too long. Please try again.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to generate multiple angles. Please check your connection and try again.');
   }
 }

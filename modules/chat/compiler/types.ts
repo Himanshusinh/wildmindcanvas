@@ -23,6 +23,7 @@ export interface CreateNodeAction extends CanvasAction {
         model: string;
         duration?: number;
         aspectRatio?: string;
+        resolution?: string;
         style?: string;
         prompt?: string;
         [key: string]: any;
@@ -89,6 +90,7 @@ export interface SemanticGoal {
     durationSeconds?: number;
     style?: string;
     aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    resolution?: string; // Video resolution e.g. '720p', '1080p', '480p'
     count?: number;
     model?: string;
     needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion' | 'plugin'>;

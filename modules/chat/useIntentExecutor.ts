@@ -58,7 +58,10 @@ export function useIntentExecutor({
 
                             const batchConfig = step.batchConfigs?.[i] || {};
                             const nodePrompt = batchConfig.prompt || step.configTemplate.prompt;
-                            const nodeDuration = batchConfig.duration || step.configTemplate.duration || 4;
+                            // Use duration from step config, default to 6 seconds for image-to-video (matching compileImageAnimate default)
+                            const nodeDuration = batchConfig.duration ?? step.configTemplate.duration ?? 6;
+                            // Get resolution from step config
+                            const nodeResolution = batchConfig.resolution || step.configTemplate.resolution;
 
                             if (step.nodeType === 'video-generator') {
                                 const newId = `video-${uuidv4()}`;
@@ -69,11 +72,6 @@ export function useIntentExecutor({
                                     ? explicitTargets
                                     : (canvasSelection.selectedIds || []);
 
-                                let sourceId: string | null = null;
-                                if (targetIds.length > 0) {
-                                    sourceId = targetIds[0];
-                                }
-
                                 const newModal = {
                                     id: newId,
                                     x: posX,
@@ -82,6 +80,7 @@ export function useIntentExecutor({
                                     model: step.configTemplate.model,
                                     aspectRatio: step.configTemplate.aspectRatio || '16:9',
                                     duration: nodeDuration,
+                                    resolution: nodeResolution, // Add resolution to modal state
                                     frameWidth: 600,
                                     frameHeight: 400,
                                 };
@@ -89,16 +88,34 @@ export function useIntentExecutor({
                                 if (props.onPersistVideoModalCreate) await props.onPersistVideoModalCreate(newModal);
                                 newIds.push(newId);
 
-                                // Create Connection if source existed
-                                if (sourceId) {
-                                    const newConn = {
+                                // Create Connections for selected images
+                                // If 2 images are selected, connect both as first frame and last frame
+                                // If 1 image is selected, connect it as first frame (single frame mode)
+                                if (targetIds.length >= 1) {
+                                    // Connect first image as first frame
+                                    const firstFrameId = targetIds[0];
+                                    const firstConn = {
                                         id: `conn-${uuidv4()}`,
-                                        from: sourceId,
+                                        from: firstFrameId,
                                         to: newId,
                                         color: '#555555'
                                     };
                                     if (props.onPersistConnectorCreate) {
-                                        await props.onPersistConnectorCreate(newConn);
+                                        await props.onPersistConnectorCreate(firstConn);
+                                    }
+
+                                    // If 2 images are selected, connect second image as last frame
+                                    if (targetIds.length >= 2) {
+                                        const lastFrameId = targetIds[1];
+                                        const lastConn = {
+                                            id: `conn-${uuidv4()}`,
+                                            from: lastFrameId,
+                                            to: newId,
+                                            color: '#555555'
+                                        };
+                                        if (props.onPersistConnectorCreate) {
+                                            await props.onPersistConnectorCreate(lastConn);
+                                        }
                                     }
                                 }
                             }

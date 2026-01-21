@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import {
     SemanticGoal,
@@ -7,6 +6,32 @@ import {
     GoalType
 } from './types';
 import { CAPABILITY_REGISTRY } from '../capabilityRegistry';
+
+// Helper function to get model capability from registry
+function getModelCapability(modelName: string) {
+    if (!modelName) return null;
+    // Normalize model name to match registry keys
+    // Registry keys use format like "veo-3.1-fast", "seedance-1.0-pro"
+    let modelKey = modelName.toLowerCase().trim();
+    // Replace spaces with hyphens, but keep dots for version numbers
+    modelKey = modelKey.replace(/\s+/g, '-');
+    // Try exact match first
+    if (CAPABILITY_REGISTRY.VIDEO.models[modelKey]) {
+        return CAPABILITY_REGISTRY.VIDEO.models[modelKey];
+    }
+    // Try common variations
+    const variations = [
+        modelKey,
+        modelKey.replace(/\./g, '-'), // "veo-3-1-fast"
+        modelKey.replace(/-/g, '.'), // "veo.3.1.fast"
+    ];
+    for (const variant of variations) {
+        if (CAPABILITY_REGISTRY.VIDEO.models[variant]) {
+            return CAPABILITY_REGISTRY.VIDEO.models[variant];
+        }
+    }
+    return null;
+}
 
 const generateId = () => uuidv4();
 
@@ -137,7 +162,14 @@ function compileStoryVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): 
         label: `${topic} (${duration}s Video Production)`
     });
 
-    return `Create a ${duration}s ${topic} video with ${segmentCount} scenes (script, images, video segments).`;
+    // Generate a clear, formatted summary with all parameters
+    const summaryParts: string[] = [];
+    summaryParts.push(`Time Duration: ${duration} seconds`);
+    summaryParts.push(`Frame Size: ${aspectRatio}`);
+    summaryParts.push(`Scenes: ${segmentCount} segments`);
+    summaryParts.push(`Topic: ${topic}`);
+
+    return summaryParts.join('\n');
 }
 
 /**
@@ -174,7 +206,16 @@ function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep
         }
     });
 
-    return `Generate ${requestedCount} ${style} images of "${topic}" using ${model}.`;
+    // Generate a clear, formatted summary with all parameters
+    const summaryParts: string[] = [];
+    summaryParts.push(`Model: ${model}`);
+    summaryParts.push(`Frame Size: ${goal.aspectRatio || '1:1'}`);
+    summaryParts.push(`Prompt: ${topic} in ${style} style`);
+    if (requestedCount > 1) {
+        summaryParts.push(`Count: ${requestedCount} images`);
+    }
+
+    return summaryParts.join('\n');
 }
 
 /**
@@ -183,9 +224,142 @@ function compileImageGeneration(goal: SemanticGoal, steps: CanvasInstructionStep
 function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[]): string {
     const topic = goal.topic || "Visual";
     const style = goal.style || "cinematic";
-    const count = goal.references?.length || 1;
-    // Use durationSeconds from goal, default to 6 seconds if not specified
-    const duration = goal.durationSeconds || 6;
+    // Always create 1 video generator, even if 2 images are selected (first/last frame mode)
+    // The 2 images will be connected as first frame and last frame to the same video generator
+    const count = 1;
+    // Check if user explicitly specified a duration
+    const userSpecifiedDuration = goal.durationSeconds !== undefined && goal.durationSeconds !== null;
+    // Use durationSeconds from goal, default to 6 seconds ONLY if user didn't specify
+    let duration = userSpecifiedDuration ? goal.durationSeconds! : 6;
+
+    // Auto-select model based on duration if model not explicitly specified
+    // Veo 3.1 / Veo 3.1 Fast: support 4, 6, 8 seconds
+    // Seedance 1.0 Pro/Lite: support 2-12 seconds
+    let model = goal.model;
+    if (!model) {
+        if (duration >= 4 && duration <= 8) {
+            // Default to Veo 3.1 Fast for 4-8 second videos
+            model = 'Veo 3.1 Fast';
+        } else if (duration >= 9 && duration <= 12) {
+            // Use Seedance for 9-12 second videos
+            model = 'Seedance 1.0 Pro';
+        } else {
+            // Default fallback for durations outside normal ranges
+            model = 'Veo 3.1 Fast';
+        }
+    }
+
+    // Normalize model name (handle variations like "veo 3.1 fast", "veo3.1 fast", "veo-3.1-fast")
+    const modelLower = model.toLowerCase().trim();
+    
+    // Normalize model names to frontend format
+    if (modelLower.includes('veo') && modelLower.includes('3.1')) {
+        if (modelLower.includes('fast')) {
+            model = 'Veo 3.1 Fast';
+        } else {
+            model = 'Veo 3.1';
+        }
+    } else if (modelLower.includes('seedance')) {
+        if (modelLower.includes('lite')) {
+            model = 'Seedance 1.0 Lite';
+        } else {
+            model = 'Seedance 1.0 Pro';
+        }
+    }
+
+    // Validate and clamp duration based on selected model using capability registry
+    // IMPORTANT: Only modify duration if user didn't specify it OR if it's invalid for the model
+    const modelLowerAfter = model.toLowerCase().trim();
+    const modelCapability = getModelCapability(model);
+    
+    if (modelCapability && modelCapability.temporal) {
+        const maxDuration = modelCapability.temporal.maxOutputSeconds;
+        const minDuration = modelCapability.temporal.maxInputSeconds || 2;
+        
+        // For Veo models, valid durations are exactly 4, 6, or 8
+        if (modelLowerAfter.includes('veo') && modelLowerAfter.includes('3.1')) {
+            const validVeoDurations = [4, 6, 8];
+            // If user specified a duration and it's valid, use it exactly
+            if (userSpecifiedDuration && validVeoDurations.includes(duration)) {
+                // Keep the exact user-specified value (4, 6, or 8)
+            } else {
+                // Only round/clamp if user didn't specify OR if value is invalid
+                if (duration < minDuration) duration = minDuration;
+                if (duration > maxDuration) duration = maxDuration;
+                // Round to nearest valid duration
+                if (duration < 5) duration = 4;
+                else if (duration < 7) duration = 6;
+                else duration = 8;
+            }
+        } else {
+            // For other models (like Seedance), validate range but preserve user's value if valid
+            if (userSpecifiedDuration && duration >= minDuration && duration <= maxDuration) {
+                // Keep user's exact value if it's within valid range
+                duration = Math.round(duration); // Just round to integer
+            } else {
+                // Only clamp/round if user didn't specify OR if value is invalid
+                if (duration < minDuration) duration = minDuration;
+                if (duration > maxDuration) duration = maxDuration;
+                duration = Math.round(duration);
+            }
+        }
+    } else {
+        // Fallback to hardcoded logic if capability not found
+        if (modelLowerAfter.includes('veo') && modelLowerAfter.includes('3.1')) {
+            const validVeoDurations = [4, 6, 8];
+            // If user specified a valid duration, use it exactly
+            if (userSpecifiedDuration && validVeoDurations.includes(duration)) {
+                // Keep exact value
+            } else {
+                // Only round if user didn't specify OR if value is invalid
+                if (duration < 4) duration = 4;
+                if (duration > 8) duration = 8;
+                if (duration < 5) duration = 4;
+                else if (duration < 7) duration = 6;
+                else duration = 8;
+            }
+        } else if (modelLowerAfter.includes('seedance')) {
+            // For Seedance, preserve user's value if within valid range
+            if (userSpecifiedDuration && duration >= 2 && duration <= 12) {
+                duration = Math.round(duration);
+            } else {
+                if (duration < 2) duration = 2;
+                if (duration > 12) duration = 12;
+                duration = Math.round(duration);
+            }
+        }
+    }
+
+    // Extract and normalize resolution using capability registry
+    let resolution = goal.resolution;
+    if (resolution) {
+        // Normalize resolution format (e.g., "720p", "1080p", "480p")
+        resolution = resolution.toLowerCase().trim();
+        // Ensure it ends with 'p'
+        if (!resolution.endsWith('p')) {
+            resolution = resolution + 'p';
+        }
+        
+        // Validate resolution against model capabilities from registry
+        if (modelCapability && modelCapability.resolutions) {
+            const validResolutions = modelCapability.resolutions;
+            if (!validResolutions.includes(resolution)) {
+                // Use first valid resolution as default if user's choice is invalid
+                resolution = validResolutions[0] || '720p';
+            }
+        } else {
+            // Fallback to hardcoded validation
+            if (modelLowerAfter.includes('veo') && modelLowerAfter.includes('3.1')) {
+                if (resolution !== '720p' && resolution !== '1080p') {
+                    resolution = '720p';
+                }
+            } else if (modelLowerAfter.includes('seedance')) {
+                if (resolution !== '480p' && resolution !== '720p' && resolution !== '1080p') {
+                    resolution = '1080p';
+                }
+            }
+        }
+    }
 
     const videoStepId = generateId();
     steps.push({
@@ -194,15 +368,30 @@ function compileImageAnimate(goal: SemanticGoal, steps: CanvasInstructionStep[])
         nodeType: 'video-generator',
         count,
         configTemplate: {
-            model: goal.model || 'veo-3.1',
+            model: model,
             aspectRatio: goal.aspectRatio || '16:9',
             duration: duration,
+            resolution: resolution, // Add resolution to config
             prompt: goal.topic ? `${topic} in ${style} style` : "Animate this image with cinematic motion",
             targetIds: goal.references
         }
     });
 
-    return `Animate ${count} images into cinematic video loops showing ${topic}.`;
+    // Generate a clear, formatted summary with all parameters
+    const summaryParts: string[] = [];
+    summaryParts.push(`Time Duration: ${duration} seconds`);
+    summaryParts.push(`Frame Size: ${goal.aspectRatio || '16:9'}`);
+    if (resolution) {
+        summaryParts.push(`Resolution: ${resolution}`);
+    }
+    summaryParts.push(`Model: ${model}`);
+    summaryParts.push(`Prompt: ${goal.topic ? `${topic} in ${style} style` : "Animate this image with cinematic motion"}`);
+    // If 2 images are selected, indicate first/last frame mode
+    if (goal.references && goal.references.length >= 2) {
+        summaryParts.push(`Mode: First frame and last frame`);
+    }
+
+    return summaryParts.join('\n');
 }
 
 /**
@@ -236,7 +425,14 @@ function compileMusicVideo(goal: SemanticGoal, steps: CanvasInstructionStep[]): 
         }
     });
 
-    return `Create a music video production: 1 song and a 4-scene visual montage.`;
+    // Generate a clear, formatted summary with all parameters
+    const summaryParts: string[] = [];
+    summaryParts.push(`Type: Music Video`);
+    summaryParts.push(`Audio: 1 song`);
+    summaryParts.push(`Video: 4-scene visual montage`);
+    summaryParts.push(`Topic: ${topic}`);
+
+    return summaryParts.join('\n');
 }
 
 /**
@@ -346,3 +542,4 @@ function compilePluginAction(goal: SemanticGoal, steps: CanvasInstructionStep[])
 
     return `Applying ${pluginType} plugin...`;
 }
+

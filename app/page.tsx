@@ -112,6 +112,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Use UI visibility hook
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
+
+  // Allow full-screen plugin popups (like Multiangle) to hide global UI chrome
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { hidden?: boolean; source?: string } | undefined;
+      if (!detail) return;
+      if (typeof detail.hidden === 'boolean') {
+        setIsUIHidden(detail.hidden);
+      }
+    };
+    window.addEventListener('wildmind:ui-hidden', handler as EventListener);
+    return () => window.removeEventListener('wildmind:ui-hidden', handler as EventListener);
+  }, [setIsUIHidden]);
   const openExternalVideoEditor = useCallback(() => {
     try {
       const externalBase = process.env.NEXT_PUBLIC_EDITOR_VIDEO_URL || 'https://editor-video.wildmindai.com';
@@ -1377,8 +1390,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onUpscale={pluginHandlers.onUpscale}
 
               onPersistMultiangleCameraModalCreate={pluginHandlers.onPersistMultiangleCameraModalCreate}
+              onPersistMultiangleCameraModalMove={pluginHandlers.onPersistMultiangleCameraModalMove}
               onPersistMultiangleCameraModalDelete={pluginHandlers.onPersistMultiangleCameraModalDelete}
               onMultiangleCamera={pluginHandlers.onMultiangleCamera}
+              onQwenMultipleAngles={pluginHandlers.onQwenMultipleAngles}
 
               onPersistCompareModalCreate={pluginHandlers.onPersistCompareModalCreate}
               onPersistCompareModalMove={pluginHandlers.onPersistCompareModalMove}

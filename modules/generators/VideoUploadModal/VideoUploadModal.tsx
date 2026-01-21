@@ -134,12 +134,44 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(
     initialAspectRatio ?? getModelDefaultAspectRatio(initialModel ?? 'Seedance 1.0 Pro')
   );
-  const [selectedDuration, setSelectedDuration] = useState<number>(
-    initialDuration ?? getModelDefaultDuration(initialModel ?? 'Seedance 1.0 Pro')
-  );
-  const [selectedResolution, setSelectedResolution] = useState<string>(
-    initialResolution ?? getModelDefaultResolution(initialModel ?? 'Seedance 1.0 Pro')
-  );
+  // Prioritize initialDuration if provided (from chat instructions), otherwise use model default
+  const [selectedDuration, setSelectedDuration] = useState<number>(() => {
+    const modelForDefault = initialModel ?? 'Seedance 1.0 Pro';
+    const defaultDuration = getModelDefaultDuration(modelForDefault);
+    // If initialDuration is provided, validate it against the model (if model is known)
+    if (typeof initialDuration === 'number') {
+      if (initialModel && isValidDurationForModel(initialModel, initialDuration)) {
+        return initialDuration;
+      }
+      // If model is not known yet, still use initialDuration (it will be validated later)
+      if (!initialModel) {
+        return initialDuration;
+      }
+      // If invalid for the model, use default
+      return defaultDuration;
+    }
+    // Otherwise use default
+    return defaultDuration;
+  });
+  // Prioritize initialResolution if provided (from chat instructions), otherwise use model default
+  const [selectedResolution, setSelectedResolution] = useState<string>(() => {
+    const modelForDefault = initialModel ?? 'Seedance 1.0 Pro';
+    const defaultResolution = getModelDefaultResolution(modelForDefault);
+    // If initialResolution is provided, validate it against the model (if model is known)
+    if (initialResolution) {
+      if (initialModel && isValidResolutionForModel(initialModel, initialResolution)) {
+        return initialResolution;
+      }
+      // If model is not known yet, still use initialResolution (it will be validated later)
+      if (!initialModel) {
+        return initialResolution;
+      }
+      // If invalid for the model, use default
+      return defaultResolution;
+    }
+    // Otherwise use default
+    return defaultResolution;
+  });
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAspectRatioDropdownOpen, setIsAspectRatioDropdownOpen] = useState(false);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
@@ -279,36 +311,53 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const defaultDuration = getModelDefaultDuration(targetModel);
     const defaultResolution = getModelDefaultResolution(targetModel);
 
+    // Respect initialDuration if provided (from chat instructions)
+    const durationToUse = (initialDuration && isValidDurationForModel(targetModel, initialDuration)) 
+      ? initialDuration 
+      : defaultDuration;
+
+    // Respect initialResolution if provided (from chat instructions)
+    const resolutionToUse = (initialResolution && isValidResolutionForModel(targetModel, initialResolution))
+      ? initialResolution
+      : defaultResolution;
+
+    // Respect initialAspectRatio if provided (from chat instructions)
+    const aspectRatioToUse = (initialAspectRatio && isValidAspectRatioForModel(targetModel, initialAspectRatio))
+      ? initialAspectRatio
+      : defaultAspectRatio;
+
     // Only update model if it's not already a Veo 3.1 model
     if (selectedModel !== targetModel) {
       setSelectedModel(targetModel);
       // When model changes, also update aspect ratio, duration, and resolution to defaults
-      setSelectedAspectRatio(defaultAspectRatio);
-      setSelectedDuration(defaultDuration);
-      setSelectedResolution(defaultResolution);
+      // BUT respect initialDuration, initialResolution, and initialAspectRatio if they were provided
+      setSelectedAspectRatio(aspectRatioToUse);
+      setSelectedDuration(durationToUse);
+      setSelectedResolution(resolutionToUse);
       hasInitializedDefaultsRef.current = true;
       onOptionsChange?.({
         model: targetModel,
-        aspectRatio: defaultAspectRatio,
-        duration: defaultDuration,
+        aspectRatio: aspectRatioToUse,
+        duration: durationToUse,
         frame: selectedFrame,
         prompt,
-        resolution: defaultResolution,
+        resolution: resolutionToUse,
       });
     } else if (!hasInitializedDefaultsRef.current || justConnected) {
       // Initialize defaults only when frames are first connected (0 -> 1 or 0 -> 2)
       // After that, let user change aspect ratio, duration, and resolution freely
-      setSelectedAspectRatio(defaultAspectRatio);
-      setSelectedDuration(defaultDuration);
-      setSelectedResolution(defaultResolution);
+      // BUT respect initialDuration, initialResolution, and initialAspectRatio if they were provided
+      setSelectedAspectRatio(aspectRatioToUse);
+      setSelectedDuration(durationToUse);
+      setSelectedResolution(resolutionToUse);
       hasInitializedDefaultsRef.current = true;
       onOptionsChange?.({
         model: targetModel,
-        aspectRatio: defaultAspectRatio,
-        duration: defaultDuration,
+        aspectRatio: aspectRatioToUse,
+        duration: durationToUse,
         frame: selectedFrame,
         prompt,
-        resolution: defaultResolution,
+        resolution: resolutionToUse,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -486,22 +535,46 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const defaultAspectRatio = getModelDefaultAspectRatio(selectedModel);
     const defaultResolution = getModelDefaultResolution(selectedModel);
 
-    // Update duration if current is not valid for new model
-    if (!isValidDurationForModel(selectedModel, selectedDuration)) {
+    // ALWAYS prioritize initialDuration if it was provided and is valid for the model
+    // This ensures chat instructions (e.g., "8 seconds") are respected
+    if (initialDuration && isValidDurationForModel(selectedModel, initialDuration)) {
+      // Only update if current duration doesn't match initialDuration
+      if (selectedDuration !== initialDuration) {
+        setSelectedDuration(initialDuration);
+      }
+    } else if (!isValidDurationForModel(selectedModel, selectedDuration)) {
+      // If initialDuration is not provided or invalid, and current duration is invalid, use default
       setSelectedDuration(defaultDuration);
     }
+    // If current duration is valid and no initialDuration was provided, keep it as is
 
-    // Update aspect ratio if current is not valid for new model
-    if (!isValidAspectRatioForModel(selectedModel, selectedAspectRatio)) {
+    // ALWAYS prioritize initialAspectRatio if it was provided and is valid for the model
+    // This ensures chat instructions (e.g., "16:9") are respected
+    if (initialAspectRatio && isValidAspectRatioForModel(selectedModel, initialAspectRatio)) {
+      // Only update if current aspect ratio doesn't match initialAspectRatio
+      if (selectedAspectRatio !== initialAspectRatio) {
+        setSelectedAspectRatio(initialAspectRatio);
+      }
+    } else if (!isValidAspectRatioForModel(selectedModel, selectedAspectRatio)) {
+      // If initialAspectRatio is not provided or invalid, and current aspect ratio is invalid, use default
       setSelectedAspectRatio(defaultAspectRatio);
     }
+    // If current aspect ratio is valid and no initialAspectRatio was provided, keep it as is
 
-    // Update resolution if current is not valid for new model
-    if (!isValidResolutionForModel(selectedModel, selectedResolution)) {
+    // ALWAYS prioritize initialResolution if it was provided and is valid for the model
+    // This ensures chat instructions (e.g., "1080p") are respected
+    if (initialResolution && isValidResolutionForModel(selectedModel, initialResolution)) {
+      // Only update if current resolution doesn't match initialResolution
+      if (selectedResolution !== initialResolution) {
+        setSelectedResolution(initialResolution);
+      }
+    } else if (!isValidResolutionForModel(selectedModel, selectedResolution)) {
+      // If initialResolution is not provided or invalid, and current resolution is invalid, use default
       setSelectedResolution(defaultResolution);
     }
+    // If current resolution is valid and no initialResolution was provided, keep it as is
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedModel]); // Only run when model changes
+  }, [selectedModel, initialDuration, initialResolution, initialAspectRatio]); // Run when model, initialDuration, initialResolution, OR initialAspectRatio changes
 
 
   // Handle click for shift-selection (fires after mousedown + mouseup)

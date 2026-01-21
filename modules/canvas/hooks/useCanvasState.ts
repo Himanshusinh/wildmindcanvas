@@ -99,7 +99,33 @@ export function useCanvasState(props: CanvasProps) {
     useEffect(() => { if (externalImageEditorModals) setImageEditorModalStates(externalImageEditorModals as any); }, [externalImageEditorModals]);
     useEffect(() => { if (externalMusicModals) setMusicModalStates(externalMusicModals as any); }, [externalMusicModals]);
     useEffect(() => { if (externalUpscaleModals) setUpscaleModalStates(externalUpscaleModals as any); }, [externalUpscaleModals]);
-    useEffect(() => { if (externalMultiangleCameraModals) setMultiangleCameraModalStates(externalMultiangleCameraModals as any); }, [externalMultiangleCameraModals]);
+    useEffect(() => { 
+      if (externalMultiangleCameraModals) {
+        setMultiangleCameraModalStates(prev => {
+          // Create a map of external modals by id
+          const externalMap = new Map(externalMultiangleCameraModals.map((m: any) => [m.id, m]));
+          
+          // Update existing modals with external data (position is source of truth from store)
+          const updated = prev.map(local => {
+            const external = externalMap.get(local.id);
+            if (external) {
+              // Use external as base (has correct position from store), but preserve local-only state
+              return {
+                ...external,
+                // Preserve isExpanded if it exists locally (UI state that might not be in store)
+                ...(local.isExpanded !== undefined ? { isExpanded: local.isExpanded } : {}),
+              };
+            }
+            return local;
+          });
+          
+          // Add any new external modals that aren't in local state
+          const newModals = externalMultiangleCameraModals.filter((ext: any) => !prev.some(local => local.id === ext.id));
+          
+          return [...updated, ...newModals];
+        });
+      }
+    }, [externalMultiangleCameraModals]);
     useEffect(() => { if (externalCompareModals) setCompareModalStates(externalCompareModals); }, [externalCompareModals]);
     useEffect(() => { if (externalRemoveBgModals) setRemoveBgModalStates(externalRemoveBgModals as any); }, [externalRemoveBgModals]);
     useEffect(() => { if (externalEraseModals) setEraseModalStates(externalEraseModals as any); }, [externalEraseModals]);
