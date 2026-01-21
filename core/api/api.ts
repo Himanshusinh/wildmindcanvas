@@ -455,7 +455,74 @@ export async function generateImageForCanvas(
 
     if (!response.ok) {
       // Extract detailed error message
-      let errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      // Helper function to safely extract string from error value
+      const extractErrorMessage = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'string') {
+          // Check if it's the literal "[object Object]" string (backend bug)
+          if (value === '[object Object]' || value.includes('[object Object]')) {
+            return ''; // Return empty to trigger fallback extraction
+          }
+          return value;
+        }
+        if (typeof value === 'object') {
+          // If it's an Error object, use its message
+          if (value instanceof Error) return value.message;
+          // If it has a message property, use that
+          if (value.message && typeof value.message === 'string') {
+            if (value.message === '[object Object]') {
+              // Try to extract from the object itself
+              try {
+                return JSON.stringify(value);
+              } catch {
+                return String(value);
+              }
+            }
+            return value.message;
+          }
+          // If it has other properties, try to extract useful info
+          if (value.error && typeof value.error === 'string') return value.error;
+          if (value.msg && typeof value.msg === 'string') return value.msg;
+          // Otherwise stringify the object
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        }
+        return String(value);
+      };
+      
+      // Try to extract error message, handling "[object Object]" case
+      let errorMessage = extractErrorMessage(result?.message) || extractErrorMessage(result?.error);
+      
+      // If errorMessage is empty or "[object Object]", try to extract from result object itself
+      if (!errorMessage || errorMessage === '[object Object]') {
+        // Try to find error details in the result object
+        if (result && typeof result === 'object') {
+          // Check for nested error objects
+          if (result.error && typeof result.error === 'object') {
+            errorMessage = extractErrorMessage(result.error);
+          }
+          // Check for data.error
+          if ((!errorMessage || errorMessage === '[object Object]') && result.data && typeof result.data === 'object') {
+            errorMessage = extractErrorMessage(result.data.error) || extractErrorMessage(result.data);
+          }
+          // If still no message, stringify the whole result
+          if (!errorMessage || errorMessage === '[object Object]') {
+            try {
+              errorMessage = JSON.stringify(result);
+            } catch {
+              errorMessage = String(result);
+            }
+          }
+        }
+      }
+      
+      // Final fallback
+      if (!errorMessage || errorMessage === '[object Object]') {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
       
       // If it's a validation error, try to extract more details
       // The error handler returns: { responseStatus: "error", message: "...", data: errors.array() }
@@ -501,23 +568,24 @@ export async function generateImageForCanvas(
             }).join(', ');
             errorMessage = `Validation failed: ${validationErrors}`;
           } else {
-            errorMessage = typeof result.error === 'string' ? result.error : JSON.stringify(result.error);
+            errorMessage = extractErrorMessage(result.error);
           }
         } else if (result?.message) {
-          errorMessage = result.message;
+          errorMessage = extractErrorMessage(result.message);
         } else {
           // If result is empty or doesn't have expected fields, log the full result
           errorMessage = `Validation failed: ${JSON.stringify(result)}`;
         }
       } else if (result?.data?.error) {
-        errorMessage = result.data.error;
+        errorMessage = extractErrorMessage(result.data.error);
       } else if (result?.error?.message) {
-        errorMessage = result.error.message;
-      } else if (result?.error && typeof result.error === 'string') {
-        errorMessage = result.error;
+        errorMessage = extractErrorMessage(result.error.message);
+      } else if (result?.error) {
+        errorMessage = extractErrorMessage(result.error);
       }
       
-      if (typeof errorMessage === 'object') {
+      // Final safety check - ensure errorMessage is always a string
+      if (typeof errorMessage !== 'string') {
         errorMessage = JSON.stringify(errorMessage);
       }
       
@@ -540,7 +608,27 @@ export async function generateImageForCanvas(
 
     // Handle API Gateway response format
     if (result.responseStatus === 'error') {
-      throw new Error(result.message || 'Failed to generate image');
+      // Safely extract error message
+      let errorMsg = 'Failed to generate image';
+      if (result.message) {
+        if (typeof result.message === 'string') {
+          errorMsg = result.message;
+        } else if (typeof result.message === 'object') {
+          // If message is an object, try to extract useful info
+          if (result.message.message && typeof result.message.message === 'string') {
+            errorMsg = result.message.message;
+          } else {
+            try {
+              errorMsg = JSON.stringify(result.message);
+            } catch {
+              errorMsg = String(result.message);
+            }
+          }
+        } else {
+          errorMsg = String(result.message);
+        }
+      }
+      throw new Error(errorMsg);
     }
 
     // Trigger credit refresh event

@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, X, MessageSquare, ChevronDown, ChevronRight, Check, Trash2, Zap, Mic, MicOff, RefreshCcw } from 'lucide-react';
+import { Send, Sparkles, X, MessageSquare, ChevronDown, ChevronRight, Check, Trash2, Zap, Mic, MicOff, RefreshCcw, ArrowRight, Video, Film } from 'lucide-react';
 import { useChatEngine, ChatMessage } from './useChatEngine';
 import { useIntentExecutor } from './useIntentExecutor';
 import { useSpeechToText } from './useSpeechToText';
+import { VIDEO_TEMPLATES, VideoTemplate, parseVideoFlowRequest, VideoFlowConfig } from './videoTemplateFlow';
+import { executeVideoFlow } from './videoFlowExecutor';
 
 interface ChatPanelProps {
     canvasState: any;
@@ -29,6 +31,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
     // const [isOpen, setIsOpen] = useState(false); // Removed local state
     const [inputValue, setInputValue] = useState('');
+    const [isInputFocused, setIsInputFocused] = useState(false);
+    const [inputLineCount, setInputLineCount] = useState(1);
+    const [showTemplates, setShowTemplates] = useState(false);
+    const [videoFlowConfig, setVideoFlowConfig] = useState<VideoFlowConfig | null>(null);
     const chatEngine = useChatEngine({ canvasState, canvasSelection });
     const executor = useIntentExecutor({
         canvasState,
@@ -123,6 +129,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     });
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -130,9 +137,80 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
     }, [chatEngine.messages]);
 
+    // Auto-resize textarea up to 4 lines and calculate line count
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            const scrollHeight = textarea.scrollHeight;
+            const maxHeight = 96; // 4 lines at 24px line height
+            textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+            
+            // Calculate number of lines (line height is 24px)
+            const lineCount = Math.ceil(scrollHeight / 24);
+            setInputLineCount(lineCount);
+        }
+    }, [inputValue]);
+
     const handleSend = () => {
         if (!inputValue.trim()) return;
+        
+        // Check if this is a video > 12 seconds request FIRST (before chat engine)
+        console.log('[ChatPanel] Checking for video flow request:', inputValue);
+        const flowConfig = parseVideoFlowRequest(inputValue);
+        if (flowConfig) {
+            console.log('[ChatPanel] Video flow detected! Duration:', flowConfig.totalDuration, 'Topic:', flowConfig.topic);
+            // Show template selection
+            setVideoFlowConfig(flowConfig);
+            setShowTemplates(true);
+            // Don't send to chat engine yet, wait for template selection
+            // Clear input but don't send to chat
+            setInputValue('');
+            return;
+        }
+        
+        console.log('[ChatPanel] Not a video flow request, sending to chat engine');
+        // Normal chat flow
         chatEngine.sendMessage(inputValue);
+        setInputValue('');
+    };
+    
+    const handleTemplateSelect = async (template: VideoTemplate) => {
+        if (!videoFlowConfig) return;
+        
+        setShowTemplates(false);
+        
+        // Show processing message
+        const processingMsg = `Creating ${videoFlowConfig.totalDuration} second video using "${template.name}" template. Generating script and dividing into scenes...`;
+        chatEngine.sendMessage(processingMsg);
+        
+        // Execute the flow
+        try {
+            console.log('[ChatPanel] Executing video flow with template:', template.id, 'Template name:', template.name);
+            console.log('[ChatPanel] Video flow config:', videoFlowConfig);
+            await executeVideoFlow(videoFlowConfig, template.id, {
+                canvasState,
+                props,
+                viewportSize,
+                position,
+                scale,
+            });
+            console.log('[ChatPanel] Video flow execution completed');
+            
+            // Send confirmation message with details
+            const frameCount = Math.ceil(videoFlowConfig.totalDuration / 8);
+            const isFirstLastFlow = template.id === 'first-last-frame';
+            const imageCount = isFirstLastFlow ? frameCount * 2 : frameCount;
+            const confirmationMsg = isFirstLastFlow
+                ? `✅ Video flow created successfully!\n\n📝 Script generated and divided into ${frameCount} scenes\n🎬 ${imageCount} image generation frames created (2 per scene: first & last frame)\n🎥 ${frameCount} video generation nodes created\n🔗 All frames connected automatically\n\nYou can now generate images and videos. Each video will use first frame and last frame.`
+                : `✅ Video flow created successfully!\n\n📝 Script generated and divided into ${frameCount} scenes\n🎬 ${imageCount} image generation frames created\n🎥 ${frameCount} video generation nodes created\n🔗 All frames connected automatically\n\nYou can now generate images and videos for each scene.`;
+            chatEngine.sendMessage(confirmationMsg);
+        } catch (error) {
+            console.error('[ChatPanel] Error executing video flow:', error);
+            chatEngine.sendMessage('❌ Failed to create video flow. Please try again.');
+        }
+        
+        setVideoFlowConfig(null);
         setInputValue('');
     };
 
@@ -179,12 +257,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div
                     className="absolute top-0 right-0 h-full w-[400px] flex flex-col transition-all duration-300 transform origin-right animate-in slide-in-from-right pointer-events-auto border-l border-white/10"
                     style={{
-                        background: 'rgba(5, 10, 20, 0.6)', // Darker, more premium glass
-                        backdropFilter: 'blur(20px)',
+                        background: '#121212', // Solid dark background matching theme
                     }}
                 >
-                    {/* Glass Gradient Overlays */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-transparent to-blue-500/5 pointer-events-none rounded-l-none" />
 
                     {/* Side Toggle / Close Handle - Outside & Facing Right */}
                     <button
@@ -239,7 +314,54 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             ref={scrollRef}
                             className="h-full overflow-y-auto p-4 pt-2 space-y-4 custom-scrollbar"
                         >
-                            {chatEngine.messages.length === 0 ? (
+                            {showTemplates && videoFlowConfig ? (
+                                <div className="h-full flex flex-col items-center justify-center p-6 space-y-6">
+                                    <div className="text-center space-y-2">
+                                        <h3 className="text-white/90 text-sm font-medium">
+                                            Select a Template for {videoFlowConfig.totalDuration}s Video
+                                        </h3>
+                                        <p className="text-white/50 text-xs">
+                                            Topic: {videoFlowConfig.topic}
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 w-full max-w-md">
+                                        {VIDEO_TEMPLATES.map((template) => (
+                                            <button
+                                                key={template.id}
+                                                onClick={() => handleTemplateSelect(template)}
+                                                className="p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all text-left group"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20 group-hover:bg-blue-500/20 transition-colors">
+                                                        {template.id === 'sequential-frames' ? (
+                                                            <Video size={20} className="text-blue-400" />
+                                                        ) : (
+                                                            <Film size={20} className="text-blue-400" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-white/90 text-sm font-medium mb-1">
+                                                            {template.name}
+                                                        </h4>
+                                                        <p className="text-white/50 text-xs leading-relaxed">
+                                                            {template.description}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowTemplates(false);
+                                            setVideoFlowConfig(null);
+                                        }}
+                                        className="text-white/40 hover:text-white/60 text-xs transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : chatEngine.messages.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 opacity-50">
                                     <div className="w-16 h-16 rounded-3xl bg-blue-500/5 flex items-center justify-center text-blue-400/20 border border-blue-500/10">
                                         <MessageSquare size={32} />
@@ -313,7 +435,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 pt-2 z-20 bg-gradient-to-t from-blue-950/80 to-transparent">
+                    <div className="p-4 pt-2 z-20">
                         {/* Selected references are hidden from UI but still available for chat functionality */}
                         {/* {selectedReferences.length > 0 && (
                             <div className="flex items-center gap-2 mb-3 px-1 overflow-x-auto custom-scrollbar pb-2">
@@ -330,13 +452,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             </div>
                         )} */}
                         <div className="relative group">
-                            <input
-                                type="text"
+                            <textarea
+                                ref={textareaRef}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                onFocus={() => setIsInputFocused(true)}
+                                onBlur={() => setIsInputFocused(false)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
                                 placeholder={isListening ? "Listening..." : "Type a command..."}
-                                className={`w-full bg-blue-950/40 border ${isListening ? 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'border-blue-500/10'} focus:border-blue-500/40 rounded-xl py-4 pl-4 pr-24 text-[13px] text-white placeholder-blue-200/20 outline-none transition-all focus:bg-blue-950/60`}
+                                rows={1}
+                                style={{
+                                    minHeight: '40px',
+                                    maxHeight: '96px', // ~4 lines at 24px line height
+                                    lineHeight: '24px',
+                                    resize: 'none',
+                                    overflowY: 'auto',
+                                }}
+                                className={`w-full bg-blue-950/40 border ${
+                                    isListening 
+                                        ? 'border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.1)]' 
+                                        : 'border-white/10'
+                                } ${inputLineCount >= 2 ? 'rounded-2xl' : 'rounded-full'} py-2.5 pl-4 pr-24 text-[13px] text-white placeholder-blue-200/20 outline-none transition-all focus:bg-blue-950/60 focus:border-white/10 custom-scrollbar`}
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                 {isSupported && (
@@ -353,9 +494,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 <button
                                     onClick={handleSend}
                                     disabled={!inputValue.trim() || isListening}
-                                    className="p-2 rounded-lg bg-blue-500 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-400 hover:scale-105 disabled:opacity-0 disabled:scale-95 transition-all duration-300"
+                                    className={`p-2 rounded-lg text-white shadow-lg hover:scale-105 transition-all duration-300 ${
+                                        !inputValue.trim() || isListening
+                                            ? 'bg-blue-500/30 cursor-not-allowed'
+                                            : 'bg-blue-500 hover:bg-blue-400 shadow-blue-500/20'
+                                    }`}
                                 >
-                                    <Send size={16} fill="currentColor" />
+                                    <ArrowRight size={16} />
                                 </button>
                             </div>
                         </div>
