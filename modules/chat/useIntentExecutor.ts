@@ -40,7 +40,48 @@ export function useIntentExecutor({
             const steps = plan.steps;
             const stepToNodeIds: Record<string, string[]> = {};
 
-            // Layout State
+            console.log(`[Executor] ===== STARTING PLAN EXECUTION =====`);
+            console.log(`[Executor] Total steps: ${steps.length}`);
+            steps.forEach((step, idx) => {
+                const nodeType = (step as any).nodeType || 'N/A';
+                console.log(`[Executor] Step ${idx + 1}: ${step.action} - ${nodeType} (id: ${step.id})`);
+            });
+
+            // ✅ FIX: Improved Layout - Images in left column, Videos in right column
+            // Calculate layout dimensions
+            const FRAME_WIDTH = 600;
+            const FRAME_HEIGHT = 400;
+            const VERTICAL_SPACING = 500; // Space between frames in same column
+            const COLUMN_GAP = 800; // Horizontal gap between image and video columns
+            
+            // Track image and video counts for proper positioning
+            let imageCount = 0;
+            let videoCount = 0;
+            
+            // Pre-count images and videos to center them properly
+            steps.forEach(step => {
+                if (step.action === 'CREATE_NODE') {
+                    if ((step as any).nodeType === 'image-generator') {
+                        imageCount += (step.count || 1);
+                    } else if ((step as any).nodeType === 'video-generator') {
+                        videoCount += (step.count || 1);
+                    }
+                }
+            });
+            
+            // Left column (images) - centered vertically
+            const IMAGE_COLUMN_X = center.x - COLUMN_GAP / 2;
+            const IMAGE_START_Y = center.y - ((imageCount - 1) * VERTICAL_SPACING) / 2;
+            
+            // Right column (videos) - centered vertically
+            const VIDEO_COLUMN_X = center.x + COLUMN_GAP / 2;
+            const VIDEO_START_Y = center.y - ((videoCount - 1) * VERTICAL_SPACING) / 2;
+            
+            // Track current positions
+            let currentImageIndex = 0;
+            let currentVideoIndex = 0;
+            
+            // Fallback for other node types
             let currentX = center.x - 400;
             let currentY = center.y - 200;
             const X_SPACING = 500;
@@ -51,90 +92,34 @@ export function useIntentExecutor({
                         const newIds: string[] = [];
                         const count = step.count || 1;
 
-                        for (let i = 0; i < count; i++) {
-                            // Calculate position (simple horizontal flow)
-                            const posX = currentX + (i * 250); // Inner spacing for batches
-                            const posY = currentY;
+                        // ✅ FIX: Handle image-generator FIRST with an early path.
+                        // The current control-flow below can skip image creation entirely due to brace/flow issues.
+                        if (step.nodeType === 'image-generator') {
+                            const nodeCount = count;
+                            const batchConfigs = step.batchConfigs || [];
 
-                            const batchConfig = step.batchConfigs?.[i] || {};
-                            const nodePrompt = batchConfig.prompt || step.configTemplate.prompt;
-                            // Use duration from step config, default to 6 seconds for image-to-video (matching compileImageAnimate default)
-                            const nodeDuration = batchConfig.duration ?? step.configTemplate.duration ?? 6;
-                            // Get resolution from step config
-                            const nodeResolution = batchConfig.resolution || step.configTemplate.resolution;
+                            console.log(`[Executor] ✅ Creating ${nodeCount} image node(s) (early path)`, {
+                                stepId: step.id,
+                                nodeCount,
+                                batchConfigs: batchConfigs.length
+                            });
 
-                            if (step.nodeType === 'video-generator') {
-                                const newId = `video-${uuidv4()}`;
-
-                                // Img2Vid / Auto-Connect Logic
-                                const explicitTargets = step.configTemplate.targetIds;
-                                const targetIds = (explicitTargets && explicitTargets.length > 0)
-                                    ? explicitTargets
-                                    : (canvasSelection.selectedIds || []);
-
-                                const newModal = {
-                                    id: newId,
-                                    x: posX,
-                                    y: posY,
-                                    prompt: nodePrompt,
-                                    model: step.configTemplate.model,
-                                    aspectRatio: step.configTemplate.aspectRatio || '16:9',
-                                    duration: nodeDuration,
-                                    resolution: nodeResolution, // Add resolution to modal state
-                                    frameWidth: 600,
-                                    frameHeight: 400,
-                                };
-                                canvasState.setVideoModalStates((prev: any) => [...prev, newModal]);
-                                if (props.onPersistVideoModalCreate) await props.onPersistVideoModalCreate(newModal);
-                                newIds.push(newId);
-
-                                // Create Connections for selected images
-                                // If 2 images are selected, connect both as first frame and last frame
-                                // If 1 image is selected, connect it as first frame (single frame mode)
-                                if (targetIds.length >= 1) {
-                                    // Connect first image as first frame
-                                    const firstFrameId = targetIds[0];
-                                    const firstConn = {
-                                        id: `conn-${uuidv4()}`,
-                                        from: firstFrameId,
-                                        to: newId,
-                                        color: '#555555'
-                                    };
-                                    if (props.onPersistConnectorCreate) {
-                                        await props.onPersistConnectorCreate(firstConn);
-                                    }
-
-                                    // If 2 images are selected, connect second image as last frame
-                                    if (targetIds.length >= 2) {
-                                        const lastFrameId = targetIds[1];
-                                        const lastConn = {
-                                            id: `conn-${uuidv4()}`,
-                                            from: lastFrameId,
-                                            to: newId,
-                                            color: '#555555'
-                                        };
-                                        if (props.onPersistConnectorCreate) {
-                                            await props.onPersistConnectorCreate(lastConn);
-                                        }
-                                    }
-                                }
-                            }
-                            else if (step.nodeType === 'image-generator') {
+                            for (let imgIdx = 0; imgIdx < nodeCount; imgIdx++) {
                                 const newId = `image-${uuidv4()}`;
+                                const batchConfig = batchConfigs[imgIdx] || {};
+                                const imgPrompt = batchConfig.prompt || step.configTemplate.prompt;
 
                                 // Img2Img / Auto-Connect Logic
-                                // Resolve source image to use as reference (and dimensions)
-                                const explicitTargets = step.configTemplate.targetIds;
+                                const explicitTargets = (step as any).configTemplate?.targetIds;
                                 const targetIds = (explicitTargets && explicitTargets.length > 0)
                                     ? explicitTargets
                                     : (canvasSelection.selectedIds || []);
 
-                                let sourceImageConfig = {};
+                                let sourceImageConfig: any = {};
                                 let sourceId: string | null = null;
 
                                 if (targetIds.length > 0) {
                                     sourceId = targetIds[0];
-                                    // Find source node in ImageModalStates (Generated) or Images (Uploaded)
                                     const sourceModal = canvasState.imageModalStates?.find((m: any) => m.id === sourceId);
                                     const sourceUpload = canvasState.images?.find((img: any) => img.elementId === sourceId || img.id === sourceId);
 
@@ -142,58 +127,486 @@ export function useIntentExecutor({
                                         sourceImageConfig = {
                                             frameWidth: sourceModal.frameWidth,
                                             frameHeight: sourceModal.frameHeight,
-                                            sourceImageUrl: sourceModal.generatedImageUrl || sourceModal.url, // url for uploaded wrapped in modal
-                                            // Maybe preserve aspect ratio?
+                                            sourceImageUrl: sourceModal.generatedImageUrl || sourceModal.url,
                                             aspectRatio: sourceModal.aspectRatio
                                         };
                                     } else if (sourceUpload) {
                                         sourceImageConfig = {
-                                            frameWidth: sourceUpload.width, // Assuming Upload has width/height? Maybe need getDimensions?
+                                            frameWidth: sourceUpload.width,
                                             frameHeight: sourceUpload.height,
                                             sourceImageUrl: sourceUpload.url
                                         };
                                     }
                                 }
 
+                                // Position: left column, vertical stack
+                                const imagePosX = IMAGE_COLUMN_X;
+                                const imagePosY = IMAGE_START_Y + (currentImageIndex * VERTICAL_SPACING);
+                                currentImageIndex++;
+
+                                const imgResolution = (batchConfig as any)?.resolution || step.configTemplate.resolution || '1024';
+
                                 const newModal = {
                                     id: newId,
-                                    x: posX,
-                                    y: posY,
-                                    prompt: nodePrompt,
+                                    x: imagePosX,
+                                    y: imagePosY,
+                                    prompt: imgPrompt,
                                     model: step.configTemplate.model,
                                     aspectRatio: step.configTemplate.aspectRatio || '1:1',
-                                    imageCount: step.configTemplate.imageCount || 1,
-                                    initialCount: step.configTemplate.imageCount || 1,
-                                    resolution: '1024',
+                                    imageCount: 1,
+                                    initialCount: 1,
+                                    resolution: imgResolution,
                                     frameWidth: 600,
                                     frameHeight: 400,
                                     isGenerating: true,
-                                    ...sourceImageConfig // Override defaults with source config
+                                    ...sourceImageConfig
                                 };
-                                canvasState.setImageModalStates((prev: any) => [...prev, newModal]);
-                                if (props.onPersistImageModalCreate) await props.onPersistImageModalCreate(newModal);
+
+                                if (canvasState.setImageModalStates) {
+                                    canvasState.setImageModalStates((prev: any) => [...prev, newModal]);
+                                } else {
+                                    console.error('[Executor] ❌ setImageModalStates is not available on canvasState');
+                                }
+
+                                if (props.onPersistImageModalCreate) {
+                                    await props.onPersistImageModalCreate(newModal);
+                                } else {
+                                    console.warn('[Executor] ⚠️ onPersistImageModalCreate not available; image will not persist');
+                                }
+
                                 newIds.push(newId);
 
-                                // Create Connection if source existed
-                                if (sourceId) {
-                                    const newConn = {
+                                // Create connector if a source existed (img2img reference)
+                                if (sourceId && props.onPersistConnectorCreate) {
+                                    await props.onPersistConnectorCreate({
                                         id: `conn-${uuidv4()}`,
                                         from: sourceId,
                                         to: newId,
                                         color: '#555555'
-                                    };
-                                    if (props.onPersistConnectorCreate) {
-                                        await props.onPersistConnectorCreate(newConn);
-                                    }
+                                    });
                                 }
                             }
-                            else if (step.nodeType === 'music-generator') {
-                                const newId = `music-${uuidv4()}`;
+
+                            // Store mapping for this step
+                            stepToNodeIds[step.id] = [...newIds];
+
+                            console.log(`[Executor] ✅ Step "${step.id}" completed (image-generator early path):`, {
+                                stepId: step.id,
+                                action: step.action,
+                                nodeType: (step as any).nodeType,
+                                createdNodes: newIds.length,
+                                nodeIds: newIds
+                            });
+
+                            // Advance layout cursor for next step
+                            currentX += X_SPACING;
+                            break;
+                        }
+                        
+                        // ✅ Handle image-generator separately (outside the general loop)
+                        if ((step as any).nodeType === 'image-generator') {
+                            // Skip the general loop - images handled below
+                        } else {
+                            // Handle video-generator and other types in the loop
+                            for (let i = 0; i < count; i++) {
+                                // ✅ Calculate position based on node type
+                                let posX: number;
+                                let posY: number;
+                                
+                                if (step.nodeType === 'video-generator') {
+                                    // Videos in right column, vertical layout
+                                    posX = VIDEO_COLUMN_X;
+                                    posY = VIDEO_START_Y + (currentVideoIndex * VERTICAL_SPACING);
+                                    currentVideoIndex++;
+                                    console.log(`[Executor] Video ${currentVideoIndex} position: (${posX}, ${posY})`);
+                                } else {
+                                    // Other node types: use fallback horizontal flow
+                                    posX = currentX + (i * 250);
+                                    posY = currentY;
+                                }
+
+                                const batchConfig = step.batchConfigs?.[i] || {};
+                                const nodePrompt = batchConfig.prompt || step.configTemplate.prompt;
+                                // Use duration from step config, default to 6 seconds for image-to-video (matching compileImageAnimate default)
+                                const nodeDuration = batchConfig.duration ?? step.configTemplate.duration ?? 6;
+                                // Get resolution from step config
+                                const nodeResolution = batchConfig.resolution || step.configTemplate.resolution;
+
+                                if (step.nodeType === 'video-generator') {
+                                const newId = `video-${uuidv4()}`;
+                                const config = step.configTemplate;
+                                
+                                console.log(`[Executor] ✅ Creating video ${currentVideoIndex + 1} at position (${posX}, ${posY})`);
+
                                 const newModal = {
                                     id: newId,
                                     x: posX,
                                     y: posY,
                                     prompt: nodePrompt,
+                                    model: config.model,
+                                    aspectRatio: config.aspectRatio || '16:9',
+                                    duration: nodeDuration,
+                                    resolution: nodeResolution,
+                                    frameWidth: 600,
+                                    frameHeight: 400,
+                                };
+                                
+                                console.log(`[Executor] Video modal created:`, {
+                                    id: newId,
+                                    position: { x: posX, y: posY },
+                                    model: config.model,
+                                    duration: nodeDuration
+                                });
+                                
+                                canvasState.setVideoModalStates((prev: any) => [...prev, newModal]);
+                                if (props.onPersistVideoModalCreate) {
+                                    await props.onPersistVideoModalCreate(newModal);
+                                    console.log(`[Executor] Video persisted: ${newId}`);
+                                } else {
+                                    console.error(`[Executor] ❌ ERROR: onPersistVideoModalCreate is not available!`);
+                                }
+                                newIds.push(newId);
+                                stepToNodeIds[step.id] = stepToNodeIds[step.id] || [];
+                                stepToNodeIds[step.id].push(newId);
+                                
+                                console.log(`[Executor] Video ${newId} added to step ${step.id}, total videos in step: ${stepToNodeIds[step.id].length}`);
+
+                                // ✅ FIX: Connect frame images to video node using new connectToFrames structure
+                                if (config.connectToFrames) {
+                                    const connConfig = config.connectToFrames;
+                                    
+                                    console.log(`[Executor] Video ${newId} connecting frames:`, {
+                                        connectionType: connConfig.connectionType,
+                                        hasUserUpload: !!(connConfig.firstFrameSource === "USER_UPLOAD" || connConfig.frameSource === "USER_UPLOAD")
+                                    });
+                                    
+                                    if (connConfig.connectionType === "FIRST_LAST_FRAME") {
+                                        // Connect first frame
+                                        let firstFrameNodeId: string | undefined;
+                                        if (connConfig.firstFrameSource === "USER_UPLOAD") {
+                                            firstFrameNodeId = connConfig.firstFrameId;
+                                            console.log(`[Executor] Using user-uploaded image as first frame: ${firstFrameNodeId}`);
+                                        } else {
+                                            const sourceNodeIds = stepToNodeIds[connConfig.firstFrameStepId];
+                                            console.log(`[Executor] FIRST_LAST_FRAME - Looking for first frame:`, {
+                                                stepId: connConfig.firstFrameStepId,
+                                                frameIndex: connConfig.firstFrameIndex,
+                                                availableNodeIds: sourceNodeIds,
+                                                nodeCount: sourceNodeIds?.length || 0,
+                                                selectedNodeId: sourceNodeIds?.[connConfig.firstFrameIndex]
+                                            });
+                                            if (sourceNodeIds && Array.isArray(sourceNodeIds)) {
+                                                if (connConfig.firstFrameIndex >= 0 && connConfig.firstFrameIndex < sourceNodeIds.length) {
+                                                    firstFrameNodeId = sourceNodeIds[connConfig.firstFrameIndex];
+                                                    console.log(`[Executor] ✅ Found first frame at index ${connConfig.firstFrameIndex}: ${firstFrameNodeId}`);
+                                                } else {
+                                                    console.error(`[Executor] ❌ Invalid first frame index: ${connConfig.firstFrameIndex} (array length: ${sourceNodeIds.length})`);
+                                                }
+                                            } else {
+                                                console.error(`[Executor] ❌ Source node IDs not found for step: ${connConfig.firstFrameStepId}`);
+                                            }
+                                        }
+                                        
+                                        // Connect last frame
+                                        let lastFrameNodeId: string | undefined;
+                                        if (connConfig.lastFrameSource === "USER_UPLOAD") {
+                                            lastFrameNodeId = connConfig.lastFrameId;
+                                            console.log(`[Executor] Using user-uploaded image as last frame: ${lastFrameNodeId}`);
+                                        } else {
+                                            const sourceNodeIds = stepToNodeIds[connConfig.lastFrameStepId];
+                                            console.log(`[Executor] FIRST_LAST_FRAME - Looking for last frame:`, {
+                                                stepId: connConfig.lastFrameStepId,
+                                                frameIndex: connConfig.lastFrameIndex,
+                                                availableNodeIds: sourceNodeIds,
+                                                nodeCount: sourceNodeIds?.length || 0,
+                                                selectedNodeId: sourceNodeIds?.[connConfig.lastFrameIndex]
+                                            });
+                                            if (sourceNodeIds && Array.isArray(sourceNodeIds)) {
+                                                if (connConfig.lastFrameIndex >= 0 && connConfig.lastFrameIndex < sourceNodeIds.length) {
+                                                    lastFrameNodeId = sourceNodeIds[connConfig.lastFrameIndex];
+                                                    console.log(`[Executor] ✅ Found last frame at index ${connConfig.lastFrameIndex}: ${lastFrameNodeId}`);
+                                                } else {
+                                                    console.error(`[Executor] ❌ Invalid last frame index: ${connConfig.lastFrameIndex} (array length: ${sourceNodeIds.length})`);
+                                                }
+                                            } else {
+                                                console.error(`[Executor] ❌ Source node IDs not found for step: ${connConfig.lastFrameStepId}`);
+                                            }
+                                        }
+                                        
+                                        console.log(`[Executor] FIRST_LAST_FRAME Connection Summary:`, {
+                                            videoId: newId,
+                                            firstFrame: firstFrameNodeId,
+                                            lastFrame: lastFrameNodeId,
+                                            firstFrameIndex: connConfig.firstFrameIndex,
+                                            lastFrameIndex: connConfig.lastFrameIndex
+                                        });
+                                        
+                                        // ✅ FIX: Ensure exactly 2 connections (first + last frame only)
+                                        if (firstFrameNodeId && lastFrameNodeId) {
+                                            // First frame connection
+                                            const conn1 = {
+                                                id: `conn-first-${uuidv4()}`,
+                                                from: firstFrameNodeId,
+                                                to: newId,
+                                                color: '#3b82f6', // Blue for first frame
+                                                label: 'First Frame',
+                                                strokeWidth: 2
+                                            };
+                                            if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(conn1);
+                                                console.log(`[Executor] ✅ Connected FIRST frame: ${firstFrameNodeId} → ${newId}`);
+                                            }
+                                            
+                                            // Last frame connection
+                                            const conn2 = {
+                                                id: `conn-last-${uuidv4()}`,
+                                                from: lastFrameNodeId,
+                                                to: newId,
+                                                color: '#ef4444', // Red for last frame
+                                                label: 'Last Frame',
+                                                strokeWidth: 2
+                                            };
+                                            if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(conn2);
+                                                console.log(`[Executor] ✅ Connected LAST frame: ${lastFrameNodeId} → ${newId}`);
+                                            }
+                                            
+                                            console.log(`[Executor] ✅ FIRST_LAST_FRAME: Connected exactly 2 frames to video ${newId}`);
+                                            
+                                            // ✅ Log detailed connection summary for debugging
+                                            const allFrames = stepToNodeIds[connConfig.firstFrameStepId] || [];
+                                            console.log(`[Executor] 📊 Connection Summary for Video ${newId}:`, {
+                                                videoIndex: (stepToNodeIds[step.id]?.length || 1) - 1,
+                                                firstFrame: {
+                                                    nodeId: firstFrameNodeId,
+                                                    index: connConfig.firstFrameIndex,
+                                                    stepId: connConfig.firstFrameStepId
+                                                },
+                                                lastFrame: {
+                                                    nodeId: lastFrameNodeId,
+                                                    index: connConfig.lastFrameIndex,
+                                                    stepId: connConfig.lastFrameStepId
+                                                },
+                                                allAvailableFrames: allFrames,
+                                                frameCount: allFrames.length
+                                            });
+                                        } else {
+                                            console.error(`[Executor] ❌ Missing frames for FIRST_LAST_FRAME:`, {
+                                                firstFrame: firstFrameNodeId,
+                                                lastFrame: lastFrameNodeId,
+                                                videoId: newId,
+                                                firstFrameStepId: connConfig.firstFrameStepId,
+                                                firstFrameIndex: connConfig.firstFrameIndex,
+                                                lastFrameStepId: connConfig.lastFrameStepId,
+                                                lastFrameIndex: connConfig.lastFrameIndex,
+                                                stepToNodeIds: Object.keys(stepToNodeIds),
+                                                availableFrames: stepToNodeIds[connConfig.firstFrameStepId] || []
+                                            });
+                                        }
+                                        
+                                    } else if (connConfig.connectionType === "IMAGE_TO_VIDEO") {
+                                        
+                                        let frameNodeId: string | undefined;
+                                        if (connConfig.frameSource === "USER_UPLOAD") {
+                                            frameNodeId = connConfig.frameId;
+                                            console.log(`[Executor] Using user-uploaded image: ${frameNodeId}`);
+                                        } else {
+                                            const sourceNodeIds = stepToNodeIds[connConfig.frameStepId];
+                                            if (sourceNodeIds && Array.isArray(sourceNodeIds)) {
+                                                frameNodeId = sourceNodeIds[connConfig.frameIndex];
+                                            }
+                                        }
+                                        
+                                        console.log(`[Executor] Connecting IMAGE_TO_VIDEO: ${frameNodeId} → ${newId}`);
+                                        
+                                        if (frameNodeId) {
+                                            const conn = {
+                                                id: `conn-${uuidv4()}`,
+                                                from: frameNodeId,
+                                                to: newId,
+                                                color: '#555555',
+                                                label: 'Source Frame'
+                                            };
+                                            if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(conn);
+                                            }
+                                        } else {
+                                            console.warn(`[Executor] ⚠️ Frame not found`);
+                                        }
+                                    }
+                                } else {
+                                    // Fallback: Original auto-connect logic for selected images
+                                    const explicitTargets = step.configTemplate.targetIds;
+                                    const targetIds = (explicitTargets && explicitTargets.length > 0)
+                                        ? explicitTargets
+                                        : (canvasSelection.selectedIds || []);
+
+                                    if (targetIds.length >= 1) {
+                                        const firstFrameId = targetIds[0];
+                                        const firstConn = {
+                                            id: `conn-${uuidv4()}`,
+                                            from: firstFrameId,
+                                            to: newId,
+                                            color: '#555555'
+                                        };
+                                        if (props.onPersistConnectorCreate) {
+                                            await props.onPersistConnectorCreate(firstConn);
+                                        }
+
+                                        if (targetIds.length >= 2) {
+                                            const lastFrameId = targetIds[1];
+                                            const lastConn = {
+                                        id: `conn-${uuidv4()}`,
+                                                from: lastFrameId,
+                                        to: newId,
+                                        color: '#555555'
+                                    };
+                                    if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(lastConn);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // ✅ Handle image-generator separately (outside the loop)
+                        // Fallback layout locals for non-image nodes in this legacy chain
+                        const fallbackPosX = currentX;
+                        const fallbackPosY = currentY;
+                        const fallbackNodePrompt = (step.batchConfigs?.[0] as any)?.prompt || step.configTemplate?.prompt;
+
+                        if ((step as any).nodeType === 'image-generator') {
+                            // ✅ FIX: Create individual nodes for each image (needed for frame references)
+                            const nodeCount = step.count || 1;
+                            const batchConfigs = step.batchConfigs || [];
+                            
+                            // ✅ VALIDATION: Ensure batchConfigs doesn't exceed nodeCount
+                            const actualConfigCount = Math.min(batchConfigs.length, nodeCount);
+                            if (batchConfigs.length > nodeCount) {
+                                console.warn(`[Executor] ⚠️ Warning: batchConfigs (${batchConfigs.length}) exceeds nodeCount (${nodeCount}). Using first ${nodeCount} configs.`);
+                            }
+                            
+                            console.log(`[Executor] Creating ${nodeCount} image node(s)`, {
+                                stepId: step.id,
+                                batchConfigs: batchConfigs.length,
+                                actualConfigCount,
+                                nodeCount
+                            });
+                            
+                            // ✅ FIX: Create exactly nodeCount nodes, not more
+                            // Create one node per image (for proper frame referencing)
+                            for (let imgIdx = 0; imgIdx < nodeCount; imgIdx++) {
+                                const newId = `image-${uuidv4()}`;
+                                const batchConfig = batchConfigs[imgIdx] || {};
+                                const imgPrompt = batchConfig.prompt || step.configTemplate.prompt;
+
+                                    // Img2Img / Auto-Connect Logic
+                                    const explicitTargets = step.configTemplate.targetIds;
+                                    const targetIds = (explicitTargets && explicitTargets.length > 0)
+                                        ? explicitTargets
+                                        : (canvasSelection.selectedIds || []);
+
+                                    let sourceImageConfig = {};
+                                    let sourceId: string | null = null;
+
+                                    if (targetIds.length > 0) {
+                                        sourceId = targetIds[0];
+                                        const sourceModal = canvasState.imageModalStates?.find((m: any) => m.id === sourceId);
+                                        const sourceUpload = canvasState.images?.find((img: any) => img.elementId === sourceId || img.id === sourceId);
+
+                                        if (sourceModal) {
+                                            sourceImageConfig = {
+                                                frameWidth: sourceModal.frameWidth,
+                                                frameHeight: sourceModal.frameHeight,
+                                                sourceImageUrl: sourceModal.generatedImageUrl || sourceModal.url,
+                                                aspectRatio: sourceModal.aspectRatio
+                                            };
+                                        } else if (sourceUpload) {
+                                            sourceImageConfig = {
+                                                frameWidth: sourceUpload.width,
+                                                frameHeight: sourceUpload.height,
+                                                sourceImageUrl: sourceUpload.url
+                                            };
+                                        }
+                                    }
+
+                                    // ✅ Calculate position for images in vertical column
+                                    const imagePosX = IMAGE_COLUMN_X;
+                                    const imagePosY = IMAGE_START_Y + (currentImageIndex * VERTICAL_SPACING);
+                                    
+                                    console.log(`[Executor] Creating image ${currentImageIndex + 1} at position (${imagePosX}, ${imagePosY})`);
+                                    
+                                    const newModal = {
+                                        id: newId,
+                                        x: imagePosX,
+                                        y: imagePosY,
+                                        prompt: imgPrompt,
+                                    model: step.configTemplate.model,
+                                    aspectRatio: step.configTemplate.aspectRatio || '1:1',
+                                        imageCount: 1,
+                                        initialCount: 1,
+                                    resolution: (batchConfig as any)?.resolution || step.configTemplate.resolution || '1024',
+                                        frameWidth: 600,
+                                        frameHeight: 400,
+                                        isGenerating: true,
+                                        ...sourceImageConfig
+                                    };
+                                    
+                                    canvasState.setImageModalStates((prev: any) => [...prev, newModal]);
+                                    if (props.onPersistImageModalCreate) await props.onPersistImageModalCreate(newModal);
+                                    newIds.push(newId);
+                                    
+                                    // Increment image index for next image
+                                    currentImageIndex++;
+
+                                    // Create Connection if source existed
+                                    if (sourceId) {
+                                        const newConn = {
+                                            id: `conn-${uuidv4()}`,
+                                            from: sourceId,
+                                            to: newId,
+                                            color: '#555555'
+                                        };
+                                        if (props.onPersistConnectorCreate) {
+                                            await props.onPersistConnectorCreate(newConn);
+                                        }
+                                    }
+                                }
+                                
+                                // ✅ FIX: Store all image node IDs in stepToNodeIds for frame references
+                                // IMPORTANT: Replace the array, don't append, to ensure correct order
+                                const imageNodeIds = newIds.filter(id => id.startsWith('image-'));
+                                stepToNodeIds[step.id] = [...imageNodeIds]; // Create new array copy to ensure clean state
+                                
+                                console.log(`[Executor] ✅ Created ${imageNodeIds.length} image nodes for step ${step.id}:`, {
+                                    stepId: step.id,
+                                    nodeIds: imageNodeIds,
+                                    nodeCount: imageNodeIds.length,
+                                    expectedCount: nodeCount,
+                                    batchConfigsCount: batchConfigs.length,
+                                    storedInStepToNodeIds: stepToNodeIds[step.id]
+                                });
+                                
+                                // Verify order matches frame prompts
+                                if (batchConfigs.length > 0 && batchConfigs.length === imageNodeIds.length) {
+                                    console.log(`[Executor] 📋 Frame order verification (${imageNodeIds.length} frames):`);
+                                    imageNodeIds.forEach((id, idx) => {
+                                        const prompt = batchConfigs[idx]?.prompt || 'N/A';
+                                        const isFirst = idx % 2 === 0;
+                                        const isLast = idx % 2 === 1;
+                                        const segmentNum = Math.floor(idx / 2) + 1;
+                                        console.log(`[Executor]   Frame ${idx}: ${id} (Segment ${segmentNum} ${isFirst ? 'FIRST' : 'LAST'}) - "${prompt.substring(0, 60)}..."`);
+                                    });
+                                }
+                            }
+                        if (step.nodeType === 'music-generator') {
+                                const newId = `music-${uuidv4()}`;
+                                const newModal = {
+                                    id: newId,
+                                    x: fallbackPosX,
+                                    y: fallbackPosY,
+                                    prompt: fallbackNodePrompt,
                                     model: step.configTemplate.model,
                                     frameWidth: 400,
                                     frameHeight: 150
@@ -204,13 +617,13 @@ export function useIntentExecutor({
                                 }
                                 newIds.push(newId);
                             }
-                            else if (step.nodeType === 'text') {
+                            if (step.nodeType === 'text') {
                                 const newId = `text-${uuidv4()}`;
                                 const newText = {
                                     id: newId,
-                                    x: posX,
-                                    y: posY,
-                                    text: step.configTemplate.content || nodePrompt || "New Text",
+                                    x: fallbackPosX,
+                                    y: fallbackPosY,
+                                    text: step.configTemplate.content || fallbackNodePrompt || "New Text",
                                     width: 400,
                                     height: 300,
                                     style: step.configTemplate.style || 'standard'
@@ -221,7 +634,7 @@ export function useIntentExecutor({
                                 }
                                 newIds.push(newId);
                             }
-                            else if (step.nodeType === 'plugin') {
+                            if (step.nodeType === 'plugin') {
                                 const pluginType = step.configTemplate.pluginType || 'upscale';
                                 const newId = `${pluginType}-${uuidv4()}`;
 
@@ -278,8 +691,8 @@ export function useIntentExecutor({
                                 if (setter) {
                                     const newModal = {
                                         id: newId,
-                                        x: posX,
-                                        y: posY,
+                                        x: fallbackPosX,
+                                        y: fallbackPosY,
                                         width: 500,
                                         height: 500,
                                         pluginType: pluginType
@@ -317,6 +730,16 @@ export function useIntentExecutor({
                         }
 
                         stepToNodeIds[step.id] = newIds;
+                        
+                        // ✅ Log step completion summary
+                        console.log(`[Executor] ✅ Step "${step.id}" completed:`, {
+                            stepId: step.id,
+                            action: step.action,
+                            nodeType: (step as any).nodeType,
+                            createdNodes: newIds.length,
+                            nodeIds: newIds
+                        });
+                        
                         // Advance Layout Cursor for next step
                         currentX += X_SPACING;
                         break;
@@ -326,7 +749,34 @@ export function useIntentExecutor({
                         const fromIds = stepToNodeIds[step.fromStepId];
                         const toIds = step.toStepId ? stepToNodeIds[step.toStepId] : null;
 
-                        if (toIds && fromIds) {
+                        console.log(`[Executor] CONNECT_SEQUENTIALLY: ${step.fromStepId} → ${step.toStepId || 'self'}`, {
+                            fromIds: fromIds?.length,
+                            toIds: toIds?.length
+                        });
+
+                        if (toIds && fromIds && Array.isArray(fromIds) && Array.isArray(toIds)) {
+                            // ✅ FIX: Video-to-Video sequential connections
+                            // For video-to-video, connect first video to second, second to third, etc.
+                            if (fromIds.length === toIds.length && fromIds.length > 1) {
+                                // Connect corresponding videos sequentially
+                                for (let i = 0; i < fromIds.length - 1; i++) {
+                                    const fromId = fromIds[i];
+                                    const toId = toIds[i + 1];
+                                    
+                                    if (fromId && toId) {
+                                        console.log(`[Executor] Connecting video-to-video: ${fromId} → ${toId}`);
+                                        const newConn = {
+                                            id: `conn-${uuidv4()}`,
+                                            from: fromId,
+                                            to: toId,
+                                            color: '#555555'
+                                        };
+                                        if (props.onPersistConnectorCreate) {
+                                            await props.onPersistConnectorCreate(newConn);
+                                        }
+                                    }
+                                }
+                            } else {
                             // Connect Step-to-Step (e.g. Image Group -> Video Group)
                             // We connect them 1-to-1 if counts match, otherwise many-to-one or one-to-many
                             const maxLen = Math.max(fromIds.length, toIds.length);
@@ -334,6 +784,7 @@ export function useIntentExecutor({
                                 const source = fromIds[i] || fromIds[fromIds.length - 1];
                                 const target = toIds[i] || toIds[0];
                                 if (source && target) {
+                                        console.log(`[Executor] Connecting step-to-step: ${source} → ${target}`);
                                     const newConn = {
                                         id: `conn-${uuidv4()}`,
                                         from: source,
@@ -343,9 +794,11 @@ export function useIntentExecutor({
                                     if (props.onPersistConnectorCreate) await props.onPersistConnectorCreate(newConn);
                                 }
                             }
-                        } else if (fromIds && fromIds.length > 1) {
-                            // Self-Sequence within a step
+                            }
+                        } else if (fromIds && Array.isArray(fromIds) && fromIds.length > 1) {
+                            // Self-Sequence within a step (e.g., video-1 → video-2 → video-3)
                             // Connect n -> n+1
+                            console.log(`[Executor] Self-sequencing ${fromIds.length} nodes`);
                             for (let i = 0; i < fromIds.length - 1; i++) {
                                 const newConn = {
                                     id: `conn-${uuidv4()}`,
@@ -355,6 +808,8 @@ export function useIntentExecutor({
                                 };
                                 if (props.onPersistConnectorCreate) await props.onPersistConnectorCreate(newConn);
                             }
+                        } else {
+                            console.warn(`[Executor] ⚠️ Cannot connect: fromIds=${!!fromIds}, toIds=${!!toIds}`);
                         }
                         break;
                     }
@@ -483,6 +938,26 @@ export function useIntentExecutor({
 
                         break;
                     }
+                }
+                
+                // ✅ Final summary after all steps are processed
+                console.log(`[Executor] ===== PLAN EXECUTION COMPLETE =====`);
+                console.log(`[Executor] Step-to-Node mapping:`, Object.keys(stepToNodeIds).map(stepId => ({
+                    stepId,
+                    nodeCount: stepToNodeIds[stepId]?.length || 0,
+                    nodeIds: stepToNodeIds[stepId]?.slice(0, 5) || [] // Show first 5 for brevity
+                })));
+                
+                // ✅ Verify FIRST_LAST_FRAME connections
+                const frameStepId = Object.keys(stepToNodeIds).find(id => id.includes('frame') || id.includes('image'));
+                if (frameStepId) {
+                    const frameNodes = stepToNodeIds[frameStepId] || [];
+                    console.log(`[Executor] 📋 Frame nodes created: ${frameNodes.length} frames`);
+                    frameNodes.forEach((nodeId, idx) => {
+                        const segmentNum = Math.floor(idx / 2) + 1;
+                        const isFirst = idx % 2 === 0;
+                        console.log(`[Executor]   Frame ${idx}: ${nodeId} → Segment ${segmentNum} ${isFirst ? 'FIRST' : 'LAST'}`);
+                    });
                 }
             }
             return;

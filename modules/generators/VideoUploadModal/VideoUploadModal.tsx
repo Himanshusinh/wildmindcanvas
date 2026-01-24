@@ -696,9 +696,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
       // If dragging, update position
       if (isDraggingContainer) {
-        pendingEvent = e;
-        if (rafId == null) {
-          rafId = requestAnimationFrame(flush);
+      pendingEvent = e;
+      if (rafId == null) {
+        rafId = requestAnimationFrame(flush);
         }
       }
     };

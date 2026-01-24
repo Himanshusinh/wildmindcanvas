@@ -1679,16 +1679,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
       // If dragging, update position
       if (isDraggingContainer && containerRef.current && onPositionChange) {
-        // Calculate new screen position
-        const newScreenX = e.clientX - dragOffset.x;
-        const newScreenY = e.clientY - dragOffset.y;
+      // Calculate new screen position
+      const newScreenX = e.clientX - dragOffset.x;
+      const newScreenY = e.clientY - dragOffset.y;
 
-        // Convert screen coordinates back to canvas coordinates
-        const newCanvasX = (newScreenX - position.x) / scale;
-        const newCanvasY = (newScreenY - position.y) / scale;
+      // Convert screen coordinates back to canvas coordinates
+      const newCanvasX = (newScreenX - position.x) / scale;
+      const newCanvasY = (newScreenY - position.y) / scale;
 
-        onPositionChange(newCanvasX, newCanvasY);
-        lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
+      onPositionChange(newCanvasX, newCanvasY);
+      lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
       }
     };
 

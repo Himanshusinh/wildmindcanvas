@@ -496,8 +496,87 @@ export async function generateImageForCanvas(
       // Try to extract error message, handling "[object Object]" case
       let errorMessage = extractErrorMessage(result?.message) || extractErrorMessage(result?.error);
       
+      // Special handling: If message contains "[object Object]", try to extract actual error
+      if (errorMessage && typeof errorMessage === 'string' && errorMessage.includes('[object Object]')) {
+        // The backend error message contains "[object Object]", try to find the actual error
+        console.log('[generateImageForCanvas] Message contains "[object Object]", attempting deep extraction...');
+        
+        // Try to extract from nested structures
+        if (result && typeof result === 'object') {
+          // Check result.data for error details
+          if (result.data) {
+            if (Array.isArray(result.data) && result.data.length > 0) {
+              // Validation errors array
+              const validationErrors = result.data.map((e: any) => {
+                if (typeof e === 'string') return e;
+                const field = e.param || e.field || e.location || 'unknown';
+                const msg = e.msg || e.message || JSON.stringify(e);
+                return `${field}: ${msg}`;
+              }).join(', ');
+              errorMessage = `Validation failed: ${validationErrors}`;
+            } else if (typeof result.data === 'object') {
+              // Try to extract from data object
+              const dataError = extractErrorMessage(result.data.error) || 
+                               extractErrorMessage(result.data.message) ||
+                               extractErrorMessage(result.data);
+              if (dataError && !dataError.includes('[object Object]')) {
+                errorMessage = dataError;
+              }
+            }
+          }
+          
+          // Check for error property that might be an object
+          if (result.error && typeof result.error === 'object' && !Array.isArray(result.error)) {
+            const errorObj = result.error;
+            // Try common error object properties
+            const errorFromObj = errorObj.message || errorObj.error || errorObj.msg || errorObj.detail;
+            if (errorFromObj && typeof errorFromObj === 'string' && !errorFromObj.includes('[object Object]')) {
+              errorMessage = errorFromObj;
+            } else {
+              // Try to stringify the error object in a readable way
+              try {
+                const errorKeys = Object.keys(errorObj);
+                if (errorKeys.length > 0) {
+                  const errorDetails = errorKeys.map(key => {
+                    const val = errorObj[key];
+                    return `${key}: ${typeof val === 'string' ? val : JSON.stringify(val)}`;
+                  }).join(', ');
+                  errorMessage = `Error details: ${errorDetails}`;
+                }
+              } catch {}
+            }
+          }
+          
+          // If still contains "[object Object]", try to get more context from the result
+          if (errorMessage.includes('[object Object]')) {
+            // Log the full result structure for debugging
+            console.error('[generateImageForCanvas] Full result structure:', JSON.stringify(result, null, 2));
+            
+            // Try to find any string property that might contain the actual error
+            const stringProps: string[] = [];
+            const findStringProps = (obj: any, depth = 0): void => {
+              if (depth > 3) return; // Limit recursion
+              if (obj && typeof obj === 'object') {
+                for (const [key, value] of Object.entries(obj)) {
+                  if (typeof value === 'string' && value.length > 0 && !value.includes('[object Object]')) {
+                    stringProps.push(`${key}: ${value}`);
+                  } else if (typeof value === 'object' && value !== null) {
+                    findStringProps(value, depth + 1);
+                  }
+                }
+              }
+            };
+            findStringProps(result);
+            
+            if (stringProps.length > 0) {
+              errorMessage = stringProps.join('; ');
+            }
+          }
+        }
+      }
+      
       // If errorMessage is empty or "[object Object]", try to extract from result object itself
-      if (!errorMessage || errorMessage === '[object Object]') {
+      if (!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) {
         // Try to find error details in the result object
         if (result && typeof result === 'object') {
           // Check for nested error objects
@@ -505,13 +584,13 @@ export async function generateImageForCanvas(
             errorMessage = extractErrorMessage(result.error);
           }
           // Check for data.error
-          if ((!errorMessage || errorMessage === '[object Object]') && result.data && typeof result.data === 'object') {
+          if ((!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) && result.data && typeof result.data === 'object') {
             errorMessage = extractErrorMessage(result.data.error) || extractErrorMessage(result.data);
           }
           // If still no message, stringify the whole result
-          if (!errorMessage || errorMessage === '[object Object]') {
+          if (!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) {
             try {
-              errorMessage = JSON.stringify(result);
+              errorMessage = JSON.stringify(result, null, 2);
             } catch {
               errorMessage = String(result);
             }

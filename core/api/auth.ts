@@ -402,7 +402,7 @@ export async function checkAuthStatus(): Promise<boolean> {
         if (isExpectedDevConnectivityIssue) {
           console.warn(logEntry);
         } else {
-          console.error(logEntry);
+        console.error(logEntry);
         }
         try {
           const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';

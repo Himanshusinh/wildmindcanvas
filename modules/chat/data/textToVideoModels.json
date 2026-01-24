@@ -1,0 +1,748 @@
+{
+  "metadata": {
+    "description": "Complete list of all Text-to-Video and Image-to-Video models available in WildMind AI with their capabilities, parameters, and supported features",
+    "version": "1.0.0",
+    "lastUpdated": "2025-01-23",
+    "source": "capabilityRegistry.ts"
+  },
+  "features": {
+    "textToVideo": {
+      "name": "Text-to-Video (T2V)",
+      "description": "Generate videos from text descriptions/prompts",
+      "supported": true,
+      "modelsCount": 13,
+      "useCase": "Create new videos from scratch using text descriptions"
+    },
+    "imageToVideo": {
+      "name": "Image-to-Video (I2V)",
+      "description": "Animate or transform existing images into videos using text prompts",
+      "supported": true,
+      "modelsCount": 5,
+      "useCase": "Bring static images to life with motion and animation"
+    },
+    "videoToVideo": {
+      "name": "Video-to-Video (V2V)",
+      "description": "Transform or modify existing videos using text prompts",
+      "supported": true,
+      "modelsCount": 2,
+      "useCase": "Edit, enhance, or transform existing videos with AI"
+    },
+    "durationControl": {
+      "name": "Duration Control",
+      "description": "Control the length of generated videos (seconds)",
+      "supported": true,
+      "supportedDurations": [4, 5, 6, 8, 10, 12, 20],
+      "maxDuration": 20,
+      "useCase": "Create videos of specific lengths for different platforms"
+    },
+    "resolutionControl": {
+      "name": "Resolution Control",
+      "description": "Select specific resolution for video output",
+      "supported": true,
+      "availableResolutions": ["360p", "480p", "540p", "720p", "768P", "1080p", "1080P", "1440p", "2160p"],
+      "useCase": "Optimize video quality and file size based on intended use"
+    },
+    "aspectRatioControl": {
+      "name": "Aspect Ratio Control",
+      "description": "Control the width-to-height ratio of generated videos",
+      "supported": true,
+      "supportedRatios": ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"],
+      "useCase": "Create videos optimized for specific platforms (YouTube, Instagram, TikTok, etc.)"
+    },
+    "stitching": {
+      "name": "Video Stitching",
+      "description": "Combine multiple video segments into longer videos",
+      "supported": true,
+      "modelsCount": 12,
+      "useCase": "Create long-form videos by connecting multiple shorter segments"
+    },
+    "temporalControl": {
+      "name": "Temporal Control",
+      "description": "Control input and output duration limits",
+      "supported": true,
+      "useCase": "Manage video length and input constraints"
+    },
+    "turboMode": {
+      "name": "Turbo/Fast Generation",
+      "description": "Faster video generation with reduced wait times",
+      "supported": true,
+      "modelsCount": 4,
+      "useCase": "Quick iterations and rapid prototyping"
+    },
+    "qualityTiers": {
+      "name": "Quality Tiers",
+      "description": "Different quality levels from fast to cinematic",
+      "supported": true,
+      "tiers": ["fast", "realistic", "cinematic", "character-consistency"],
+      "useCase": "Match quality to project requirements and budget"
+    },
+    "multimodal": {
+      "name": "Multimodal Support",
+      "description": "Support for multiple input types (text, image, video, audio)",
+      "supported": true,
+      "modelsCount": 1,
+      "useCase": "Combine different media types for richer video generation"
+    },
+    "firstLastFrame": {
+      "name": "First-Last Frame Mode",
+      "description": "Generate videos using two reference images (first frame and last frame) for better consistency and smoother transitions between segments",
+      "supported": true,
+      "modelsCount": 2,
+      "useCase": "Create long-form videos with consistent transitions by using start and end frames for each segment",
+      "howItWorks": "For each video segment, the system generates 2 images (first frame and last frame). The video model uses both frames to create a smooth transition. For sequential segments, the last frame of one video becomes the first frame of the next, ensuring seamless continuity.",
+      "benefits": [
+        "Better consistency between video segments",
+        "Smoother transitions",
+        "More control over video flow",
+        "Ideal for long-form content"
+      ],
+      "framePattern": "For N segments, generates N+1 images (e.g., 5 segments = 6 images). Video 1 uses Image 1 + Image 2, Video 2 uses Image 2 + Image 3, etc."
+    }
+  },
+  "models": [
+    {
+      "id": "sora-2-pro",
+      "name": "Sora 2 Pro",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "contextWindow": 60,
+      "temporal": {
+        "maxInputSeconds": 60,
+        "maxOutputSeconds": 20,
+        "stitchable": true,
+        "supportedDurations": [4, 6, 8, 12, 20]
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "strengths": ["realistic", "complex-motion"],
+      "qualityTier": "realistic",
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "veo-3.1",
+      "name": "Veo 3.1",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "multimodal": true,
+        "description": "Supports Text-to-Video (T2V), Image-to-Video (I2V), and Video-to-Video (V2V)"
+      },
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isHighRes": true,
+      "isTurbo": false,
+      "isDefault": true,
+      "contextWindow": 60,
+      "temporal": {
+        "maxInputSeconds": 60,
+        "maxOutputSeconds": 8,
+        "stitchable": true,
+        "supportedDurations": [4, 6, 8]
+      },
+      "contracts": {
+        "accepts": ["text", "image", "video"],
+        "produces": ["video"],
+        "optional": ["image", "video"]
+      },
+      "strengths": ["realistic", "cinematic"],
+      "qualityTier": "cinematic",
+      "textToVideo": true,
+      "imageToVideo": true,
+      "videoToVideo": true,
+      "firstLastFrame": true,
+      "firstLastFrameDetails": {
+        "supported": true,
+        "description": "Supports first-last frame mode for better segment consistency",
+        "consistencyScore": 8,
+        "recommendedFor": "Long-form videos requiring smooth transitions"
+      }
+    },
+    {
+      "id": "veo-3.1-fast",
+      "name": "Veo 3.1 Fast",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports Text-to-Video (T2V) and Image-to-Video (I2V)"
+      },
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": true,
+      "temporal": {
+        "maxInputSeconds": 60,
+        "maxOutputSeconds": 8,
+        "stitchable": true,
+        "supportedDurations": [4, 6, 8],
+        "note": "Supports 4, 6, 8 seconds for image-to-video"
+      },
+      "contracts": {
+        "accepts": ["text", "image", "video"],
+        "produces": ["video"],
+        "optional": ["image", "video"]
+      },
+      "qualityTier": "fast",
+      "textToVideo": true,
+      "imageToVideo": true,
+      "videoToVideo": false,
+      "firstLastFrame": true,
+      "firstLastFrameDetails": {
+        "supported": true,
+        "description": "Supports first-last frame mode for better segment consistency",
+        "consistencyScore": 8,
+        "recommendedFor": "Long-form videos requiring smooth transitions",
+        "supportedDurations": [4, 6, 8],
+        "note": "Works with 4, 6, and 8 second durations for image-to-video"
+      }
+    },
+    {
+      "id": "kling-2.5-turbo-pro",
+      "name": "Kling 2.5 Turbo Pro",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": true,
+      "contextWindow": 5,
+      "temporal": {
+        "maxInputSeconds": 5,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["text", "image"],
+        "produces": ["video"],
+        "optional": ["image"]
+      },
+      "strengths": ["fast", "motion"],
+      "qualityTier": "fast",
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "seedance-1.0-pro",
+      "name": "Seedance 1.0 Pro",
+      "inputType": "image",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports Text-to-Video (T2V) and Image-to-Video (I2V), requires image input"
+      },
+      "resolutions": ["480p", "720p", "1080p"],
+      "aspectRatios": ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "9:21"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "contextWindow": 4,
+      "temporal": {
+        "maxInputSeconds": 12,
+        "maxOutputSeconds": 12,
+        "stitchable": true,
+        "supportedDurations": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "note": "Supports 2-12 seconds for image-to-video"
+      },
+      "contracts": {
+        "accepts": ["image", "audio"],
+        "produces": ["video"],
+        "requires": ["image"]
+      },
+      "strengths": ["animation", "dance", "character-consistency"],
+      "qualityTier": "character-consistency",
+      "textToVideo": true,
+      "imageToVideo": true,
+      "videoToVideo": false,
+      "firstLastFrame": false,
+      "firstLastFrameDetails": {
+        "supported": false,
+        "note": "Uses character-consistency mode instead"
+      }
+    },
+    {
+      "id": "seedance-1.0-lite",
+      "name": "Seedance 1.0 Lite",
+      "inputType": "image",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports Text-to-Video (T2V) and Image-to-Video (I2V), requires image input"
+      },
+      "resolutions": ["480p", "720p", "1080p"],
+      "aspectRatios": ["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "9:21"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": true,
+      "temporal": {
+        "maxInputSeconds": 12,
+        "maxOutputSeconds": 12,
+        "stitchable": true,
+        "supportedDurations": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        "note": "Supports 2-12 seconds for image-to-video"
+      },
+      "contracts": {
+        "accepts": ["image", "text"],
+        "produces": ["video"],
+        "requires": ["image"]
+      },
+      "textToVideo": true,
+      "imageToVideo": true,
+      "videoToVideo": false,
+      "firstLastFrame": false,
+      "firstLastFrameDetails": {
+        "supported": false,
+        "note": "Uses character-consistency mode instead"
+      }
+    },
+    {
+      "id": "pixverse-v5",
+      "name": "PixVerse v5",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["360p", "540p", "720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "contextWindow": 5,
+      "temporal": {
+        "maxInputSeconds": 5,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "ltx-v2-pro",
+      "name": "LTX V2 Pro",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["1080p", "1440p", "2160p"],
+      "aspectRatios": ["16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "temporal": {
+        "maxInputSeconds": 10,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "ltx-v2-fast",
+      "name": "LTX V2 Fast",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["1080p", "1440p", "2160p"],
+      "aspectRatios": ["16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": true,
+      "temporal": {
+        "maxInputSeconds": 10,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "wan-2.5",
+      "name": "WAN 2.5",
+      "inputType": "image",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only, requires image input"
+      },
+      "resolutions": ["480p", "720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "temporal": {
+        "maxInputSeconds": 5,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["image", "text"],
+        "produces": ["video"],
+        "requires": ["image"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "wan-2.5-fast",
+      "name": "WAN 2.5 Fast",
+      "inputType": "image",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only, requires image input"
+      },
+      "resolutions": ["480p", "720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": true,
+      "temporal": {
+        "maxInputSeconds": 5,
+        "maxOutputSeconds": 5,
+        "stitchable": true,
+        "supportedDurations": [5]
+      },
+      "contracts": {
+        "accepts": ["image", "text"],
+        "produces": ["video"],
+        "requires": ["image"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    },
+    {
+      "id": "minimax-hailuo-02",
+      "name": "MiniMax-Hailuo-02",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only"
+      },
+      "resolutions": ["768P", "1080P"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "temporal": {
+        "maxInputSeconds": 6,
+        "maxOutputSeconds": 6,
+        "stitchable": true,
+        "supportedDurations": [6]
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false
+    },
+    {
+      "id": "t2v-01-director",
+      "name": "T2V-01-Director",
+      "inputType": "text",
+      "outputType": "video",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Video (T2V) only with enhanced camera control"
+      },
+      "resolutions": ["720P"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": false,
+      "strengths": ["camera-control", "director-mode"],
+      "temporal": {
+        "maxInputSeconds": 5,
+        "maxOutputSeconds": 5,
+        "stitchable": false,
+        "supportedDurations": [5],
+        "note": "Director modes usually standalone"
+      },
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["video"]
+      },
+      "textToVideo": true,
+      "imageToVideo": false,
+      "videoToVideo": false,
+      "firstLastFrame": false
+    }
+  ],
+  "firstLastFrameModels": [
+    {
+      "id": "veo-3.1",
+      "name": "Veo 3.1",
+      "description": "Default model with first-last frame support. Uses 2 images per video segment (first frame + last frame) for better consistency. Supports 4, 6, 8 second durations.",
+      "consistencyScore": 8,
+      "supportedDurations": [4, 6, 8],
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "bestFor": "Long-form videos requiring smooth transitions between segments"
+    },
+    {
+      "id": "veo-3.1-fast",
+      "name": "Veo 3.1 Fast",
+      "description": "Fast variant with first-last frame support. Uses 2 images per video segment for consistency. Supports 4, 6, 8 second durations for image-to-video.",
+      "consistencyScore": 8,
+      "supportedDurations": [4, 6, 8],
+      "resolutions": ["720p", "1080p"],
+      "aspectRatios": ["16:9", "9:16", "1:1"],
+      "bestFor": "Long-form videos with faster generation times"
+    }
+  ],
+  "textToVideoModels": [
+    {
+      "id": "sora-2-pro",
+      "name": "Sora 2 Pro",
+      "description": "High-quality T2V model with up to 20 seconds duration, realistic motion"
+    },
+    {
+      "id": "veo-3.1",
+      "name": "Veo 3.1",
+      "description": "Default model supporting T2V, I2V, and V2V with cinematic quality"
+    },
+    {
+      "id": "veo-3.1-fast",
+      "name": "Veo 3.1 Fast",
+      "description": "Fast variant supporting T2V and I2V, up to 8 seconds"
+    },
+    {
+      "id": "kling-2.5-turbo-pro",
+      "name": "Kling 2.5 Turbo Pro",
+      "description": "Fast T2V model with 5-second duration, excellent motion"
+    },
+    {
+      "id": "pixverse-v5",
+      "name": "PixVerse v5",
+      "description": "T2V model with multiple resolution options (360p to 1080p)"
+    },
+    {
+      "id": "ltx-v2-pro",
+      "name": "LTX V2 Pro",
+      "description": "High-res T2V model supporting up to 4K (2160p) resolution"
+    },
+    {
+      "id": "ltx-v2-fast",
+      "name": "LTX V2 Fast",
+      "description": "Fast variant with 4K support, 5-second duration"
+    },
+    {
+      "id": "wan-2.5",
+      "name": "WAN 2.5",
+      "description": "T2V model requiring image input, 5-second duration"
+    },
+    {
+      "id": "wan-2.5-fast",
+      "name": "WAN 2.5 Fast",
+      "description": "Fast variant requiring image input, 5-second duration"
+    },
+    {
+      "id": "minimax-hailuo-02",
+      "name": "MiniMax-Hailuo-02",
+      "description": "T2V model with 6-second duration, 768P and 1080P support"
+    },
+    {
+      "id": "t2v-01-director",
+      "name": "T2V-01-Director",
+      "description": "T2V model with enhanced camera control and director mode"
+    }
+  ],
+  "imageToVideoModels": [
+    {
+      "id": "veo-3.1",
+      "name": "Veo 3.1",
+      "description": "Supports I2V with 4, 6, 8 second durations, cinematic quality"
+    },
+    {
+      "id": "veo-3.1-fast",
+      "name": "Veo 3.1 Fast",
+      "description": "Fast I2V variant with 4, 6, 8 second durations"
+    },
+    {
+      "id": "seedance-1.0-pro",
+      "name": "Seedance 1.0 Pro",
+      "description": "I2V model with 2-12 second duration range, character consistency"
+    },
+    {
+      "id": "seedance-1.0-lite",
+      "name": "Seedance 1.0 Lite",
+      "description": "Fast I2V variant with 2-12 second duration range"
+    }
+  ],
+  "videoToVideoModels": [
+    {
+      "id": "veo-3.1",
+      "name": "Veo 3.1",
+      "description": "Supports V2V transformation with cinematic quality"
+    }
+  ],
+  "summary": {
+    "totalModels": 13,
+    "modelsByCapability": {
+      "textToVideoOnly": 9,
+      "textToVideoAndImageToVideo": 4,
+      "textToVideoAndVideoToVideo": 1,
+      "imageToVideoSupported": 4,
+      "videoToVideoSupported": 1
+    },
+    "modelsByResolution": {
+      "supports360p": 1,
+      "supports480p": 3,
+      "supports540p": 1,
+      "supports720p": 12,
+      "supports768P": 1,
+      "supports1080p": 13,
+      "supports1440p": 2,
+      "supports2160p": 2,
+      "supportsHighRes": 11
+    },
+    "modelsBySpeed": {
+      "turbo": 4,
+      "standard": 9
+    },
+    "defaultModels": 1,
+    "maxBatchSizes": {
+      "1": 13
+    },
+    "modelsByDuration": {
+      "max5Seconds": 7,
+      "max6Seconds": 1,
+      "max8Seconds": 2,
+      "max12Seconds": 2,
+      "max20Seconds": 1
+    },
+    "stitchableModels": 12,
+    "multimodalModels": 1,
+    "firstLastFrameModels": 2
+  },
+  "fieldDescriptions": {
+    "id": "Unique identifier for the model (used in API calls)",
+    "name": "Display name of the model",
+    "inputType": "Primary input type required (text, image, video, audio, none)",
+    "outputType": "Type of content produced (image, video, audio, text)",
+    "supports": {
+      "textToContent": "Whether the model supports Text-to-Video generation",
+      "contentToContent": "Whether the model supports Image-to-Video or Video-to-Video transformation",
+      "multimodal": "Whether the model supports multiple input types simultaneously",
+      "description": "Human-readable description of supported capabilities"
+    },
+    "resolutions": "List of supported resolutions (e.g., '720p', '1080p', '2160p')",
+    "aspectRatios": "List of supported aspect ratios (e.g., '16:9', '9:16', '1:1')",
+    "maxBatch": "Maximum number of videos that can be generated in a single batch request",
+    "isDefault": "Whether this model is set as default for new users",
+    "isHighRes": "Whether this model supports high-resolution output",
+    "isTurbo": "Whether this is a fast/turbo variant of the model",
+    "contextWindow": "Maximum input context length (in seconds for video models)",
+    "temporal": {
+      "maxInputSeconds": "Maximum duration of input video/content (if applicable)",
+      "maxOutputSeconds": "Maximum duration of output video",
+      "stitchable": "Whether multiple segments can be stitched together for longer videos",
+      "supportedDurations": "List of specific duration values supported (in seconds)",
+      "note": "Additional notes about temporal capabilities"
+    },
+    "strengths": "Array of keywords describing the model's strengths (e.g., 'fast', 'realistic', 'motion')",
+    "qualityTier": "Quality classification (e.g., 'fast', 'realistic', 'cinematic', 'character-consistency')",
+    "textToVideo": "Boolean indicating if this model supports Text-to-Video generation",
+    "imageToVideo": "Boolean indicating if this model supports Image-to-Video transformation",
+    "videoToVideo": "Boolean indicating if this model supports Video-to-Video transformation",
+    "firstLastFrame": "Boolean indicating if this model supports First-Last Frame mode (using 2 reference images per video segment)",
+    "firstLastFrameDetails": {
+      "supported": "Whether first-last frame mode is supported",
+      "description": "Description of first-last frame capabilities",
+      "consistencyScore": "Consistency score (1-10) indicating how well the model maintains consistency",
+      "supportedDurations": "List of durations supported in first-last frame mode",
+      "recommendedFor": "Use cases where this mode is recommended",
+      "note": "Additional notes about first-last frame support"
+    },
+    "contracts": {
+      "accepts": "List of input types the model accepts",
+      "produces": "List of output types the model produces",
+      "requires": "List of required inputs (if any)",
+      "optional": "List of optional inputs (if any)"
+    }
+  }
+}

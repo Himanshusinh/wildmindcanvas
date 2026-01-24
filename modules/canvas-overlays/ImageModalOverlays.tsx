@@ -271,7 +271,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               // Belt-and-suspenders: allow only stitched refs; drop legacy comma lists
               if (!sourceUrl) return undefined;
               if (sourceUrl.includes('reference-stitched')) return sourceUrl;
-              if (sourceUrl.includes(',')) return undefined;
+              // NOTE: data URLs (base64) contain a comma after the header, so don't treat those as "multiple URLs".
+              if (sourceUrl.includes(',') && !sourceUrl.startsWith('data:')) return undefined;
               return sourceUrl;
             })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
             onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height, options) => {
@@ -316,7 +317,8 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
 
                   // For Scene 1: Prefer stitched image URL (contains both images combined)
                   // If sourceImageUrl is comma-separated (individual images), try to get stitched image from snapshot
-                  if (sceneNumber === 1 && sourceImageUrl && sourceImageUrl.includes(',') && !sourceImageUrl.includes('reference-stitched')) {
+                  // Only treat comma as "multiple URLs" for non-data URLs (data: URIs include a comma by design).
+                  if (sceneNumber === 1 && sourceImageUrl && sourceImageUrl.includes(',') && !sourceImageUrl.startsWith('data:') && !sourceImageUrl.includes('reference-stitched')) {
                     console.warn('[ImageModalOverlays] ⚠️ Scene 1 has comma-separated images. Trying to get stitched image from snapshot...');
                     // Try to get stitched image from snapshot metadata
                     try {

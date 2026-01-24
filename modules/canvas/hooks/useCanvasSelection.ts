@@ -280,24 +280,24 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedIds: (() => {
             // Collect all selected IDs
             const allSelectedIds = new Set([
-                ...selectedImageModalIds,
-                ...selectedVideoModalIds,
-                ...selectedVideoEditorModalIds,
-                ...selectedImageEditorModalIds,
-                ...selectedMusicModalIds,
-                ...selectedUpscaleModalIds,
-                ...selectedMultiangleCameraModalIds,
-                ...selectedRemoveBgModalIds,
-                ...selectedEraseModalIds,
-                ...selectedExpandModalIds,
-                ...selectedVectorizeModalIds,
-                ...selectedNextSceneModalIds,
-                ...selectedStoryboardModalIds,
-                ...selectedScriptFrameModalIds,
-                ...selectedSceneFrameModalIds,
-                ...selectedGroupIds,
-                ...effectiveSelectedCanvasTextIds,
-                ...effectiveSelectedRichTextIds
+            ...selectedImageModalIds,
+            ...selectedVideoModalIds,
+            ...selectedVideoEditorModalIds,
+            ...selectedImageEditorModalIds,
+            ...selectedMusicModalIds,
+            ...selectedUpscaleModalIds,
+            ...selectedMultiangleCameraModalIds,
+            ...selectedRemoveBgModalIds,
+            ...selectedEraseModalIds,
+            ...selectedExpandModalIds,
+            ...selectedVectorizeModalIds,
+            ...selectedNextSceneModalIds,
+            ...selectedStoryboardModalIds,
+            ...selectedScriptFrameModalIds,
+            ...selectedSceneFrameModalIds,
+            ...selectedGroupIds,
+            ...effectiveSelectedCanvasTextIds,
+            ...effectiveSelectedRichTextIds
             ]);
 
             // If we have selection order, use it to maintain the order items were selected

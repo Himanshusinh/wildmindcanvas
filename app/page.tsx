@@ -1346,6 +1346,45 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // We only persist on create/delete.
               }}
               onPersistConnectorCreate={async (connector) => {
+                // ✅ VALIDATION: Limit image-to-video connections to maximum 2
+                const targetVideoId = connector.to;
+                const sourceImageId = connector.from;
+                
+                // Helper function to check if a node ID is an image node
+                const isImageNode = (nodeId: string): boolean => {
+                  return imageGenerators.some(ig => ig.id === nodeId) ||
+                         images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
+                };
+                
+                // Helper function to check if a node ID is a video node
+                const isVideoNode = (nodeId: string): boolean => {
+                  return videoGenerators.some(vg => vg.id === nodeId);
+                };
+                
+                // Check if this is an image-to-video connection
+                const isTargetVideo = isVideoNode(targetVideoId);
+                const isSourceImage = isImageNode(sourceImageId);
+                
+                if (isTargetVideo && isSourceImage) {
+                  // Count existing connections from images to this video
+                  const existingImageToVideoConnections = connectors.filter(c => 
+                    c.to === targetVideoId && isImageNode(c.from)
+                  );
+                  
+                  if (existingImageToVideoConnections.length >= 2) {
+                    console.warn(`[Connection Validation] ❌ BLOCKED: Video ${targetVideoId} already has ${existingImageToVideoConnections.length} image connections (maximum 2 allowed)`);
+                    console.warn(`[Connection Validation] Existing connections:`, existingImageToVideoConnections.map(c => c.from));
+                    console.warn(`[Connection Validation] Attempted connection from: ${sourceImageId}`);
+                    
+                    // Show user-friendly error message
+                    alert(`⚠️ Connection Limit Reached\n\nThis video generation frame already has 2 image connections (maximum allowed).\n\nPlease disconnect an existing image connection first if you want to connect a different image.`);
+                    return; // Reject the connection
+                  }
+                  
+                  console.log(`[Connection Validation] ✅ ALLOWED: Video ${targetVideoId} will have ${existingImageToVideoConnections.length + 1} image connection(s) (limit: 2)`);
+                }
+                
+                // ✅ Connection is valid - proceed with creation
                 const cid = connector.id || `connector-${Date.now()}`;
                 setConnectors(prev => [...prev, {
                   id: cid,
