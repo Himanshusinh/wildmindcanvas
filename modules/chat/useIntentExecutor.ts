@@ -33,6 +33,20 @@ export function useIntentExecutor({
         console.log('[IntentExecutor] Executing action:', action);
 
         const center = getViewportCenter();
+        const resolveCanvasImageNodeId = (rawId: string): string => {
+            if (!rawId) return rawId;
+            const images = canvasState?.images;
+            if (!Array.isArray(images) || images.length === 0) return rawId;
+            // CanvasImageConnectionNodes uses: imageData.elementId || `canvas-image-${actualIndex}`
+            for (let idx = 0; idx < images.length; idx++) {
+                const img = images[idx];
+                if (!img) continue;
+                if (img.elementId === rawId || img.id === rawId) {
+                    return (img.elementId || `canvas-image-${idx}`) as string;
+                }
+            }
+            return rawId;
+        };
 
         // EXECUTION ENGINE: Process CanvasInstructionPlan
         if (action.intent === 'EXECUTE_PLAN') {
@@ -53,6 +67,11 @@ export function useIntentExecutor({
             const FRAME_HEIGHT = 400;
             const VERTICAL_SPACING = 500; // Space between frames in same column
             const COLUMN_GAP = 800; // Horizontal gap between image and video columns
+            // 3-column layout:
+            // - Left: user reference images (already on canvas)
+            // - Middle: generated scene-frame images (img2img uses targetIds)
+            // - Right: video frames
+            const SCENE_COLUMN_X = center.x; // middle column for scene frames
             
             // Track image and video counts for proper positioning
             let imageCount = 0;
@@ -140,7 +159,8 @@ export function useIntentExecutor({
                                 }
 
                                 // Position: left column, vertical stack
-                                const imagePosX = IMAGE_COLUMN_X;
+                                const isSceneFrame = Array.isArray((step as any).configTemplate?.targetIds) && (step as any).configTemplate.targetIds.length > 0;
+                                const imagePosX = isSceneFrame ? SCENE_COLUMN_X : IMAGE_COLUMN_X;
                                 const imagePosY = IMAGE_START_Y + (currentImageIndex * VERTICAL_SPACING);
                                 currentImageIndex++;
 
@@ -176,14 +196,19 @@ export function useIntentExecutor({
 
                                 newIds.push(newId);
 
-                                // Create connector if a source existed (img2img reference)
-                                if (sourceId && props.onPersistConnectorCreate) {
-                                    await props.onPersistConnectorCreate({
-                                        id: `conn-${uuidv4()}`,
-                                        from: sourceId,
-                                        to: newId,
-                                        color: '#555555'
-                                    });
+                                // Create connectors from ALL selected reference images to this scene frame (3-column chain)
+                                if (props.onPersistConnectorCreate) {
+                                    const uniqueTargets = Array.from(new Set(targetIds)).filter(Boolean);
+                                    for (const fromIdRaw of uniqueTargets) {
+                                        const fromId = resolveCanvasImageNodeId(String(fromIdRaw));
+                                        if (!fromId || fromId === newId) continue;
+                                        await props.onPersistConnectorCreate({
+                                            id: `conn-${uuidv4()}`,
+                                            from: fromId,
+                                            to: newId,
+                                            color: '#555555'
+                                        });
+                                    }
                                 }
                             }
 

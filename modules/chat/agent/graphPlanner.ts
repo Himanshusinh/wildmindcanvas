@@ -114,82 +114,60 @@ export function buildVideoCanvasPlan(input: {
   const task = requirements.task;
   if (task === 'image_to_video') {
     const selected = requirements.referenceImageIds || [];
-    const mode: VideoMode = requirements.mode || (selected.length >= 2 ? 'first_last' : 'single');
+    // Always use boundary scene frames (N+1) generated WITH the selected reference image(s),
+    // then connect each video segment to consecutive frames:
+    // video i uses frame i (first) + frame i+1 (last).
+    //
+    // This yields the desired 3-column flow:
+    // Reference Image(s) → Scene Frame Images → Video Segments.
+    const imageStepId = `frames-${uuidv4()}`;
+    const imageCount = expanded.length + 1;
+    const imagePrompts = Array.from({ length: imageCount }).map((_, i) => {
+      if (i === 0) return `First frame (0s): ${expanded[0]?.prompt || 'Opening frame'}`;
+      const prev = expanded[i - 1];
+      return `Last frame (${i * clampToSupportedDuration(videoModel, prev?.durationSeconds ?? maxClip)}s) for clip ${i}: ${prev?.prompt || 'Closing frame'}`;
+    });
 
-    if (mode === 'single') {
-      const imageId = selected[0];
-      // One step for all videos; same image -> each video
+    steps.push({
+      id: imageStepId,
+      action: 'CREATE_NODE',
+      nodeType: 'image-generator',
+      count: imageCount,
+      configTemplate: {
+        model: getDefaultTextToImageModel().name,
+        aspectRatio,
+        prompt: 'Scene boundary frame',
+        // IMPORTANT: this makes each generated scene frame use the user's reference image(s) (img2img),
+        // and the executor will also connect the reference image(s) to every scene frame.
+        targetIds: selected,
+      },
+      batchConfigs: imagePrompts.map(p => ({ prompt: p })),
+    } as any);
+
+    expanded.forEach((clip, idx) => {
       steps.push({
-        id: `videos-${uuidv4()}`,
+        id: `video-${idx + 1}-${uuidv4()}`,
         action: 'CREATE_NODE',
         nodeType: 'video-generator',
-        count: expanded.length,
+        count: 1,
         configTemplate: {
           model: videoModel,
           aspectRatio,
           resolution,
-          duration: clampToSupportedDuration(videoModel, expanded[0]?.durationSeconds ?? maxClip),
+          duration: clampToSupportedDuration(videoModel, clip.durationSeconds),
+          prompt: clip.prompt,
           connectToFrames: {
-            connectionType: 'IMAGE_TO_VIDEO',
-            frameSource: 'USER_UPLOAD',
-            frameId: imageId,
+            connectionType: 'FIRST_LAST_FRAME',
+            firstFrameSource: 'GENERATED',
+            lastFrameSource: 'GENERATED',
+            firstFrameStepId: imageStepId,
+            lastFrameStepId: imageStepId,
+            firstFrameIndex: idx,
+            lastFrameIndex: idx + 1,
           },
         },
-        batchConfigs: expanded.map(c => ({
-          prompt: c.prompt,
-          duration: clampToSupportedDuration(videoModel, c.durationSeconds),
-        })),
       } as any);
-    } else {
-      // First/last frame mode implemented using generated boundary images (N+1)
-      const imageStepId = `frames-${uuidv4()}`;
-      const imageCount = expanded.length + 1;
-
-      const imagePrompts = Array.from({ length: imageCount }).map((_, i) => {
-        if (i === 0) return `First frame (opening): ${expanded[0]?.prompt || 'Opening frame'}`;
-        const prev = expanded[i - 1];
-        return `Last frame (closing) for clip ${i}: ${prev?.prompt || 'Closing frame'}`;
-      });
-
-      steps.push({
-        id: imageStepId,
-        action: 'CREATE_NODE',
-        nodeType: 'image-generator',
-        count: imageCount,
-        configTemplate: {
-          model: getDefaultTextToImageModel().name,
-          aspectRatio,
-          prompt: 'Frame image',
-        },
-        batchConfigs: imagePrompts.map(p => ({ prompt: p })),
-      } as any);
-
-      // One step per video to support unique frame indices
-      expanded.forEach((clip, idx) => {
-        steps.push({
-          id: `video-${idx + 1}-${uuidv4()}`,
-          action: 'CREATE_NODE',
-          nodeType: 'video-generator',
-          count: 1,
-          configTemplate: {
-            model: videoModel,
-            aspectRatio,
-            resolution,
-            duration: clampToSupportedDuration(videoModel, clip.durationSeconds),
-            prompt: clip.prompt,
-            connectToFrames: {
-              connectionType: 'FIRST_LAST_FRAME',
-              firstFrameSource: 'GENERATED',
-              lastFrameSource: 'GENERATED',
-              firstFrameStepId: imageStepId,
-              lastFrameStepId: imageStepId,
-              firstFrameIndex: idx,
-              lastFrameIndex: idx + 1,
-            },
-          },
-        } as any);
-      });
-    }
+    });
   } else {
     // text_to_video:
     // For long-form videos where the model supports first/last-frame, use boundary images (N+1)

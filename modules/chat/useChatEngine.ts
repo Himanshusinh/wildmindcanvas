@@ -124,23 +124,35 @@ export interface CanvasContext {
 const getSelectedImageIds = (context: CanvasContext): string[] => {
     const ids = new Set<string>(context.canvasSelection?.selectedIds || []);
     if (ids.size === 0) return [];
-    const imageArrays = [
-        context.canvasState?.images,
+    const selected: string[] = [];
+
+    // 1) Canvas uploaded images:
+    // Selection may contain `img.id` OR `img.elementId`, but connection nodes (and connectors) should use:
+    // `img.elementId || canvas-image-{index}` (see CanvasImageConnectionNodes).
+    const canvasImages = context.canvasState?.images;
+    if (Array.isArray(canvasImages)) {
+        canvasImages.forEach((img: any, idx: number) => {
+            const rawIds = [img?.id, img?.elementId].filter(Boolean) as string[];
+            const matched = rawIds.some(rid => ids.has(rid));
+            if (!matched) return;
+            const nodeId = (img?.elementId || `canvas-image-${idx}`) as string;
+            selected.push(nodeId);
+        });
+    }
+
+    // 2) Modals (image generators, scene frames, etc.) use their `id` directly.
+    const modalArrays = [
         context.canvasState?.imageModalStates,
         context.canvasState?.sceneFrameModalStates,
     ];
-    const selected: string[] = [];
-    imageArrays.forEach(arr => {
-        if (Array.isArray(arr)) {
-            arr.forEach((item: any) => {
-                // Canvas selections often use `elementId` for uploads and `id` for modals.
-                const candidateIds = [item?.id, item?.elementId].filter(Boolean) as string[];
-                candidateIds.forEach(cid => {
-                    if (ids.has(cid)) selected.push(cid);
-                });
-            });
-        }
+    modalArrays.forEach(arr => {
+        if (!Array.isArray(arr)) return;
+        arr.forEach((item: any) => {
+            const cid = item?.id;
+            if (cid && ids.has(cid)) selected.push(cid);
+        });
     });
+
     // unique + stable
     return Array.from(new Set(selected));
 };
