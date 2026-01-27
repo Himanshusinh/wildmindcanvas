@@ -114,6 +114,13 @@ export function buildVideoCanvasPlan(input: {
   const task = requirements.task;
   if (task === 'image_to_video') {
     const selected = requirements.referenceImageIds || [];
+    const strength = requirements.referenceStrength || 'medium';
+    const strengthPrefix =
+      strength === 'high'
+        ? 'Match the reference image strongly (same product identity, materials, branding).'
+        : strength === 'low'
+          ? 'Use the reference image loosely (keep general identity but allow variation).'
+          : 'Use the reference image as guidance (keep product identity consistent).';
     // Always use boundary scene frames (N+1) generated WITH the selected reference image(s),
     // then connect each video segment to consecutive frames:
     // video i uses frame i (first) + frame i+1 (last).
@@ -123,9 +130,9 @@ export function buildVideoCanvasPlan(input: {
     const imageStepId = `frames-${uuidv4()}`;
     const imageCount = expanded.length + 1;
     const imagePrompts = Array.from({ length: imageCount }).map((_, i) => {
-      if (i === 0) return `First frame (0s): ${expanded[0]?.prompt || 'Opening frame'}`;
+      if (i === 0) return `${strengthPrefix} First frame (0s): ${expanded[0]?.prompt || 'Opening frame'}`;
       const prev = expanded[i - 1];
-      return `Last frame (${i * clampToSupportedDuration(videoModel, prev?.durationSeconds ?? maxClip)}s) for clip ${i}: ${prev?.prompt || 'Closing frame'}`;
+      return `${strengthPrefix} Last frame (${i * clampToSupportedDuration(videoModel, prev?.durationSeconds ?? maxClip)}s) for clip ${i}: ${prev?.prompt || 'Closing frame'}`;
     });
 
     steps.push({

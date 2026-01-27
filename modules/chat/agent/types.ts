@@ -4,7 +4,8 @@ export type AgentPhase =
   | 'IDLE'
   | 'COLLECTING_REQUIREMENTS'
   | 'SCRIPT_REVIEW'
-  | 'GRAPH_PREVIEW';
+  | 'GRAPH_PREVIEW'
+  | 'EDIT_CONFIRMATION';
 
 export type AgentTask =
   | 'text_to_image'
@@ -84,6 +85,8 @@ export interface CollectedRequirements {
   model?: string | null;
   mode?: VideoMode; // for image_to_video
   referenceImageIds?: string[]; // selected ids on canvas
+  referenceStrength?: 'low' | 'medium' | 'high';
+  batchVariationMode?: 'same_prompt' | 'different_angles' | 'different_lighting' | 'different_styles';
   needsScript?: boolean;
 }
 
@@ -96,5 +99,6 @@ export interface AgentSessionState {
   scriptPlan?: ScriptPlan;
   lastUserMessage?: string;
   graphPlan?: CanvasInstructionPlan;
+  pendingPlanEdits?: any;
 }
 

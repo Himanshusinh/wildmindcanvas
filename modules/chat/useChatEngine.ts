@@ -7,8 +7,9 @@ import { buildRequirementQuestions, applyRequirementAnswer } from './agent/requi
 import { generateScriptAndScenes } from './agent/scriptAgent';
 import { buildVideoCanvasPlan } from './agent/graphPlanner';
 import { validateCanvasPlan } from './agent/validator';
+import type { PlanAutoFix } from './agent/validator';
 import { CanvasInstructionPlan, CanvasInstructionStep } from './compiler/types';
-import { findTextToImageModel, findTextToVideoModel, getDefaultTextToImageModel, getDefaultTextToVideoModel, isValidImageAspectRatio, isValidImageResolution, isValidVideoAspectRatio, isValidVideoResolution } from './agent/modelCatalog';
+import { findTextToImageModel, findTextToVideoModel, getDefaultTextToImageModel, getDefaultTextToVideoModel, isValidImageAspectRatio, isValidImageResolution, isValidVideoAspectRatio, isValidVideoResolution, findClosestImageResolution, findPlugin, getDefaultPluginModel } from './agent/modelCatalog';
 import { decideNextForPlan } from './agent/planDecisionAgent';
 import textToVideoModels from './data/textToVideoModels.json';
 
@@ -66,6 +67,96 @@ function getVideoMaxClipSeconds(modelName?: string | null): number {
     return rec?.temporal?.maxOutputSeconds ?? fallback;
 }
 
+/**
+ * Build structured prompt for image-to-image edits.
+ * Format: "Preserve original" + "Apply change" + "Keep lighting/style consistent"
+ */
+function buildImg2ImgPrompt(userRequest: string, style: string): string {
+    const parts: string[] = [];
+    
+    // Preserve original
+    parts.push('Preserve the original image composition, colors, and overall structure.');
+    
+    // Apply change
+    const cleanRequest = userRequest.trim();
+    if (cleanRequest) {
+        parts.push(`Apply the following change: ${cleanRequest}.`);
+    }
+    
+    // Keep lighting/style consistent
+    parts.push(`Maintain consistent lighting, style, and visual coherence with the original. ${style} style.`);
+    
+    return parts.join(' ');
+}
+
+/**
+ * Generate batch variation prompts based on variation mode.
+ */
+function generateBatchVariations(
+    basePrompt: string,
+    count: number,
+    variationMode: 'same_prompt' | 'different_angles' | 'different_lighting' | 'different_styles' = 'same_prompt'
+): string[] {
+    if (count === 1) return [basePrompt];
+    
+    if (variationMode === 'same_prompt') {
+        return Array(count).fill(basePrompt);
+    }
+    
+    const variations: string[] = [];
+    const angleVariations = [
+        'front view',
+        'side view',
+        'three-quarter view',
+        'back view',
+        'top-down view',
+        'low angle view',
+        'bird\'s eye view',
+        'close-up detail'
+    ];
+    
+    const lightingVariations = [
+        'natural daylight',
+        'golden hour lighting',
+        'soft diffused lighting',
+        'dramatic high contrast lighting',
+        'warm ambient lighting',
+        'cool blue hour lighting',
+        'studio lighting',
+        'cinematic lighting'
+    ];
+    
+    const styleVariations = [
+        'photorealistic',
+        'cinematic',
+        'artistic',
+        'minimalist',
+        'vibrant',
+        'muted tones',
+        'high contrast',
+        'soft pastel'
+    ];
+    
+    for (let i = 0; i < count; i++) {
+        let variation = basePrompt;
+        
+        if (variationMode === 'different_angles') {
+            const angle = angleVariations[i % angleVariations.length];
+            variation = `${basePrompt}, ${angle}`;
+        } else if (variationMode === 'different_lighting') {
+            const lighting = lightingVariations[i % lightingVariations.length];
+            variation = `${basePrompt}, ${lighting}`;
+        } else if (variationMode === 'different_styles') {
+            const style = styleVariations[i % styleVariations.length];
+            variation = `${basePrompt}, ${style} style`;
+        }
+        
+        variations.push(variation);
+    }
+    
+    return variations;
+}
+
 function looksLikePlanModification(text: string): boolean {
     const t = text.toLowerCase();
     return (
@@ -120,6 +211,60 @@ export interface CanvasContext {
     };
     canvasSelection: any;
 }
+
+type PlanPreviewExtras = {
+    warnings: string[];
+    fixes: PlanAutoFix[];
+    timeline?: {
+        boundaryMarks: string; // "0s → 8s → 16s ..."
+        clips: Array<{ index: number; start: number; end: number; prompt?: string }>;
+    };
+};
+
+const computeVideoTimeline = (plan: any): PlanPreviewExtras['timeline'] | undefined => {
+    const steps = Array.isArray(plan?.steps) ? plan.steps : [];
+    const videoSteps = steps.filter((s: any) => s?.action === 'CREATE_NODE' && s?.nodeType === 'video-generator');
+    if (videoSteps.length === 0) return undefined;
+
+    const clips: Array<{ duration: number; prompt?: string }> = [];
+    for (const s of videoSteps) {
+        const cfg = s?.configTemplate || {};
+        const count = Number(s?.count || 1);
+        const batch = Array.isArray(s?.batchConfigs) ? s.batchConfigs : [];
+        if (count > 1) {
+            for (let i = 0; i < count; i++) {
+                const bc = batch[i] || {};
+                const d = Number(bc.duration ?? cfg.duration);
+                if (Number.isFinite(d) && d > 0) clips.push({ duration: d, prompt: String(bc.prompt ?? cfg.prompt ?? '').trim() || undefined });
+            }
+        } else {
+            const d = Number(cfg.duration);
+            if (Number.isFinite(d) && d > 0) clips.push({ duration: d, prompt: String(cfg.prompt ?? '').trim() || undefined });
+        }
+    }
+    if (clips.length === 0) return undefined;
+
+    let t = 0;
+    const detailed = clips.map((c, idx) => {
+        const start = t;
+        const end = t + c.duration;
+        t = end;
+        return { index: idx + 1, start, end, prompt: c.prompt };
+    });
+    const marks = [0, ...detailed.map(d => d.end)].map(x => `${Math.round(x)}s`).join(' → ');
+    return { boundaryMarks: marks, clips: detailed };
+};
+
+const attachPlanPreview = (plan: any, requirements: any): PlanPreviewExtras => {
+    const validation = validateCanvasPlan(plan, { requirements });
+    const extras: PlanPreviewExtras = {
+        warnings: validation.warnings || [],
+        fixes: validation.fixes || [],
+        timeline: computeVideoTimeline(plan),
+    };
+    plan.__preview = extras;
+    return extras;
+};
 
 const getSelectedImageIds = (context: CanvasContext): string[] => {
     const ids = new Set<string>(context.canvasSelection?.selectedIds || []);
@@ -196,6 +341,157 @@ export const useChatEngine = (context: CanvasContext) => {
         };
     };
 
+    const applyEditsFromDecision = useCallback(async (decision: any) => {
+        const session = sessionRef.current;
+        const currentPlan: any = session.graphPlan;
+        if (!currentPlan) return;
+
+        const videoNodeSteps: any[] = (currentPlan.steps || []).filter((s: any) => s.action === 'CREATE_NODE' && s.nodeType === 'video-generator');
+        if (videoNodeSteps.length > 0) {
+            const requestedModelText = (decision.changes?.model || '').toString().trim();
+            const requestedVideoModel = requestedModelText ? findTextToVideoModel(requestedModelText) : null;
+            if (requestedModelText && !requestedVideoModel) {
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: `I couldn't find that video model in the registry. Try: "Veo 3.1 Fast", "Veo 3.1", "Sora 2 Pro".`,
+                    timestamp: Date.now(),
+                }]);
+                return;
+            }
+
+            const nextVideoModel = requestedVideoModel?.name || session.requirements.model || getDefaultTextToVideoModel().name;
+            const nextRatioRaw = (decision.changes?.aspectRatio || '').toString().trim() || session.requirements.aspectRatio || '16:9';
+            const nextRatio = isValidVideoAspectRatio(nextRatioRaw) ? nextRatioRaw : '16:9';
+            const nextResRaw = (decision.changes?.resolution || '').toString().trim() || session.requirements.resolution || '1080p';
+            const nextRes = isValidVideoResolution(nextResRaw) ? nextResRaw : '1080p';
+            const nextDuration = Number(decision.changes?.durationSeconds || session.requirements.durationSeconds || 8);
+
+            session.requirements = {
+                ...session.requirements,
+                model: nextVideoModel,
+                aspectRatio: nextRatio,
+                resolution: nextRes,
+                durationSeconds: nextDuration,
+            };
+
+            const rebuilt = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
+            const validation = validateCanvasPlan(rebuilt, { requirements: session.requirements });
+            if (!validation.ok) {
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: `❌ I couldn't update the video plan:\n- ${validation.errors.join('\n- ')}`,
+                    timestamp: Date.now(),
+                }]);
+                return;
+            }
+
+            session.graphPlan = rebuilt;
+            attachPlanPreview(rebuilt as any, session.requirements);
+            session.phase = 'GRAPH_PREVIEW';
+
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: [
+                    `✅ **Updated Video Plan**`,
+                    ``,
+                    `- **Duration**: ${nextDuration}s`,
+                    `- **Frame**: ${nextRatio}`,
+                    `- **Resolution**: ${nextRes}`,
+                    `- **Model**: ${nextVideoModel}`,
+                    ``,
+                    `Approve execution?`,
+                    `A) Execute\nB) Cancel`,
+                ].join('\n'),
+                action: {
+                    type: 'SINGLE',
+                    intent: 'EXECUTE_PLAN',
+                    confidence: 1,
+                    payload: rebuilt,
+                    requiresConfirmation: true,
+                    explanation: rebuilt.summary,
+                },
+                timestamp: Date.now(),
+            }]);
+            return;
+        }
+
+        // Image plan edits
+        const step0: any = currentPlan.steps?.find((s: any) => s.action === 'CREATE_NODE' && s.nodeType === 'image-generator');
+        if (!step0) return;
+
+        const requestedModelText = (decision.changes?.model || '').toString().trim();
+        const requestedModel = requestedModelText ? findTextToImageModel(requestedModelText) : null;
+        if (requestedModelText && !requestedModel) {
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: `I couldn't find that image model in the registry. Try: "Google Nano Banana", "Z Image Turbo", "Flux 1.1 Pro".`,
+                timestamp: Date.now(),
+            }]);
+            return;
+        }
+
+        const ratioFromDecision = (decision.changes?.aspectRatio || '').toString().trim() || null;
+        const nextRatioRaw = ratioFromDecision || step0.configTemplate?.aspectRatio || '1:1';
+        const nextRatio = isValidImageAspectRatio(nextRatioRaw) ? nextRatioRaw : '1:1';
+
+        const resFromDecision = (decision.changes?.resolution || '').toString().trim() || null;
+        const nextResolutionRaw = resFromDecision || step0.configTemplate?.resolution || '1024';
+        const nextResolution = isValidImageResolution(nextResolutionRaw) ? nextResolutionRaw : '1024';
+
+        const countFromDecision = decision.changes?.count ?? null;
+        const nextCount = Math.max(1, Math.min(4, (countFromDecision || step0.count || 1)));
+
+        const promptFromDecision = (decision.changes?.prompt || '').toString().trim();
+        const nextPrompt = promptFromDecision || step0.configTemplate?.prompt;
+
+        const isImg2ImgPlan = Array.isArray(step0.configTemplate?.targetIds) && step0.configTemplate.targetIds.length > 0;
+        let nextModel = requestedModel?.name || step0.configTemplate?.model;
+        if (isImg2ImgPlan && (!nextModel || String(nextModel).toLowerCase().includes('z image turbo') || String(nextModel).toLowerCase().includes('z-image-turbo'))) {
+            nextModel = 'Google Nano Banana';
+        }
+
+        step0.configTemplate = { ...(step0.configTemplate || {}), model: nextModel, aspectRatio: nextRatio, resolution: nextResolution, prompt: nextPrompt };
+        step0.count = nextCount;
+        step0.batchConfigs = Array.from({ length: nextCount }).map(() => ({ prompt: nextPrompt }));
+
+        currentPlan.summary = [
+            `Frame: ${nextRatio}`,
+            `Resolution: ${nextResolution}`,
+            `Images: ${nextCount}`,
+            `Model: ${nextModel}`,
+            `Prompt: ${nextPrompt}`,
+        ].join('\n');
+
+        attachPlanPreview(currentPlan as any, session.requirements);
+
+        setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: [
+                `✅ **Updated Image Generation Plan**`,
+                ``,
+                `- **Frame**: ${nextRatio}`,
+                `- **Resolution**: ${nextResolution}`,
+                `- **Number of images**: ${nextCount}`,
+                `- **Model**: ${nextModel}`,
+                `- **Prompt**: ${nextPrompt}`,
+            ].join('\n'),
+            action: {
+                type: 'SINGLE',
+                intent: 'EXECUTE_PLAN',
+                confidence: 1,
+                payload: currentPlan,
+                requiresConfirmation: true,
+                explanation: currentPlan.summary,
+            },
+            timestamp: Date.now(),
+        }]);
+    }, []);
+
     const sendMessage = useCallback(async (text: string) => {
         if (!text.trim()) return;
 
@@ -214,6 +510,38 @@ export const useChatEngine = (context: CanvasContext) => {
             const session = sessionRef.current;
             session.lastUserMessage = text;
 
+            // Phase: confirm a proposed plan edit (voice-friendly)
+            if (session.phase === 'EDIT_CONFIRMATION' && session.pendingPlanEdits && session.graphPlan) {
+                const normalized = text.trim().toLowerCase();
+                const apply = normalized === 'a' || /\b(yes|apply|ok|okay|confirm)\b/.test(normalized);
+                const cancel = normalized === 'b' || /\b(no|cancel|stop)\b/.test(normalized);
+                if (cancel) {
+                    session.pendingPlanEdits = undefined;
+                    session.phase = 'GRAPH_PREVIEW';
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `Ok — keeping the current plan as-is.`,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+                if (apply) {
+                    const decision = session.pendingPlanEdits;
+                    session.pendingPlanEdits = undefined;
+                    session.phase = 'GRAPH_PREVIEW';
+                    await applyEditsFromDecision(decision);
+                    return;
+                }
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: `Please say "yes" to apply the changes, or "no" to keep the current plan.\nA) Apply\nB) Keep current`,
+                    timestamp: Date.now(),
+                }]);
+                return;
+            }
+
             // If user is modifying a plan but the session lost the plan (e.g., after refresh / state reset),
             // recover it from the last assistant EXECUTE_PLAN message.
             if ((!session.graphPlan || session.phase === 'IDLE') && looksLikePlanModification(text)) {
@@ -229,7 +557,7 @@ export const useChatEngine = (context: CanvasContext) => {
                 const q = session.pendingQuestions[session.currentQuestionIndex];
                 if (!q) {
                     session.phase = 'IDLE';
-                } else {
+                        } else {
                     session.requirements = applyRequirementAnswer(session.requirements, q, text, { selectedImageIds });
                     session.currentQuestionIndex += 1;
 
@@ -289,7 +617,7 @@ export const useChatEngine = (context: CanvasContext) => {
                     } else {
                         session.phase = 'GRAPH_PREVIEW';
                         const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
-                        const validation = validateCanvasPlan(plan);
+                        const validation = validateCanvasPlan(plan, { requirements: session.requirements });
                         if (!validation.ok) {
                             resetSession();
                             setMessages(prev => [...prev, {
@@ -301,9 +629,10 @@ export const useChatEngine = (context: CanvasContext) => {
                     return;
                 }
                         session.graphPlan = plan;
+                        attachPlanPreview(plan as any, session.requirements);
                         setMessages(prev => [...prev, {
-                            id: (Date.now() + 1).toString(),
-                            role: 'assistant',
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
                             content: `✅ Plan ready:\n\n${plan.summary}\n\nApprove execution?\nA) Execute\nB) Cancel`,
                             action: {
                                 type: 'SINGLE',
@@ -315,8 +644,8 @@ export const useChatEngine = (context: CanvasContext) => {
                             },
                             timestamp: Date.now(),
                         }]);
-                        return;
-                    }
+                    return;
+                }
                 }
             }
 
@@ -335,7 +664,7 @@ export const useChatEngine = (context: CanvasContext) => {
                     }]);
                     return;
                 }
-
+                
                 if (!isApprove && session.scriptPlan) {
                     // Treat as modification text
                     const videoModelName = session.requirements.model || getDefaultTextToVideoModel().name;
@@ -378,7 +707,7 @@ export const useChatEngine = (context: CanvasContext) => {
                 if (isApprove) {
                     session.phase = 'GRAPH_PREVIEW';
                     const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
-                    const validation = validateCanvasPlan(plan);
+                    const validation = validateCanvasPlan(plan, { requirements: session.requirements });
                     if (!validation.ok) {
                         resetSession();
                         setMessages(prev => [...prev, {
@@ -390,6 +719,7 @@ export const useChatEngine = (context: CanvasContext) => {
                         return;
                     }
                     session.graphPlan = plan;
+                    attachPlanPreview(plan as any, session.requirements);
                     const scriptBlock = session.scriptPlan?.script
                         ? [
                             `📝 **Script (approved)**`,
@@ -423,7 +753,7 @@ export const useChatEngine = (context: CanvasContext) => {
             if (session.phase === 'GRAPH_PREVIEW' && session.graphPlan) {
                 const currentPlan = session.graphPlan;
                 const normalized = text.trim().toLowerCase();
-
+                
                 // If a plan is open but the user clearly starts a NEW request (e.g. "generate a video..."),
                 // reset the session and fall through to intent detection.
                 const isNewRequestVerb = /\b(generate|create|make|animate)\b/.test(normalized);
@@ -447,8 +777,8 @@ export const useChatEngine = (context: CanvasContext) => {
                 if (isCancel) {
                     resetSession();
                     setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'assistant',
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
                         content: `Cancelled. Tell me what you want to do instead.`,
                         timestamp: Date.now(),
                     }]);
@@ -488,8 +818,8 @@ export const useChatEngine = (context: CanvasContext) => {
                         content: decision.reply || `Cancelled. Tell me what you want to do instead.`,
                         timestamp: Date.now(),
                     }]);
-                    return;
-                }
+                        return;
+                    }
 
                 if (decision.intent === 'EXECUTE') {
                     const plan = currentPlan;
@@ -516,6 +846,27 @@ export const useChatEngine = (context: CanvasContext) => {
                         id: (Date.now() + 1).toString(),
                         role: 'assistant',
                         content: decision.reply || `Do you want me to execute this plan, cancel it, or change something (model/frame/count)?`,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+
+                if (decision.intent === 'EDIT_PLAN') {
+                    session.pendingPlanEdits = decision;
+                    session.phase = 'EDIT_CONFIRMATION';
+                    const changes = decision.changes || {};
+                    const parts: string[] = [];
+                    if (changes.model) parts.push(`model → ${changes.model}`);
+                    if (changes.aspectRatio) parts.push(`frame → ${changes.aspectRatio}`);
+                    if (changes.resolution) parts.push(`resolution → ${changes.resolution}`);
+                    if (changes.count) parts.push(`count → ${changes.count}`);
+                    const dur = (changes as any).durationSeconds ?? (changes as any).duration;
+                    if (dur) parts.push(`duration → ${dur}s`);
+                    const summary = parts.length ? parts.join(', ') : 'a plan update';
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `I will apply: **${summary}** and keep everything else the same.\n\nConfirm?\nA) Apply\nB) Keep current`,
                         timestamp: Date.now(),
                     }]);
                     return;
@@ -604,11 +955,11 @@ export const useChatEngine = (context: CanvasContext) => {
 
                     // Rebuild plan deterministically from requirements + (optional) current script
                     const rebuilt = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
-                    const validation = validateCanvasPlan(rebuilt);
+                    const validation = validateCanvasPlan(rebuilt, { requirements: session.requirements });
                     if (!validation.ok) {
                         setMessages(prev => [...prev, {
-                            id: (Date.now() + 1).toString(),
-                            role: 'assistant',
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
                             content: `❌ I couldn't update the video plan:\n- ${validation.errors.join('\n- ')}`,
                             timestamp: Date.now(),
                         }]);
@@ -616,6 +967,7 @@ export const useChatEngine = (context: CanvasContext) => {
                     }
 
                     session.graphPlan = rebuilt;
+                    attachPlanPreview(rebuilt as any, session.requirements);
 
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
@@ -647,8 +999,8 @@ export const useChatEngine = (context: CanvasContext) => {
                 const step0: any = currentPlan.steps?.find((s: any) => s.action === 'CREATE_NODE' && s.nodeType === 'image-generator');
                 if (!step0) {
                     setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'assistant',
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
                         content: decision.reply || `I can edit this plan, but I couldn't find an editable image/video generation step.`,
                         timestamp: Date.now(),
                     }]);
@@ -684,7 +1036,7 @@ export const useChatEngine = (context: CanvasContext) => {
                 const nextCount = Math.max(1, Math.min(4, (countFromDecision || countFallback || step0.count || 1)));
 
                 const promptFromDecision = (decision.changes?.prompt || '').toString().trim();
-                const nextPrompt = promptFromDecision || step0.configTemplate?.prompt;
+                const basePrompt = promptFromDecision || step0.configTemplate?.prompt || '';
 
                 let nextModel = requestedModel?.name || step0.configTemplate?.model;
                 // Rule: for image-to-image, always default to Google Nano Banana if model isn't specified or is unsupported.
@@ -692,19 +1044,22 @@ export const useChatEngine = (context: CanvasContext) => {
                     nextModel = 'Google Nano Banana';
                 }
 
+                // Get or default variation mode
+                const variationMode = session.requirements.batchVariationMode || 'same_prompt';
+                const promptVariations = generateBatchVariations(basePrompt, nextCount, variationMode);
+
                 // Patch plan
-                step0.configTemplate = { ...(step0.configTemplate || {}), model: nextModel, aspectRatio: nextRatio, resolution: nextResolution, prompt: nextPrompt };
+                step0.configTemplate = { ...(step0.configTemplate || {}), model: nextModel, aspectRatio: nextRatio, resolution: nextResolution, prompt: basePrompt };
                 step0.count = nextCount;
-                step0.batchConfigs = Array.from({ length: nextCount }).map(() => ({ prompt: nextPrompt }));
+                step0.batchConfigs = promptVariations.map(p => ({ prompt: p }));
 
                 currentPlan.summary = [
                     `Frame: ${nextRatio}`,
                     `Resolution: ${nextResolution}`,
-                    `Images: ${nextCount}`,
+                    `Images: ${nextCount}${nextCount > 1 && variationMode !== 'same_prompt' ? ` (${variationMode.replace(/_/g, ' ')})` : ''}`,
                     `Model: ${nextModel}`,
-                    `Prompt: ${nextPrompt}`,
+                    `Prompt: ${basePrompt.substring(0, 60)}${basePrompt.length > 60 ? '...' : ''}`,
                 ].join('\n');
-
                 setMessages(prev => [...prev, {
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
@@ -713,23 +1068,23 @@ export const useChatEngine = (context: CanvasContext) => {
                         ``,
                         `- **Frame**: ${nextRatio}`,
                         `- **Resolution**: ${nextResolution}`,
-                        `- **Number of images**: ${nextCount}`,
+                        `- **Number of images**: ${nextCount}${nextCount > 1 && variationMode !== 'same_prompt' ? ` (variation: ${variationMode.replace(/_/g, ' ')})` : ''}`,
                         `- **Model**: ${nextModel}`,
-                        `- **Prompt**: ${nextPrompt}`,
+                        `- **Prompt**: ${basePrompt.substring(0, 60)}${basePrompt.length > 60 ? '...' : ''}`,
                     ].join('\n'),
-                    action: {
-                        type: 'SINGLE',
-                        intent: 'EXECUTE_PLAN',
-                        confidence: 1,
+                            action: {
+                                type: 'SINGLE',
+                                intent: 'EXECUTE_PLAN',
+                                confidence: 1,
                         payload: currentPlan,
                         requiresConfirmation: true,
                         explanation: currentPlan.summary,
-                    },
+                            },
                     timestamp: Date.now(),
                 }]);
-                return;
+                        return;
+                    }
                 }
-            }
 
             // Phase 1: intent detection
             const intent = await detectIntent(text, { selectedImageCount: selectedImageIds.length });
@@ -750,22 +1105,161 @@ export const useChatEngine = (context: CanvasContext) => {
                 referenceImageIds: selectedImageIds,
             };
 
+            // Plugin Action: create plugin node plan
+            if (intent.task === 'plugin_action') {
+                const detectedPluginId = (intent as any).pluginId;
+                if (!detectedPluginId) {
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `I couldn't identify which plugin you want to use. Available plugins: Upscale, Remove Background, Expand, Erase, Vectorize, Multiangle Camera, Storyboard, Next Scene.`,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+
+                // Map detected plugin ID to executor's expected pluginType
+                // Executor uses shorter IDs (e.g., 'multiangle' instead of 'multiangle-camera')
+                const pluginTypeMap: Record<string, string> = {
+                    'upscale': 'upscale',
+                    'remove-bg': 'remove-bg',
+                    'expand': 'expand',
+                    'erase': 'erase',
+                    'vectorize': 'vectorize',
+                    'multiangle-camera': 'multiangle',
+                    'multiangle': 'multiangle',
+                    'storyboard': 'storyboard',
+                    'next-scene': 'next-scene',
+                };
+                const executorPluginType = pluginTypeMap[detectedPluginId] || detectedPluginId;
+
+                // Find plugin in registry (use original ID for lookup)
+                const plugin = findPlugin(detectedPluginId);
+                if (!plugin) {
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `I couldn't find the plugin "${detectedPluginId}". Please try again.`,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+
+                // Check if plugin requires source image
+                if (plugin.requiresSourceImage && selectedImageIds.length === 0) {
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `To use the **${plugin.name}** plugin, please select an image first. Click on an image on the canvas, then try again.`,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+
+                const defaultModel = getDefaultPluginModel(detectedPluginId);
+                const model = defaultModel || plugin.models?.[0];
+
+                // Build plugin plan
+                const pluginPlan: CanvasInstructionPlan = {
+                    id: `plugin-plan-${Date.now()}`,
+                    summary: [
+                        `Plugin: ${plugin.name}`,
+                        `Model: ${model?.name || 'Default'}`,
+                        `Input: ${plugin.inputType}`,
+                        `Output: ${plugin.outputType}`,
+                    ].join('\n'),
+                    steps: [
+                        {
+                            id: `plugin-${Date.now()}`,
+                            action: 'CREATE_NODE',
+                            nodeType: 'plugin',
+                            count: 1,
+                            configTemplate: {
+                                pluginType: executorPluginType, // Executor expects pluginType in configTemplate
+                                model: model?.name || model?.id || 'default',
+                                ...(model?.parameters ? Object.fromEntries(
+                                    Object.entries(model.parameters).map(([key, param]: [string, any]) => [
+                                        key,
+                                        param.default !== undefined ? param.default : null
+                                    ])
+                                ) : {}),
+                                targetIds: plugin.requiresSourceImage ? selectedImageIds : [],
+                            },
+                        } as any,
+                    ],
+                    metadata: {
+                        sourceGoal: {
+                            goalType: 'PLUGIN_ACTION',
+                            pluginType: executorPluginType,
+                            topic: plugin.name,
+                            needs: plugin.requiresSourceImage ? ['image'] : [],
+                            explanation: `Apply ${plugin.name} plugin`,
+                        },
+                        compiledAt: Date.now(),
+                    },
+                    requiresConfirmation: true,
+                };
+
+                // Build user-friendly message
+                const modelParams = model?.parameters ? Object.entries(model.parameters)
+                    .filter(([_, param]: [string, any]) => param.default !== undefined)
+                    .map(([key, param]: [string, any]) => {
+                        const label = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+                        return `- **${label}**: ${param.default}`;
+                    }) : [];
+
+                const guideMessage = [
+                    `✅ **${plugin.name} Plugin Ready**`,
+                    ``,
+                    `I've created a ${plugin.name} plugin node for you.`,
+                    ``,
+                    `**How to use:**`,
+                    `1. The plugin is connected to your selected image${selectedImageIds.length > 1 ? 's' : ''}`,
+                    `2. You can adjust settings in the plugin controls`,
+                    modelParams.length > 0 ? `3. Default settings:\n${modelParams.join('\n')}` : `3. Click the plugin to configure settings`,
+                    `4. Click the action button to process`,
+                    ``,
+                    plugin.description ? `**About:** ${plugin.description}` : '',
+                ].filter(Boolean).join('\n');
+
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: guideMessage,
+                    action: {
+                        type: 'SINGLE',
+                        intent: 'EXECUTE_PLAN',
+                        confidence: 1,
+                        payload: pluginPlan,
+                        requiresConfirmation: true,
+                        explanation: pluginPlan.summary,
+                    },
+                    timestamp: Date.now(),
+                }]);
+                return;
+            }
+
             // Text-to-Image / Image-to-Image: create an executable plan (EXECUTE_PLAN)
             if (intent.task === 'text_to_image' || intent.task === 'image_to_image') {
                 // For image-to-image, default to the selected image's aspect ratio (if available).
                 const isImg2Img = intent.task === 'image_to_image';
                 let inferredAspect: string | null = null;
+                let inferredResolution: string | null = null;
+                let refWidth: number | null = null;
+                let refHeight: number | null = null;
+                
                 if (isImg2Img && selectedImageIds.length > 0) {
                     const srcId = selectedImageIds[0];
                     const srcModal = context.canvasState?.imageModalStates?.find((m: any) => m.id === srcId);
                     const srcUpload = context.canvasState?.images?.find((img: any) => img.elementId === srcId || img.id === srcId);
                     inferredAspect = srcModal?.aspectRatio || null;
-                    if (!inferredAspect && srcUpload?.width && srcUpload?.height) {
-                        const w = Number(srcUpload.width);
-                        const h = Number(srcUpload.height);
-                        if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+                    
+                    if (srcUpload?.width && srcUpload?.height) {
+                        refWidth = Number(srcUpload.width);
+                        refHeight = Number(srcUpload.height);
+                        if (Number.isFinite(refWidth) && Number.isFinite(refHeight) && refWidth > 0 && refHeight > 0) {
                             // Map to common ratios we already validate against.
-                            const ratio = w / h;
+                            const ratio = refWidth / refHeight;
                             const close = (a: number, b: number) => Math.abs(a - b) < 0.03;
                             if (close(ratio, 1)) inferredAspect = '1:1';
                             else if (close(ratio, 16 / 9)) inferredAspect = '16:9';
@@ -774,6 +1268,23 @@ export const useChatEngine = (context: CanvasContext) => {
                             else if (close(ratio, 3 / 4)) inferredAspect = '3:4';
                             else if (close(ratio, 3 / 2)) inferredAspect = '3:2';
                             else if (close(ratio, 2 / 3)) inferredAspect = '2:3';
+                            
+                            // Auto-detect closest resolution from reference image dimensions
+                            const defaultModel = getDefaultTextToImageModel();
+                            const rawModel = session.requirements.model || defaultModel.name;
+                            const resolvedModel = rawModel ? findTextToImageModel(rawModel) : null;
+                            const modelName = resolvedModel?.name || defaultModel.name;
+                            inferredResolution = findClosestImageResolution(refWidth, refHeight, modelName);
+                        }
+                    } else if (srcModal?.frameWidth && srcModal?.frameHeight) {
+                        refWidth = Number(srcModal.frameWidth);
+                        refHeight = Number(srcModal.frameHeight);
+                        if (Number.isFinite(refWidth) && Number.isFinite(refHeight) && refWidth > 0 && refHeight > 0) {
+                            const defaultModel = getDefaultTextToImageModel();
+                            const rawModel = session.requirements.model || defaultModel.name;
+                            const resolvedModel = rawModel ? findTextToImageModel(rawModel) : null;
+                            const modelName = resolvedModel?.name || defaultModel.name;
+                            inferredResolution = findClosestImageResolution(refWidth, refHeight, modelName);
                         }
                     }
                 }
@@ -792,11 +1303,31 @@ export const useChatEngine = (context: CanvasContext) => {
                 const count = Math.max(1, Math.min(4, intent.count || 1)); // respect registry max batch (4)
                 const style = session.requirements.style || 'photorealistic';
                 const topic = session.requirements.topic || session.requirements.product || text;
-                const prompt = isImg2Img
-                    ? `${text.trim()}. Preserve the original image and only apply the requested change. ${style} style.`
+                
+                // Detect variation mode from user input
+                const textLower = text.toLowerCase();
+                let detectedVariationMode: 'same_prompt' | 'different_angles' | 'different_lighting' | 'different_styles' = 'same_prompt';
+                if (count > 1) {
+                    if (textLower.includes('different angle') || textLower.includes('various angle') || textLower.includes('multiple angle')) {
+                        detectedVariationMode = 'different_angles';
+                    } else if (textLower.includes('different light') || textLower.includes('various light') || textLower.includes('multiple light')) {
+                        detectedVariationMode = 'different_lighting';
+                    } else if (textLower.includes('different style') || textLower.includes('various style') || textLower.includes('multiple style')) {
+                        detectedVariationMode = 'different_styles';
+                    }
+                }
+                
+                // Use structured prompt builder for img2img, regular prompt for t2i
+                const basePrompt = isImg2Img
+                    ? buildImg2ImgPrompt(text.trim(), style)
                     : `${topic} in ${style} style`;
+                
+                // Generate batch variations if count > 1
+                const variationMode = session.requirements.batchVariationMode || detectedVariationMode;
+                const promptVariations = generateBatchVariations(basePrompt, count, variationMode);
+                
                 const targetIds = isImg2Img ? (session.requirements.referenceImageIds || []) : [];
-                const requestedRes = (session.requirements.resolution || intent.resolution || '1024');
+                const requestedRes = (session.requirements.resolution || intent.resolution || inferredResolution || '1024');
                 const resolution = isValidImageResolution(requestedRes) ? requestedRes : '1024';
 
                 const steps: CanvasInstructionStep[] = [
@@ -809,22 +1340,25 @@ export const useChatEngine = (context: CanvasContext) => {
                             model,
                             aspectRatio,
                             resolution,
-                            prompt,
+                            prompt: basePrompt, // Base prompt (variations in batchConfigs)
                             targetIds: intent.task === 'image_to_image' ? targetIds : [],
                         },
-                        batchConfigs: Array.from({ length: count }).map(() => ({ prompt })),
+                        batchConfigs: promptVariations.map(p => ({ prompt: p })),
                     } as any,
                 ];
 
+                // Build summary with auto-detected values highlighted
+                const summaryParts = [
+                        `Frame: ${aspectRatio}${inferredAspect ? ' (auto from reference)' : ''}`,
+                        `Resolution: ${resolution}${inferredResolution ? ' (auto from reference)' : ''}`,
+                        `Images: ${count}${count > 1 && variationMode !== 'same_prompt' ? ` (${variationMode.replace('_', ' ')})` : ''}`,
+                        `Model: ${model}`,
+                        `Prompt: ${basePrompt.substring(0, 60)}${basePrompt.length > 60 ? '...' : ''}`,
+                    ];
+                
                 const plan: CanvasInstructionPlan = {
                     id: `plan-${Date.now()}`,
-                    summary: [
-                        `Frame: ${aspectRatio}`,
-                        `Resolution: ${resolution}`,
-                        `Images: ${count}`,
-                        `Model: ${model}`,
-                        `Prompt: ${prompt}`,
-                    ].join('\n'),
+                    summary: summaryParts.join('\n'),
                     steps,
                     metadata: {
                         sourceGoal: {
@@ -846,19 +1380,30 @@ export const useChatEngine = (context: CanvasContext) => {
                 // Put image plans into GRAPH_PREVIEW so the user can modify parameters before executing.
                 session.phase = 'GRAPH_PREVIEW';
                 session.graphPlan = plan;
+                attachPlanPreview(plan as any, session.requirements);
 
+                const displayParts = [
+                        `✅ **Image Generation Plan**`,
+                        ``,
+                        `- **Frame**: ${aspectRatio}${inferredAspect ? ' (auto from reference)' : ''}`,
+                        `- **Resolution**: ${resolution}${inferredResolution ? ' (auto from reference)' : ''}`,
+                        `- **Number of images**: ${count}${count > 1 && variationMode !== 'same_prompt' ? ` (variation: ${variationMode.replace(/_/g, ' ')})` : ''}`,
+                        `- **Model**: ${model}`,
+                    ];
+                
+                if (isImg2Img) {
+                    displayParts.push(`- **Structured Prompt**:`);
+                    displayParts.push(`  • Preserve original composition and structure`);
+                    displayParts.push(`  • Apply: ${text.trim()}`);
+                    displayParts.push(`  • Maintain consistent lighting and ${style} style`);
+                } else {
+                    displayParts.push(`- **Prompt**: ${basePrompt}`);
+                }
+                
                 setMessages(prev => [...prev, {
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
-                    content: [
-                        `✅ **Image Generation Plan**`,
-                        ``,
-                        `- **Frame**: ${aspectRatio}`,
-                        `- **Resolution**: ${resolution}`,
-                        `- **Number of images**: ${count}`,
-                        `- **Model**: ${model}`,
-                        `- **Prompt**: ${prompt}`,
-                    ].join('\n'),
+                    content: displayParts.join('\n'),
                     action: {
                         type: 'SINGLE',
                         intent: 'EXECUTE_PLAN',
@@ -940,7 +1485,7 @@ export const useChatEngine = (context: CanvasContext) => {
 
             session.phase = 'GRAPH_PREVIEW';
             const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
-            const validation = validateCanvasPlan(plan);
+            const validation = validateCanvasPlan(plan, { requirements: session.requirements });
             if (!validation.ok) {
                 resetSession();
                 setMessages(prev => [...prev, {
@@ -952,6 +1497,7 @@ export const useChatEngine = (context: CanvasContext) => {
                 return;
             }
             session.graphPlan = plan;
+            attachPlanPreview(plan as any, session.requirements);
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -973,12 +1519,138 @@ export const useChatEngine = (context: CanvasContext) => {
         }
     }, [context, messages]);
 
+    const applyAutoFix = useCallback(async (fix: PlanAutoFix) => {
+        const session = sessionRef.current;
+        if (!session.graphPlan) {
+            const recovered = findLastImagePlanInMessages(messages);
+            if (recovered) {
+                session.graphPlan = recovered;
+                session.phase = 'GRAPH_PREVIEW';
+            }
+        }
+        if (!session.graphPlan) return;
+
+        const task = session.requirements.task;
+
+        // Apply patch to requirements (source of truth) where possible.
+        switch (fix.patch.kind) {
+            case 'SET_VIDEO_DURATION':
+                session.requirements.durationSeconds = fix.patch.seconds;
+                break;
+            case 'SET_VIDEO_RESOLUTION':
+                session.requirements.resolution = fix.patch.resolution;
+                break;
+            case 'SET_VIDEO_ASPECT_RATIO':
+                session.requirements.aspectRatio = fix.patch.aspectRatio;
+                break;
+            case 'SET_IMAGE_MODEL':
+                session.requirements.model = fix.patch.model;
+                break;
+            case 'SET_IMAGE_RESOLUTION':
+                session.requirements.resolution = fix.patch.resolution;
+                break;
+            case 'SET_IMAGE_ASPECT_RATIO':
+                session.requirements.aspectRatio = fix.patch.aspectRatio;
+                break;
+            case 'SET_REFERENCE_PRIMARY_INDEX': {
+                const ids = (session.requirements.referenceImageIds || []).filter(Boolean);
+                if (ids.length > 0) {
+                    const idx = Math.max(0, Math.min(ids.length - 1, fix.patch.index));
+                    const primary = ids[idx];
+                    session.requirements.referenceImageIds = [primary, ...ids.filter((_, i) => i !== idx)];
+                }
+                break;
+            }
+            case 'SET_REFERENCE_STRENGTH':
+                session.requirements.referenceStrength = fix.patch.strength;
+                break;
+            default:
+                break;
+        }
+
+        // Rebuild plan
+        let rebuilt: any = null;
+        if (task === 'text_to_video' || task === 'image_to_video') {
+            rebuilt = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
+        } else if (task === 'text_to_image' || task === 'image_to_image') {
+            // Re-use current plan's base prompt if available
+            const currentImageStep: any = session.graphPlan.steps?.find((s: any) => s.action === 'CREATE_NODE' && s.nodeType === 'image-generator');
+            const isImg2Img = task === 'image_to_image';
+            const model = session.requirements.model || currentImageStep?.configTemplate?.model || getDefaultTextToImageModel().name;
+            const aspectRatio = session.requirements.aspectRatio || currentImageStep?.configTemplate?.aspectRatio || '1:1';
+            const resolution = session.requirements.resolution || currentImageStep?.configTemplate?.resolution || '1024';
+            const prompt = currentImageStep?.configTemplate?.prompt || session.lastUserMessage || 'Image';
+            const targetIds = isImg2Img ? (session.requirements.referenceImageIds || []) : [];
+            const count = Math.max(1, Math.min(4, Number(currentImageStep?.count || session.intent?.count || 1)));
+            rebuilt = {
+                ...session.graphPlan,
+                summary: [
+                    `Frame: ${aspectRatio}`,
+                    `Resolution: ${resolution}`,
+                    `Images: ${count}`,
+                    `Model: ${model}`,
+                    `Prompt: ${prompt}`,
+                ].join('\n'),
+                steps: [
+                    {
+                        ...(currentImageStep || {}),
+                        id: currentImageStep?.id || `img-${Date.now()}`,
+                        action: 'CREATE_NODE',
+                        nodeType: 'image-generator',
+                        count,
+                        configTemplate: {
+                            ...(currentImageStep?.configTemplate || {}),
+                            model,
+                            aspectRatio,
+                            resolution,
+                            prompt,
+                            targetIds,
+                        },
+                        batchConfigs: Array.from({ length: count }).map(() => ({ prompt })),
+                    } as any,
+                ],
+            };
+        }
+        if (!rebuilt) return;
+
+        const validation = validateCanvasPlan(rebuilt, { requirements: session.requirements });
+        if (!validation.ok) {
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: `❌ I couldn't apply that fix:\n- ${validation.errors.join('\n- ')}`,
+                timestamp: Date.now(),
+            }]);
+            return;
+        }
+
+        attachPlanPreview(rebuilt as any, session.requirements);
+        session.graphPlan = rebuilt;
+        session.phase = 'GRAPH_PREVIEW';
+
+        setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: `✅ **Updated Plan**\n\n${rebuilt.summary}\n\nApprove execution?\nA) Execute\nB) Cancel`,
+            action: {
+                type: 'SINGLE',
+                intent: 'EXECUTE_PLAN',
+                confidence: 1,
+                payload: rebuilt,
+                requiresConfirmation: true,
+                explanation: rebuilt.summary,
+            },
+            timestamp: Date.now(),
+        }]);
+    }, [messages]);
+
     const clearMessages = useCallback(() => setMessages([]), []);
 
     return {
         messages,
         isProcessing,
         sendMessage,
+        applyAutoFix,
         clearMessages
     };
 };

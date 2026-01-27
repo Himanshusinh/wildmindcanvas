@@ -1,6 +1,7 @@
 import { queryCanvasPrompt } from '@/core/api/api';
 import { extractFirstJsonObject, coerceNumber } from './llm';
 import { IntentResult } from './types';
+import { findPlugin } from './modelCatalog';
 
 const INTENT_PROMPT = `
 You are an Intent Detection Agent for a creative canvas.
@@ -85,9 +86,41 @@ export async function detectIntent(userMessage: string, ctx: { selectedImageCoun
     intent.needsScript = !userOptedOut && !userProvidedScript;
   }
 
+  // Deterministic guardrail: detect plugin requests BEFORE image-to-image
+  // This ensures plugin actions (upscale, remove bg, expand, etc.) are correctly identified
+  {
+    const t = userMessage.toLowerCase();
+    
+    // Plugin detection patterns
+    // Note: pluginId must match executor's expected pluginType values
+    const pluginPatterns: Array<{ pattern: RegExp; pluginId: string }> = [
+      { pattern: /\b(upscale|upscaling|enhance resolution|increase resolution|make.*higher resolution)\b/, pluginId: 'upscale' },
+      { pattern: /\b(remove.*background|remove.*bg|delete.*background|transparent.*background|cut.*out)\b/, pluginId: 'remove-bg' },
+      { pattern: /\b(expand|outpaint|extend|widen|make.*wider|add.*edges|fill.*edges)\b/, pluginId: 'expand' },
+      { pattern: /\b(erase|remove.*object|delete.*object|inpaint|remove.*from.*image)\b/, pluginId: 'erase' },
+      { pattern: /\b(vectorize|vector|svg|convert.*to.*vector|make.*vector)\b/, pluginId: 'vectorize' },
+      { pattern: /\b(multiangle|multi.*angle|multiple.*angles|different.*angles|9.*angles|camera.*angles)\b/, pluginId: 'multiangle' }, // Executor expects 'multiangle', not 'multiangle-camera'
+      { pattern: /\b(storyboard|story.*board|create.*storyboard)\b/, pluginId: 'storyboard' },
+      { pattern: /\b(next.*scene|continue.*scene|next.*frame)\b/, pluginId: 'next-scene' },
+    ];
+    
+    for (const { pattern, pluginId } of pluginPatterns) {
+      if (pattern.test(t)) {
+        const plugin = findPlugin(pluginId);
+        if (plugin) {
+          intent.task = 'plugin_action';
+          // Store plugin info in the explanation or a custom field
+          (intent as any).pluginId = pluginId;
+          (intent as any).pluginName = plugin.name;
+          break;
+        }
+      }
+    }
+  }
+
   // Deterministic guardrail: if the user has an image selected and the message looks like an edit,
-  // force image-to-image even if the LLM misclassifies it.
-  if (ctx.selectedImageCount > 0) {
+  // force image-to-image even if the LLM misclassifies it (but only if not a plugin action).
+  if (ctx.selectedImageCount > 0 && intent.task !== 'plugin_action') {
     const t = userMessage.toLowerCase();
     const looksLikeEdit =
       /\b(add|remove|replace|edit|change|modify|erase|inpaint|outpaint|insert|put|add a|add an)\b/.test(t) &&

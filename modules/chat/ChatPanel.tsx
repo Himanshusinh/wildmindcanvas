@@ -278,6 +278,66 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                                                 {msg.action.intent === 'EXECUTE_PLAN' && (
                                                     <div className="space-y-2">
+                                                        {(() => {
+                                                            const preview = (msg.action?.payload as any)?.__preview as any;
+                                                            const warnings: string[] = Array.isArray(preview?.warnings) ? preview.warnings : [];
+                                                            const fixes: any[] = Array.isArray(preview?.fixes) ? preview.fixes : [];
+                                                            const timeline = preview?.timeline as any;
+
+                                                            return (
+                                                                <>
+                                                                    {warnings.length > 0 && (
+                                                                        <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 p-3">
+                                                                            <div className="text-[10px] text-yellow-200/70 font-medium mb-2">Warnings:</div>
+                                                                            <div className="space-y-1.5 text-[10px] text-yellow-100/70">
+                                                                                {warnings.map((w, idx) => (
+                                                                                    <div key={idx} className="flex items-start gap-2">
+                                                                                        <span className="mt-0.5 text-yellow-300/60">•</span>
+                                                                                        <span>{w}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {timeline?.boundaryMarks && (
+                                                                        <div className="rounded-lg bg-white/5 border border-white/10 p-3">
+                                                                            <div className="text-[10px] text-white/60 font-medium mb-2">Timeline:</div>
+                                                                            <div className="text-[10px] text-white/70 leading-relaxed">
+                                                                                {timeline.boundaryMarks}
+                                                                            </div>
+                                                                            {Array.isArray(timeline.clips) && timeline.clips.length > 0 && (
+                                                                                <div className="mt-2 space-y-1 text-[10px] text-white/60">
+                                                                                    {timeline.clips.slice(0, 6).map((c: any) => (
+                                                                                        <div key={c.index} className="flex gap-2">
+                                                                                            <span className="text-blue-300/50">{c.start}s–{c.end}s</span>
+                                                                                            <span className="truncate">{c.prompt || `Clip ${c.index}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {fixes.length > 0 && (
+                                                                        <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 p-3">
+                                                                            <div className="text-[10px] text-blue-200/60 font-medium mb-2">Auto-fix:</div>
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {fixes.map((f: any) => (
+                                                                                    <button
+                                                                                        key={f.id || f.label}
+                                                                                        onClick={() => chatEngine.applyAutoFix(f)}
+                                                                                        className="px-2.5 py-1.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-100/80 border border-blue-500/20 text-[10px] transition-all"
+                                                                                    >
+                                                                                        {f.label}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
                                                         <div className="text-[11px] text-white/70 font-medium mb-2">Summary:</div>
                                                         <div className="text-[11px] text-white/80 font-light leading-relaxed pl-3 border-l-2 border-blue-500/40 space-y-1.5">
                           {String(msg.action.payload?.summary || '')
