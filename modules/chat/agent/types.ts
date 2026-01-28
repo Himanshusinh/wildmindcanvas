@@ -17,7 +17,7 @@ export type AgentTask =
   | 'explain'
   | 'unknown';
 
-export type VideoMode = 'single' | 'first_last';
+export type VideoMode = 'single' | 'first_last' | 'first_frame';
 
 export interface IntentResult {
   task: AgentTask;

@@ -775,6 +775,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           onDelete={onDelete}
           onDuplicate={onDuplicate}
           onDownload={generatedVideoUrl ? onDownload : undefined}
+          generatedUrl={generatedVideoUrl || null}
           onTogglePin={onTogglePin}
           onRegenerate={!isUploadedVideo ? handleGenerate : undefined}
         />

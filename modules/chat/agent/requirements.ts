@@ -78,43 +78,102 @@ export function buildRequirementQuestions(
     });
   }
 
-  // Reference images for image_to_video
-  if (intent.task === 'image_to_video') {
-    if (!ctx.selectedImageIds || ctx.selectedImageIds.length === 0) {
-      questions.push({
-        key: 'reference_images',
-        question:
-          `Please select/upload your product image on the canvas, then reply:\n` +
-          `A) Done (I selected 1 image)\nB) Done (I selected 2 images: start + end)\n\n` +
-          `Tip: selecting 2 images enables First/Last frame mode.`,
-        options: [
-          { label: 'A', value: '1', text: 'Done (selected 1 image)' },
-          { label: 'B', value: '2', text: 'Done (selected 2 images)' },
-        ],
-      });
-    } else if (ctx.selectedImageIds.length >= 2) {
-      // Ask mode (single vs first_last)
-      questions.push({
-        key: 'transition_mode',
-        question:
-          `You selected ${ctx.selectedImageIds.length} images. Which consistency method?\n` +
-          `A) First-Last Frame (recommended)\nB) Single Image (use only the first image)`,
-        options: [
-          { label: 'A', value: 'first_last', text: 'First-Last Frame (recommended)' },
-          { label: 'B', value: 'single', text: 'Single Image' },
-        ],
-      });
+  // Video mode question - ASK FIRST (before script generation)
+  // This helps the script generation understand the video structure
+  if (intent.task === 'text_to_video' || intent.task === 'image_to_video') {
+    if (intent.task === 'image_to_video') {
+      if (!ctx.selectedImageIds || ctx.selectedImageIds.length === 0) {
+        questions.push({
+          key: 'reference_images',
+          question:
+            `Please select/upload your product image on the canvas, then reply:\n` +
+            `A) Done (I selected 1 image)\nB) Done (I selected 2 images: start + end)\n\n` +
+            `Tip: selecting 2 images enables First/Last frame mode.`,
+          options: [
+            { label: 'A', value: '1', text: 'Done (selected 1 image)' },
+            { label: 'B', value: '2', text: 'Done (selected 2 images)' },
+          ],
+        });
+      } else {
+        // Always ask about video mode (First-Last Frame vs First Frame)
+        if (ctx.selectedImageIds.length >= 2) {
+          questions.push({
+            key: 'transition_mode',
+            question:
+              `You selected ${ctx.selectedImageIds.length} images. Which video generation method?\n` +
+              `A) First-Last Frame (each video uses 2 consecutive images: first + last)\n` +
+              `B) First Frame (each image becomes the first frame of its own video)`,
+            options: [
+              { label: 'A', value: 'first_last', text: 'First-Last Frame (recommended for sequences)' },
+              { label: 'B', value: 'first_frame', text: 'First Frame (one video per image)' },
+            ],
+          });
+        } else if (ctx.selectedImageIds.length === 1) {
+          // Single image - still allow First-Last Frame by generating boundary frames from this reference image.
+          questions.push({
+            key: 'transition_mode',
+            question:
+              `You selected 1 image. Which video generation method?\n` +
+              `A) First-Last Frame (generate boundary frames from this image; best for long ads)\n` +
+              `B) First Frame (use this image as first frame for all videos)`,
+            options: [
+              { label: 'A', value: 'first_last', text: 'First-Last Frame (auto-generate boundary frames)' },
+              { label: 'B', value: 'first_frame', text: 'First Frame (use current image)' },
+            ],
+          });
+        }
+      }
+    } else {
+      // text_to_video - ask about video mode
+      if (ctx.selectedImageIds.length >= 2) {
+        questions.push({
+          key: 'transition_mode',
+          question:
+            `You selected ${ctx.selectedImageIds.length} images. Which video generation method?\n` +
+            `A) First-Last Frame (each video uses 2 consecutive images: first + last)\n` +
+            `B) First Frame (each image becomes the first frame of its own video)`,
+          options: [
+            { label: 'A', value: 'first_last', text: 'First-Last Frame (recommended for sequences)' },
+            { label: 'B', value: 'first_frame', text: 'First Frame (one video per image)' },
+          ],
+        });
+      } else if (ctx.selectedImageIds.length === 1) {
+        questions.push({
+          key: 'transition_mode',
+          question:
+            `You selected 1 image. Which video generation method?\n` +
+            `A) First-Last Frame (generate boundary frames from this image)\n` +
+            `B) First Frame (use this image as first frame for all videos)`,
+          options: [
+            { label: 'A', value: 'first_last', text: 'First-Last Frame (auto-generate boundary frames)' },
+            { label: 'B', value: 'first_frame', text: 'First Frame (use current image)' },
+          ],
+        });
+      } else {
+        // No images selected - ask if they want to add reference images
+        questions.push({
+          key: 'transition_mode',
+          question:
+            `Do you want to use reference images for video generation?\n` +
+            `A) Yes, I will select images (you can select 1 or more images on canvas, then reply "done")\n` +
+            `B) No, generate from text only`,
+          options: [
+            { label: 'A', value: 'wait_for_images', text: 'Yes, I will select images' },
+            { label: 'B', value: 'text_only', text: 'No, text only' },
+          ],
+        });
+      }
     }
   }
 
-  // Script confirmation for ads/long videos
+  // Script confirmation for ads/long videos (asked AFTER video mode)
   if ((intent.task === 'text_to_video' || intent.task === 'image_to_video') && intent.needsScript) {
     questions.push({
       key: 'needs_script_confirmation',
-      question: `Do you want me to generate a script + scenes?\nA) Yes, generate\nB) No, I’ll provide my own`,
+      question: `Do you want me to generate a script + scenes?\nA) Yes, generate\nB) No, I will provide my own`,
       options: [
         { label: 'A', value: 'yes', text: 'Yes, generate' },
-        { label: 'B', value: 'no', text: 'No, I’ll provide my own' },
+        { label: 'B', value: 'no', text: 'No, I will provide my own' },
       ],
     });
   }
@@ -152,8 +211,22 @@ export function applyRequirementAnswer(
       return { ...requirements, referenceImageIds: ctx.selectedImageIds.slice(0, Number(value) || 1) };
     }
     case 'transition_mode': {
-      const mode: VideoMode = value === 'first_last' ? 'first_last' : 'single';
-      return { ...requirements, mode };
+      if (value === 'text_only') {
+        // Don't use reference images
+        return { ...requirements, mode: undefined, referenceImageIds: [] };
+      } else if (value === 'wait_for_images') {
+        // User wants to add images - keep mode undefined for now, will be set when images are selected
+        return { ...requirements, mode: undefined };
+      } else if (value === 'first_last') {
+        // First-Last Frame mode
+        return { ...requirements, mode: 'first_last', referenceImageIds: ctx.selectedImageIds };
+      } else if (value === 'first_frame') {
+        // First Frame mode
+        return { ...requirements, mode: 'first_frame', referenceImageIds: ctx.selectedImageIds };
+      } else {
+        // Fallback (shouldn't happen)
+        return { ...requirements, mode: 'first_frame', referenceImageIds: ctx.selectedImageIds };
+      }
     }
     case 'needs_script_confirmation': {
       const needsScript = value === 'yes';

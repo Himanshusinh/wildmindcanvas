@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { IntentAction } from './intentSchemas';
 import { queryCanvasPrompt } from '@/core/api/api';
 import { detectIntent } from './agent/intentAgent';
-import { AgentSessionState, AgentTask, RequirementQuestion } from './agent/types';
+import { AgentSessionState, AgentTask, RequirementQuestion, VideoMode } from './agent/types';
 import { buildRequirementQuestions, applyRequirementAnswer } from './agent/requirements';
 import { generateScriptAndScenes } from './agent/scriptAgent';
 import { buildVideoCanvasPlan } from './agent/graphPlanner';
@@ -562,8 +562,111 @@ export const useChatEngine = (context: CanvasContext) => {
                     session.currentQuestionIndex += 1;
 
                     // If we asked for selecting images, re-check selection now.
+                    // NOTE: First-Last Frame is allowed with 1 reference image (we generate boundary frames from it),
+                    // so do NOT force a second image selection.
                     if (q.key === 'reference_images') {
                         session.requirements.referenceImageIds = selectedImageIds.slice(0, session.requirements.referenceImageIds?.length || 1);
+                    }
+                    
+                    // If user selected "wait_for_images", check if they've now selected images
+                    if (q.key === 'transition_mode' && session.requirements.mode === undefined && selectedImageIds.length > 0) {
+                        // User selected images after choosing to wait - ask about mode again
+                        if (selectedImageIds.length >= 2) {
+                            const modeQ: RequirementQuestion = {
+                                key: 'transition_mode',
+                                question:
+                                    `You selected ${selectedImageIds.length} images. Which video generation method?\n` +
+                                    `A) First-Last Frame (each video uses 2 consecutive images: first + last)\n` +
+                                    `B) First Frame (each image becomes the first frame of its own video)\n` +
+                                    `C) Single Image (use only the first image for all videos)`,
+                                options: [
+                                    { label: 'A', value: 'first_last', text: 'First-Last Frame' },
+                                    { label: 'B', value: 'first_frame', text: 'First Frame' },
+                                    { label: 'C', value: 'single', text: 'Single Image' },
+                                ],
+                            };
+                            // Insert this question before the next one
+                            session.pendingQuestions.splice(session.currentQuestionIndex, 0, modeQ);
+                            const nextQ = session.pendingQuestions[session.currentQuestionIndex];
+                            setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                                content: nextQ.question,
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        } else if (selectedImageIds.length === 1) {
+                            const modeQ: RequirementQuestion = {
+                                key: 'transition_mode',
+                                question:
+                                    `You selected 1 image. Which video generation method?\n` +
+                                    `A) First-Last Frame (generate boundary frames from this image; best for long ads)\n` +
+                                    `B) First Frame (use this image as first frame for all videos)`,
+                                options: [
+                                    { label: 'A', value: 'first_last', text: 'First-Last Frame (auto-generate boundary frames)' },
+                                    { label: 'B', value: 'first_frame', text: 'First Frame (use current image)' },
+                                ],
+                            };
+                            session.pendingQuestions.splice(session.currentQuestionIndex, 0, modeQ);
+                            const nextQ = session.pendingQuestions[session.currentQuestionIndex];
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: nextQ.question,
+                                timestamp: Date.now(),
+                            }]);
+                    return;
+                        }
+                    }
+                    
+                    // Handle "done" response when user was asked to select images
+                    if (q.key === 'transition_mode' && (text.toLowerCase().includes('done') || text.toLowerCase().includes('selected'))) {
+                        const currentSelected = getSelectedImageIds(context);
+                        if (currentSelected.length >= 2) {
+                            const modeQ: RequirementQuestion = {
+                                key: 'transition_mode',
+                                question:
+                                    `You selected ${currentSelected.length} images. Which video generation method?\n` +
+                                    `A) First-Last Frame (each video uses 2 consecutive images: first + last)\n` +
+                                    `B) First Frame (each image becomes the first frame of its own video)\n` +
+                                    `C) Single Image (use only the first image for all videos)`,
+                                options: [
+                                    { label: 'A', value: 'first_last', text: 'First-Last Frame' },
+                                    { label: 'B', value: 'first_frame', text: 'First Frame' },
+                                    { label: 'C', value: 'single', text: 'Single Image' },
+                                ],
+                            };
+                            session.pendingQuestions.splice(session.currentQuestionIndex, 0, modeQ);
+                            const nextQ = session.pendingQuestions[session.currentQuestionIndex];
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: nextQ.question,
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        } else if (currentSelected.length === 1) {
+                            const modeQ: RequirementQuestion = {
+                                key: 'transition_mode',
+                                question:
+                                    `You selected 1 image. Do you want to use it as reference?\n` +
+                                    `A) Yes, use this image as first frame for all videos\n` +
+                                    `B) No, generate from text only`,
+                                options: [
+                                    { label: 'A', value: 'single', text: 'Yes, use this image' },
+                                    { label: 'B', value: 'text_only', text: 'No, text only' },
+                                ],
+                            };
+                            session.pendingQuestions.splice(session.currentQuestionIndex, 0, modeQ);
+                            const nextQ = session.pendingQuestions[session.currentQuestionIndex];
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: nextQ.question,
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        }
                     }
 
                     if (session.currentQuestionIndex < session.pendingQuestions.length) {
@@ -614,7 +717,7 @@ export const useChatEngine = (context: CanvasContext) => {
                             timestamp: Date.now(),
                         }]);
                         return;
-                    } else {
+                        } else {
                         session.phase = 'GRAPH_PREVIEW';
                         const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
                         const validation = validateCanvasPlan(plan, { requirements: session.requirements });
@@ -654,6 +757,183 @@ export const useChatEngine = (context: CanvasContext) => {
                 const normalized = text.trim().toLowerCase();
                 const isApprove = normalized === 'a' || normalized.includes('approve') || normalized === 'yes' || normalized === 'proceed';
                 const isModify = normalized === 'b' || normalized.includes('modify') || normalized.includes('change') || normalized.includes('edit');
+                
+                // Video mode is now asked in the requirements collection phase (before script generation)
+                // So we don't need to handle it here after script approval
+                // This block is kept for backward compatibility but should rarely be needed
+                const selectedImageIds = getSelectedImageIds(context);
+                const task = session.requirements.task;
+                const needsModeSelection = 
+                    !session.requirements.mode && 
+                    (task === 'text_to_video' || task === 'image_to_video') &&
+                    session.scriptPlan;
+                
+                // Only handle mode selection if somehow it wasn't set during requirements collection
+                if (needsModeSelection && !isApprove && !isModify && false) { // Disabled - mode should be set earlier
+                    // User is answering the mode question
+                    let mode: VideoMode | undefined = undefined;
+                    let useReferenceImages = true;
+                    let shouldProceed = false;
+                    
+                    // Handle "done" response when user was asked to select images
+                    if (normalized.includes('done') || normalized.includes('selected')) {
+                        // User has selected images, re-check and ask about mode
+                        const currentSelected = getSelectedImageIds(context);
+                        if (currentSelected.length >= 2) {
+                            // Ask about video mode with new selection
+                            setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                                content: [
+                                    `📝 **Script (approved)**`,
+                                    ``,
+                                    session.scriptPlan?.script || '',
+                                    ``,
+                                    `## 🎬 Scenes`,
+                                    ...(session.scriptPlan?.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
+                                    ``,
+                                    `You have ${currentSelected.length} images selected. Which video generation method?`,
+                                    ``,
+                                    `A) First-Last Frame (each video uses 2 consecutive images: first + last)`,
+                                    `B) First Frame (each image becomes the first frame of its own video)`,
+                                    `C) Single Image (use only the first image for all videos)`,
+                                    `D) No reference images (generate from text only)`,
+                                ].join('\n'),
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        } else if (currentSelected.length === 1) {
+                            // Ask about single image usage
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: [
+                                    `📝 **Script (approved)**`,
+                                    ``,
+                                    session.scriptPlan?.script || '',
+                                    ``,
+                                    `## 🎬 Scenes`,
+                                    ...(session.scriptPlan?.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
+                                    ``,
+                                    `You have 1 image selected. Do you want to use it as reference?`,
+                                    ``,
+                                    `A) Yes, use this image as first frame for all videos`,
+                                    `B) No, generate from text only (ignore selected image)`,
+                                ].join('\n'),
+                                timestamp: Date.now(),
+                            }]);
+                    return;
+                        }
+                    }
+                    
+                    // Check current selection count
+                    const currentSelected = getSelectedImageIds(context);
+                    
+                    if (currentSelected.length >= 2) {
+                        // Multiple images - A/B/C/D options
+                        if (normalized === 'a' || (normalized.includes('first') && normalized.includes('last'))) {
+                            mode = 'first_last';
+                            shouldProceed = true;
+                        } else if (normalized === 'b' || (normalized.includes('first') && !normalized.includes('last') && !normalized.includes('frame'))) {
+                            mode = 'first_frame';
+                            shouldProceed = true;
+                        } else if (normalized === 'c' || normalized.includes('single')) {
+                            mode = 'single';
+                            shouldProceed = true;
+                        } else if (normalized === 'd' || normalized.includes('no reference') || normalized.includes('text only') || normalized.includes('ignore')) {
+                            useReferenceImages = false;
+                            mode = undefined;
+                            shouldProceed = true;
+                        }
+                    } else if (currentSelected.length === 1) {
+                        // Single image - A/B options
+                        if (normalized === 'a' || normalized.includes('yes') || normalized.includes('use')) {
+                            mode = 'single';
+                            useReferenceImages = true;
+                            shouldProceed = true;
+                        } else if (normalized === 'b' || normalized.includes('no') || normalized.includes('ignore') || normalized.includes('text only')) {
+                            useReferenceImages = false;
+                            mode = undefined;
+                            shouldProceed = true;
+                        }
+                    } else {
+                        // No images - A/B options (add images or proceed without)
+                        if (normalized === 'a' || normalized.includes('yes') || normalized.includes('select')) {
+                            // User wants to add images - ask them to select and reply "done"
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: `Please select 1 or more images on the canvas, then reply "done" or "selected".`,
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        } else if (normalized === 'b' || normalized.includes('no') || normalized.includes('text only')) {
+                            useReferenceImages = false;
+                            mode = undefined;
+                            shouldProceed = true;
+                    }
+                    }
+                    
+                    if (shouldProceed) {
+                        // Update requirements
+                        if (useReferenceImages && mode) {
+                            session.requirements.mode = mode;
+                            session.requirements.referenceImageIds = currentSelected;
+                            // Convert text_to_video to image_to_video if using images
+                            if (task === 'text_to_video') {
+                                session.requirements.task = 'image_to_video';
+                            }
+                        } else {
+                            // Don't use reference images
+                            session.requirements.referenceImageIds = [];
+                            session.requirements.mode = undefined as any; // Explicitly set to undefined
+                        }
+                        
+                        // Now proceed to build plan
+                        session.phase = 'GRAPH_PREVIEW';
+                        if (!session.scriptPlan) {
+                            setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                                content: `❌ Script plan is missing. Please try again.`,
+                                timestamp: Date.now(),
+                            }]);
+                    return;
+                }
+                        const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
+                        const validation = validateCanvasPlan(plan, { requirements: session.requirements });
+                        if (!validation.ok) {
+                            resetSession();
+                            setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                                content: `❌ I couldn't build a valid plan:\n- ${validation.errors.join('\n- ')}`,
+                                timestamp: Date.now(),
+                            }]);
+                    return;
+                        }
+                        session.graphPlan = plan;
+                        attachPlanPreview(plan as any, session.requirements);
+                        setMessages(prev => [...prev, {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            // NOTE: `plan.summary` already contains the full script + structured prompts (images + videos).
+                            // Don't print the script twice in chat.
+                            content: `✅ Plan ready:\n\n${plan.summary}\n\nApprove execution?\nA) Execute\nB) Cancel`,
+                            action: {
+                                type: 'SINGLE',
+                                intent: 'EXECUTE_PLAN',
+                                confidence: 1,
+                                payload: plan,
+                                requiresConfirmation: true,
+                                explanation: plan.summary,
+                            },
+                            timestamp: Date.now(),
+                        }]);
+                        return;
+                    }
+                    // If mode not recognized, fall through to normal approve/modify logic
+                }
 
                 if (isModify) {
                     setMessages(prev => [...prev, {
@@ -705,6 +985,84 @@ export const useChatEngine = (context: CanvasContext) => {
                 }
 
                 if (isApprove) {
+                    // After script approval, ALWAYS ask about video mode if not already set
+                    // This gives users the chance to select images and choose their preferred mode
+                    const selectedImageIds = getSelectedImageIds(context);
+                    const task = session.requirements.task;
+                    
+                    // Ask about mode if not set (for both text_to_video and image_to_video)
+                    if (!session.requirements.mode && (task === 'text_to_video' || task === 'image_to_video')) {
+                        
+                        if (selectedImageIds.length >= 2) {
+                            // Multiple images - ask about video mode
+                            setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                                content: [
+                                    `📝 **Script (approved)**`,
+                                    ``,
+                                    session.scriptPlan?.script || '',
+                                    ``,
+                                    `## 🎬 Scenes`,
+                                    ...(session.scriptPlan?.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
+                                    ``,
+                                    `You have ${selectedImageIds.length} images selected. Which video generation method?`,
+                                    ``,
+                                    `A) First-Last Frame (each video uses 2 consecutive images: first + last)`,
+                                    `B) First Frame (each image becomes the first frame of its own video)`,
+                                    `C) Single Image (use only the first image for all videos)`,
+                                    `D) No reference images (generate from text only)`,
+                                ].join('\n'),
+                                timestamp: Date.now(),
+                            }]);
+                            // Stay in SCRIPT_REVIEW phase to collect the mode answer
+                            return;
+                        } else if (selectedImageIds.length === 1) {
+                            // Single image - ask if they want to use it
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: [
+                                    `📝 **Script (approved)**`,
+                                    ``,
+                                    session.scriptPlan?.script || '',
+                                    ``,
+                                    `## 🎬 Scenes`,
+                                    ...(session.scriptPlan?.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
+                                    ``,
+                                    `You have 1 image selected. Do you want to use it as reference?`,
+                                    ``,
+                                    `A) Yes, use this image as first frame for all videos`,
+                                    `B) No, generate from text only (ignore selected image)`,
+                                ].join('\n'),
+                                timestamp: Date.now(),
+                            }]);
+                            return;
+                        } else {
+                            // No images selected - ask if they want to add reference images
+                            setMessages(prev => [...prev, {
+                                id: (Date.now() + 1).toString(),
+                                role: 'assistant',
+                                content: [
+                                    `📝 **Script (approved)**`,
+                                    ``,
+                                    session.scriptPlan?.script || '',
+                                    ``,
+                                    `## 🎬 Scenes`,
+                                    ...(session.scriptPlan?.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
+                                    ``,
+                                    `Do you want to use reference images for video generation?`,
+                                    ``,
+                                    `A) Yes, I'll select images (you can select 1 or more images on canvas, then reply "done")`,
+                                    `B) No, generate from text only`,
+                                ].join('\n'),
+                                timestamp: Date.now(),
+                            }]);
+                    return;
+                }
+                    }
+                    
+                    // If mode is already set or no images selected, proceed to build plan
                     session.phase = 'GRAPH_PREVIEW';
                     const plan = buildVideoCanvasPlan({ requirements: session.requirements, script: session.scriptPlan });
                     const validation = validateCanvasPlan(plan, { requirements: session.requirements });
@@ -720,21 +1078,12 @@ export const useChatEngine = (context: CanvasContext) => {
                     }
                     session.graphPlan = plan;
                     attachPlanPreview(plan as any, session.requirements);
-                    const scriptBlock = session.scriptPlan?.script
-                        ? [
-                            `📝 **Script (approved)**`,
-                            ``,
-                            session.scriptPlan.script,
-                            ``,
-                            `## 🎬 Scenes`,
-                            ...(session.scriptPlan.scenes || []).map(s => `- ${s.scene}. (${s.durationSeconds}s) ${s.prompt}`),
-                            ``,
-                          ].join('\n')
-                        : '';
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'assistant',
-                        content: `${scriptBlock}${scriptBlock ? '\n' : ''}✅ Plan ready:\n\n${plan.summary}\n\nApprove execution?\nA) Execute\nB) Cancel`,
+                        // NOTE: `plan.summary` already contains the full script + structured prompts (images + videos).
+                        // Don't print the script twice in chat.
+                        content: `✅ Plan ready:\n\n${plan.summary}\n\nApprove execution?\nA) Execute\nB) Cancel`,
                         action: {
                             type: 'SINGLE',
                             intent: 'EXECUTE_PLAN',
@@ -748,7 +1097,7 @@ export const useChatEngine = (context: CanvasContext) => {
                     return;
                 }
             }
-
+            
             // Phase: graph preview (execute/cancel OR modify parameters)
             if (session.phase === 'GRAPH_PREVIEW' && session.graphPlan) {
                 const currentPlan = session.graphPlan;
@@ -1115,8 +1464,8 @@ export const useChatEngine = (context: CanvasContext) => {
                         content: `I couldn't identify which plugin you want to use. Available plugins: Upscale, Remove Background, Expand, Erase, Vectorize, Multiangle Camera, Storyboard, Next Scene.`,
                         timestamp: Date.now(),
                     }]);
-                    return;
-                }
+                        return;
+                    }
 
                 // Map detected plugin ID to executor's expected pluginType
                 // Executor uses shorter IDs (e.g., 'multiangle' instead of 'multiangle-camera')
@@ -1223,8 +1572,8 @@ export const useChatEngine = (context: CanvasContext) => {
                 ].filter(Boolean).join('\n');
 
                 setMessages(prev => [...prev, {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
                     content: guideMessage,
                     action: {
                         type: 'SINGLE',

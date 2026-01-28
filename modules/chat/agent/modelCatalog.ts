@@ -18,6 +18,22 @@ export function getDefaultTextToImageModel(): { id: string; name: string } {
   return { id: chosen?.id || 'google-nano-banana', name: chosen?.name || 'Google Nano Banana' };
 }
 
+/**
+ * Get default model for image-to-image tasks
+ * Defaults to Google Nano Banana as it supports image-to-image
+ */
+export function getDefaultImageToImageModel(): { id: string; name: string } {
+  const models = (textToImageModels as TextToImageJson).models as any[];
+  // Google Nano Banana is the default for img2img
+  const chosen = models.find(m => m.id === 'google-nano-banana' && m.imageToImage === true);
+  if (chosen) return { id: chosen.id, name: chosen.name };
+  // Fallback to first model that supports image-to-image
+  const img2imgModel = models.find(m => m.imageToImage === true);
+  if (img2imgModel) return { id: img2imgModel.id, name: img2imgModel.name };
+  // Final fallback
+  return { id: 'google-nano-banana', name: 'Google Nano Banana' };
+}
+
 export function findTextToImageModel(query: string): { id: string; name: string } | null {
   const q = (query || '').toLowerCase().trim();
   if (!q) return null;

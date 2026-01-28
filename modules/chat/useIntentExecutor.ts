@@ -429,6 +429,39 @@ export function useIntentExecutor({
                                             });
                                         }
                                         
+                                    } else if (connConfig.connectionType === "FIRST_FRAME_ONLY") {
+                                        // Connect only the first frame (single image to video)
+                                        let firstFrameNodeId: string | undefined;
+                                        if (connConfig.firstFrameSource === "USER_UPLOAD") {
+                                            firstFrameNodeId = resolveCanvasImageNodeId(connConfig.firstFrameId);
+                                            console.log(`[Executor] Using user-uploaded image as first frame: ${firstFrameNodeId}`);
+                                        } else if (connConfig.firstFrameStepId) {
+                                            const sourceNodeIds = stepToNodeIds[connConfig.firstFrameStepId];
+                                            if (sourceNodeIds && Array.isArray(sourceNodeIds)) {
+                                                const frameIndex = connConfig.firstFrameIndex ?? 0;
+                                                if (frameIndex >= 0 && frameIndex < sourceNodeIds.length) {
+                                                    firstFrameNodeId = sourceNodeIds[frameIndex];
+                                                    console.log(`[Executor] ✅ Found first frame at index ${frameIndex}: ${firstFrameNodeId}`);
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (firstFrameNodeId) {
+                                            const conn = {
+                                                id: `conn-first-only-${uuidv4()}`,
+                                                from: firstFrameNodeId,
+                                                to: newId,
+                                                color: '#3b82f6', // Blue for first frame
+                                                label: 'First Frame',
+                                                strokeWidth: 2
+                                            };
+                                            if (props.onPersistConnectorCreate) {
+                                                await props.onPersistConnectorCreate(conn);
+                                                console.log(`[Executor] ✅ Connected FIRST_FRAME_ONLY: ${firstFrameNodeId} → ${newId}`);
+                                            }
+                                        } else {
+                                            console.error(`[Executor] ❌ Missing first frame for FIRST_FRAME_ONLY connection`);
+                                        }
                                     } else if (connConfig.connectionType === "IMAGE_TO_VIDEO") {
                                         
                                         let frameNodeId: string | undefined;

@@ -32,3 +32,17 @@ i give me prompt like "generate 4 images of india lion " so my agent will cerate
 
 
 generate 40 seconds vidoe of this image that i have provided and its a watch and i want to make its advertisement 
+
+
+
+generate a 40 seconds of video for instgram reels and i want that vidoe for advertisement so it should be cinamatic and the sports plater is wearing that shoues and plaing basket ball and prompoting that shoes and also some cinamatic short with come amazing camara angle and telling the features of the shoes all things like that make a perfect reel advertisement 
+
+
+
+
+
+i have given a image of perfume bottle where i want to make advertisement vidoe for instagram and my target audiance is dubai and i need a female model who is using this perfume and also telling is advatages and all other thinfs that advertisement have and also the whole vidoe will be a cinamatic short vidoe 
+
+
+
+this is a shampoo image i want to make advertisement vidoe for instagram advertisement and this shampoo is for girls and my target audiance is amarica so create a 30 seconds vidoe for that and i want a girl using this product and also at the end of vidoe there are some cinamatic shorts and also make the advertisement eye catchy so first impression should be perfect

@@ -219,8 +219,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                         fillPatternScaleX={1 / Math.pow(scale, 0.9)}
                                         fillPatternScaleY={1 / Math.pow(scale, 0.9)}
                                         fillPatternOffset={{
-                                            x: -rectX,
-                                            y: -rectY
+                                            // Keep the dot pattern anchored in world space so it pans in the
+                                            // same direction as the canvas (no inverted/parallax drift).
+                                            x: rectX,
+                                            y: rectY
                                         }}
                                         name="background-rect"
                                         listening={false}

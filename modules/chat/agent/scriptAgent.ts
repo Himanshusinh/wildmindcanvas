@@ -13,10 +13,19 @@ Output ONLY valid JSON (no markdown) with schema:
   "style": string|null
 }
 
+CRITICAL CONSISTENCY RULES:
+- Maintain visual consistency across ALL scenes: same product/character identity, color palette, lighting style, camera style, and overall aesthetic.
+- Each scene prompt must be DETAILED and SPECIFIC: include camera angle, lighting, composition, colors, textures, mood, and visual style.
+- Scene transitions should feel natural and connected - maintain the same visual language throughout.
+- For product ads: keep product appearance, branding, and key visual elements consistent across all scenes.
+- For story videos: maintain character appearance, setting style, and narrative tone consistently.
+- Each scene prompt should build upon the previous one while maintaining visual coherence.
+
 Rules:
 - Total of scene durations should be close to requested duration. If shorter, keep pacing and leave last scene repeatable.
-- Prompts must be specific and visual (camera, lighting, composition).
+- Prompts must be specific and visual (camera, lighting, composition, colors, textures, mood).
 - For product ads, include a strong opening hook and a clear CTA near the end.
+- Include a "style" field that describes the overall visual style to maintain consistency (e.g., "cinematic, high-contrast, professional product photography").
 `;
 
 export async function generateScriptAndScenes(input: {
