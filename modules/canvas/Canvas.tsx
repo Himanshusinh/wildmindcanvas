@@ -175,6 +175,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   } = canvasState;
 
   // --- VIEW STATE ---
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [viewportSize, setViewportSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800
@@ -543,6 +544,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setIsSelecting: events.setIsSelecting,
     selectionTightRect: canvasSelection.selectionTightRect,
     setSelectionTightRect: canvasSelection.setSelectionTightRect,
+    selectionTransformerRect: canvasSelection.selectionTransformerRect,
+    setSelectionTransformerRect: canvasSelection.setSelectionTransformerRect,
     setIsDragSelection: canvasSelection.setIsDragSelection,
 
     // Image Deletion
@@ -599,6 +602,14 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedMultiangleCameraModalId: canvasSelection.setSelectedMultiangleCameraModalId,
     setSelectedMultiangleCameraModalIds: canvasSelection.setSelectedMultiangleCameraModalIds,
     onPersistMultiangleCameraModalDelete: props.onPersistMultiangleCameraModalDelete,
+
+    // Rich Text Deletion
+    selectedRichTextId: canvasSelection.selectedRichTextId,
+    selectedRichTextIds: canvasSelection.selectedRichTextIds,
+    richTextStates: canvasState.richTextStates,
+    setSelectedRichTextId: canvasSelection.setSelectedRichTextId,
+    setSelectedRichTextIds: canvasSelection.setSelectedRichTextIds,
+    onPersistRichTextDelete: props.onPersistRichTextDelete,
 
     // RemoveBG Deletion
     selectedRemoveBgModalIds: canvasSelection.selectedRemoveBgModalIds,
@@ -820,6 +831,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         activeGenerationCount={0}
         onFitView={handleFitView}
         setGenerationQueue={setGenerationQueue}
+        isChatOpen={isChatOpen}
       />
 
       {!isUIHidden && (
@@ -836,6 +848,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
             viewportSize={viewportSize}
             position={position}
             scale={scale}
+            isOpen={isChatOpen}
+            setIsOpen={setIsChatOpen}
           />
         </>
       )}

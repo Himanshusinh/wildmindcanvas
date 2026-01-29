@@ -164,7 +164,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
               Promise.resolve(onPersistRemoveBgModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedRemoveBgModalId === modalState.id}
+          isSelected={selectedRemoveBgModalId === modalState.id || (selectedRemoveBgModalIds || []).includes(modalState.id)}
           initialModel={modalState.model}
           initialBackgroundType={modalState.backgroundType}
           initialScaleValue={modalState.scaleValue}

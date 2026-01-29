@@ -338,6 +338,8 @@ export interface ModalOverlaysProps {
   storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
+  selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 
   // Compare Plugin
   compareModalStates?: CompareModalState[];
@@ -361,6 +363,7 @@ export interface ModalOverlaysProps {
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
   onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+  onQwenMultipleAngles?: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
 
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
@@ -395,10 +398,10 @@ export interface ModalOverlaysProps {
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
   setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
   setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: (ids: string[]) => void;
+  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
   setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: (ids: string[]) => void;
+  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
   setSelectedVideoEditorModalId?: (id: string | null) => void;
   setSelectedVideoEditorModalIds?: (ids: string[]) => void;
@@ -558,6 +561,7 @@ export interface ModalOverlaysProps {
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
   isUIHidden?: boolean;
+  isChatOpen?: boolean;
 }
 
 export interface CompareModalState {

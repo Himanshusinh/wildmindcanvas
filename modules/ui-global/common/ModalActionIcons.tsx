@@ -157,7 +157,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
 
   const handlePinMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.currentTarget.style.backgroundColor = 'rgba(67, 126, 181, 0.2)';
-    e.currentTarget.style.color = '#437eb5';
+    e.currentTarget.style.color = '#4C83FF';
     if (!isTextVariant) {
       e.currentTarget.style.transform = 'scale(1.1)';
     }
@@ -169,7 +169,7 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
       : (isDark
         ? (isTextVariant ? '#121212' : 'rgba(18, 18, 18, 0.95)')
         : (isTextVariant ? '#ffffff' : 'rgba(255, 255, 255, 0.95)'));
-    const defaultColor = isPinned ? '#437eb5' : (isDark ? '#cccccc' : '#4b5563');
+    const defaultColor = isPinned ? '#4C83FF' : (isDark ? '#cccccc' : '#4b5563');
     e.currentTarget.style.backgroundColor = defaultBg;
     e.currentTarget.style.color = defaultColor;
     if (!isTextVariant) {
@@ -224,8 +224,8 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
       width={16 * scale}
       height={16 * scale}
       viewBox="0 0 24 24"
-      fill={isPinned ? '#437eb5' : 'none'}
-      stroke={isPinned ? '#437eb5' : 'currentColor'}
+      fill={isPinned ? '#4C83FF' : 'none'}
+      stroke={isPinned ? '#4C83FF' : 'currentColor'}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -437,8 +437,8 @@ export const ModalActionIcons: React.FC<ModalActionIconsProps> = ({
           style={{
             ...baseButtonStyle,
             backgroundColor: isPinned ? 'rgba(67, 126, 181, 0.2)' : baseButtonStyle.backgroundColor,
-            border: `1px solid ${isPinned ? '#437eb5' : borderColor}`,
-            color: isPinned ? '#437eb5' : textColor,
+            border: `1px solid ${isPinned ? '#4C83FF' : borderColor}`,
+            color: isPinned ? '#4C83FF' : textColor,
           }}
           onMouseEnter={handlePinMouseEnter}
           onMouseLeave={handlePinMouseLeave}

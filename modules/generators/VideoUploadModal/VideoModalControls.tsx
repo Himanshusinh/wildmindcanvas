@@ -1,6 +1,8 @@
 'use client';
 import { useRef, useEffect, Fragment, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import {
   getModelDurations,
@@ -113,7 +115,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
 
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
-  const controlsFrameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const controlsFrameBorderColor = isSelected ? SELECTION_COLOR : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const inputBg = isDark ? (isPromptDisabled ? '#1a1a1a' : '#121212') : (isPromptDisabled ? '#f3f4f6' : '#ffffff');
   const inputText = isDark ? (isPromptDisabled ? '#666666' : '#ffffff') : (isPromptDisabled ? '#6b7280' : '#1f2937');
@@ -238,23 +240,23 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+            backgroundColor: (prompt.trim() && !isGenerating) ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
             border: 'none',
             borderRadius: `${10 * scale}px`,
             cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
             color: 'white',
-            boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+            boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
             padding: 0,
             opacity: isGenerating ? 0.6 : 1,
           }}
           onMouseEnter={(e) => {
             if (prompt.trim() && !isGenerating) {
-              e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
+              e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
             }
           }}
           onMouseLeave={(e) => {
             if (prompt.trim() && !isGenerating) {
-              e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
+              e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
             }
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -267,10 +269,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
               </path>
             </svg>
           ) : (
-            <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 12h9" />
-              <path d="M13 6l6 6-6 6" />
-            </svg>
+            <GenerateArrowIcon scale={scale} />
           )}
         </button>
       </div>

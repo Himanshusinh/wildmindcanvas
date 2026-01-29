@@ -380,9 +380,9 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 resolutions: ['720p', '1080p'],
                 aspectRatios: ['16:9', '9:16', '1:1'],
                 maxBatch: 1,
-                isDefault: false,
                 isHighRes: true,
                 isTurbo: false,
+                isDefault: true,
                 contextWindow: 60,
                 temporal: {
                     maxInputSeconds: 60,
@@ -411,7 +411,7 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 isTurbo: true,
                 temporal: {
                     maxInputSeconds: 60,
-                    maxOutputSeconds: 4,
+                    maxOutputSeconds: 8, // Supports 4, 6, 8 seconds for image-to-video
                     stitchable: true
                 },
                 contracts: {
@@ -456,13 +456,13 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 resolutions: ['480p', '720p', '1080p'],
                 aspectRatios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', '9:21'],
                 maxBatch: 1,
-                isDefault: true,
+                isDefault: false,
                 isHighRes: true,
                 isTurbo: false,
                 contextWindow: 4,
                 temporal: {
-                    maxInputSeconds: 4,
-                    maxOutputSeconds: 4,
+                    maxInputSeconds: 12,
+                    maxOutputSeconds: 12, // Supports 2-12 seconds for image-to-video
                     stitchable: true
                 },
                 contracts: {
@@ -486,8 +486,8 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 isHighRes: false,
                 isTurbo: true,
                 temporal: {
-                    maxInputSeconds: 4,
-                    maxOutputSeconds: 4,
+                    maxInputSeconds: 12,
+                    maxOutputSeconds: 12, // Supports 2-12 seconds for image-to-video
                     stitchable: true
                 },
                 contracts: {
@@ -744,7 +744,7 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 aspectRatios: [],
                 maxBatch: 1,
                 isDefault: true,
-                isHighRes: true,    
+                isHighRes: true,
                 isTurbo: false
             },
             'crystal-upscaler': {

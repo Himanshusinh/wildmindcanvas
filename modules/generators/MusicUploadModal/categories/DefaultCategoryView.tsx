@@ -1,5 +1,7 @@
 'use client';
 import React from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface DefaultCategoryProps {
     scale: number;
@@ -102,16 +104,29 @@ export const DefaultCategoryView: React.FC<DefaultCategoryProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: (prompt.trim() && !isGenerating) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+                        backgroundColor: (prompt.trim() && !isGenerating) ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
                         border: 'none',
                         borderRadius: `${10 * scale}px`,
                         cursor: (prompt.trim() && !isGenerating) ? 'pointer' : 'not-allowed',
                         color: 'white',
-                        opacity: isGenerating ? 0.6 : 1
+                        boxShadow: (prompt.trim() && !isGenerating) ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
+                        padding: 0,
+                        opacity: isGenerating ? 0.6 : 1,
+                        transition: 'all 0.3s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                        if (prompt.trim() && !isGenerating) {
+                            e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (prompt.trim() && !isGenerating) {
+                            e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
+                        }
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
-                    <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 12h9M13 6l6 6-6 6" /></svg>
+                    <GenerateArrowIcon scale={scale * 1.1} />
                 </button>
             </div>
 
@@ -165,7 +180,7 @@ export const DefaultCategoryView: React.FC<DefaultCategoryProps> = ({
                         }}
                     >
                         <span>{selectedAspectRatio}</span>
-                        <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}><path d="M2 4L6 8L10 4" stroke={isDark ? '#60a5fa' : '#3b82f6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        <svg width={10 * scale} height={10 * scale} viewBox="0 0 12 12" fill="none" style={{ transform: isAspectRatioDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}><path d="M2 4L6 8L10 4" stroke={SELECTION_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
                     {isAspectRatioDropdownOpen && (
                         <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: `${4 * scale}px`, backgroundColor: dropdownBg, border: `1px solid ${dropdownBorderColor}`, borderRadius: `${12 * scale}px`, zIndex: 10 }}>

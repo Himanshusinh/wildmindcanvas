@@ -7,7 +7,7 @@
  * 2. The Execution Engine (Canvas API)
  */
 
-export type ActionType = 'CREATE_NODE' | 'CONNECT_SEQUENTIALLY' | 'GROUP_NODES' | 'APPLY_PLUGIN';
+export type ActionType = 'CREATE_NODE' | 'CONNECT_SEQUENTIALLY' | 'GROUP_NODES' | 'APPLY_PLUGIN' | 'DELETE_NODE';
 
 export interface CanvasAction {
     id: string; // Unique ID for this action step
@@ -23,10 +23,16 @@ export interface CreateNodeAction extends CanvasAction {
         model: string;
         duration?: number;
         aspectRatio?: string;
+        resolution?: string;
         style?: string;
         prompt?: string;
         [key: string]: any;
     };
+    batchConfigs?: Array<{
+        prompt?: string;
+        duration?: number;
+        [key: string]: any;
+    }>;
     inputFrom?: string; // ID or reference to a previous step's output
 }
 
@@ -49,34 +55,57 @@ export interface ApplyPluginAction extends CanvasAction {
     targetStepId: string; // Apply plugin to output of this step
 }
 
+export interface DeleteNodeAction extends CanvasAction {
+    action: 'DELETE_NODE';
+    targetType: 'image' | 'video' | 'text' | 'music' | 'plugin' | 'all';
+    targetIds?: string[]; // If empty, delete all of targetType
+    pluginType?: string; // Optional, to specify subtype of plugin (e.g. 'upscale')
+}
+
 export type CanvasInstructionStep =
     | CreateNodeAction
     | ConnectSequentiallyAction
     | GroupNodesAction
-    | ApplyPluginAction;
+    | ApplyPluginAction
+    | DeleteNodeAction;
 
-export type GoalType = 'VIDEO_REQUEST' | 'MUSIC_VIDEO' | 'MOTION_COMIC' | 'STORY_BOARD' | 'IMAGE_GENERATION' | 'UNKNOWN';
+
+export type GoalType =
+    | 'IMAGE_GENERATION'
+    | 'STORY_VIDEO'
+    | 'MUSIC_VIDEO'
+    | 'MOTION_COMIC'
+    | 'IMAGE_ANIMATE'
+    | 'EXPLAIN_CANVAS'
+    | 'MODIFY_EXISTING_FLOW'
+    | 'CLARIFY'
+    | 'DELETE_CONTENT'
+    | 'PLUGIN_ACTION'
+    | 'UNKNOWN';
 
 export interface SemanticGoal {
     goalType: GoalType;
-    needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion'>;
-    constraints?: {
-        duration?: number;
-        style?: string;
-        mood?: string;
-        aspectRatio?: string;
-        [key: string]: any; // Allow extracted entities like 'topic'
-    };
+    topic?: string; // Can be used for pluginType if generic, or prompt context
+    pluginType?: string; // Specific plugin name e.g. 'upscale', 'remove-bg'
+    durationSeconds?: number;
+    style?: string;
+    aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    resolution?: string; // Video resolution e.g. '720p', '1080p', '480p'
+    count?: number;
+    model?: string;
+    needs: Array<'text' | 'image' | 'video' | 'audio' | 'motion' | 'plugin'>;
+    references?: string[];
+    explanation?: string; // Conversational response from LLM
     rawInput?: string;
 }
 
 export interface CanvasInstructionPlan {
     id: string;
-    planType: 'CANVAS_PIPELINE' | 'SINGLE_ACTION';
     summary: string;
     steps: CanvasInstructionStep[];
-    metadata?: {
-        sourceGoal?: SemanticGoal; // Reference to Semantic Goal
+    metadata: {
+        sourceGoal: SemanticGoal;
         compiledAt: number;
     };
+    requiresConfirmation: boolean;
 }

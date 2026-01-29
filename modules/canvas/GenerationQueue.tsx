@@ -89,7 +89,7 @@ const GenerationQueue: React.FC<GenerationQueueProps> = ({ items }) => {
         style={{
           position: 'fixed',
           right: 24,
-          bottom: 24,
+          top: 24,
           width: 320,
           maxHeight: maxVisibleHeight,
           zIndex: 6000,

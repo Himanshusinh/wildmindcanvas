@@ -6,7 +6,7 @@ import { Html } from 'react-konva-utils';
 import { Group as GroupIcon, LayoutGrid } from 'lucide-react';
 import Konva from 'konva';
 import { RichTextToolbar } from './RichText/RichTextToolbar';
-import { getClientRect } from '@/core/canvas/canvasHelpers';
+import { getClientRect, SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { ImageUpload } from '@/core/types/canvas';
 import { ScriptFrameModalState, SceneFrameModalState } from '@/modules/canvas-overlays/types';
 import { getComponentDimensions } from './utils/getComponentDimensions';
@@ -19,7 +19,7 @@ const ARRANGE_ANIMATION_DURATION = 420;
 const BUTTON_OVERFLOW_PADDING = 72;
 
 interface SelectedComponent {
-  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'videoEditorModal' | 'musicModal' | 'upscaleModal' | 'multiangleCameraModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'nextSceneModal' | 'compareModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
+  type: 'image' | 'text' | 'imageModal' | 'videoModal' | 'videoEditorModal' | 'imageEditorModal' | 'musicModal' | 'upscaleModal' | 'multiangleCameraModal' | 'removeBgModal' | 'eraseModal' | 'expandModal' | 'vectorizeModal' | 'nextSceneModal' | 'compareModal' | 'storyboardModal' | 'scriptFrameModal' | 'sceneFrameModal';
   id: number | string;
   key: string;
   width: number;
@@ -42,6 +42,7 @@ interface SelectionBoxProps {
   selectedImageModalIds: string[];
   selectedVideoModalIds: string[];
   selectedVideoEditorModalIds: string[];
+  selectedImageEditorModalIds: string[];
   selectedMusicModalIds: string[];
   selectedTextInputIds: string[];
   images: ImageUpload[];
@@ -54,6 +55,8 @@ interface SelectionBoxProps {
   setVideoModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
   videoEditorModalStates: Array<{ id: string; x: number; y: number }>;
   setVideoEditorModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number }>>>;
+  imageEditorModalStates: Array<{ id: string; x: number; y: number }>;
+  setImageEditorModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number }>>>;
   setMusicModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number }>>>;
   textInputStates: Array<{ id: string; x: number; y: number; autoFocusInput?: boolean }>;
   imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }>;
@@ -64,10 +67,12 @@ interface SelectionBoxProps {
   setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVideoEditorModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setSelectedImageEditorModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMusicModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; isGenerating?: boolean }>) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistVideoEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
+  onPersistImageEditorModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistMusicModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number }>) => void | Promise<void>;
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
@@ -154,6 +159,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   selectedImageModalIds,
   selectedVideoModalIds,
   selectedVideoEditorModalIds,
+  selectedImageEditorModalIds,
   selectedMusicModalIds,
   selectedTextInputIds,
   images,
@@ -166,6 +172,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setVideoModalStates,
   videoEditorModalStates,
   setVideoEditorModalStates,
+  imageEditorModalStates,
+  setImageEditorModalStates,
   setMusicModalStates,
   textInputStates,
   imageModalStates,
@@ -176,10 +184,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSelectedImageModalIds,
   setSelectedVideoModalIds,
   setSelectedVideoEditorModalIds,
+  setSelectedImageEditorModalIds,
   setSelectedMusicModalIds,
   onPersistImageModalMove,
   onPersistVideoModalMove,
   onPersistVideoEditorModalMove,
+  onPersistImageEditorModalMove,
   onPersistMusicModalMove,
   onPersistTextModalMove,
   onImageUpdate,
@@ -268,6 +278,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     imageModals: Map<string, { x: number; y: number; width: number; height: number }>;
     videoModals: Map<string, { x: number; y: number; width: number; height: number }>;
     videoEditorModals: Map<string, { x: number; y: number; width: number; height: number }>;
+    imageEditorModals: Map<string, { x: number; y: number; width: number; height: number }>;
     musicModals: Map<string, { x: number; y: number; width: number; height: number }>;
     upscaleModals: Map<string, { x: number; y: number; width: number; height: number }>;
     multiangleCameraModals: Map<string, { x: number; y: number; width: number; height: number }>;
@@ -308,6 +319,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedImageModalIds.length +
     selectedVideoModalIds.length +
     selectedVideoEditorModalIds.length +
+    selectedImageEditorModalIds.length +
     selectedMusicModalIds.length +
     selectedTextInputIds.length +
     selectedUpscaleModalIds.length +
@@ -515,6 +527,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       `imgModal:${serializeStrings(selectedImageModalIds)}`,
       `vidModal:${serializeStrings(selectedVideoModalIds)}`,
       `vidEditorModal:${serializeStrings(selectedVideoEditorModalIds)}`,
+      `imgEditorModal:${serializeStrings(selectedImageEditorModalIds)}`,
       `musicModal:${serializeStrings(selectedMusicModalIds)}`,
       `upscaleModal:${serializeStrings(selectedUpscaleModalIds)}`,
       `multiangleModal:${serializeStrings(selectedMultiangleCameraModalIds)}`,
@@ -540,6 +553,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
       textInputStates,
       imageModalStates,
       videoModalStates,
+      imageEditorModalStates,
       musicModalStates,
       upscaleModalStates,
       multiangleCameraModalStates,
@@ -616,14 +630,28 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedVideoEditorModalIds.forEach((id) => {
       const modal = videoEditorModalStates.find((m) => m.id === id);
       if (!modal) return;
-      // Video editor trigger is 100x100 pixels (circular icon) plus label above (~20px)
-      // Total bounding box: 100px width, 120px height (100px circle + label space)
+      const { width, height } = getComponentDimensions('videoEditorModal', id, canvasData);
       components.push({
         type: 'videoEditorModal',
         id,
         key: `videoEditorModal-${id}`,
-        width: 100,
-        height: 120,
+        width,
+        height,
+        x: modal.x || 0,
+        y: modal.y || 0,
+      });
+    });
+
+    selectedImageEditorModalIds.forEach((id) => {
+      const modal = imageEditorModalStates.find((m) => m.id === id);
+      if (!modal) return;
+      const { width, height } = getComponentDimensions('imageEditorModal', id, canvasData);
+      components.push({
+        type: 'imageEditorModal',
+        id,
+        key: `imageEditorModal-${id}`,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -647,12 +675,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedUpscaleModalIds.forEach((id) => {
       const modal = upscaleModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('upscaleModal', id, canvasData);
       components.push({
         type: 'upscaleModal',
         id,
         key: `upscaleModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -661,12 +690,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedMultiangleCameraModalIds.forEach((id) => {
       const modal = multiangleCameraModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('multiangleCameraModal', id, canvasData);
       components.push({
         type: 'multiangleCameraModal',
         id,
         key: `multiangleCameraModal-${id}`,
-        width: 100,
-        height: 100,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -675,12 +705,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedRemoveBgModalIds.forEach((id) => {
       const modal = removeBgModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('removeBgModal', id, canvasData);
       components.push({
         type: 'removeBgModal',
         id,
         key: `removeBgModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -689,12 +720,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedEraseModalIds.forEach((id) => {
       const modal = eraseModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('eraseModal', id, canvasData);
       components.push({
         type: 'eraseModal',
         id,
         key: `eraseModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -703,12 +735,13 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     selectedExpandModalIds.forEach((id) => {
       const modal = expandModalStates.find((m) => m.id === id);
       if (!modal) return;
+      const { width, height } = getComponentDimensions('expandModal', id, canvasData);
       components.push({
         type: 'expandModal',
         id,
         key: `expandModal-${id}`,
-        width: modal.frameWidth || 600,
-        height: modal.frameHeight || 400,
+        width,
+        height,
         x: modal.x || 0,
         y: modal.y || 0,
       });
@@ -1346,7 +1379,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
             height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
             fill={hasRichText ? "transparent" : "rgba(100,149,237,0.08)"}
-            stroke="#4C83FF"
+            stroke={SELECTION_COLOR}
             strokeWidth={3}
             dash={[8, 6]}
             listening={false}
@@ -1370,6 +1403,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               imageModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
               videoModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
               videoEditorModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
+              imageEditorModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
               musicModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
               upscaleModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
               multiangleCameraModals: new Map<string, { x: number; y: number; width: number; height: number }>(),
@@ -1405,6 +1439,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               scriptFrameModals: scriptFrameModalStates,
               sceneFrameModals: sceneFrameModalStates,
               videoEditorModalStates,
+              imageEditorModalStates,
             } as any;
 
             // Store original image positions
@@ -1468,6 +1503,15 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               }
             });
 
+            // Store original image editor modal positions
+            selectedImageEditorModalIds.forEach(modalId => {
+              const modalState = imageEditorModalStates.find(m => m.id === modalId);
+              if (modalState) {
+                const { width, height } = getComponentDimensions('imageEditorModal', modalId, canvasData);
+                originalPositions.imageEditorModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
+              }
+            });
+
             // Store original music modal positions
             selectedMusicModalIds.forEach(modalId => {
               const modalState = musicModalStates.find(m => m.id === modalId);
@@ -1481,12 +1525,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedUpscaleModalIds.forEach(modalId => {
               const modalState = upscaleModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.upscaleModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('upscaleModal', modalId, canvasData);
+                originalPositions.upscaleModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1494,7 +1534,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedMultiangleCameraModalIds.forEach(modalId => {
               const modalState = multiangleCameraModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y, width: 100, height: 100 });
+                const { width, height } = getComponentDimensions('multiangleCameraModal', modalId, canvasData);
+                originalPositions.multiangleCameraModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1502,12 +1543,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedRemoveBgModalIds.forEach(modalId => {
               const modalState = removeBgModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.removeBgModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('removeBgModal', modalId, canvasData);
+                originalPositions.removeBgModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1515,12 +1552,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedEraseModalIds.forEach(modalId => {
               const modalState = eraseModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.eraseModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('eraseModal', modalId, canvasData);
+                originalPositions.eraseModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1528,12 +1561,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedExpandModalIds.forEach(modalId => {
               const modalState = expandModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.expandModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('expandModal', modalId, canvasData);
+                originalPositions.expandModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1541,12 +1570,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedVectorizeModalIds.forEach(modalId => {
               const modalState = vectorizeModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.vectorizeModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('vectorizeModal', modalId, canvasData);
+                originalPositions.vectorizeModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1554,12 +1579,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             selectedNextSceneModalIds.forEach(modalId => {
               const modalState = nextSceneModalStates.find(m => m.id === modalId);
               if (modalState) {
-                originalPositions.nextSceneModals.set(modalId, {
-                  x: modalState.x,
-                  y: modalState.y,
-                  width: modalState.frameWidth || 600,
-                  height: modalState.frameHeight || 400
-                });
+                const { width, height } = getComponentDimensions('nextSceneModal', modalId, canvasData);
+                originalPositions.nextSceneModals.set(modalId, { x: modalState.x, y: modalState.y, width, height });
               }
             });
 
@@ -1844,6 +1865,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               }
             });
 
+            // Move all selected image editor modals by delta in real-time (from original positions)
+            selectedImageEditorModalIds.forEach(modalId => {
+              const originalPos = originalPositions.imageEditorModals.get(modalId);
+              if (originalPos) {
+                setImageEditorModalStates((prev) =>
+                  prev.map((modalState) =>
+                    modalState.id === modalId
+                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
+                      : modalState
+                  )
+                );
+              }
+            });
+
             // Move all selected music modals by delta in real-time (from original positions)
             selectedMusicModalIds.forEach(modalId => {
               const originalPos = originalPositions.musicModals.get(modalId);
@@ -2075,6 +2110,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                 const originalPos = originalPositions.videoEditorModals.get(modalId);
                 if (originalPos) {
                   Promise.resolve(onPersistVideoEditorModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
+                }
+              });
+            }
+
+            // Persist final positions for image editor modals
+            if (onPersistImageEditorModalMove) {
+              selectedImageEditorModalIds.forEach((modalId) => {
+                const originalPos = originalPositions.imageEditorModals.get(modalId);
+                if (originalPos) {
+                  Promise.resolve(onPersistImageEditorModalMove(modalId, { x: originalPos.x + deltaX, y: originalPos.y + deltaY })).catch(console.error);
                 }
               });
             }
@@ -2392,7 +2437,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             boundBoxFunc={(oldBox: { x: number; y: number; width: number; height: number; rotation: number }, newBox: { x: number; y: number; width: number; height: number; rotation: number }) => {
               return oldBox; // Prevent any resizing logic just in case
             }}
-            borderStroke="#4C83FF"
+            borderStroke={SELECTION_COLOR}
             borderStrokeWidth={1}
             borderDash={[4, 4]} // Keep dashed as per "smart selected" typical look
             padding={4}
@@ -2412,7 +2457,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
         fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.2)"}
-        stroke={isOnlyText ? "transparent" : "#4C83FF"}
+        stroke={isOnlyText ? "transparent" : SELECTION_COLOR}
         strokeWidth={2}
         dash={[4, 4]}
         listening={false}

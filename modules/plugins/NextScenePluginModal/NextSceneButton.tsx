@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface NextSceneButtonProps {
   scale: number;
@@ -36,22 +38,32 @@ export const NextSceneButton: React.FC<NextSceneButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: `${6 * scale}px`,
-        padding: `${8 * scale}px ${16 * scale}px`,
-        backgroundColor: isLoading ? (isDark ? '#333' : '#ddd') : '#437eb5',
+        height: `${40 * scale}px`,
+        padding: `0 ${16 * scale}px`,
+        backgroundColor: isLoading ? (isDark ? '#333' : '#ddd') : SELECTION_COLOR,
         color: '#ffffff',
         border: 'none',
-        borderRadius: `${8 * scale}px`,
+        borderRadius: `${10 * scale}px`,
         fontSize: `${13 * scale}px`,
         fontWeight: 600,
         cursor: (isLoading || !sourceImageUrl) ? 'not-allowed' : 'pointer',
         opacity: (isLoading || !sourceImageUrl) ? 0.7 : 1,
         whiteSpace: 'nowrap',
-        boxShadow: isLoading
+        boxShadow: isLoading || !sourceImageUrl
           ? 'none'
-          : (isDark ? `0 ${2 * scale}px ${4 * scale}px rgba(0,0,0,0.3)` : `0 ${2 * scale}px ${4 * scale}px rgba(67, 126, 181, 0.3)`),
-
+          : `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`,
+        transition: 'all 0.3s ease',
         transform: isLoading ? 'scale(0.98)' : 'scale(1)',
+      }}
+      onMouseEnter={(e) => {
+        if (!isLoading && sourceImageUrl) {
+          e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isLoading && sourceImageUrl) {
+          e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
+        }
       }}
     >
       {isLoading ? (
@@ -62,19 +74,7 @@ export const NextSceneButton: React.FC<NextSceneButtonProps> = ({
           </svg>
         </div>
       ) : (
-        <svg
-          width={`${16 * scale}px`}
-          height={`${16 * scale}px`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12h14" />
-          <path d="M12 5l7 7-7 7" />
-        </svg>
+        <GenerateArrowIcon scale={scale} />
       )}
     </button>
   );

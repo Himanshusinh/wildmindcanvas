@@ -157,7 +157,11 @@ export function useCanvasStore(projectId: string | null) {
 
                     execute(new AddNodeCommand(node));
                 } else {
-                    if (oldItem === item) return; // No change
+                    // Check if position changed (x or y) - always update if position changed
+                    const positionChanged = (oldItem as any).x !== (item as any).x || (oldItem as any).y !== (item as any).y;
+                    const hasPositionUpdate = (item as any).x !== undefined || (item as any).y !== undefined;
+                    
+                    if (oldItem === item && !positionChanged && !hasPositionUpdate) return; // No change
 
                     let newNode = (type === 'image' || type === 'model3d')
                         ? imageToNode(item as any)
@@ -165,6 +169,21 @@ export function useCanvasStore(projectId: string | null) {
 
                     if (!newNode.width) newNode.width = (oldItem as any).width || 400;
                     if (!newNode.height) newNode.height = (oldItem as any).height || 400;
+                    
+                    // Ensure position is always set from item - explicitly check for position updates
+                    if ((item as any).x !== undefined) {
+                        newNode.x = (item as any).x;
+                    } else if (positionChanged && (oldItem as any).x !== undefined) {
+                        // If position changed but new item doesn't have x, preserve old x
+                        newNode.x = (oldItem as any).x;
+                    }
+                    
+                    if ((item as any).y !== undefined) {
+                        newNode.y = (item as any).y;
+                    } else if (positionChanged && (oldItem as any).y !== undefined) {
+                        // If position changed but new item doesn't have y, preserve old y
+                        newNode.y = (oldItem as any).y;
+                    }
 
                     const oldNode = (type === 'image' || type === 'model3d')
                         ? imageToNode(oldItem as any)

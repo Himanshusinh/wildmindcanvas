@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface UseSpeechToTextOptions {
     onTranscriptChange?: (transcript: string) => void;
+    onFinalTranscript?: (transcript: string) => void;
     language?: string;
     continuous?: boolean;
     interimResults?: boolean;
@@ -10,6 +11,7 @@ export interface UseSpeechToTextOptions {
 export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
     const {
         onTranscriptChange,
+        onFinalTranscript,
         language = 'en-US',
         continuous = true,
         interimResults = true,
@@ -18,6 +20,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const recognitionRef = useRef<any>(null);   
+    const lastTranscriptRef = useRef<string>('');
 
     useEffect(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -39,6 +42,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
             }
 
             setTranscript(currentTranscript);
+            lastTranscriptRef.current = currentTranscript;
             if (onTranscriptChange) {
                 onTranscriptChange(currentTranscript);
             }
@@ -51,6 +55,10 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
 
         recognition.onend = () => {
             setIsListening(false);
+            const finalText = (lastTranscriptRef.current || '').trim();
+            if (finalText && onFinalTranscript) {
+                onFinalTranscript(finalText);
+            }
         };
 
         recognitionRef.current = recognition;
@@ -60,7 +68,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
                 recognitionRef.current.stop();
             }
         };
-    }, [language, continuous, interimResults, onTranscriptChange]);
+    }, [language, continuous, interimResults, onTranscriptChange, onFinalTranscript]);
 
     const startListening = useCallback(() => {
         if (recognitionRef.current && !isListening) {

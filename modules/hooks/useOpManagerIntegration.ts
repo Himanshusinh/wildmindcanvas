@@ -283,7 +283,7 @@ export function useOpManagerIntegration({
           });
         } else if (element.type === 'connector') {
           // Add connector element into connectors state
-          const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#437eb5', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
+          const conn = { id: element.id, from: element.from || element.meta?.from, to: element.to || element.meta?.to, color: element.meta?.color || '#4C83FF', fromAnchor: element.meta?.fromAnchor, toAnchor: element.meta?.toAnchor };
           setters.setConnectors(prev => prev.some(c => c.id === conn.id) ? prev : [...prev, conn as any]);
         }
       } else if (op.type === 'delete' && op.elementId) {
@@ -478,7 +478,7 @@ export function useOpManagerIntegration({
         });
         // If this update modified meta.connections, update connectors state accordingly (backwards compat)
         if (op.data.updates && op.data.updates.meta && Array.isArray(op.data.updates.meta.connections)) {
-          const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
+          const conns = (op.data.updates.meta.connections || []).map((c: any) => ({ id: c.id, from: op.elementId, to: c.to, color: c.color || '#4C83FF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor }));
           setters.setConnectors(prev => {
             // remove existing connectors from this source then append new ones
             const filtered = prev.filter(p => p.from !== op.elementId);

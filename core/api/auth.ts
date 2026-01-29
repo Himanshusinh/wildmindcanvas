@@ -384,10 +384,26 @@ export async function checkAuthStatus(): Promise<boolean> {
     } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
 
+      const isDev =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1');
+
       const logDebug = (message: string, data?: unknown) => {
         const timestamp = new Date().toISOString();
         const logEntry = `[${timestamp}] [checkAuthStatus] ${message}${data ? `: ${JSON.stringify(data)}` : ''}`;
+        // In dev, avoid noisy red console errors when the API gateway isn't running.
+        // Keep errors in production (or for unexpected failures).
+        const isExpectedDevConnectivityIssue =
+          isDev &&
+          (message.includes('API Gateway may not be running') ||
+            message.includes('API Gateway may be unreachable') ||
+            message.includes('Development mode: Allowing access'));
+        if (isExpectedDevConnectivityIssue) {
+          console.warn(logEntry);
+        } else {
         console.error(logEntry);
+        }
         try {
           const existingLogs = localStorage.getItem('authguard_debug_logs') || '[]';
           const logs = JSON.parse(existingLogs);
@@ -404,8 +420,6 @@ export async function checkAuthStatus(): Promise<boolean> {
         logDebug('Auth check timeout - API Gateway may be unreachable', { apiUrl });
 
         // In development, allow access even if API times out (likely hanging)
-        const isDev = typeof window !== 'undefined' &&
-          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         if (isDev) {
           logDebug('Development mode: Allowing access despite API timeout');
           return true; // Allow access in dev mode
@@ -417,8 +431,6 @@ export async function checkAuthStatus(): Promise<boolean> {
           error: error.message
         });
         // In development, allow access even if API is down
-        const isDev = typeof window !== 'undefined' &&
-          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
         if (isDev) {
           logDebug('Development mode: Allowing access despite API connection failure');
           return true; // Allow access in dev mode

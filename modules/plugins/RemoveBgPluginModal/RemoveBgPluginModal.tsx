@@ -11,6 +11,7 @@ import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedP
 import { PluginNodeShell } from '../PluginComponents';
 import { PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface RemoveBgPluginModalProps {
   isOpen: boolean;
@@ -267,7 +268,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
         const newConnector = {
           from: id,
           to: newModalId,
-          color: '#437eb5',
+          color: SELECTION_COLOR,
           fromX,
           fromY,
           toX,
@@ -393,7 +394,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             height: `${100 * scale}px`,
             backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isSelected ? '#437eb5' : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
+            border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

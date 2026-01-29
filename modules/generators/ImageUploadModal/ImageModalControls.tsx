@@ -1,5 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { ChevronDown } from 'lucide-react';
 
@@ -91,7 +93,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const aspectRatioDropdownRef = useRef<HTMLDivElement>(null);
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
-  const frameBorderColor = isSelected ? '#437eb5' : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
+  const frameBorderColor = isSelected ? SELECTION_COLOR : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
   const frameBorderWidth = 2;
   const dropdownBorderColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0,0,0,0.1)';
   const controlFontSize = `${13 * scale}px`;
@@ -179,6 +181,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
         }}
       >
         {/* Prompt Input */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: `${4 * scale}px` }}>
         <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>
           <input
             className="prompt-input"
@@ -218,31 +221,31 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           />
           <button
             onClick={onGenerate}
-            disabled={!prompt.trim() || isGenerating || isLocked}
-            title={isLocked ? lockReason : undefined}
+              disabled={!prompt.trim() || isGenerating || isLocked || prompt.trim().length > 5000}
+              title={isLocked ? lockReason : (prompt.trim().length > 5000 ? 'Prompt is too long (max 5000 characters)' : undefined)}
             style={{
               width: `${40 * scale}px`,
               height: `${40 * scale}px`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: (prompt.trim() && !isGenerating && !isLocked) ? '#437eb5' : 'rgba(0, 0, 0, 0.1)',
+                backgroundColor: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
               border: 'none',
               borderRadius: `${10 * scale}px`,
-              cursor: (prompt.trim() && !isGenerating && !isLocked) ? 'pointer' : 'not-allowed',
+                cursor: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? 'pointer' : 'not-allowed',
               color: 'white',
-              boxShadow: (prompt.trim() && !isGenerating && !isLocked) ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+                boxShadow: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
               padding: 0,
               opacity: (isGenerating || isLocked) ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (prompt.trim() && !isLocked) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
+                if (prompt.trim() && !isLocked && prompt.trim().length <= 5000) {
+                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
               }
             }}
             onMouseLeave={(e) => {
-              if (prompt.trim() && !isLocked) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
+                if (prompt.trim() && !isLocked && prompt.trim().length <= 5000) {
+                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
               }
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -261,11 +264,28 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                 </path>
               </svg>
             ) : (
-              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L14.4 9.1L22 12L14.4 14.9L12 22L9.6 14.9L2 12L9.6 9.1L12 2Z" />
-              </svg>
+              <GenerateArrowIcon scale={scale} />
             )}
           </button>
+          </div>
+          {/* Character Counter */}
+          {prompt.length > 0 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              paddingRight: `${8 * scale}px`,
+            }}>
+              <span style={{
+                fontSize: `${10 * scale}px`,
+                color: prompt.trim().length > 5000 ? '#ef4444' : (prompt.trim().length > 4500 ? '#f59e0b' : labelColor),
+                fontWeight: prompt.trim().length > 5000 ? 600 : 400,
+                transition: 'color 0.2s ease',
+              }}>
+                {prompt.trim().length} / 5000
+                {prompt.trim().length > 5000 && ' (too long)'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Settings Row */}
@@ -597,9 +617,9 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
               minWidth: `${28 * scale}px`,
               textAlign: 'center',
               fontWeight: 600,
-              fontSize: `${13 * scale}px`,
+              fontSize: controlFontSize,
               color: countText,
-              transition: 'color 0.3s ease'
+              transition: 'color 0.3s ease',
             }}>{imageCount}</div>
             <button
               onClick={(e) => { e.stopPropagation(); onImageCountChange(Math.min(4, imageCount + 1)); }}
@@ -738,7 +758,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptQuality === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptQuality === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>
@@ -774,7 +794,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptBackground === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptBackground === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>
@@ -810,7 +830,7 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
                         }}
                       >
                         {opt === 'auto' ? 'Automatic' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                        {gptModeration === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: '#437eb5' }} />}
+                        {gptModeration === opt && <div style={{ width: 6 * scale, height: 6 * scale, borderRadius: '50%', background: SELECTION_COLOR }} />}
                       </div>
                     ))}
                   </div>

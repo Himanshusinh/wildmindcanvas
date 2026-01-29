@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
 interface TextModalControlsProps {
@@ -53,7 +54,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
   const controlsBg = isDark ? '#121212' : '#ffffff';
   const dropdownText = isDark ? '#ffffff' : '#1f2937';
   const dropdownHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-  const selectedBg = isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)';
+  const selectedBg = isDark ? 'rgba(76, 131, 255, 0.2)' : 'rgba(76, 131, 255, 0.1)';
   const iconColor = isDark ? '#cccccc' : '#4b5563';
 
   const buttonHoverBg = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
@@ -194,7 +195,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
                   }}
                 >
                   {selectedModel === model && (
-                    <div style={{ width: `${6 * scale}px`, height: `${6 * scale}px`, borderRadius: '50%', backgroundColor: isDark ? '#3b82f6' : '#2563eb', marginRight: `${8 * scale}px` }} />
+                    <div style={{ width: `${6 * scale}px`, height: `${6 * scale}px`, borderRadius: '50%', backgroundColor: SELECTION_COLOR, marginRight: `${8 * scale}px` }} />
                   )}
                   <span style={{ fontWeight: selectedModel === model ? 500 : 400 }}>{model}</span>
                 </div>

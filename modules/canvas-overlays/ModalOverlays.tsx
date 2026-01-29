@@ -88,6 +88,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   selectedNextSceneModalIds,
   selectedStoryboardModalId,
   selectedStoryboardModalIds,
+  selectedIds,
+  setSelectionOrder,
 
   // Canvas Text
   canvasTextStates,
@@ -195,6 +197,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistUpscaleModalDelete,
   onUpscale,
   onMultiangleCamera,
+  onQwenMultipleAngles,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
   onPersistRemoveBgModalDelete,
@@ -239,6 +242,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onGenerateStoryboard,
   projectId,
   setGenerationQueue,
+  isChatOpen,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
 
@@ -347,6 +351,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         storyboardModalStates={storyboardModalStates ?? []}
         isComponentDraggable={isComponentDraggable}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
+        setSelectionOrder={setSelectionOrder}
       />
 
       <VideoModalOverlays
@@ -370,6 +377,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         textInputStates={textInputStates}
         isComponentDraggable={isComponentDraggable}
         setGenerationQueue={setGenerationQueue}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
+        setSelectionOrder={setSelectionOrder}
       />
 
       <VideoEditorModalOverlays
@@ -550,6 +560,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
         onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
         onMultiangleCamera={onMultiangleCamera}
+        onQwenMultipleAngles={onQwenMultipleAngles}
         onPersistImageModalCreate={onPersistImageModalCreate}
         onPersistImageModalMove={onPersistImageModalMove}
         connections={externalConnections ?? []}

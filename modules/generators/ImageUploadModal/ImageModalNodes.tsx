@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ImageModalNodesProps {
   id?: string;
@@ -50,10 +51,10 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
           try {
             const active: any = (window as any).__canvas_active_capture;
             if (active?.element && typeof active?.pid === 'number') {
-              try { active.element.releasePointerCapture(active.pid); } catch (err) {}
+              try { active.element.releasePointerCapture(active.pid); } catch (err) { }
               delete (window as any).__canvas_active_capture;
             }
-          } catch (err) {}
+          } catch (err) { }
         }}
         style={{
           position: 'absolute',
@@ -63,7 +64,7 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
+          backgroundColor: SELECTION_COLOR,
           cursor: 'pointer',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,
           zIndex: 5000,
@@ -79,13 +80,13 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
         onPointerDown={(e: React.PointerEvent) => {
           const el = e.currentTarget as HTMLElement;
           const pid = e.pointerId;
-          try { el.setPointerCapture?.(pid); } catch (err) {}
+          try { el.setPointerCapture?.(pid); } catch (err) { }
           // store active capture so receiver can release if needed
-          try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) {}
+          try { (window as any).__canvas_active_capture = { element: el, pid }; } catch (err) { }
           if (!id) return;
           e.stopPropagation();
           e.preventDefault();
-          const color = '#437eb5';
+          const color = SELECTION_COLOR;
           const startX = e.clientX;
           const startY = e.clientY;
           const DRAG_THRESHOLD_PX = 1;
@@ -107,8 +108,8 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
           };
 
           const handlePointerUp = (pe: any) => {
-            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) {}
-            try { delete (window as any).__canvas_active_capture; } catch (err) {}
+            try { el.releasePointerCapture?.(pe?.pointerId ?? pid); } catch (err) { }
+            try { delete (window as any).__canvas_active_capture; } catch (err) { }
             window.removeEventListener('canvas-node-complete', handleComplete as any);
             window.removeEventListener('pointerup', handlePointerUp as any);
             window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -116,8 +117,8 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
           };
 
           const handleComplete = () => {
-            try { el.releasePointerCapture?.(pid); } catch (err) {}
-            try { delete (window as any).__canvas_active_capture; } catch (err) {}
+            try { el.releasePointerCapture?.(pid); } catch (err) { }
+            try { delete (window as any).__canvas_active_capture; } catch (err) { }
             window.removeEventListener('canvas-node-complete', handleComplete as any);
             window.removeEventListener('pointerup', handlePointerUp as any);
             window.removeEventListener('pointercancel', handlePointerUp as any);
@@ -138,7 +139,7 @@ export const ImageModalNodes: React.FC<ImageModalNodesProps> = ({
           width: `${20 * scale}px`,
           height: `${20 * scale}px`,
           borderRadius: '50%',
-          backgroundColor: '#437eb5',
+          backgroundColor: SELECTION_COLOR,
           boxShadow: `0 0 ${8 * scale}px rgba(0,0,0,0.25)`,
           cursor: 'grab',
           border: `${2 * scale}px solid rgba(255,255,255,0.95)`,

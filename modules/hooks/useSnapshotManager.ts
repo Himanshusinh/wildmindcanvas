@@ -193,6 +193,23 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
         meta: metaObj,
       };
     });
+    // Multiangle Camera generators
+    state.multiangleCameraGenerators.forEach((modal) => {
+      if (!modal || !modal.id) return;
+      const connections = connectionsBySource[modal.id]?.length ? connectionsBySource[modal.id] : undefined;
+      const metaObj = {
+        sourceImageUrl: modal.sourceImageUrl || null,
+        ...(connections ? { connections } : {})
+      };
+      elements[modal.id] = {
+        id: modal.id,
+        type: 'multiangle-camera-plugin',
+        x: modal.x,
+        y: modal.y,
+        bounds: { width: 400, height: 500 }, // Default dimensions
+        meta: metaObj,
+      };
+    });
     // Storyboard generators
     state.storyboardGenerators.forEach((modal) => {
       if (!modal || !modal.id) return;
@@ -342,7 +359,7 @@ export function useSnapshotManager({ projectId, state, isHydrated, mutationVersi
     );
     connectorsToUseFinal.forEach(c => {
       if (!c || !c.id) return;
-      elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#437eb5', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
+      elements[c.id] = { id: c.id, type: 'connector', from: c.from, to: c.to, meta: { color: c.color || '#4C83FF', fromAnchor: c.fromAnchor, toAnchor: c.toAnchor } };
     });
 
     // Fix 4: Strict Snapshot Schema - Filter out garbage

@@ -26,6 +26,7 @@ interface MultiangleCameraModalOverlaysProps {
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number; sourceImageUrl?: string | null }>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
   onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+  onQwenMultipleAngles?: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }>) => void | Promise<void>;
   connections: Connection[];
@@ -49,6 +50,7 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
   onPersistMultiangleCameraModalMove,
   onPersistMultiangleCameraModalDelete,
   onMultiangleCamera,
+  onQwenMultipleAngles,
   onPersistImageModalCreate,
   onPersistImageModalMove,
   connections,
@@ -158,7 +160,7 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
               Promise.resolve(onPersistMultiangleCameraModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedMultiangleCameraModalId === modalState.id}
+          isSelected={selectedMultiangleCameraModalId === modalState.id || (selectedMultiangleCameraModalIds || []).includes(modalState.id)}
           initialSourceImageUrl={modalState.sourceImageUrl}
           onOptionsChange={(opts) => {
             const hasChanges = Object.keys(opts).some(key => {
@@ -189,6 +191,14 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
               throw err;
             }
           } : undefined}
+          onQwenMultipleAngles={onQwenMultipleAngles ? async (imageUrls, horizontalAngle, verticalAngle, zoom, additionalPrompt, loraScale) => {
+            try {
+              return await onQwenMultipleAngles(imageUrls, horizontalAngle, verticalAngle, zoom, additionalPrompt, loraScale);
+            } catch (err) {
+              console.error('[ModalOverlays] qwen multiple angles failed', err);
+              throw err;
+            }
+          } : undefined}
           onPersistImageModalCreate={onPersistImageModalCreate}
           onUpdateImageModalState={(modalId, updates) => {
             if (onPersistImageModalMove) {
@@ -209,10 +219,16 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
             setMultiangleCameraModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
           }}
           onPositionCommit={(finalX, finalY) => {
+            // Update local state immediately for responsive UI
+            setMultiangleCameraModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: finalX, y: finalY } : m));
+            // Persist to parent state (which will be saved to backend via snapshot)
             if (onPersistMultiangleCameraModalMove) {
-              Promise.resolve(onPersistMultiangleCameraModalMove(modalState.id, { x: finalX, y: finalY })).catch((err) => {
-                console.error('[ModalOverlays] Error in onPersistMultiangleCameraModalMove', err);
-              });
+              const result = onPersistMultiangleCameraModalMove(modalState.id, { x: finalX, y: finalY });
+              if (result && typeof result.then === 'function') {
+                result.catch((err: any) => {
+                  console.error('[ModalOverlays] Error in onPersistMultiangleCameraModalMove', err);
+                });
+              }
             }
           }}
         />

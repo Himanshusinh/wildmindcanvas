@@ -292,11 +292,11 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                 userSelect: 'none',
                 cursor: isDragging ? 'grabbing' : 'grab',
             }}
-        tabIndex={0}
-        onBlur={(e) => {
-            if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-                setIsSelected(false);
-            }
+            tabIndex={0}
+            onBlur={(e) => {
+                if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+                    setIsSelected(false);
+                }
             }}
         >
             <div
@@ -307,12 +307,12 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     minHeight: `${cardMinHeight}px`,
                     backgroundColor: isDark ? '#1b1b1b' : '#ffffff',
                     borderRadius: `${cardRadius}px`,
-                    border: isSelected ? `${2 * scale}px solid #437eb5` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
+                    border: isSelected ? `${2 * scale}px solid #4C83FF` : `1.5px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
                     boxShadow: isSelected
                         ? '0 0 0 3px rgba(67, 126, 181, 0.25)'
                         : isDark
-                        ? '0 12px 24px rgba(0,0,0,0.6)'
-                        : '0 12px 24px rgba(15,23,42,0.18)',
+                            ? '0 12px 24px rgba(0,0,0,0.6)'
+                            : '0 12px 24px rgba(15,23,42,0.18)',
                     padding: `${cardPadding}px`,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     transition: 'box-shadow 0.2s ease, border 0.2s ease',
@@ -397,7 +397,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                                 padding: `${12 * scale}px`,
                                 resize: 'vertical',
                                 fontFamily: 'system-ui, -apple-system, sans-serif',
-                        }}
+                            }}
                         />
                         <div style={{ display: 'flex', gap: `${8 * scale}px` }}>
                             <button
@@ -437,16 +437,16 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                                 }}
                             >
                                 Cancel
-                    </button>
-                </div>
+                            </button>
+                        </div>
                     </div>
                 ) : (
-                <SceneFrame
-                    scale={scale}
-                    sceneNumber={frame.sceneNumber}
-                    sceneContent={frame.content}
-                    isDark={isDark}
-                />
+                    <SceneFrame
+                        scale={scale}
+                        sceneNumber={frame.sceneNumber}
+                        sceneContent={frame.content}
+                        isDark={isDark}
+                    />
                 )}
             </div>
         </div>

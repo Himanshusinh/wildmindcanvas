@@ -55,7 +55,7 @@ interface VideoModalOverlaysProps {
   clearAllSelections: () => void;
   setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
   setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: (ids: string[]) => void;
+  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; isPinned?: boolean }>) => void | Promise<void>;
@@ -69,6 +69,9 @@ interface VideoModalOverlaysProps {
   textInputStates?: TextModalState[];
   isComponentDraggable?: (id: string) => boolean;
   setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+  isChatOpen?: boolean;
+  selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 }
 
 export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
@@ -92,8 +95,36 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   textInputStates,
   isComponentDraggable,
   setGenerationQueue,
+  isChatOpen,
+  selectedIds,
+  setSelectionOrder,
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Track Shift key locally for robust multi-selection
+  const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Use ref to access latest video selection state
+  const selectedVideoModalIdsRef = React.useRef(selectedVideoModalIds);
+  React.useEffect(() => {
+    selectedVideoModalIdsRef.current = selectedVideoModalIds;
+  }, [selectedVideoModalIds]);
 
   return (
     <>
@@ -313,12 +344,51 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           connections={connections}
           imageModalStates={imageModalStates}
           images={images}
-          onSelect={() => {
-            // Clear all other selections first
-            clearAllSelections();
-            // Then set this modal as selected
-            setSelectedVideoModalId(modalState.id);
-            setSelectedVideoModalIds([modalState.id]);
+          isAttachedToChat={isChatOpen && (selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (selectedIds ? (selectedIds.includes(modalState.id) ? selectedIds.indexOf(modalState.id) + 1 : undefined)
+                : (selectedVideoModalIds.includes(modalState.id) ? selectedVideoModalIds.indexOf(modalState.id) + 1 : (selectedVideoModalId === modalState.id ? 1 : undefined)))
+              : undefined
+          }
+          onSelect={(e) => {
+            const isShift = e?.shiftKey || isShiftPressed;
+            if (isShift) {
+              if (e) e.stopPropagation();
+              // Multi-select toggle
+              const currentSelected = selectedVideoModalIdsRef.current;
+              if (currentSelected.includes(modalState.id)) {
+                setSelectedVideoModalIds(currentSelected.filter(id => id !== modalState.id));
+                // Remove from selection order
+                if (setSelectionOrder) {
+                  setSelectionOrder(prev => prev.filter(id => id !== modalState.id));
+                }
+              } else {
+                setSelectedVideoModalIds([...currentSelected, modalState.id]);
+                // Add to selection order (append to end) - but only if not already in order
+                if (setSelectionOrder) {
+                  setSelectionOrder(prev => {
+                    // Only add if not already in the order
+                    if (!prev.includes(modalState.id)) {
+                      return [...prev, modalState.id];
+                    }
+                    return prev;
+                  });
+                }
+              }
+              if (!selectedVideoModalIds.includes(modalState.id)) {
+                setSelectedVideoModalId(modalState.id);
+              }
+            } else {
+              // Single select
+              clearAllSelections();
+              setSelectedVideoModalId(modalState.id);
+              setSelectedVideoModalIds([modalState.id]);
+              // Reset selection order to just this item
+              if (setSelectionOrder) {
+                setSelectionOrder([modalState.id]);
+              }
+            }
           }}
           onDelete={() => {
             console.log('[VideoModalOverlays] onDelete called', {

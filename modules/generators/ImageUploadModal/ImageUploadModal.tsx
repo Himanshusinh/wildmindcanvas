@@ -30,7 +30,7 @@ interface ImageUploadModalProps {
   y: number;
   onPositionChange?: (x: number, y: number) => void;
   onPositionCommit?: (x: number, y: number) => void;
-  onSelect?: () => void;
+  onSelect?: (e?: React.MouseEvent) => void;
   onDelete?: () => void;
   onDownload?: () => void;
   onDuplicate?: () => void;
@@ -59,10 +59,14 @@ interface ImageUploadModalProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isOpen,
+  isAttachedToChat,
+  selectionOrder,
   id,
   onClose,
   onGenerate,
@@ -120,14 +124,30 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Track initial mouse position to distinguish clicks from drags
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
   // Track if resolution change was user-initiated to prevent useEffect from overriding it
   const userInitiatedResolutionChangeRef = useRef(false);
+  // Debug Selection Props
+  useEffect(() => {
+    if (isAttachedToChat || isSelected || selectionOrder) {
+      console.log('[ImageUploadModal] Selection Props Received:', {
+        id,
+        isAttachedToChat,
+        isSelected,
+        selectionOrder,
+        selectionOrderType: typeof selectionOrder,
+        renderBadgeCondition: !!isAttachedToChat
+      });
+    }
+  }, [id, isAttachedToChat, isSelected, selectionOrder]);
+
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Google Nano Banana');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState((initialAspectRatio ?? '1:1').replace(/\s+/g, ''));
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuImageIndex, setContextMenuImageIndex] = useState<number | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -263,7 +283,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
-  const frameBorderColor = isSelected ? '#437eb5' : 'rgba(0, 0, 0, 0.3)';
+  const frameBorderColor = isSelected ? '#4C83FF' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
 
@@ -422,7 +442,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
   }, [hasConnectedImage, hasExistingImage, selectedModel, selectedAspectRatio, selectedFrame, prompt, onOptionsChange, isUploadedImage, IMAGE_TO_IMAGE_MODELS]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (countOverride?: number) => {
     // Use effective prompt (connected text or local prompt)
     const promptToUse = effectivePrompt;
     if (promptToUse.trim() && !isGenerating && onPersistImageModalCreate && onImageGenerate) {
@@ -498,8 +518,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             width = Math.max(256, Math.min(1440, width));
             height = Math.max(256, Math.min(1440, height));
           }
-          // Flux Pro 1.1 Ultra, Flux 2 Pro & Seedream models: Strict Fit Inside Logic
-          else if (isFluxUltra || modelLower.includes('flux 2 pro') || modelLower.includes('seedream')) {
+          // Flux Pro 1.1 Ultra, Flux 2 Pro, Google nano banana pro & Seedream models: Strict Fit Inside Logic
+          else if (isFluxUltra || modelLower.includes('flux 2 pro') || modelLower.includes('nano banana pro') || modelLower.includes('seedream')) {
             if (selectedResolution === '4K') baseSize = 4096;
             else if (selectedResolution === '2K') baseSize = 2048;
             else baseSize = 1024; // Default 1K
@@ -814,7 +834,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const newConnector = {
                   from: connectedImageSource.id,
                   to: targetModalId,
-                  color: '#437eb5',
+                  color: '#4C83FF',
                   fromX,
                   fromY,
                   toX,
@@ -860,7 +880,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                 const newConnector = {
                   from: id,
                   to: targetModalId,
-                  color: '#437eb5',
+                  color: '#4C83FF',
                   fromX,
                   fromY,
                   toX,
@@ -972,7 +992,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
         // Now make ONE API call with the full imageCount
         // The backend will generate all images in parallel, ensuring they are different
-        console.log(`[Image Generation] Starting generation of ${imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
+        console.log(`[Image Generation] Starting generation of ${typeof countOverride === 'number' ? countOverride : imageCount} images${isImageToImageMode ? ' (image-to-image mode)' : ''}`);
         console.log(`[Image Generation] 🔍 About to call onImageGenerate with:`, {
           targetModalId,
           referenceImageUrls: allReferenceImageUrls,
@@ -986,12 +1006,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           height,
         });
 
+        // Use countOverride if provided, otherwise default to imageCount
+        const effectiveImageCount = typeof countOverride === 'number' ? countOverride : imageCount;
+
         console.log('[Image Generation] 🚨 CRITICAL CHECK - What is being passed to API:', {
           'finalSourceImageUrlParam is': finalSourceImageUrlParam || 'UNDEFINED/NULL',
           'finalSourceImageUrlParam type': typeof finalSourceImageUrlParam,
           'finalSourceImageUrlParam truthy': !!finalSourceImageUrlParam,
           'finalSourceImageUrlParam length': finalSourceImageUrlParam?.length || 0,
           'This will be': finalSourceImageUrlParam ? 'IMAGE-TO-IMAGE' : 'TEXT-TO-IMAGE',
+          'imageCount': effectiveImageCount
         });
 
         // Collect model-specific options
@@ -1004,13 +1028,41 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           generationOptions.moderation = gptModeration;
         }
 
+        const permittedRatios = ['21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', 'auto'];
+
+        // Helper to find closest permitted aspect ratio
+        const getClosestAspectRatio = (currentRatio: string): string => {
+          if (permittedRatios.includes(currentRatio)) return currentRatio;
+
+          const [w, h] = currentRatio.split(':').map(Number);
+          if (!w || !h) return '1:1'; // Fallback for invalid format
+
+          const targetVal = w / h;
+          let bestRatio = '1:1';
+          let minDiff = Number.MAX_VALUE;
+
+          permittedRatios.forEach(r => {
+            if (r === 'auto') return;
+            const [rw, rh] = r.split(':').map(Number);
+            const val = rw / rh;
+            const diff = Math.abs(targetVal - val);
+            if (diff < minDiff) {
+              minDiff = diff;
+              bestRatio = r;
+            }
+          });
+          return bestRatio;
+        };
+
+        const finalAspectRatio = getClosestAspectRatio(selectedAspectRatio);
+
         const result = await onImageGenerate(
           promptToUse,
           getFinalModelName(),
           selectedFrame,
-          selectedAspectRatio,
+          finalAspectRatio,
           targetModalId,
-          imageCount,
+          typeof countOverride === 'number' ? countOverride : imageCount,
           finalSourceImageUrlParam,
           width,
           height,
@@ -1041,10 +1093,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           console.warn(`[Image Generation] No result returned from API`);
         }
 
-        console.log(`[Image Generation] Final extracted ${imageUrls.length} image URLs (requested ${imageCount})`);
+        console.log(`[Image Generation] Final extracted ${imageUrls.length} image URLs (requested ${effectiveImageCount})`);
 
-        if (imageUrls.length < imageCount) {
-          console.warn(`[Image Generation] WARNING: Requested ${imageCount} images but only got ${imageUrls.length}`);
+        if (imageUrls.length < effectiveImageCount) {
+          console.warn(`[Image Generation] WARNING: Requested ${effectiveImageCount} images but only got ${imageUrls.length}`);
         }
 
         // Update all frames with their respective images
@@ -1083,7 +1135,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     }
   };
 
-  // Sync internal state from initial props (hydration)
+  // Auto-start generation if requested from parent (e.g. chat intent)
+  useEffect(() => {
+    // Only auto-start if:
+    // 1. External prop says we should be generating
+    // 2. We haven't generated an image yet
+    // 3. We aren't currently generating (local state)
+    // 4. It's not an uploaded image (safety check)
+    if (externalIsGenerating && !generatedImageUrl && !isGenerating && !isUploadedImage) {
+      console.log('[ImageUploadModal] 🚀 Auto-starting generation based on externalIsGenerating prop');
+      // Small timeout to ensure everything is initialized
+      const timer = setTimeout(() => {
+        handleGenerate();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [externalIsGenerating, generatedImageUrl, isGenerating, isUploadedImage]);
+
   useEffect(() => {
     if (typeof initialPrompt === 'string' && initialPrompt !== prompt) setPrompt(initialPrompt);
   }, [initialPrompt]);
@@ -1162,6 +1230,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     return { model: baseModel, resolution: foundResolution };
   };
 
+  // Ensure resolution is valid for Google nano banana pro on mount
+  useEffect(() => {
+    const modelLower = selectedModel.toLowerCase();
+    if (modelLower.includes('nano banana pro')) {
+      const validResolutions = ['1K', '2K', '4K'];
+      if (!validResolutions.includes(selectedResolution)) {
+        setSelectedResolution('2K');
+      }
+    }
+  }, [selectedModel, selectedResolution]);
+
   useEffect(() => {
     if (initialModel) {
       const { model, resolution } = parseModelAndResolution(initialModel);
@@ -1171,6 +1250,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         const modelLower = model.toLowerCase();
         const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
         const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+        const isNanoBananaPro = modelLower.includes('nano banana pro');
 
         // For Z Image Turbo and P-Image, only accept valid resolutions
         if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
@@ -1182,6 +1262,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           if (resolution !== selectedResolution) {
             userInitiatedResolutionChangeRef.current = false;
             setSelectedResolution(resolution);
+          }
+        } else if (isNanoBananaPro) {
+          // For Google nano banana pro, ensure resolution is 1K, 2K, or 4K
+          const validResolutions = ['1K', '2K', '4K'];
+          const finalResolution = validResolutions.includes(resolution) ? resolution : '2K'; // Default to 2K if invalid
+          if (finalResolution !== selectedResolution) {
+            userInitiatedResolutionChangeRef.current = false;
+            setSelectedResolution(finalResolution);
           }
         } else if (!isZTurbo && !isPImage) {
           // For other models, use the parsed resolution
@@ -1197,12 +1285,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           const modelLower = model.toLowerCase();
           const isZTurbo = modelLower.includes('z image turbo') || modelLower.includes('z-image-turbo');
           const isPImage = modelLower.includes('p-image') && !modelLower.includes('p-image-edit');
+          const isNanoBananaPro = modelLower.includes('nano banana pro');
 
           // For Z Image Turbo and P-Image, only accept valid resolutions
           if (isZTurbo && (resolution === '1024' || resolution === '1440')) {
             setSelectedResolution(resolution);
           } else if (isPImage && ['512', '768', '1024', '1280', '1440'].includes(resolution)) {
             setSelectedResolution(resolution);
+          } else if (isNanoBananaPro) {
+            // For Google nano banana pro, ensure resolution is 1K, 2K, or 4K
+            const validResolutions = ['1K', '2K', '4K'];
+            const finalResolution = validResolutions.includes(resolution) ? resolution : '2K'; // Default to 2K if invalid
+            setSelectedResolution(finalResolution);
           } else if (!isZTurbo && !isPImage) {
             // For other models, use the parsed resolution
             setSelectedResolution(resolution);
@@ -1472,28 +1566,88 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   };
 
 
+  // Handle click for shift-selection (fires after mousedown + mouseup)
+  const handleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+    const isButton = target.tagName === 'BUTTON' || target.closest('button');
+    const isControls = target.closest('.controls-overlay');
+    const isShiftClick = e.shiftKey || e.ctrlKey || e.metaKey;
+
+    // Always stop propagation to prevent canvas from handling the click
+    // This is especially important for shift-clicks to preserve selection
+    e.stopPropagation();
+
+    // For shift/ctrl/cmd clicks, ensure selection is handled on click event
+    // This ensures single click (not hold) works properly
+    if (onSelect && !isInput && !isButton && !isControls && isShiftClick) {
+      // Check if mouse actually moved (was it a drag or a click?)
+      let wasClick = true;
+      if (mouseDownPosRef.current) {
+        const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+        const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+        // Only handle as click if mouse didn't move much (was a click, not a drag)
+        wasClick = dx <= 5 && dy <= 5;
+      }
+      
+      if (wasClick) {
+        console.log('[ImageUploadModal] handleClick triggering onSelect for shift-click', {
+          id,
+          shiftKey: e.shiftKey,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+        });
+        onSelect(e);
+        e.preventDefault();
+      }
+    }
+    
+    // Clear the mouseDownPosRef after click event has been processed
+    mouseDownPosRef.current = null;
+  };
 
   // Handle drag start
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isLocked) {
+      return;
+    }
     const target = e.target as HTMLElement;
     const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isImage = target.tagName === 'IMG';
     const isControls = target.closest('.controls-overlay');
+    const isShiftClick = e.shiftKey || e.ctrlKey || e.metaKey;
 
     // Check if dragging is allowed
     if (draggable === false && !isInput && !isButton && !isControls) {
       return;
     }
 
-    // Call onSelect when clicking on the modal (this will trigger context menu)
-    if (onSelect && !isInput && !isButton && !isControls) {
-      onSelect();
+    // Store initial mouse position
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+
+    // For shift-clicks, we'll handle selection on click event (after mouseup)
+    // So we don't call onSelect here for shift-clicks to avoid double-triggering
+    if (onSelect && !isInput && !isButton && !isControls && !isShiftClick) {
+      console.log('[ImageUploadModal] handleMouseDown triggering onSelect (non-shift)', {
+        id,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+      });
+      onSelect(e);
+    }
+
+    // For shift/ctrl/cmd clicks, stop propagation and don't start dragging
+    // But don't prevent default - we want the click event to fire
+    if (isShiftClick && !isInput && !isButton && !isControls) {
+      e.stopPropagation();
+      // Don't prevent default - we need the click event to fire for proper selection
+      return; // Don't start dragging for multi-select clicks
     }
 
     // Only allow dragging from the frame, not from controls
-    if (!isInput && !isButton && !isImage && !isControls) {
-      setIsDraggingContainer(true);
+    if (!isInput && !isButton && !isControls) {
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({
@@ -1503,16 +1657,28 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }
       e.preventDefault();
       e.stopPropagation();
+      // Don't set isDraggingContainer immediately - wait to see if mouse moves
     }
   };
 
-  // Handle drag move
+  // Handle drag move - only start dragging if mouse actually moves
   useEffect(() => {
-    if (!isDraggingContainer) return;
+    if (!mouseDownPosRef.current) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      if (!mouseDownPosRef.current) return;
+      
+      // Check if mouse has moved enough to consider it a drag (not just a click)
+      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+      
+      // Only start dragging if mouse moved more than 5 pixels
+      if ((dx > 5 || dy > 5) && !isDraggingContainer) {
+        setIsDraggingContainer(true);
+      }
 
+      // If dragging, update position
+      if (isDraggingContainer && containerRef.current && onPositionChange) {
       // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
@@ -1523,13 +1689,16 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
       onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
+      }
     };
 
     const handleMouseUp = () => {
-      setIsDraggingContainer(false);
-      if (onPositionCommit && lastCanvasPosRef.current) {
+      if (isDraggingContainer && onPositionCommit && lastCanvasPosRef.current) {
         onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
+      setIsDraggingContainer(false);
+      // Don't clear mouseDownPosRef here - we need it for the click event
+      // It will be cleared in the click handler after we check it
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -1550,6 +1719,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       data-modal-component="image"
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
+      onClick={handleClick}
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -1563,6 +1733,23 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         transition: 'opacity 0.2s ease',
       }}
     >
+
+      {isAttachedToChat && selectionOrder && (
+        <div 
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
 
       {/* Auto-Reference Indicator */}
       {autoReferenceInfo && (
@@ -1697,7 +1884,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           onDuplicate={onDuplicate}
           onDownload={generatedImageUrl ? onDownload : undefined}
           onTogglePin={onTogglePin}
-          onRegenerate={!isUploadedImage ? handleGenerate : undefined}
+          onRegenerate={!isUploadedImage ? () => handleGenerate(1) : undefined}
         />
         <ImageModalFrame
           id={id}
@@ -1708,7 +1895,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           isUploadedImage={Boolean(isUploadedImage)}
           isSelected={Boolean(isSelected)}
           isDraggingContainer={isDraggingContainer}
-          generatedImageUrl={generatedImageUrl}
+          generatedImageUrl={(!isUploadedImage && connectedImageSource?.url && generatedImageUrl === connectedImageSource.url) ? null : generatedImageUrl}
           isGenerating={isGenerating}
           externalIsGenerating={externalIsGenerating}
           onSelect={onSelect}
@@ -1788,7 +1975,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onModelChange={(model) => {
               setSelectedModel(model);
               setIsModelDropdownOpen(false);
+              
+              // Ensure resolution is set correctly for Google nano banana pro
               const modelLower = model.toLowerCase();
+              if (modelLower.includes('nano banana pro')) {
+                // If current resolution is not valid for nano banana pro, set to default 2K
+                const validResolutions = ['1K', '2K', '4K'];
+                if (!validResolutions.includes(selectedResolution)) {
+                  setSelectedResolution('2K');
+                }
+              }
+              
               let availableRatios: Array<{ value: string; label: string }>;
               if (modelLower.includes('flux')) {
                 availableRatios = [

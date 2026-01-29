@@ -56,7 +56,7 @@ interface ImageModalOverlaysProps {
   clearAllSelections: () => void;
   setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
   setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: (ids: string[]) => void;
+  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onImageGenerate?: (
     prompt: string,
     model: string,
@@ -88,7 +88,11 @@ interface ImageModalOverlaysProps {
   scriptFrameModalStates?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
   storyboardModalStates?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string> }>;
   isComponentDraggable?: (id: string) => boolean;
+  isChatOpen?: boolean;
+  selectedIds?: string[];
+  setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 }
+
 
 export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   imageModalStates,
@@ -115,8 +119,36 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   scriptFrameModalStates = [],
   storyboardModalStates = [],
   isComponentDraggable,
+  isChatOpen,
+  selectedIds,
+  setSelectionOrder,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Track Shift key locally for robust multi-selection
+  const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Use ref to access latest selection state inside closures/callbacks
+  const selectedImageModalIdsRef = React.useRef(selectedImageModalIds);
+  React.useEffect(() => {
+    selectedImageModalIdsRef.current = selectedImageModalIds;
+  }, [selectedImageModalIds]);
 
   const handleContextMenu = (e: React.MouseEvent, modalId: string) => {
     e.preventDefault();
@@ -156,515 +188,631 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
 
   return (
     <>
-      {imageModalStates.map((modalState) => (
-        <ImageUploadModal
-          key={modalState.id}
-          isOpen={true}
-          id={modalState.id}
-          draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
-          onContextMenu={(e) => handleContextMenu(e, modalState.id)}
-          isPinned={modalState.isPinned}
-          onTogglePin={() => {
-            if (onPersistImageModalMove) {
-              onPersistImageModalMove(modalState.id, { isPinned: !modalState.isPinned });
-            }
-          }}
-          onClose={() => {
-            setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
-            setSelectedImageModalId(null);
-            if (onPersistImageModalDelete) {
-              Promise.resolve(onPersistImageModalDelete(modalState.id)).catch(console.error);
-            }
-          }}
-          refImages={refImages}
-          sourceImageUrl={(() => {
-            const sourceUrl = modalState.sourceImageUrl;
-            console.log('[ImageModalOverlays] 🚨 CRITICAL: About to render ImageUploadModal:', {
-              modalId: modalState.id,
-              hasSourceImageUrlInModalState: !!sourceUrl,
-              sourceImageUrlValue: sourceUrl || 'UNDEFINED/NULL',
-              sourceImageUrlPreview: sourceUrl ? sourceUrl.substring(0, 100) + '...' : 'UNDEFINED/NULL',
-              modalStateKeys: Object.keys(modalState),
-              fullModalState: modalState,
-            });
-            // Belt-and-suspenders: allow only stitched refs; drop legacy comma lists
-            if (!sourceUrl) return undefined;
-            if (sourceUrl.includes('reference-stitched')) return sourceUrl;
-            if (sourceUrl.includes(',')) return undefined;
-            return sourceUrl;
-          })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
-          onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height, options) => {
-            const selectedStyle = options?.style;
-            console.log('[ImageModalOverlays] onGenerate called!', {
-              modalId: modalState.id,
-              hasOnImageGenerate: !!onImageGenerate,
-              sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
-            });
-            if (onImageGenerate) {
-              try {
-                // Fix shadowing: usage of 'imageCount' argument (from onImageGenerate params)
-                // Use the passed argument if available, otherwise fall back to state
-                const countToUse = imageCount || modalState.imageCount || 1;
+      {imageModalStates.map((modalState) => {
+        // Fix for regeneration glitch: Check if this modal is displaying its connected source image
+        // This happens briefly when a new frame is connected to an old frame
+        const incomingConnectionCheck = connections.find(c => c.to === modalState.id);
+        let sourceImageUrlForDisplayCheck: string | null = null;
+        if (incomingConnectionCheck) {
+          const sourceModal = imageModalStates.find(m => m.id === incomingConnectionCheck.from);
+          if (sourceModal && sourceModal.generatedImageUrl) {
+            sourceImageUrlForDisplayCheck = sourceModal.generatedImageUrl;
+          }
+        }
+        // Only consider it a ghost image if it's NOT an uploaded image (uploaded images might be duplicates)
+        const isGhostImage = modalState.generatedImageUrl &&
+          sourceImageUrlForDisplayCheck &&
+          modalState.generatedImageUrl === sourceImageUrlForDisplayCheck &&
+          modalState.model !== 'Uploaded Image';
 
-                // CRITICAL: Prioritize sourceImageUrl passed from ImageUploadModal (for simple image-to-image)
-                // Fall back to modalState.sourceImageUrl only for scene-based generation
-                let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
-                const sceneNumber = (modalState as any).sceneNumber;
+        if (isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))) {
+          console.log('[ImageModalOverlays] Render Debug:', {
+            id: modalState.id,
+            selectedIds: selectedIds || 'undefined',
+            selectedImageModalIds,
+            indexInAll: selectedIds ? selectedIds.indexOf(modalState.id) : -1,
+            indexInLocal: selectedImageModalIds.indexOf(modalState.id),
+            isShiftPressed
+          });
+        }
 
-                console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
-                  fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
-                  fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-                  finalChoice: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-                });
-
-                console.log('[ImageModalOverlays] 🔍 Checking modalState.sourceImageUrl:', {
-                  modalId: modalState.id,
-                  hasSourceImageUrl: !!modalState.sourceImageUrl,
-                  sourceImageUrl: modalState.sourceImageUrl || 'NONE - will try to build from connected scene',
-                  sourceImageUrlPreview: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-                  sceneNumber,
-                  isStitchedImage: modalState.sourceImageUrl?.includes('reference-stitched'),
-                  isCommaSeparated: modalState.sourceImageUrl?.includes(','),
-                });
-
-                // CRITICAL: If modal state already has a stitched image URL, use it and don't override!
-                if (sourceImageUrl && sourceImageUrl.includes('reference-stitched')) {
-                  console.log('[ImageModalOverlays] ✅ Modal state already has stitched image URL (contains both images). Using it directly.');
-                  // Don't override - the stitched image already contains both images combined
-                }
-
-                // For Scene 1: Prefer stitched image URL (contains both images combined)
-                // If sourceImageUrl is comma-separated (individual images), try to get stitched image from snapshot
-                if (sceneNumber === 1 && sourceImageUrl && sourceImageUrl.includes(',') && !sourceImageUrl.includes('reference-stitched')) {
-                  console.warn('[ImageModalOverlays] ⚠️ Scene 1 has comma-separated images. Trying to get stitched image from snapshot...');
-                  // Try to get stitched image from snapshot metadata
-                  try {
-                    const { getCurrentSnapshot } = await import('@/core/api/canvasApi');
-                    // Try to get projectId from multiple sources
-                    let projectId: string | null = null;
-
-                    // 1. Try from URL params
-                    const urlParams = new URLSearchParams(window.location.search);
-                    projectId = urlParams.get('projectId');
-
-                    // 2. Try from window global
-                    if (!projectId) {
-                      projectId = (window as any).__PROJECT_ID__ || (window as any).projectId;
-                    }
-
-                    // 3. Try from storyboard connection (if available)
-                    if (!projectId) {
-                      const sceneConnection = connections.find(c => c.to === modalState.id);
-                      if (sceneConnection && storyboardModalStates) {
-                        const connectedScene = sceneFrameModalStates?.find(s => s.id === sceneConnection.from);
-                        if (connectedScene && scriptFrameModalStates) {
-                          const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
-                          if (parentScript && storyboardModalStates) {
-                            const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
-                            // Storyboard might have projectId in meta, but it's unlikely
-                            // For now, we'll rely on URL or window global
-                          }
-                        }
-                      }
-                    }
-
-                    if (projectId) {
-                      const current = await getCurrentSnapshot(projectId);
-                      const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
-
-                      if (stitchedImageData && typeof stitchedImageData === 'object') {
-                        const stitchedUrl = Object.values(stitchedImageData)[0];
-                        if (stitchedUrl && typeof stitchedUrl === 'string') {
-                          sourceImageUrl = stitchedUrl;
-                          console.log('[ImageModalOverlays] ✅ Scene 1: Using stitched image from snapshot (contains both images):', {
-                            url: stitchedUrl.substring(0, 100) + '...',
-                          });
-                        } else {
-                          console.warn('[ImageModalOverlays] ⚠️ Stitched image found in snapshot but URL is invalid');
-                        }
-                      } else {
-                        console.warn('[ImageModalOverlays] ⚠️ No stitched-image found in snapshot metadata');
-                      }
-                    } else {
-                      console.warn('[ImageModalOverlays] ⚠️ No projectId available to fetch stitched image from snapshot. Will use comma-separated images as fallback.');
-                    }
-                  } catch (error) {
-                    console.error('[ImageModalOverlays] ❌ Failed to get stitched image from snapshot:', error);
-                    // Keep the comma-separated images as fallback
+        return (
+          <ImageUploadModal
+            key={modalState.id}
+            isOpen={true}
+            id={modalState.id}
+            isAttachedToChat={isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))}
+            isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
+            selectionOrder={
+              isChatOpen
+                ? (() => {
+                  // 1. Try global selectedIds first (if valid and contains id)
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
                   }
-                }
+                  // 2. Fallback to specific type list
+                  if (selectedImageModalIds && selectedImageModalIds.includes(modalState.id)) {
+                    return selectedImageModalIds.indexOf(modalState.id) + 1;
+                  }
+                  // 3. Fallback to singular
+                  if (selectedImageModalId === modalState.id) {
+                    return 1;
+                  }
+                  return undefined;
+                })()
+                : undefined
+            }
+            draggable={isComponentDraggable ? isComponentDraggable(modalState.id) : true}
+            onContextMenu={(e) => handleContextMenu(e, modalState.id)}
+            isPinned={modalState.isPinned}
+            onTogglePin={() => {
+              if (onPersistImageModalMove) {
+                onPersistImageModalMove(modalState.id, { isPinned: !modalState.isPinned });
+              }
+            }}
+            onClose={() => {
+              setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
+              setSelectedImageModalId(null);
+              if (onPersistImageModalDelete) {
+                Promise.resolve(onPersistImageModalDelete(modalState.id)).catch(console.error);
+              }
+            }}
+            refImages={refImages}
+            sourceImageUrl={(() => {
+              const sourceUrl = modalState.sourceImageUrl;
+              console.log('[ImageModalOverlays] 🚨 CRITICAL: About to render ImageUploadModal:', {
+                modalId: modalState.id,
+                hasSourceImageUrlInModalState: !!sourceUrl,
+                sourceImageUrlValue: sourceUrl || 'UNDEFINED/NULL',
+                sourceImageUrlPreview: sourceUrl ? sourceUrl.substring(0, 100) + '...' : 'UNDEFINED/NULL',
+                modalStateKeys: Object.keys(modalState),
+                fullModalState: modalState,
+              });
+              // Belt-and-suspenders: allow only stitched refs; drop legacy comma lists
+              if (!sourceUrl) return undefined;
+              if (sourceUrl.includes('reference-stitched')) return sourceUrl;
+              // NOTE: data URLs (base64) contain a comma after the header, so don't treat those as "multiple URLs".
+              if (sourceUrl.includes(',') && !sourceUrl.startsWith('data:')) return undefined;
+              return sourceUrl;
+            })()}  // CRITICAL: Pass sanitized sourceImageUrl (stitched-only) for scene generation
+            onImageGenerate={async (prompt, model, frame, aspectRatio, modalId, imageCount, sourceImageUrlFromModal, width, height, options) => {
+              const selectedStyle = options?.style;
+              console.log('[ImageModalOverlays] onGenerate called!', {
+                modalId: modalState.id,
+                hasOnImageGenerate: !!onImageGenerate,
+                sourceImageUrlFromModal: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
+              });
+              if (onImageGenerate) {
+                try {
+                  // Fix shadowing: usage of 'imageCount' argument (from onImageGenerate params)
+                  // Use the passed argument if available, otherwise fall back to state
+                  const countToUse = imageCount || modalState.imageCount || 1;
 
-                console.log('[ImageModalOverlays] 🔍 Final sourceImageUrl decision:', {
-                  modalId: modalState.id,
-                  hasSourceImageUrl: !!sourceImageUrl,
-                  sourceImageUrlFromState: sourceImageUrl ? `${sourceImageUrl.substring(0, 100)}...` : 'none',
-                  sourceImageUrlCount: sourceImageUrl ? sourceImageUrl.split(',').length : 0,
-                  isStitchedImage: sourceImageUrl?.includes('reference-stitched'),
-                  isCommaSeparated: sourceImageUrl?.includes(','),
-                });
+                  // CRITICAL: Prioritize sourceImageUrl passed from ImageUploadModal (for simple image-to-image)
+                  // Fall back to modalState.sourceImageUrl only for scene-based generation
+                  let sourceImageUrl: string | undefined = sourceImageUrlFromModal || modalState.sourceImageUrl || undefined;
+                  const sceneNumber = (modalState as any).sceneNumber;
 
-                // If sourceImageUrl is not already set, try to resolve it from scene connections using namedImages
-                if (!sourceImageUrl) {
-                  // Check if this image generator is connected to a Scene Frame
-                  const sceneConnection = connections.find(c => c.to === modalState.id);
-                  if (sceneConnection && sceneFrameModalStates) {
-                    const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
+                  console.log('[ImageModalOverlays] 🎯 Source image URL priority:', {
+                    fromModalProp: sourceImageUrlFromModal ? sourceImageUrlFromModal.substring(0, 100) + '...' : 'NONE',
+                    fromModalState: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+                    finalChoice: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+                  });
 
-                    if (connectedScene && scriptFrameModalStates && scriptFrameModalStates.length > 0) {
-                      const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
+                  console.log('[ImageModalOverlays] 🔍 Checking modalState.sourceImageUrl:', {
+                    modalId: modalState.id,
+                    hasSourceImageUrl: !!modalState.sourceImageUrl,
+                    sourceImageUrl: modalState.sourceImageUrl || 'NONE - will try to build from connected scene',
+                    sourceImageUrlPreview: modalState.sourceImageUrl ? modalState.sourceImageUrl.substring(0, 100) + '...' : 'NONE',
+                    sceneNumber,
+                    isStitchedImage: modalState.sourceImageUrl?.includes('reference-stitched'),
+                    isCommaSeparated: modalState.sourceImageUrl?.includes(','),
+                  });
 
-                      if (parentScript && storyboardModalStates && storyboardModalStates.length > 0) {
-                        const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
+                  // CRITICAL: If modal state already has a stitched image URL, use it and don't override!
+                  if (sourceImageUrl && sourceImageUrl.includes('reference-stitched')) {
+                    console.log('[ImageModalOverlays] ✅ Modal state already has stitched image URL (contains both images). Using it directly.');
+                    // Don't override - the stitched image already contains both images combined
+                  }
 
-                        if (sourceStoryboard && (sourceStoryboard as any).namedImages) {
-                          console.log('[ImageModalOverlays] ✅ Found source Storyboard with namedImages:', sourceStoryboard.id);
-                          const namedImages = (sourceStoryboard as any).namedImages;
-                          const referenceImageUrls: string[] = [];
+                  // For Scene 1: Prefer stitched image URL (contains both images combined)
+                  // If sourceImageUrl is comma-separated (individual images), try to get stitched image from snapshot
+                  // Only treat comma as "multiple URLs" for non-data URLs (data: URIs include a comma by design).
+                  if (sceneNumber === 1 && sourceImageUrl && sourceImageUrl.includes(',') && !sourceImageUrl.startsWith('data:') && !sourceImageUrl.includes('reference-stitched')) {
+                    console.warn('[ImageModalOverlays] ⚠️ Scene 1 has comma-separated images. Trying to get stitched image from snapshot...');
+                    // Try to get stitched image from snapshot metadata
+                    try {
+                      const { getCurrentSnapshot } = await import('@/core/api/canvasApi');
+                      // Try to get projectId from multiple sources
+                      let projectId: string | null = null;
 
-                          // Match character names from scene to namedImages
-                          if ((connectedScene as any).characterNames && Array.isArray((connectedScene as any).characterNames)) {
-                            (connectedScene as any).characterNames.forEach((charName: string) => {
-                              if (charName && namedImages.characters) {
-                                const normalizedName = charName.toLowerCase().trim();
-                                let matchedImageUrl = namedImages.characters[normalizedName];
+                      // 1. Try from URL params
+                      const urlParams = new URLSearchParams(window.location.search);
+                      projectId = urlParams.get('projectId');
 
-                                // Fuzzy matching if exact match not found
-                                if (!matchedImageUrl) {
-                                  const matchedKey = Object.keys(namedImages.characters).find(key => {
-                                    const normalizedKey = key.toLowerCase().trim();
-                                    return normalizedKey === normalizedName ||
-                                      normalizedKey.includes(normalizedName) ||
-                                      normalizedName.includes(normalizedKey);
-                                  });
-                                  if (matchedKey) {
-                                    matchedImageUrl = namedImages.characters[matchedKey];
-                                  }
-                                }
+                      // 2. Try from window global
+                      if (!projectId) {
+                        projectId = (window as any).__PROJECT_ID__ || (window as any).projectId;
+                      }
 
-                                if (matchedImageUrl) {
-                                  referenceImageUrls.push(matchedImageUrl);
-                                  console.log(`[ImageModalOverlays] ✅ Matched character "${charName}" -> image URL`);
-                                }
-                              }
-                            });
-                          }
-
-                          // Match location name from scene to namedImages
-                          if ((connectedScene as any).locationName && namedImages.backgrounds) {
-                            const normalizedLocationName = (connectedScene as any).locationName.toLowerCase().trim();
-                            let matchedImageUrl = namedImages.backgrounds[normalizedLocationName];
-
-                            // Fuzzy matching
-                            if (!matchedImageUrl) {
-                              const matchedKey = Object.keys(namedImages.backgrounds).find(key => {
-                                const normalizedKey = key.toLowerCase().trim();
-                                return normalizedKey === normalizedLocationName ||
-                                  normalizedKey.includes(normalizedLocationName) ||
-                                  normalizedLocationName.includes(normalizedKey);
-                              });
-                              if (matchedKey) {
-                                matchedImageUrl = namedImages.backgrounds[matchedKey];
-                              }
+                      // 3. Try from storyboard connection (if available)
+                      if (!projectId) {
+                        const sceneConnection = connections.find(c => c.to === modalState.id);
+                        if (sceneConnection && storyboardModalStates) {
+                          const connectedScene = sceneFrameModalStates?.find(s => s.id === sceneConnection.from);
+                          if (connectedScene && scriptFrameModalStates) {
+                            const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
+                            if (parentScript && storyboardModalStates) {
+                              const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
+                              // Storyboard might have projectId in meta, but it's unlikely
+                              // For now, we'll rely on URL or window global
                             }
-
-                            if (matchedImageUrl) {
-                              referenceImageUrls.push(matchedImageUrl);
-                              console.log(`[ImageModalOverlays] ✅ Matched location "${(connectedScene as any).locationName}" -> image URL`);
-                            }
                           }
+                        }
+                      }
 
-                          // Match props mentioned in scene content
-                          if (namedImages.props && Object.keys(namedImages.props).length > 0) {
-                            Object.entries(namedImages.props).forEach(([propName, imageUrl]: [string, any]) => {
-                              const propNameRegex = new RegExp(`\\b${propName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-                              if (propNameRegex.test(connectedScene.content || '')) {
-                                referenceImageUrls.push(imageUrl as string);
-                                console.log(`[ImageModalOverlays] ✅ Matched prop "${propName}" mentioned in scene -> image URL`);
-                              }
-                            });
-                          }
+                      if (projectId) {
+                        const current = await getCurrentSnapshot(projectId);
+                        const stitchedImageData = (current?.snapshot?.metadata || {})['stitched-image'] as Record<string, string> | undefined;
 
-                          if (referenceImageUrls.length > 0) {
-                            sourceImageUrl = referenceImageUrls.join(',');
-                            console.log('[ImageModalOverlays] ✅ Matched reference images from namedImages:', {
-                              count: referenceImageUrls.length,
-                              urls: referenceImageUrls.map(url => url.substring(0, 60) + '...'),
+                        if (stitchedImageData && typeof stitchedImageData === 'object') {
+                          const stitchedUrl = Object.values(stitchedImageData)[0];
+                          if (stitchedUrl && typeof stitchedUrl === 'string') {
+                            sourceImageUrl = stitchedUrl;
+                            console.log('[ImageModalOverlays] ✅ Scene 1: Using stitched image from snapshot (contains both images):', {
+                              url: stitchedUrl.substring(0, 100) + '...',
                             });
                           } else {
-                            console.warn('[ImageModalOverlays] ⚠️ No images matched from namedImages, falling back to old method');
-                            // Fallback to old method if namedImages matching fails
-                            const referenceImageUrls = getReferenceImagesForText({
-                              text: connectedScene.content || '',
-                              characterNamesMap: sourceStoryboard.characterNamesMap || {},
-                              backgroundNamesMap: sourceStoryboard.backgroundNamesMap || {},
-                              propsNamesMap: sourceStoryboard.propsNamesMap || {},
-                              connectedCharacterImages: [],
-                              connectedBackgroundImages: [],
-                              connectedPropsImages: [],
-                            });
+                            console.warn('[ImageModalOverlays] ⚠️ Stitched image found in snapshot but URL is invalid');
+                          }
+                        } else {
+                          console.warn('[ImageModalOverlays] ⚠️ No stitched-image found in snapshot metadata');
+                        }
+                      } else {
+                        console.warn('[ImageModalOverlays] ⚠️ No projectId available to fetch stitched image from snapshot. Will use comma-separated images as fallback.');
+                      }
+                    } catch (error) {
+                      console.error('[ImageModalOverlays] ❌ Failed to get stitched image from snapshot:', error);
+                      // Keep the comma-separated images as fallback
+                    }
+                  }
+
+                  console.log('[ImageModalOverlays] 🔍 Final sourceImageUrl decision:', {
+                    modalId: modalState.id,
+                    hasSourceImageUrl: !!sourceImageUrl,
+                    sourceImageUrlFromState: sourceImageUrl ? `${sourceImageUrl.substring(0, 100)}...` : 'none',
+                    sourceImageUrlCount: sourceImageUrl ? sourceImageUrl.split(',').length : 0,
+                    isStitchedImage: sourceImageUrl?.includes('reference-stitched'),
+                    isCommaSeparated: sourceImageUrl?.includes(','),
+                  });
+
+                  // If sourceImageUrl is not already set, try to resolve it from scene connections using namedImages
+                  if (!sourceImageUrl) {
+                    // Check if this image generator is connected to a Scene Frame
+                    const sceneConnection = connections.find(c => c.to === modalState.id);
+                    if (sceneConnection && sceneFrameModalStates) {
+                      const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
+
+                      if (connectedScene && scriptFrameModalStates && scriptFrameModalStates.length > 0) {
+                        const parentScript = scriptFrameModalStates.find(s => s.id === connectedScene.scriptFrameId);
+
+                        if (parentScript && storyboardModalStates && storyboardModalStates.length > 0) {
+                          const sourceStoryboard = storyboardModalStates.find(sb => sb.id === parentScript.pluginId);
+
+                          if (sourceStoryboard && (sourceStoryboard as any).namedImages) {
+                            console.log('[ImageModalOverlays] ✅ Found source Storyboard with namedImages:', sourceStoryboard.id);
+                            const namedImages = (sourceStoryboard as any).namedImages;
+                            const referenceImageUrls: string[] = [];
+
+                            // Match character names from scene to namedImages
+                            if ((connectedScene as any).characterNames && Array.isArray((connectedScene as any).characterNames)) {
+                              (connectedScene as any).characterNames.forEach((charName: string) => {
+                                if (charName && namedImages.characters) {
+                                  const normalizedName = charName.toLowerCase().trim();
+                                  let matchedImageUrl = namedImages.characters[normalizedName];
+
+                                  // Fuzzy matching if exact match not found
+                                  if (!matchedImageUrl) {
+                                    const matchedKey = Object.keys(namedImages.characters).find(key => {
+                                      const normalizedKey = key.toLowerCase().trim();
+                                      return normalizedKey === normalizedName ||
+                                        normalizedKey.includes(normalizedName) ||
+                                        normalizedName.includes(normalizedKey);
+                                    });
+                                    if (matchedKey) {
+                                      matchedImageUrl = namedImages.characters[matchedKey];
+                                    }
+                                  }
+
+                                  if (matchedImageUrl) {
+                                    referenceImageUrls.push(matchedImageUrl);
+                                    console.log(`[ImageModalOverlays] ✅ Matched character "${charName}" -> image URL`);
+                                  }
+                                }
+                              });
+                            }
+
+                            // Match location name from scene to namedImages
+                            if ((connectedScene as any).locationName && namedImages.backgrounds) {
+                              const normalizedLocationName = (connectedScene as any).locationName.toLowerCase().trim();
+                              let matchedImageUrl = namedImages.backgrounds[normalizedLocationName];
+
+                              // Fuzzy matching
+                              if (!matchedImageUrl) {
+                                const matchedKey = Object.keys(namedImages.backgrounds).find(key => {
+                                  const normalizedKey = key.toLowerCase().trim();
+                                  return normalizedKey === normalizedLocationName ||
+                                    normalizedKey.includes(normalizedLocationName) ||
+                                    normalizedLocationName.includes(normalizedKey);
+                                });
+                                if (matchedKey) {
+                                  matchedImageUrl = namedImages.backgrounds[matchedKey];
+                                }
+                              }
+
+                              if (matchedImageUrl) {
+                                referenceImageUrls.push(matchedImageUrl);
+                                console.log(`[ImageModalOverlays] ✅ Matched location "${(connectedScene as any).locationName}" -> image URL`);
+                              }
+                            }
+
+                            // Match props mentioned in scene content
+                            if (namedImages.props && Object.keys(namedImages.props).length > 0) {
+                              Object.entries(namedImages.props).forEach(([propName, imageUrl]: [string, any]) => {
+                                const propNameRegex = new RegExp(`\\b${propName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                                if (propNameRegex.test(connectedScene.content || '')) {
+                                  referenceImageUrls.push(imageUrl as string);
+                                  console.log(`[ImageModalOverlays] ✅ Matched prop "${propName}" mentioned in scene -> image URL`);
+                                }
+                              });
+                            }
+
                             if (referenceImageUrls.length > 0) {
                               sourceImageUrl = referenceImageUrls.join(',');
+                              console.log('[ImageModalOverlays] ✅ Matched reference images from namedImages:', {
+                                count: referenceImageUrls.length,
+                                urls: referenceImageUrls.map(url => url.substring(0, 60) + '...'),
+                              });
+                            } else {
+                              console.warn('[ImageModalOverlays] ⚠️ No images matched from namedImages, falling back to old method');
+                              // Fallback to old method if namedImages matching fails
+                              const referenceImageUrls = getReferenceImagesForText({
+                                text: connectedScene.content || '',
+                                characterNamesMap: sourceStoryboard.characterNamesMap || {},
+                                backgroundNamesMap: sourceStoryboard.backgroundNamesMap || {},
+                                propsNamesMap: sourceStoryboard.propsNamesMap || {},
+                                connectedCharacterImages: [],
+                                connectedBackgroundImages: [],
+                                connectedPropsImages: [],
+                              });
+                              if (referenceImageUrls.length > 0) {
+                                sourceImageUrl = referenceImageUrls.join(',');
+                              }
                             }
                           }
                         }
                       }
                     }
                   }
-                }
 
-                // Extract scene metadata from modal state or scene connection
-                let extractedSceneNumber: number | undefined = (modalState as any).sceneNumber;
-                let extractedStoryboardMetadata: Record<string, string> | undefined = (modalState as any).storyboardMetadata;
-                let extractedPreviousSceneImageUrl: string | undefined = undefined;
+                  // Extract scene metadata from modal state or scene connection
+                  let extractedSceneNumber: number | undefined = (modalState as any).sceneNumber;
+                  let extractedStoryboardMetadata: Record<string, string> | undefined = (modalState as any).storyboardMetadata;
+                  let extractedPreviousSceneImageUrl: string | undefined = undefined;
 
-                // If scene metadata not in modal state, try to extract from scene connection
-                if (!extractedSceneNumber || !extractedStoryboardMetadata) {
-                  const sceneConnection = connections.find(c => c.to === modalState.id);
-                  if (sceneConnection && sceneFrameModalStates) {
-                    const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
-                    if (connectedScene) {
-                      extractedSceneNumber = connectedScene.sceneNumber;
+                  // If scene metadata not in modal state, try to extract from scene connection
+                  if (!extractedSceneNumber || !extractedStoryboardMetadata) {
+                    const sceneConnection = connections.find(c => c.to === modalState.id);
+                    if (sceneConnection && sceneFrameModalStates) {
+                      const connectedScene = sceneFrameModalStates.find(s => s.id === sceneConnection.from);
+                      if (connectedScene) {
+                        extractedSceneNumber = connectedScene.sceneNumber;
 
-                      // Build storyboard metadata from scene
-                      if (!extractedStoryboardMetadata) {
-                        extractedStoryboardMetadata = {};
-                        if ((connectedScene as any).characterNames && Array.isArray((connectedScene as any).characterNames)) {
-                          extractedStoryboardMetadata.character = (connectedScene as any).characterNames.join(', ');
+                        // Build storyboard metadata from scene
+                        if (!extractedStoryboardMetadata) {
+                          extractedStoryboardMetadata = {};
+                          if ((connectedScene as any).characterNames && Array.isArray((connectedScene as any).characterNames)) {
+                            extractedStoryboardMetadata.character = (connectedScene as any).characterNames.join(', ');
+                          }
+                          if ((connectedScene as any).locationName) {
+                            extractedStoryboardMetadata.background = (connectedScene as any).locationName;
+                          }
+                          if ((connectedScene as any).mood) {
+                            extractedStoryboardMetadata.mood = (connectedScene as any).mood;
+                          }
                         }
-                        if ((connectedScene as any).locationName) {
-                          extractedStoryboardMetadata.background = (connectedScene as any).locationName;
-                        }
-                        if ((connectedScene as any).mood) {
-                          extractedStoryboardMetadata.mood = (connectedScene as any).mood;
-                        }
-                      }
 
-                      // For Scene 2+, find previous scene's generated image
-                      if (extractedSceneNumber > 1) {
-                        const previousSceneNumber = extractedSceneNumber - 1;
-                        const previousScene = sceneFrameModalStates.find(s =>
-                          s.scriptFrameId === connectedScene.scriptFrameId &&
-                          s.sceneNumber === previousSceneNumber
-                        );
-                        if (previousScene) {
-                          const prevConnection = connections.find(c => c.from === previousScene.id);
-                          if (prevConnection) {
-                            const prevImageModal = imageModalStatesForConnections.find(m => m.id === prevConnection.to);
-                            if (prevImageModal && prevImageModal.generatedImageUrl) {
-                              extractedPreviousSceneImageUrl = prevImageModal.generatedImageUrl;
-                              console.log(`[ImageModalOverlays] ✅ Scene ${extractedSceneNumber}: Found previous scene image`);
+                        // For Scene 2+, find previous scene's generated image
+                        if (extractedSceneNumber > 1) {
+                          const previousSceneNumber = extractedSceneNumber - 1;
+                          const previousScene = sceneFrameModalStates.find(s =>
+                            s.scriptFrameId === connectedScene.scriptFrameId &&
+                            s.sceneNumber === previousSceneNumber
+                          );
+                          if (previousScene) {
+                            const prevConnection = connections.find(c => c.from === previousScene.id);
+                            if (prevConnection) {
+                              const prevImageModal = imageModalStatesForConnections.find(m => m.id === prevConnection.to);
+                              if (prevImageModal && prevImageModal.generatedImageUrl) {
+                                extractedPreviousSceneImageUrl = prevImageModal.generatedImageUrl;
+                                console.log(`[ImageModalOverlays] ✅ Scene ${extractedSceneNumber}: Found previous scene image`);
+                              }
                             }
                           }
                         }
                       }
                     }
                   }
-                }
 
-                // CRITICAL: For Scene 1, use ONLY reference images (no previous scene)
-                // For Scene 2+, keep reference images separate from previous scene image
-                // The backend will combine them correctly
-                let finalSourceImageUrl = sourceImageUrl; // Reference images only
+                  // CRITICAL: For Scene 1, use ONLY reference images (no previous scene)
+                  // For Scene 2+, keep reference images separate from previous scene image
+                  // The backend will combine them correctly
+                  let finalSourceImageUrl = sourceImageUrl; // Reference images only
 
-                console.log('[ImageModalOverlays] 🚀 STEP 4.5: Final payload for generation:', {
-                  modalId: modalState.id,
-                  hasSourceImageUrl: !!finalSourceImageUrl,
-                  sourceImageUrl: finalSourceImageUrl || 'NONE',
-                  sourceImageUrlFull: finalSourceImageUrl,
-                  sourceImageUrlCount: finalSourceImageUrl ? finalSourceImageUrl.split(',').length : 0,
-                  sceneNumber: extractedSceneNumber,
-                  hasPreviousSceneImage: !!extractedPreviousSceneImageUrl,
-                  previousSceneImageUrl: extractedPreviousSceneImageUrl || 'NONE',
-                  previousSceneImageUrlFull: extractedPreviousSceneImageUrl,
-                  hasStoryboardMetadata: !!extractedStoryboardMetadata,
-                  storyboardMetadata: extractedStoryboardMetadata,
-                  willUseImageToImage: !!finalSourceImageUrl || !!extractedPreviousSceneImageUrl,
-                });
+                  console.log('[ImageModalOverlays] 🚀 STEP 4.5: Final payload for generation:', {
+                    modalId: modalState.id,
+                    hasSourceImageUrl: !!finalSourceImageUrl,
+                    sourceImageUrl: finalSourceImageUrl || 'NONE',
+                    sourceImageUrlFull: finalSourceImageUrl,
+                    sourceImageUrlCount: finalSourceImageUrl ? finalSourceImageUrl.split(',').length : 0,
+                    sceneNumber: extractedSceneNumber,
+                    hasPreviousSceneImage: !!extractedPreviousSceneImageUrl,
+                    previousSceneImageUrl: extractedPreviousSceneImageUrl || 'NONE',
+                    previousSceneImageUrlFull: extractedPreviousSceneImageUrl,
+                    hasStoryboardMetadata: !!extractedStoryboardMetadata,
+                    storyboardMetadata: extractedStoryboardMetadata,
+                    willUseImageToImage: !!finalSourceImageUrl || !!extractedPreviousSceneImageUrl,
+                  });
 
-                // CRITICAL: Ensure sourceImageUrl is passed to onImageGenerate
-                if (!finalSourceImageUrl && !extractedPreviousSceneImageUrl) {
-                  console.warn('[ImageModalOverlays] ⚠️ WARNING: No sourceImageUrl or previousSceneImageUrl found! Will use text-to-image mode.');
-                } else {
-                  console.log('[ImageModalOverlays] ✅ Reference images will be passed to API (image-to-image mode)');
-                }
+                  // CRITICAL: Ensure sourceImageUrl is passed to onImageGenerate
+                  if (!finalSourceImageUrl && !extractedPreviousSceneImageUrl) {
+                    console.warn('[ImageModalOverlays] ⚠️ WARNING: No sourceImageUrl or previousSceneImageUrl found! Will use text-to-image mode.');
+                  } else {
+                    console.log('[ImageModalOverlays] ✅ Reference images will be passed to API (image-to-image mode)');
+                  }
 
-                // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
-                // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
-                const targetFrameId = modalId || modalState.id;
+                  // CRITICAL: Use the modalId parameter (targetModalId) instead of modalState.id
+                  // When creating a new frame for image-to-image, modalId will be the NEW frame's ID
+                  const targetFrameId = modalId || modalState.id;
 
-                console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
-                  modalIdParam: modalId || 'NONE',
-                  modalStateId: modalState.id,
-                  targetFrameId,
-                  willUpdateNewFrame: modalId !== modalState.id,
-                });
+                  console.log('[ImageModalOverlays] 🎯 Target frame determination:', {
+                    modalIdParam: modalId || 'NONE',
+                    modalStateId: modalState.id,
+                    targetFrameId,
+                    willUpdateNewFrame: modalId !== modalState.id,
+                  });
 
-                const result = await onImageGenerate(
-                  prompt,
-                  model,
-                  frame,
-                  aspectRatio,
-                  targetFrameId,
-                  countToUse,
-                  finalSourceImageUrl, // Reference images only (for Scene 1, this is all we need)
-                  extractedSceneNumber, // Scene number
-                  extractedPreviousSceneImageUrl, // Previous scene image (Scene 2+ only)
-                  extractedStoryboardMetadata, // Storyboard metadata
-                  width,
-                  height,
-                  { style: selectedStyle } // Pass style as options
-                );
-                if (result) {
-                  // Extract image URLs
-                  const imageUrls = result.images && result.images.length > 0
-                    ? result.images.map(img => img.url)
-                    : result.url
-                      ? [result.url]
-                      : [];
+                  const result = await onImageGenerate(
+                    prompt,
+                    model,
+                    frame,
+                    aspectRatio,
+                    targetFrameId,
+                    countToUse,
+                    finalSourceImageUrl, // Reference images only (for Scene 1, this is all we need)
+                    extractedSceneNumber, // Scene number
+                    extractedPreviousSceneImageUrl, // Previous scene image (Scene 2+ only)
+                    extractedStoryboardMetadata, // Storyboard metadata
+                    width,
+                    height,
+                    { style: selectedStyle } // Pass style as options
+                  );
+                  if (result) {
+                    // Extract image URLs
+                    const imageUrls = result.images && result.images.length > 0
+                      ? result.images.map(img => img.url)
+                      : result.url
+                        ? [result.url]
+                        : [];
 
-                  // CRITICAL: Update the TARGET frame (which may be a new frame), not the current frame
-                  // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
-                  // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
-                  const [w, h] = aspectRatio.split(':').map(Number);
-                  const frameWidth = 600;
-                  const ar = w && h ? (w / h) : 1;
-                  const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
-                  const frameHeight = Math.max(400, rawHeight);
+                    // CRITICAL: Update the TARGET frame (which may be a new frame), not the current frame
+                    // Compute frame size: width fixed 600, height based on aspect ratio (min 400)
+                    // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
+                    const [w, h] = aspectRatio.split(':').map(Number);
+                    const frameWidth = 600;
+                    const ar = w && h ? (w / h) : 1;
+                    const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
+                    const frameHeight = Math.max(400, rawHeight);
 
-                  setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
-                    ...m,
-                    generatedImageUrl: imageUrls[0] || null,
-                    generatedImageUrls: imageUrls,
-                    isGenerating: false,
-                    aspectRatio, // Preserve aspect ratio
-                    frameWidth, // Update frame dimensions based on aspect ratio
-                    frameHeight, // Update frame dimensions based on aspect ratio
-                  } : m));
-                  if (onPersistImageModalMove) {
-                    Promise.resolve(onPersistImageModalMove(targetFrameId, {
+                    setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
+                      ...m,
                       generatedImageUrl: imageUrls[0] || null,
                       generatedImageUrls: imageUrls,
-                      model,
-                      frame,
-                      aspectRatio, // Preserve aspect ratio
-                      frameWidth, // Use calculated dimensions based on aspect ratio
-                      frameHeight, // Use calculated dimensions based on aspect ratio
-                      prompt,
                       isGenerating: false,
-                    } as any)).catch(console.error);
+                      aspectRatio, // Preserve aspect ratio
+                      frameWidth, // Update frame dimensions based on aspect ratio
+                      frameHeight, // Update frame dimensions based on aspect ratio
+                    } : m));
+                    if (onPersistImageModalMove) {
+                      Promise.resolve(onPersistImageModalMove(targetFrameId, {
+                        generatedImageUrl: imageUrls[0] || null,
+                        generatedImageUrls: imageUrls,
+                        model,
+                        frame,
+                        aspectRatio, // Preserve aspect ratio
+                        frameWidth, // Use calculated dimensions based on aspect ratio
+                        frameHeight, // Use calculated dimensions based on aspect ratio
+                        prompt,
+                        isGenerating: false,
+                      } as any)).catch(console.error);
+                    }
+
+                    return result;
                   }
-
-                  return result;
+                  return null;
+                } catch (error) {
+                  console.error('[ImageModalOverlays] Failed to generate image:', error);
+                  return null;
                 }
-                return null;
-              } catch (error) {
-                console.error('[ImageModalOverlays] Failed to generate image:', error);
-                return null;
               }
-            }
-            return null;
-          }}
-          generatedImageUrl={modalState.generatedImageUrl}
-          generatedImageUrls={modalState.generatedImageUrls}
-          isGenerating={modalState.isGenerating}
-          initialModel={modalState.model}
-          initialFrame={modalState.frame}
-          initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}
-          initialPrompt={modalState.prompt}
-          frameWidth={modalState.frameWidth}
-          frameHeight={modalState.frameHeight}
-          onOptionsChange={(opts) => {
-            // Update local state to keep UI in sync
-            setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
-            // Persist to parent (which will broadcast + snapshot)
-            if (onPersistImageModalMove) {
-              Promise.resolve(onPersistImageModalMove(modalState.id, opts as any)).catch(console.error);
-            }
-          }}
-          onAddToCanvas={onAddImageToCanvas}
-          onSelect={() => {
-            // Clear all other selections first
-            clearAllSelections();
-            // Then set this modal as selected
-            setSelectedImageModalId(modalState.id);
-            setSelectedImageModalIds([modalState.id]);
-          }}
-          onDelete={() => {
-            console.log('[ImageModalOverlays] onDelete called', {
-              timestamp: Date.now(),
-              modalId: modalState.id,
-            });
-            // Clear selection immediately
-            setSelectedImageModalId(null);
-            // Call persist delete - it updates parent state (imageGenerators) which flows down as externalImageModals
-            // Canvas will sync imageModalStates with externalImageModals via useEffect
-            if (onPersistImageModalDelete) {
-              console.log('[ImageModalOverlays] Calling onPersistImageModalDelete', modalState.id);
-              // Call synchronously - the handler updates parent state immediately
-              const result = onPersistImageModalDelete(modalState.id);
-              // If it returns a promise, handle it
-              if (result && typeof result.then === 'function') {
-                Promise.resolve(result).catch(console.error);
+              return null;
+            }}
+            generatedImageUrl={modalState.generatedImageUrl}
+            generatedImageUrls={modalState.generatedImageUrls}
+            isGenerating={modalState.isGenerating}
+            initialModel={modalState.model}
+            initialFrame={modalState.frame}
+            initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}
+            initialPrompt={modalState.prompt}
+            frameWidth={modalState.frameWidth}
+            frameHeight={modalState.frameHeight}
+            onOptionsChange={(opts) => {
+              // Update local state to keep UI in sync
+              setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
+              // Persist to parent (which will broadcast + snapshot)
+              if (onPersistImageModalMove) {
+                Promise.resolve(onPersistImageModalMove(modalState.id, opts as any)).catch(console.error);
               }
-            }
-            // DO NOT update local state here - let parent state flow down through props
-            // The useEffect in Canvas will sync imageModalStates with externalImageModals
-          }}
-          onDownload={async () => {
-            // Download the generated image if available
-            if (modalState.generatedImageUrl) {
-              const filename = generateDownloadFilename('generated-image', modalState.id, 'png');
-              await downloadImage(modalState.generatedImageUrl, filename);
-            }
-          }}
-          onDuplicate={() => {
-            // Create a duplicate of the image modal to the right
-            const duplicated = {
-              id: `image-modal-${Date.now()}`,
-              x: modalState.x + 600 + 50, // 600px width + 50px spacing
-              y: modalState.y, // Same Y position
-              generatedImageUrl: modalState.generatedImageUrl,
-            };
-            setImageModalStates(prev => [...prev, duplicated]);
-            if (onPersistImageModalCreate) {
-              Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
-            }
-          }}
-          isSelected={selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id)}
-          x={modalState.x}
-          y={modalState.y}
-          onPositionChange={(newX, newY) => {
-            setImageModalStates(prev => prev.map(m =>
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
-          }}
-          onPositionCommit={(finalX, finalY) => {
-            if (onPersistImageModalMove) {
-              Promise.resolve(onPersistImageModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
-            }
-          }}
-          stageRef={stageRef}
-          scale={scale}
-          position={position}
-          onPersistImageModalCreate={onPersistImageModalCreate}
+            }}
+            onAddToCanvas={onAddImageToCanvas}
+            onSelect={(e) => {
+              // Robust Shift key detection
+              const nativeEvent = e?.nativeEvent || e;
+              const isShiftNative = nativeEvent ? (nativeEvent.shiftKey || (nativeEvent.getModifierState && nativeEvent.getModifierState('Shift'))) : false;
+              const isShift = isShiftNative || isShiftPressed;
 
-          initialCount={modalState.imageCount}
-          onUpdateModalState={(modalId, updates) => {
-            setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
-            if (onPersistImageModalMove) {
-              Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
-            }
-          }}
-          connections={connections}
-          imageModalStates={imageModalStatesForConnections}
-          images={images}
-          textInputStates={textInputStates}
-          sceneFrameModalStates={sceneFrameModalStates}
-          scriptFrameModalStates={scriptFrameModalStates}
-          storyboardModalStates={storyboardModalStates}
-          onPersistConnectorCreate={onPersistConnectorCreate}
-        />
-      ))}
+              console.log('[ImageModalOverlays] onSelect Triggered:', {
+                id: modalState.id,
+                isShift,
+                isShiftNative,
+                isShiftPressed,
+                currentSelectedIds: selectedImageModalIds,
+                nativeEventValues: nativeEvent ? { shiftKey: nativeEvent.shiftKey } : 'no-native'
+              });
+
+              if (isShift) {
+                if (e) e.stopPropagation();
+
+                // Calculate new selection based on current props (closure)
+                const currentSelected = selectedImageModalIdsRef.current;
+                const isAlreadySelected = currentSelected.includes(modalState.id);
+                let newIds;
+
+                if (isAlreadySelected) {
+                  newIds = currentSelected.filter(id => id !== modalState.id);
+                  // Remove from selection order
+                  if (setSelectionOrder) {
+                    setSelectionOrder(prev => prev.filter(id => id !== modalState.id));
+                  }
+                } else {
+                  newIds = [...currentSelected, modalState.id];
+                  // Add to selection order (append to end) - but only if not already in order
+                  if (setSelectionOrder) {
+                    setSelectionOrder(prev => {
+                      // Only add if not already in the order
+                      if (!prev.includes(modalState.id)) {
+                        return [...prev, modalState.id];
+                      }
+                      return prev;
+                    });
+                  }
+                }
+
+                console.log('[ImageModalOverlays] New Multi-Selection:', newIds);
+
+                // Update plural state
+                setSelectedImageModalIds(newIds);
+
+                // Update singular state (primary selection)
+                if (!isAlreadySelected) {
+                  // New addition becomes primary
+                  setSelectedImageModalId(modalState.id);
+                } else if (newIds.length > 0) {
+                  // If removed, fallback to the last one
+                  setSelectedImageModalId(newIds[newIds.length - 1]);
+                } else {
+                  // If empty
+                  setSelectedImageModalId(null);
+                }
+              } else {
+                console.log('[ImageModalOverlays] Single Selection Reset');
+                // Clear all other selections first
+                clearAllSelections();
+                // Then set this modal as selected
+                setSelectedImageModalId(modalState.id);
+                setSelectedImageModalIds([modalState.id]);
+                // Reset selection order to just this item
+                if (setSelectionOrder) {
+                  setSelectionOrder([modalState.id]);
+                }
+              }
+            }}
+            onDelete={() => {
+              console.log('[ImageModalOverlays] onDelete called', {
+                timestamp: Date.now(),
+                modalId: modalState.id,
+              });
+              // Clear selection immediately
+              setSelectedImageModalId(null);
+              // Call persist delete - it updates parent state (imageGenerators) which flows down as externalImageModals
+              // Canvas will sync imageModalStates with externalImageModals via useEffect
+              if (onPersistImageModalDelete) {
+                console.log('[ImageModalOverlays] Calling onPersistImageModalDelete', modalState.id);
+                // Call synchronously - the handler updates parent state immediately
+                const result = onPersistImageModalDelete(modalState.id);
+                // If it returns a promise, handle it
+                if (result && typeof result.then === 'function') {
+                  Promise.resolve(result).catch(console.error);
+                }
+              }
+              // DO NOT update local state here - let parent state flow down through props
+              // The useEffect in Canvas will sync imageModalStates with externalImageModals
+            }}
+            onDownload={async () => {
+              // Download the generated image if available
+              if (modalState.generatedImageUrl) {
+                const filename = generateDownloadFilename('generated-image', modalState.id, 'png');
+                await downloadImage(modalState.generatedImageUrl, filename);
+              }
+            }}
+            onDuplicate={() => {
+              // Create a duplicate of the image modal to the right
+              const duplicated = {
+                id: `image-modal-${Date.now()}`,
+                x: modalState.x + 600 + 50, // 600px width + 50px spacing
+                y: modalState.y, // Same Y position
+                generatedImageUrl: modalState.generatedImageUrl,
+              };
+              setImageModalStates(prev => [...prev, duplicated]);
+              if (onPersistImageModalCreate) {
+                Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
+              }
+            }}
+            x={modalState.x}
+            y={modalState.y}
+            onPositionChange={(newX, newY) => {
+              setImageModalStates(prev => prev.map(m =>
+                m.id === modalState.id ? { ...m, x: newX, y: newY } : m
+              ));
+            }}
+            onPositionCommit={(finalX, finalY) => {
+              if (onPersistImageModalMove) {
+                Promise.resolve(onPersistImageModalMove(modalState.id, { x: finalX, y: finalY })).catch(console.error);
+              }
+            }}
+            stageRef={stageRef}
+            scale={scale}
+            position={position}
+            onPersistImageModalCreate={onPersistImageModalCreate}
+
+            initialCount={modalState.imageCount}
+            onUpdateModalState={(modalId, updates) => {
+              setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
+              if (onPersistImageModalMove) {
+                Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+              }
+            }}
+            connections={connections}
+            imageModalStates={imageModalStatesForConnections}
+            images={images}
+            textInputStates={textInputStates}
+            sceneFrameModalStates={sceneFrameModalStates}
+            scriptFrameModalStates={scriptFrameModalStates}
+            storyboardModalStates={storyboardModalStates}
+            onPersistConnectorCreate={onPersistConnectorCreate}
+          />
+        );
+      })}
       {contextMenu && (
         <PluginContextMenu
           x={contextMenu.x}

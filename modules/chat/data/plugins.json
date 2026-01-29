@@ -1,0 +1,605 @@
+{
+  "metadata": {
+    "description": "Complete list of all plugins available in WildMind AI Canvas with their categories, models, parameters, and capabilities",
+    "version": "1.0.0",
+    "lastUpdated": "2025-01-23",
+    "source": "plugins directory analysis"
+  },
+  "features": {
+    "imageEnhancement": {
+      "name": "Image Enhancement",
+      "description": "Enhance, upscale, and improve image quality",
+      "supported": true,
+      "pluginsCount": 3,
+      "useCase": "Improve image resolution, quality, and details"
+    },
+    "imageEditing": {
+      "name": "Image Editing",
+      "description": "Edit, modify, and transform images",
+      "supported": true,
+      "pluginsCount": 3,
+      "useCase": "Remove backgrounds, erase objects, expand images"
+    },
+    "imageConversion": {
+      "name": "Image Conversion",
+      "description": "Convert images to different formats and styles",
+      "supported": true,
+      "pluginsCount": 1,
+      "useCase": "Vectorize images, convert to SVG"
+    },
+    "cameraControl": {
+      "name": "Camera Control",
+      "description": "Generate multiple camera angles and perspectives",
+      "supported": true,
+      "pluginsCount": 1,
+      "useCase": "Create product shots from different angles, human poses"
+    },
+    "sceneGeneration": {
+      "name": "Scene Generation",
+      "description": "Generate storyboards and scene continuations",
+      "supported": true,
+      "pluginsCount": 2,
+      "useCase": "Create storyboards from scripts, generate next scene images"
+    }
+  },
+  "categories": [
+    {
+      "id": "image-enhancement",
+      "name": "Image Enhancement",
+      "description": "Upscale and enhance image quality",
+      "plugins": [
+        {
+          "id": "upscale",
+          "name": "Upscale",
+          "description": "Increase image resolution and quality",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "crystal-upscaler",
+              "name": "Crystal Upscaler",
+              "provider": "Replicate",
+              "description": "High-quality upscaling with multiple resolution options",
+              "parameters": {
+                "scale": {
+                  "type": "number",
+                  "min": 1,
+                  "max": 6,
+                  "default": 2,
+                  "description": "Upscale factor (1x to 6x)"
+                },
+                "faceEnhance": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable face enhancement (not supported for Crystal)"
+                },
+                "faceEnhanceStrength": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1,
+                  "default": 0.8,
+                  "description": "Face enhancement strength (0-1, not applicable for Crystal)"
+                },
+                "topazModel": {
+                  "type": "string",
+                  "default": null,
+                  "description": "Topaz model variant (only for Topaz Upscaler)"
+                },
+                "faceEnhanceCreativity": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1,
+                  "default": 0,
+                  "description": "Face enhancement creativity (only for Topaz)"
+                }
+              },
+              "supportedResolutions": ["1080p", "1440p", "2160p", "6K", "8K", "12K"],
+              "credits": {
+                "1080p": 220,
+                "1440p": 420,
+                "2160p": 820,
+                "6K": 1620,
+                "8K": 3220,
+                "12K": 6420
+              }
+            },
+            {
+              "id": "topaz-upscaler",
+              "name": "Topaz Upscaler",
+              "provider": "FAL",
+              "description": "Professional upscaling with face enhancement and multiple model variants",
+              "parameters": {
+                "scale": {
+                  "type": "number",
+                  "min": 1,
+                  "max": 4,
+                  "default": 2,
+                  "description": "Upscale factor (1x to 4x max for Topaz)"
+                },
+                "faceEnhance": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable face enhancement"
+                },
+                "faceEnhanceStrength": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1,
+                  "default": 0.8,
+                  "description": "Face enhancement strength (0-1)"
+                },
+                "topazModel": {
+                  "type": "string",
+                  "options": ["Default", "Low Resolution V2", "Standard V2", "CGI", "High Fidelity V2", "Text Refine", "Recovery", "Redefine", "Recovery V2"],
+                  "default": "Standard V2",
+                  "description": "Topaz model variant"
+                },
+                "faceEnhanceCreativity": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1,
+                  "default": 0,
+                  "description": "Face enhancement creativity (0-1)"
+                }
+              },
+              "supportedResolutions": ["24MP", "48MP", "96MP", "512MP"],
+              "credits": {
+                "24MP": 180,
+                "48MP": 340,
+                "96MP": 660,
+                "512MP": 2740
+              }
+            },
+            {
+              "id": "real-esrgan",
+              "name": "Real-ESRGAN",
+              "provider": "Replicate",
+              "description": "Fast and efficient upscaling with face enhancement support",
+              "parameters": {
+                "scale": {
+                  "type": "number",
+                  "min": 1,
+                  "max": 6,
+                  "default": 2,
+                  "description": "Upscale factor (1x to 6x)"
+                },
+                "faceEnhance": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable face enhancement"
+                },
+                "faceEnhanceStrength": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 1,
+                  "default": 0.8,
+                  "description": "Face enhancement strength (0-1)"
+                },
+                "topazModel": {
+                  "type": "string",
+                  "default": null,
+                  "description": "Not applicable for Real-ESRGAN"
+                },
+                "faceEnhanceCreativity": {
+                  "type": "number",
+                  "default": 0,
+                  "description": "Not applicable for Real-ESRGAN"
+                }
+              },
+              "supportedResolutions": ["1080p", "1440p", "2160p"],
+              "credits": {
+                "1080p": 180,
+                "1440p": 340,
+                "2160p": 660
+              }
+            }
+          ],
+          "defaultModel": "crystal-upscaler"
+        }
+      ]
+    },
+    {
+      "id": "image-editing",
+      "name": "Image Editing",
+      "description": "Edit and modify images",
+      "plugins": [
+        {
+          "id": "remove-bg",
+          "name": "Remove Background",
+          "description": "Remove or replace image backgrounds",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "851-labs-background-remover",
+              "name": "851-labs/background-remover",
+              "provider": "Replicate",
+              "description": "High-quality background removal",
+              "parameters": {
+                "backgroundType": {
+                  "type": "string",
+                  "options": ["green", "rgba (transparent)", "white", "blue", "overlay", "map"],
+                  "default": "rgba (transparent)",
+                  "description": "Background replacement type"
+                },
+                "scale": {
+                  "type": "number",
+                  "min": 0.1,
+                  "max": 1,
+                  "default": 0.5,
+                  "description": "Scale factor for processing"
+                }
+              },
+              "supportedResolutions": ["original", "1080p", "1440p", "2160p"],
+              "credits": {
+                "default": 100
+              }
+            }
+          ],
+          "defaultModel": "851-labs-background-remover"
+        },
+        {
+          "id": "erase",
+          "name": "Erase",
+          "description": "Erase objects or parts of images using masks",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "bria-eraser",
+              "name": "bria/eraser",
+              "provider": "Bria",
+              "description": "AI-powered object erasure with mask support",
+              "parameters": {
+                "mask": {
+                  "type": "string",
+                  "format": "base64_image",
+                  "description": "Mask image (white areas = erase, black = keep)"
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Optional prompt describing what to erase"
+                },
+                "brushSize": {
+                  "type": "number",
+                  "min": 1,
+                  "max": 100,
+                  "default": 20,
+                  "description": "Brush size for mask drawing"
+                }
+              },
+              "supportedResolutions": ["original"],
+              "credits": {
+                "default": 80
+              }
+            }
+          ],
+          "defaultModel": "bria-eraser"
+        },
+        {
+          "id": "expand",
+          "name": "Expand",
+          "description": "Expand image boundaries and fill new areas",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "bria-expander",
+              "name": "bria/expander",
+              "provider": "Bria",
+              "description": "Intelligent image expansion with prompt guidance",
+              "parameters": {
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Description of what to generate in expanded areas"
+                },
+                "aspectRatio": {
+                  "type": "string",
+                  "options": ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "custom"],
+                  "default": "1:1",
+                  "description": "Target aspect ratio for expanded image"
+                },
+                "canvasSize": {
+                  "type": "array",
+                  "items": "number",
+                  "format": "[width, height]",
+                  "description": "Custom canvas size (when aspectRatio is 'custom')"
+                },
+                "originalImageSize": {
+                  "type": "array",
+                  "items": "number",
+                  "format": "[width, height]",
+                  "description": "Original image dimensions"
+                },
+                "originalImageLocation": {
+                  "type": "array",
+                  "items": "number",
+                  "format": "[x, y]",
+                  "description": "Original image position on canvas"
+                }
+              },
+              "supportedResolutions": ["1080p", "1440p", "2160p"],
+              "credits": {
+                "default": 100
+              }
+            }
+          ],
+          "defaultModel": "bria-expander"
+        }
+      ]
+    },
+    {
+      "id": "image-conversion",
+      "name": "Image Conversion",
+      "description": "Convert images to different formats",
+      "plugins": [
+        {
+          "id": "vectorize",
+          "name": "Vectorize",
+          "description": "Convert raster images to vector format (SVG)",
+          "inputType": "image",
+          "outputType": "svg",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "recraft-vectorize",
+              "name": "Recraft",
+              "provider": "Recraft",
+              "description": "Convert images to scalable vector graphics",
+              "parameters": {
+                "mode": {
+                  "type": "string",
+                  "options": ["simple", "Detailed"],
+                  "default": "simple",
+                  "description": "Vectorization mode: simple (faster, less detail) or Detailed (slower, more detail)"
+                }
+              },
+              "supportedResolutions": ["original"],
+              "credits": {
+                "simple": 40,
+                "Detailed": 60
+              }
+            }
+          ],
+          "defaultModel": "recraft-vectorize"
+        }
+      ]
+    },
+    {
+      "id": "camera-control",
+      "name": "Camera Control",
+      "description": "Generate multiple camera angles and perspectives",
+      "plugins": [
+        {
+          "id": "multiangle-camera",
+          "name": "Multiangle Camera",
+          "description": "Generate 9 different camera angles from a single product or human image",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "google-nano-banana-pro-multiangle",
+              "name": "Google nano banana pro",
+              "provider": "Google",
+              "description": "High-quality multi-angle generation with resolution control",
+              "parameters": {
+                "category": {
+                  "type": "string",
+                  "options": ["human", "product"],
+                  "default": "human",
+                  "description": "Subject category: human (for people/portraits) or product (for objects/products)"
+                },
+                "resolution": {
+                  "type": "string",
+                  "options": ["1K", "2K", "4K"],
+                  "default": "2K",
+                  "description": "Output resolution"
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Optional prompt for style guidance"
+                }
+              },
+              "supportedResolutions": ["1K", "2K", "4K"],
+              "credits": {
+                "1K": 320,
+                "2K": 620,
+                "4K": 1200
+              }
+            },
+            {
+              "id": "google-nano-banana-multiangle",
+              "name": "Google Nano Banana",
+              "provider": "Google",
+              "description": "Fast multi-angle generation",
+              "parameters": {
+                "category": {
+                  "type": "string",
+                  "options": ["human", "product"],
+                  "default": "human",
+                  "description": "Subject category"
+                },
+                "resolution": {
+                  "type": "string",
+                  "options": ["1K", "2K", "4K"],
+                  "default": "2K",
+                  "description": "Output resolution"
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Optional prompt for style guidance"
+                }
+              },
+              "supportedResolutions": ["1K", "2K", "4K"],
+              "credits": {
+                "1K": 98,
+                "2K": 180,
+                "4K": 360
+              }
+            },
+            {
+              "id": "seedream-4.5-multiangle",
+              "name": "Seedream 4.5",
+              "provider": "Seedream",
+              "description": "Multi-angle generation with Seedream model",
+              "parameters": {
+                "category": {
+                  "type": "string",
+                  "options": ["human", "product"],
+                  "default": "human",
+                  "description": "Subject category"
+                },
+                "resolution": {
+                  "type": "string",
+                  "options": ["1K", "2K", "4K"],
+                  "default": "2K",
+                  "description": "Output resolution"
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Optional prompt for style guidance"
+                }
+              },
+              "supportedResolutions": ["1K", "2K", "4K"],
+              "credits": {
+                "1K": 80,
+                "2K": 160,
+                "4K": 320
+              }
+            }
+          ],
+          "defaultModel": "google-nano-banana-pro-multiangle",
+          "outputCount": 9,
+          "description": "Generates 9 different camera angles: front, side, back, top-down, low-angle, and intermediate angles"
+        }
+      ]
+    },
+    {
+      "id": "scene-generation",
+      "name": "Scene Generation",
+      "description": "Generate storyboards and scene continuations",
+      "plugins": [
+        {
+          "id": "storyboard",
+          "name": "Storyboard",
+          "description": "Generate storyboard images from script text and character/background descriptions",
+          "inputType": "text",
+          "outputType": "image",
+          "requiresSourceImage": false,
+          "models": [
+            {
+              "id": "storyboard-generator",
+              "name": "Storyboard Generator",
+              "provider": "Internal",
+              "description": "Generate storyboard frames from script and descriptions",
+              "parameters": {
+                "scriptText": {
+                  "type": "string",
+                  "required": true,
+                  "description": "Script text describing scenes"
+                },
+                "characterInput": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Character descriptions"
+                },
+                "characterNames": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Comma-separated character names"
+                },
+                "backgroundDescription": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Background/setting descriptions"
+                },
+                "specialRequest": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Additional special requests or style notes"
+                },
+                "characterNamesMap": {
+                  "type": "object",
+                  "format": "Record<number, string>",
+                  "description": "Map of scene number to character name"
+                },
+                "propsNamesMap": {
+                  "type": "object",
+                  "format": "Record<number, string>",
+                  "description": "Map of scene number to props"
+                },
+                "backgroundNamesMap": {
+                  "type": "object",
+                  "format": "Record<number, string>",
+                  "description": "Map of scene number to background"
+                }
+              },
+              "supportedResolutions": ["1080p", "1440p"],
+              "credits": {
+                "default": 200
+              }
+            }
+          ],
+          "defaultModel": "storyboard-generator"
+        },
+        {
+          "id": "next-scene",
+          "name": "Next Scene",
+          "description": "Generate the next scene image based on previous scene and prompt",
+          "inputType": "image",
+          "outputType": "image",
+          "requiresSourceImage": true,
+          "models": [
+            {
+              "id": "next-scene-generator",
+              "name": "Next Scene Generator",
+              "provider": "Internal",
+              "description": "Generate continuation scene from previous image",
+              "parameters": {
+                "mode": {
+                  "type": "string",
+                  "options": ["scene"],
+                  "default": "scene",
+                  "description": "Generation mode"
+                },
+                "prompt": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Description of the next scene"
+                },
+                "aspectRatio": {
+                  "type": "string",
+                  "options": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+                  "default": "1:1",
+                  "description": "Output aspect ratio"
+                },
+                "loraScale": {
+                  "type": "number",
+                  "min": 0,
+                  "max": 2,
+                  "default": 1.15,
+                  "description": "LoRA scale for consistency (0-2)"
+                }
+              },
+              "supportedResolutions": ["1080p", "1440p"],
+              "credits": {
+                "default": 150
+              }
+            }
+          ],
+          "defaultModel": "next-scene-generator"
+        }
+      ]
+    }
+  ]
+}

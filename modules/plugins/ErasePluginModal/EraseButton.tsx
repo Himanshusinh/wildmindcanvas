@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { GenerateArrowIcon } from '@/modules/ui-global/common/GenerateArrowIcon';
 
 interface EraseButtonProps {
   scale: number;
@@ -35,12 +37,12 @@ export const EraseButton: React.FC<EraseButtonProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isActive ? '#437eb5' : disabledBg,
+        backgroundColor: isActive ? SELECTION_COLOR : disabledBg,
         border: 'none',
         borderRadius: `${10 * scale}px`,
         cursor: isActive ? 'pointer' : 'not-allowed',
         color: 'white',
-        boxShadow: isActive ? `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)` : 'none',
+        boxShadow: isActive ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
         opacity: (isErasing || externalIsErasing) ? 0.6 : 1,
         fontSize: `${14 * scale}px`,
         fontWeight: 500,
@@ -48,12 +50,12 @@ export const EraseButton: React.FC<EraseButtonProps> = ({
       }}
       onMouseEnter={(e) => {
         if (isActive) {
-          e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(67, 126, 181, 0.5)`;
+          e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
         }
       }}
       onMouseLeave={(e) => {
         if (isActive) {
-          e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(67, 126, 181, 0.4)`;
+          e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
         }
       }}
       onMouseDown={(e) => e.stopPropagation()}
@@ -61,19 +63,7 @@ export const EraseButton: React.FC<EraseButtonProps> = ({
       {isErasing || externalIsErasing ? (
         <span>Erasing...</span>
       ) : (
-        <svg
-          width={16 * scale}
-          height={16 * scale}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12h14" />
-          <path d="M12 5l7 7-7 7" />
-        </svg>
+        <GenerateArrowIcon scale={scale} />
       )}
     </button>
   );

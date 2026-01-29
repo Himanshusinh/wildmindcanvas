@@ -112,6 +112,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Use UI visibility hook
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
+
+  // Allow full-screen plugin popups (like Multiangle) to hide global UI chrome
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { hidden?: boolean; source?: string } | undefined;
+      if (!detail) return;
+      if (typeof detail.hidden === 'boolean') {
+        setIsUIHidden(detail.hidden);
+      }
+    };
+    window.addEventListener('wildmind:ui-hidden', handler as EventListener);
+    return () => window.removeEventListener('wildmind:ui-hidden', handler as EventListener);
+  }, [setIsUIHidden]);
   const openExternalVideoEditor = useCallback(() => {
     try {
       const externalBase = process.env.NEXT_PUBLIC_EDITOR_VIDEO_URL || 'https://editor-video.wildmindai.com';
@@ -676,9 +689,14 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const handleImageDelete = imageHandlers.handleImageDelete;
   const handleImageDownload = imageHandlers.handleImageDownload;
   const handleImageDuplicate = imageHandlers.handleImageDuplicate;
-  const handleImageUpload = imageHandlers.handleImageUpload;
-  const handleImagesDrop = imageHandlers.handleImagesDrop;
-  const handleImageSelect = imageHandlers.handleImageSelect;
+  // Use local handlers that have access to processMediaFile
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleMultipleFilesUpload(Array.from(e.target.files));
+    }
+  };
+  const handleImagesDrop = handleMultipleFilesUpload;
+  const handleImageSelect = (file: File) => processMediaFile(file);
   const handleImageGenerate = imageHandlers.handleImageGenerate;
   const handleTextCreate = imageHandlers.handleTextCreate;
   const handleAddImageToCanvas = imageHandlers.handleAddImageToCanvas;
@@ -850,6 +868,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         addGen(setUpscaleGenerators, 'upscale-plugin');
         break;
       case 'remove-bg':
+      case 'removebg':
         addGen(setRemoveBgGenerators, 'removebg-plugin');
         break;
       case 'erase':
@@ -862,6 +881,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         addGen(setVectorizeGenerators, 'vectorize-plugin');
         break;
       case 'multiangle':
+      case 'multiangle-camera':
         addGen(setMultiangleCameraGenerators, 'multiangle-camera-plugin');
         break;
       case 'compare':
@@ -1326,6 +1346,45 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // We only persist on create/delete.
               }}
               onPersistConnectorCreate={async (connector) => {
+                // ✅ VALIDATION: Limit image-to-video connections to maximum 2
+                const targetVideoId = connector.to;
+                const sourceImageId = connector.from;
+                
+                // Helper function to check if a node ID is an image node
+                const isImageNode = (nodeId: string): boolean => {
+                  return imageGenerators.some(ig => ig.id === nodeId) ||
+                         images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
+                };
+                
+                // Helper function to check if a node ID is a video node
+                const isVideoNode = (nodeId: string): boolean => {
+                  return videoGenerators.some(vg => vg.id === nodeId);
+                };
+                
+                // Check if this is an image-to-video connection
+                const isTargetVideo = isVideoNode(targetVideoId);
+                const isSourceImage = isImageNode(sourceImageId);
+                
+                if (isTargetVideo && isSourceImage) {
+                  // Count existing connections from images to this video
+                  const existingImageToVideoConnections = connectors.filter(c => 
+                    c.to === targetVideoId && isImageNode(c.from)
+                  );
+                  
+                  if (existingImageToVideoConnections.length >= 2) {
+                    console.warn(`[Connection Validation] ❌ BLOCKED: Video ${targetVideoId} already has ${existingImageToVideoConnections.length} image connections (maximum 2 allowed)`);
+                    console.warn(`[Connection Validation] Existing connections:`, existingImageToVideoConnections.map(c => c.from));
+                    console.warn(`[Connection Validation] Attempted connection from: ${sourceImageId}`);
+                    
+                    // Show user-friendly error message
+                    alert(`⚠️ Connection Limit Reached\n\nThis video generation frame already has 2 image connections (maximum allowed).\n\nPlease disconnect an existing image connection first if you want to connect a different image.`);
+                    return; // Reject the connection
+                  }
+                  
+                  console.log(`[Connection Validation] ✅ ALLOWED: Video ${targetVideoId} will have ${existingImageToVideoConnections.length + 1} image connection(s) (limit: 2)`);
+                }
+                
+                // ✅ Connection is valid - proceed with creation
                 const cid = connector.id || `connector-${Date.now()}`;
                 setConnectors(prev => [...prev, {
                   id: cid,
@@ -1370,8 +1429,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
               onUpscale={pluginHandlers.onUpscale}
 
               onPersistMultiangleCameraModalCreate={pluginHandlers.onPersistMultiangleCameraModalCreate}
+              onPersistMultiangleCameraModalMove={pluginHandlers.onPersistMultiangleCameraModalMove}
               onPersistMultiangleCameraModalDelete={pluginHandlers.onPersistMultiangleCameraModalDelete}
               onMultiangleCamera={pluginHandlers.onMultiangleCamera}
+              onQwenMultipleAngles={pluginHandlers.onQwenMultipleAngles}
 
               onPersistCompareModalCreate={pluginHandlers.onPersistCompareModalCreate}
               onPersistCompareModalMove={pluginHandlers.onPersistCompareModalMove}

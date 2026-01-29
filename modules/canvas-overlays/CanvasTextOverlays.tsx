@@ -22,14 +22,14 @@ export const CanvasTextOverlays: React.FC<CanvasTextOverlaysProps> = ({
     position,
 }) => {
     console.log('[CanvasTextOverlays] Rendering with states:', canvasTextStates, 'count:', canvasTextStates?.length, 'scale:', scale, 'position:', position);
-    
+
     if (!canvasTextStates || canvasTextStates.length === 0) {
         console.log('[CanvasTextOverlays] No text states to render - array is empty or undefined');
         return null;
     }
-    
+
     console.log('[CanvasTextOverlays] Rendering', canvasTextStates.length, 'text element(s)');
-    
+
     return (
         <>
             {canvasTextStates.map((textState) => {

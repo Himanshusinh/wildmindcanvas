@@ -82,7 +82,7 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     y={modalState.y}
                     scale={scale}
                     position={position}
-                    isSelected={selectedVideoEditorModalId === modalState.id}
+                    isSelected={selectedVideoEditorModalId === modalState.id || (selectedVideoEditorModalIds || []).includes(modalState.id)}
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

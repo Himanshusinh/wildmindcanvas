@@ -1,23 +1,13 @@
+import { SemanticGoal, CanvasInstructionPlan } from './compiler/types';
 
-export type CapabilityType = 'IMAGE' | 'VIDEO' | 'TEXT' | 'PLUGIN' | 'MUSIC' | 'CONNECT' | 'UNKNOWN' | 'WORKFLOW';
+export type CapabilityType = 'IMAGE' | 'VIDEO' | 'TEXT' | 'PLUGIN' | 'MUSIC' | 'BREADCRUMB' | 'UNKNOWN';
 
 /**
  * The Schema the AI is allowed to output.
- * Minimal and abstract.
+ * STRICTLY Semantic Intent only.
  */
-export interface AbstractIntent {
-    capability: CapabilityType;
-    goal: string; // e.g., "generate", "create", "upscale", "answer"
-    prompt?: string;
-    references?: string[]; // IDs of selected nodes
-    preferences?: {
-        quality?: 'high' | 'fast' | 'cheapest';
-        aspectRatio?: string;
-        count?: number;
-        preferredModel?: string;
-        [key: string]: any; // Allow custom parameters like moveForward, rotateDegrees
-    };
-    explanation?: string;
+export interface AbstractIntent extends SemanticGoal {
+    explanation: string; // Mandatory conversational response
 }
 
 /**
@@ -28,17 +18,9 @@ export interface ResolvedAction {
     intent: string; // Internal intent string for executor
     capability: CapabilityType;
     modelId: string;
-    config: any; // Final params like { resolution, aspectRatio, imageCount, etc. }
+    payload: any; // Final params like { resolution, aspectRatio, imageCount, etc. }
     requiresConfirmation: boolean;
     explanation: string;
-}
-
-export interface IntentAction {
-    intent: string;
-    confidence: number;
-    payload: any;
-    requiresConfirmation: boolean;
-    explanation?: string;
 }
 
 // ❌ WORKFLOW / GRAPH intents are BANNED for LLM output.

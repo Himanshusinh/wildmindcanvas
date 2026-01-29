@@ -92,7 +92,7 @@ export async function generateImageFAL(
   // Map frontend model names to backend model names
   let backendModel = model.toLowerCase();
   if (backendModel.includes('google nano banana') || backendModel.includes('nano banana')) {
-    backendModel = 'gemini-25-flash-image';
+    backendModel = 'gemini-2.0-flash-image';
   } else if (backendModel.includes('seedream') && backendModel.includes('4k')) {
     backendModel = 'seedream-v4';
   } else if (backendModel.includes('seedream')) {
@@ -331,20 +331,55 @@ export async function generateImageForCanvas(
     }
   }
 
+  // Validate prompt length (backend requires 1-5000 characters)
+  const trimmedPrompt = prompt?.trim() || '';
+  if (!trimmedPrompt || trimmedPrompt.length === 0) {
+    throw new Error('Prompt is required');
+  }
+  if (trimmedPrompt.length > 5000) {
+    throw new Error(`Prompt is too long (${trimmedPrompt.length} characters). Maximum length is 5000 characters. Please shorten your prompt.`);
+  }
+
   try {
-    const requestBody = {
-      prompt,
+    // Validate aspectRatio format if provided (must match pattern: "width:height" like "16:9")
+    let validatedAspectRatio: string | undefined = aspectRatio;
+    if (aspectRatio && !/^\d+:\d+$/.test(aspectRatio)) {
+      console.warn('[generateImageForCanvas] Invalid aspectRatio format, removing:', aspectRatio);
+      validatedAspectRatio = undefined;
+    }
+
+    // Validate width and height if provided
+    let validatedWidth = width;
+    let validatedHeight = height;
+    if (width !== undefined && (typeof width !== 'number' || width < 64 || width > 4096)) {
+      console.warn('[generateImageForCanvas] Invalid width, removing:', width);
+      validatedWidth = undefined;
+    }
+    if (height !== undefined && (typeof height !== 'number' || height < 64 || height > 4096)) {
+      console.warn('[generateImageForCanvas] Invalid height, removing:', height);
+      validatedHeight = undefined;
+    }
+
+    // Validate imageCount if provided
+    let validatedImageCount = imageCount;
+    if (imageCount !== undefined && (typeof imageCount !== 'number' || imageCount < 1 || imageCount > 4)) {
+      console.warn('[generateImageForCanvas] Invalid imageCount, using default:', imageCount);
+      validatedImageCount = undefined;
+    }
+
+    const requestBody: any = {
+      prompt: trimmedPrompt, // Use validated trimmed prompt
       model,
-      width,
-      height,
-      aspectRatio, // Pass aspectRatio for proper model mapping
-      imageCount, // Pass imageCount to generate multiple images
-      sourceImageUrl: processedSourceImageUrl, // Use processed URL (data URI instead of blob URL)
-      sceneNumber, // Scene number for storyboard generation
-      previousSceneImageUrl: processedPreviousSceneImageUrl, // Use processed URL (data URI instead of blob URL)
-      storyboardMetadata, // Metadata for storyboard (character, background, etc.)
-      seed, // Pass explicit seed if provided
-      options, // Pass options (style, etc.)
+      ...(validatedWidth !== undefined && { width: validatedWidth }),
+      ...(validatedHeight !== undefined && { height: validatedHeight }),
+      ...(validatedAspectRatio && { aspectRatio: validatedAspectRatio }),
+      ...(validatedImageCount !== undefined && { imageCount: validatedImageCount }),
+      ...(processedSourceImageUrl && { sourceImageUrl: processedSourceImageUrl }),
+      ...(sceneNumber !== undefined && { sceneNumber }),
+      ...(processedPreviousSceneImageUrl && { previousSceneImageUrl: processedPreviousSceneImageUrl }),
+      ...(storyboardMetadata && { storyboardMetadata }),
+      ...(seed !== undefined && { seed }),
+      ...(options && { options }),
       meta: {
         source: 'canvas',
         projectId,
@@ -394,6 +429,11 @@ export async function generateImageForCanvas(
     const contentType = response.headers.get('content-type') || '';
     const text = await response.text();
 
+    // Log raw response for debugging validation errors
+    if (!response.ok) {
+      console.error('[generateImageForCanvas] Raw response text:', text.substring(0, 500));
+    }
+
     if (!text || text.trim() === '') {
       throw new Error('Empty response body from server');
     }
@@ -414,13 +454,260 @@ export async function generateImageForCanvas(
     }
 
     if (!response.ok) {
-      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      // Extract detailed error message
+      // Helper function to safely extract string from error value
+      const extractErrorMessage = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'string') {
+          // Check if it's the literal "[object Object]" string (backend bug)
+          if (value === '[object Object]' || value.includes('[object Object]')) {
+            return ''; // Return empty to trigger fallback extraction
+          }
+          return value;
+        }
+        if (typeof value === 'object') {
+          // If it's an Error object, use its message
+          if (value instanceof Error) return value.message;
+          // If it has a message property, use that
+          if (value.message && typeof value.message === 'string') {
+            if (value.message === '[object Object]') {
+              // Try to extract from the object itself
+              try {
+                return JSON.stringify(value);
+              } catch {
+                return String(value);
+              }
+            }
+            return value.message;
+          }
+          // If it has other properties, try to extract useful info
+          if (value.error && typeof value.error === 'string') return value.error;
+          if (value.msg && typeof value.msg === 'string') return value.msg;
+          // Otherwise stringify the object
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        }
+        return String(value);
+      };
+      
+      // Try to extract error message, handling "[object Object]" case
+      let errorMessage = extractErrorMessage(result?.message) || extractErrorMessage(result?.error);
+      
+      // Special handling: If message contains "[object Object]", try to extract actual error
+      if (errorMessage && typeof errorMessage === 'string' && errorMessage.includes('[object Object]')) {
+        // The backend error message contains "[object Object]", try to find the actual error
+        console.log('[generateImageForCanvas] Message contains "[object Object]", attempting deep extraction...');
+        
+        // Try to extract from nested structures
+        if (result && typeof result === 'object') {
+          // Check result.data for error details
+          if (result.data) {
+            if (Array.isArray(result.data) && result.data.length > 0) {
+              // Validation errors array
+              const validationErrors = result.data.map((e: any) => {
+                if (typeof e === 'string') return e;
+                const field = e.param || e.field || e.location || 'unknown';
+                const msg = e.msg || e.message || JSON.stringify(e);
+                return `${field}: ${msg}`;
+              }).join(', ');
+              errorMessage = `Validation failed: ${validationErrors}`;
+            } else if (typeof result.data === 'object') {
+              // Try to extract from data object
+              const dataError = extractErrorMessage(result.data.error) || 
+                               extractErrorMessage(result.data.message) ||
+                               extractErrorMessage(result.data);
+              if (dataError && !dataError.includes('[object Object]')) {
+                errorMessage = dataError;
+              }
+            }
+          }
+          
+          // Check for error property that might be an object
+          if (result.error && typeof result.error === 'object' && !Array.isArray(result.error)) {
+            const errorObj = result.error;
+            // Try common error object properties
+            const errorFromObj = errorObj.message || errorObj.error || errorObj.msg || errorObj.detail;
+            if (errorFromObj && typeof errorFromObj === 'string' && !errorFromObj.includes('[object Object]')) {
+              errorMessage = errorFromObj;
+            } else {
+              // Try to stringify the error object in a readable way
+              try {
+                const errorKeys = Object.keys(errorObj);
+                if (errorKeys.length > 0) {
+                  const errorDetails = errorKeys.map(key => {
+                    const val = errorObj[key];
+                    return `${key}: ${typeof val === 'string' ? val : JSON.stringify(val)}`;
+                  }).join(', ');
+                  errorMessage = `Error details: ${errorDetails}`;
+                }
+              } catch {}
+            }
+          }
+          
+          // If still contains "[object Object]", try to get more context from the result
+          if (errorMessage.includes('[object Object]')) {
+            // Log the full result structure for debugging
+            console.error('[generateImageForCanvas] Full result structure:', JSON.stringify(result, null, 2));
+            
+            // Try to find any string property that might contain the actual error
+            const stringProps: string[] = [];
+            const findStringProps = (obj: any, depth = 0): void => {
+              if (depth > 3) return; // Limit recursion
+              if (obj && typeof obj === 'object') {
+                for (const [key, value] of Object.entries(obj)) {
+                  if (typeof value === 'string' && value.length > 0 && !value.includes('[object Object]')) {
+                    stringProps.push(`${key}: ${value}`);
+                  } else if (typeof value === 'object' && value !== null) {
+                    findStringProps(value, depth + 1);
+                  }
+                }
+              }
+            };
+            findStringProps(result);
+            
+            if (stringProps.length > 0) {
+              errorMessage = stringProps.join('; ');
+            }
+          }
+        }
+      }
+      
+      // If errorMessage is empty or "[object Object]", try to extract from result object itself
+      if (!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) {
+        // Try to find error details in the result object
+        if (result && typeof result === 'object') {
+          // Check for nested error objects
+          if (result.error && typeof result.error === 'object') {
+            errorMessage = extractErrorMessage(result.error);
+          }
+          // Check for data.error
+          if ((!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) && result.data && typeof result.data === 'object') {
+            errorMessage = extractErrorMessage(result.data.error) || extractErrorMessage(result.data);
+          }
+          // If still no message, stringify the whole result
+          if (!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) {
+            try {
+              errorMessage = JSON.stringify(result, null, 2);
+            } catch {
+              errorMessage = String(result);
+            }
+          }
+        }
+      }
+      
+      // Final fallback
+      if (!errorMessage || errorMessage === '[object Object]') {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
+      
+      // If it's a validation error, try to extract more details
+      // The error handler returns: { responseStatus: "error", message: "...", data: errors.array() }
+      if (response.status === 422 || response.status === 400) {
+        // Check result.data first (express-validator errors are passed as data in ApiError)
+        if (result?.data && Array.isArray(result.data)) {
+          // express-validator errors format: [{ msg: 'error message', param: 'field', value: 'value' }, ...]
+          const validationErrors = result.data.map((e: any) => {
+            if (typeof e === 'string') return e;
+            // Handle express-validator format
+            const field = e.param || e.field || e.location || 'unknown';
+            const msg = e.msg || e.message || 'validation error';
+            return `${field}: ${msg}`;
+          }).join(', ');
+          errorMessage = `Validation failed: ${validationErrors}`;
+        } else if (result?.errors) {
+          if (Array.isArray(result.errors)) {
+            const validationErrors = result.errors.map((e: any) => {
+              if (typeof e === 'string') return e;
+              // Handle express-validator format
+              const field = e.param || e.field || e.location || 'unknown';
+              const msg = e.msg || e.message || 'validation error';
+              return `${field}: ${msg}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${validationErrors}`;
+          } else if (typeof result.errors === 'object') {
+            // If errors is an object, try to extract field-specific errors
+            const errorFields = Object.entries(result.errors).map(([field, msg]: [string, any]) => {
+              return `${field}: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${errorFields}`;
+          } else {
+            errorMessage = `Validation failed: ${JSON.stringify(result.errors)}`;
+          }
+        } else if (result?.error) {
+          // Check if error is an array (express-validator format)
+          if (Array.isArray(result.error)) {
+            const validationErrors = result.error.map((e: any) => {
+              if (typeof e === 'string') return e;
+              const field = e.param || e.field || e.location || 'unknown';
+              const msg = e.msg || e.message || 'validation error';
+              return `${field}: ${msg}`;
+            }).join(', ');
+            errorMessage = `Validation failed: ${validationErrors}`;
+          } else {
+            errorMessage = extractErrorMessage(result.error);
+          }
+        } else if (result?.message) {
+          errorMessage = extractErrorMessage(result.message);
+        } else {
+          // If result is empty or doesn't have expected fields, log the full result
+          errorMessage = `Validation failed: ${JSON.stringify(result)}`;
+        }
+      } else if (result?.data?.error) {
+        errorMessage = extractErrorMessage(result.data.error);
+      } else if (result?.error?.message) {
+        errorMessage = extractErrorMessage(result.error.message);
+      } else if (result?.error) {
+        errorMessage = extractErrorMessage(result.error);
+      }
+      
+      // Final safety check - ensure errorMessage is always a string
+      if (typeof errorMessage !== 'string') {
+        errorMessage = JSON.stringify(errorMessage);
+      }
+      
+      // Log full error details for debugging
+      console.error('[generateImageForCanvas] Request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        result,
+        resultString: JSON.stringify(result),
+        errorMessage,
+        requestBody: {
+          ...requestBody,
+          prompt: prompt?.substring(0, 100) + '...',
+          sourceImageUrl: processedSourceImageUrl ? 'present' : 'missing',
+        }
+      });
+      
       throw new Error(errorMessage || 'Failed to generate image');
     }
 
     // Handle API Gateway response format
     if (result.responseStatus === 'error') {
-      throw new Error(result.message || 'Failed to generate image');
+      // Safely extract error message
+      let errorMsg = 'Failed to generate image';
+      if (result.message) {
+        if (typeof result.message === 'string') {
+          errorMsg = result.message;
+        } else if (typeof result.message === 'object') {
+          // If message is an object, try to extract useful info
+          if (result.message.message && typeof result.message.message === 'string') {
+            errorMsg = result.message.message;
+          } else {
+            try {
+              errorMsg = JSON.stringify(result.message);
+            } catch {
+              errorMsg = String(result.message);
+            }
+          }
+        } else {
+          errorMsg = String(result.message);
+        }
+      }
+      throw new Error(errorMsg);
     }
 
     // Trigger credit refresh event
@@ -1838,8 +2125,23 @@ export async function getCurrentUser(): Promise<{ uid: string; username: string;
       }
 
       return null;
-    } catch (error) {
-      console.error('Error fetching user info:', error);
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      // Dev convenience: if API gateway isn't running / reachable, return null quietly.
+      if (
+        msg === 'Failed to fetch' ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('ERR_CONNECTION_REFUSED') ||
+        msg.includes('NetworkError')
+      ) {
+        console.warn('[getCurrentUser] API unreachable - returning null', {
+          api: `${API_GATEWAY_URL}/auth/me`,
+          error: msg,
+        });
+        return null;
+      }
+
+      console.error('[getCurrentUser] Error fetching user info:', error);
       return null;
     }
   })();
@@ -2249,5 +2551,128 @@ export async function generateMusicForCanvas(
     }
 
     throw new Error('Failed to generate music. Please check your connection and try again.');
+  }
+}
+
+/**
+ * Generate multiple camera angles using Qwen Image Edit Multiple Angles (FAL API)
+ */
+export async function qwenMultipleAnglesForCanvas(
+  imageUrls: string[],
+  projectId: string,
+  horizontalAngle?: number,
+  verticalAngle?: number,
+  zoom?: number,
+  additionalPrompt?: string,
+  loraScale?: number,
+  imageSize?: string | { width: number; height: number },
+  guidanceScale?: number,
+  numInferenceSteps?: number,
+  negativePrompt?: string,
+  seed?: number,
+  numImages?: number
+): Promise<{ url: string; originalUrl?: string; storagePath: string; mediaId?: string; generationId?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+
+  try {
+    const requestBody: any = {
+      image_urls: imageUrls,
+      meta: {
+        source: 'canvas',
+        projectId,
+      },
+    };
+
+    // Add optional parameters
+    if (horizontalAngle !== undefined) requestBody.horizontal_angle = horizontalAngle;
+    if (verticalAngle !== undefined) requestBody.vertical_angle = verticalAngle;
+    if (zoom !== undefined) requestBody.zoom = zoom;
+    if (additionalPrompt) requestBody.additional_prompt = additionalPrompt;
+    if (loraScale !== undefined) requestBody.lora_scale = loraScale;
+    if (imageSize) requestBody.image_size = imageSize;
+    if (guidanceScale !== undefined) requestBody.guidance_scale = guidanceScale;
+    if (numInferenceSteps !== undefined) requestBody.num_inference_steps = numInferenceSteps;
+    if (negativePrompt) requestBody.negative_prompt = negativePrompt;
+    if (seed !== undefined) requestBody.seed = seed;
+    if (numImages !== undefined) requestBody.num_images = numImages;
+
+    const response = await fetch(`${API_GATEWAY_URL}/fal/qwen/multiple-angles`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify(requestBody),
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type') || '';
+    let text: string;
+    let result: any;
+
+    try {
+      text = await response.text();
+    } catch (readError: any) {
+      throw new Error(`Failed to read response: ${readError.message}`);
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        result = JSON.parse(text);
+        console.log('[qwenMultipleAnglesForCanvas] 📥 Parsed response:', {
+          status: response.status,
+          responseStatus: result.responseStatus,
+          hasData: !!result.data,
+          resultKeys: Object.keys(result)
+        });
+      } catch (parseError: any) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Invalid JSON response from server. Status: ${response.status}. Response: ${text.substring(0, 200)}`);
+        }
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
+    } else {
+      throw new Error(`Unexpected content type: ${contentType || 'unknown'}. Response: ${text.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const errorMessage = result?.message || result?.error || `HTTP ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage || 'Failed to generate multiple angles');
+    }
+
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to generate multiple angles');
+    }
+
+    // FAL API returns images array - get first image
+    const images = result.data?.images || [];
+    if (images.length === 0) {
+      throw new Error('No images returned from Qwen Multiple Angles API');
+    }
+
+    // Return the first image (similar structure to multiangleImageForCanvas)
+    const firstImage = images[0];
+    return {
+      url: firstImage.url || firstImage.publicUrl || '',
+      originalUrl: firstImage.originalUrl || firstImage.url || '',
+      storagePath: firstImage.storagePath || firstImage.key || '',
+      mediaId: firstImage.id || firstImage.mediaId,
+      generationId: result.data?.historyId || result.historyId,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout. Multiple angles generation is taking too long. Please try again.');
+    }
+
+    if (error.message) {
+      throw error;
+    }
+
+    throw new Error('Failed to generate multiple angles. Please check your connection and try again.');
   }
 }

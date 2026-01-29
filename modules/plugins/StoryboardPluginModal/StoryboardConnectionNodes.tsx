@@ -109,7 +109,7 @@ export const StoryboardConnectionNodes: React.FC<StoryboardConnectionNodesProps>
                     if (!id) return;
                     e.stopPropagation();
                     e.preventDefault();
-                    const color = '#437eb5';
+                    const color = '#4C83FF';
                     const startX = e.clientX;
                     const startY = e.clientY;
                     const DRAG_THRESHOLD_PX = 1;

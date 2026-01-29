@@ -29,6 +29,7 @@ interface CanvasOverlaysProps {
     activeGenerationCount: number;
     onFitView: () => void;
     setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+    isChatOpen?: boolean;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -46,7 +47,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     setIsSettingsOpen,
     activeGenerationCount,
     onFitView,
-    setGenerationQueue
+    setGenerationQueue,
+    isChatOpen
 }) => {
     const {
         images,
@@ -71,6 +73,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
 
     const {
         clearAllSelections,
+        selectedIds,
         selectedImageIndices, setSelectedImageIndices,
         selectedTextInputIds, setSelectedTextInputIds, setSelectedTextInputId, selectedTextInputId,
         selectedImageModalIds, setSelectedImageModalIds, setSelectedImageModalId, selectedImageModalId,
@@ -90,6 +93,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         contextMenuPosition, contextMenuModalType, contextMenuOpen, setContextMenuOpen,
+        setSelectionOrder,
     } = canvasSelection;
 
     const {
@@ -132,6 +136,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             />
 
             <ModalOverlays
+                isChatOpen={isChatOpen}
                 stageRef={stageRef as any}
                 scale={scale}
                 position={position}
@@ -180,6 +185,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
                 onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
                 onMultiangleCamera={props.onMultiangleCamera}
+                onQwenMultipleAngles={props.onQwenMultipleAngles}
 
                 selectedTextInputId={selectedTextInputId}
                 selectedTextInputIds={selectedTextInputIds}
@@ -207,6 +213,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 selectedNextSceneModalIds={selectedNextSceneModalIds}
                 selectedStoryboardModalId={selectedStoryboardModalId}
                 selectedStoryboardModalIds={selectedStoryboardModalIds}
+                selectedIds={selectedIds}
+                setSelectionOrder={setSelectionOrder}
 
                 clearAllSelections={clearAllSelections}
                 setTextInputStates={setTextInputStates}
@@ -399,11 +407,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onMusicCreate={(x, y) => { }}
             /> */}
 
-            {activeGenerationCount > 0 && (
-                <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium z-50">
-                    Generating ({activeGenerationCount})...
-                </div>
-            )}
+
         </>
     );
 };

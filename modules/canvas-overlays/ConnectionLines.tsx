@@ -206,7 +206,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         const isSelected = selectedConnectionId === connectionId;
         const isLineGenerating = generatingNodeIds.has(line.to);
         // When selected, match the active drag line style exactly
-        const strokeColor = '#437eb5'; // Same color as active drag
+        const strokeColor = '#4C83FF'; // Same color as active drag
         // When selected, use same width calculation as active drag (1.6 scaled)
         const strokeWidth = isSelected ? computeStrokeForScale(1.6, scale) : computeStrokeForScale(2, scale);
         const glowWidth = Math.max(5, 7 * scale);
@@ -285,17 +285,17 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                   e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2.2, scale));
                 } else {
                   // Keep selected state (same as active drag)
-                  e.currentTarget.style.stroke = '#437eb5';
+                  e.currentTarget.style.stroke = '#4C83FF';
                   e.currentTarget.style.strokeWidth = String(computeStrokeForScale(1.6, scale));
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isSelected) {
-                  e.currentTarget.style.stroke = '#437eb5';
+                  e.currentTarget.style.stroke = '#4C83FF';
                   e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2, scale));
                 } else {
                   // Keep selected state (same as active drag)
-                  e.currentTarget.style.stroke = '#437eb5';
+                  e.currentTarget.style.stroke = '#4C83FF';
                   e.currentTarget.style.strokeWidth = String(computeStrokeForScale(1.6, scale));
                 }
               }}
@@ -388,7 +388,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
           {/* Main active drag line */}
           <path
             d={`M ${activeDrag.startX} ${activeDrag.startY} C ${activeDrag.startX + 100 * scale} ${activeDrag.startY}, ${activeDrag.currentX - 100 * scale} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-            stroke="#437eb5"
+            stroke="#4C83FF"
             strokeWidth={computeStrokeForScale(1.6, scale)}
             fill="none"
             strokeLinecap="round"

@@ -14,6 +14,8 @@ interface MultiangleCameraImageFrameProps {
   sourceImageUrl: string | null;
   onMouseDown: (e: React.MouseEvent) => void;
   onSelect?: () => void;
+  /** When true, frame fills its parent container (for full-screen popup preview) */
+  fillContainer?: boolean;
 }
 
 export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProps> = ({
@@ -27,6 +29,7 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
   sourceImageUrl,
   onMouseDown,
   onSelect,
+  fillContainer = false,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -51,16 +54,16 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
         }
       }}
       style={{
-        width: `400px`,
-        maxWidth: '90vw',
-        minHeight: `150px`,
-        maxHeight: `400px`,
-        height: sourceImageUrl ? `220px` : 'auto',
-        backgroundColor: isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: `0 0 16px 16px`,
-        border: `${frameBorderWidth}px solid ${frameBorderColor}`,
+        width: fillContainer ? '100%' : `400px`,
+        maxWidth: fillContainer ? '100%' : '90vw',
+        minHeight: fillContainer ? '100%' : `150px`,
+        maxHeight: fillContainer ? '100%' : `400px`,
+        height: fillContainer ? '100%' : (sourceImageUrl ? `220px` : 'auto'),
+        backgroundColor: fillContainer ? 'transparent' : (isDark ? 'rgba(18, 18, 18, 0.95)' : 'rgba(255, 255, 255, 0.95)'),
+        backdropFilter: fillContainer ? undefined : 'blur(20px)',
+        WebkitBackdropFilter: fillContainer ? undefined : 'blur(20px)',
+        borderRadius: fillContainer ? `12px` : `0 0 16px 16px`,
+        border: fillContainer ? 'none' : `${frameBorderWidth}px solid ${frameBorderColor}`,
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -70,8 +73,8 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
         position: 'relative',
         zIndex: 1,
         transition: 'border 0.18s ease, background-color 0.3s ease',
-        padding: `16px`,
-        marginTop: `${-frameBorderWidth}px`,
+        padding: fillContainer ? 0 : `16px`,
+        marginTop: fillContainer ? 0 : `${-frameBorderWidth}px`,
       }}
     >
       {sourceImageUrl ? (
@@ -94,13 +97,25 @@ export const MultiangleCameraImageFrame: React.FC<MultiangleCameraImageFrameProp
             return sourceImageUrl;
           })()}
           alt="Source"
+          onDragStart={(e) => {
+            if (sourceImageUrl) {
+              e.dataTransfer.setData('text/plain', sourceImageUrl);
+              e.dataTransfer.setData('application/json', JSON.stringify({
+                url: sourceImageUrl,
+                type: 'uploaded',
+                id: `drop-${Date.now()}`
+              }));
+              e.dataTransfer.dropEffect = 'copy';
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
+            cursor: 'grab',
           }}
-          draggable={false}
+          draggable={true}
         />
       ) : (
         <div style={{ textAlign: 'center', color: isDark ? '#666666' : '#9ca3af', padding: `20px`, transition: 'color 0.3s ease' }}>

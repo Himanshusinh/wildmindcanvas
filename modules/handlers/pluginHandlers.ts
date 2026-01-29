@@ -40,6 +40,7 @@ export interface PluginHandlers {
   onPersistImageEditorModalDelete: (id: string) => Promise<void>;
   onUpscale: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number) => Promise<string | null>;
   onMultiangleCamera: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
+  onQwenMultipleAngles: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
   onRemoveBg: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onErase: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onExpand: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
@@ -133,6 +134,29 @@ export function createPluginHandlers(
       setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
       // extract url
       return (result as any)?.url || result;
+    } catch (e) {
+      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+      throw e;
+    }
+  };
+
+  const onQwenMultipleAngles = async (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => {
+    if (!imageUrls || imageUrls.length === 0 || !projectId) return null;
+    const queueId = `qwen-multiple-angles-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'image', operationName: 'View Morph', model: 'Qwen Multiple Angles', total: 1, index: 1, startedAt: Date.now() }]);
+    try {
+      const { qwenMultipleAnglesForCanvas } = await import('@/core/api/api');
+      const result = await qwenMultipleAnglesForCanvas(
+        imageUrls,
+        projectId,
+        horizontalAngle,
+        verticalAngle,
+        zoom,
+        additionalPrompt,
+        loraScale
+      );
+      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+      return result?.url || null;
     } catch (e) {
       setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
       throw e;
@@ -341,7 +365,7 @@ export function createPluginHandlers(
     onPersistSceneFrameModalCreate, onPersistSceneFrameModalMove, onPersistSceneFrameModalDelete,
     onPersistVideoEditorModalCreate, onPersistVideoEditorModalMove, onPersistVideoEditorModalDelete,
     onPersistImageEditorModalCreate, onPersistImageEditorModalMove, onPersistImageEditorModalDelete,
-    onUpscale, onMultiangleCamera, onRemoveBg, onErase, onExpand, onVectorize,
+    onUpscale, onMultiangleCamera, onQwenMultipleAngles, onRemoveBg, onErase, onExpand, onVectorize,
     onPersistCompareModalCreate, onPersistCompareModalMove, onPersistCompareModalDelete
   };
 }

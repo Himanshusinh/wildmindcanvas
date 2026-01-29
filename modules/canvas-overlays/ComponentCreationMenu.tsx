@@ -174,7 +174,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
         id: `connector-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         from: componentMenu.sourceNodeId,
         to: targetId,
-        color: componentMenu.connectionColor || '#437eb5', // Use drag color or default
+        color: componentMenu.connectionColor || '#4C83FF', // Use drag color or default
         fromAnchor: 'send',
         toAnchor: 'receive',
       };

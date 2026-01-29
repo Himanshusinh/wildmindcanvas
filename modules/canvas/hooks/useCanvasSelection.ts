@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CanvasItemsData, CanvasProps } from '../types';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
 
@@ -76,6 +76,9 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
 
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
+    // Selection order tracking - maintains the order items were actually selected
+    const [selectionOrder, setSelectionOrder] = useState<string[]>([]);
+
     // Rich Text Selection (with fallback)
     const [localSelectedRichTextId, setLocalSelectedRichTextId] = useState<string | null>(null);
     const [localSelectedRichTextIds, setLocalSelectedRichTextIds] = useState<string[]>([]);
@@ -84,6 +87,68 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const effectiveSetSelectedRichTextId = props.setSelectedRichTextId ?? setLocalSelectedRichTextId;
     const effectiveSelectedRichTextIds = props.selectedRichTextIds !== undefined ? props.selectedRichTextIds : localSelectedRichTextIds;
     const effectiveSetSelectedRichTextIds = props.setSelectedRichTextIds ?? setLocalSelectedRichTextIds;
+
+    // Sync and deduplicate selectionOrder when selections change
+    useEffect(() => {
+        // Collect all currently selected IDs
+        const allSelectedIds = new Set([
+            ...selectedImageModalIds,
+            ...selectedVideoModalIds,
+            ...selectedVideoEditorModalIds,
+            ...selectedImageEditorModalIds,
+            ...selectedMusicModalIds,
+            ...selectedUpscaleModalIds,
+            ...selectedMultiangleCameraModalIds,
+            ...selectedRemoveBgModalIds,
+            ...selectedEraseModalIds,
+            ...selectedExpandModalIds,
+            ...selectedVectorizeModalIds,
+            ...selectedNextSceneModalIds,
+            ...selectedStoryboardModalIds,
+            ...selectedScriptFrameModalIds,
+            ...selectedSceneFrameModalIds,
+            ...selectedGroupIds,
+            ...effectiveSelectedCanvasTextIds,
+            ...effectiveSelectedRichTextIds
+        ]);
+
+        // Clean up selectionOrder: remove items that are no longer selected, and remove duplicates
+        setSelectionOrder(prev => {
+            const seen = new Set<string>();
+            const cleaned = prev
+                .filter(id => allSelectedIds.has(id)) // Remove deselected items
+                .filter(id => {
+                    if (seen.has(id)) return false; // Remove duplicates
+                    seen.add(id);
+                    return true;
+                });
+            
+            // Only update if cleaned order is different
+            if (cleaned.length !== prev.length || cleaned.some((id, idx) => id !== prev[idx])) {
+                return cleaned;
+            }
+            return prev;
+        });
+    }, [
+        selectedImageModalIds,
+        selectedVideoModalIds,
+        selectedVideoEditorModalIds,
+        selectedImageEditorModalIds,
+        selectedMusicModalIds,
+        selectedUpscaleModalIds,
+        selectedMultiangleCameraModalIds,
+        selectedRemoveBgModalIds,
+        selectedEraseModalIds,
+        selectedExpandModalIds,
+        selectedVectorizeModalIds,
+        selectedNextSceneModalIds,
+        selectedStoryboardModalIds,
+        selectedScriptFrameModalIds,
+        selectedSceneFrameModalIds,
+        selectedGroupIds,
+        effectiveSelectedCanvasTextIds,
+        effectiveSelectedRichTextIds
+    ]);
 
     // Selection Box State
     const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
@@ -143,6 +208,9 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         // Clear canvas text selection
         effectiveSetSelectedCanvasTextId(null);
         effectiveSetSelectedCanvasTextIds([]);
+
+        // Clear selection order
+        setSelectionOrder([]);
 
         setContextMenuOpen(false);
         setContextMenuImageIndex(null);
@@ -207,6 +275,52 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         selectedGroupIds, setSelectedGroupIds,
 
+        // Build selectedIds in the order items were actually selected
+        // Use selectionOrder if available, otherwise fall back to array concatenation
+        selectedIds: (() => {
+            // Collect all selected IDs
+            const allSelectedIds = new Set([
+            ...selectedImageModalIds,
+            ...selectedVideoModalIds,
+            ...selectedVideoEditorModalIds,
+            ...selectedImageEditorModalIds,
+            ...selectedMusicModalIds,
+            ...selectedUpscaleModalIds,
+            ...selectedMultiangleCameraModalIds,
+            ...selectedRemoveBgModalIds,
+            ...selectedEraseModalIds,
+            ...selectedExpandModalIds,
+            ...selectedVectorizeModalIds,
+            ...selectedNextSceneModalIds,
+            ...selectedStoryboardModalIds,
+            ...selectedScriptFrameModalIds,
+            ...selectedSceneFrameModalIds,
+            ...selectedGroupIds,
+            ...effectiveSelectedCanvasTextIds,
+            ...effectiveSelectedRichTextIds
+            ]);
+
+            // If we have selection order, use it to maintain the order items were selected
+            if (selectionOrder.length > 0) {
+                // Remove duplicates from selectionOrder while preserving order
+                const seen = new Set<string>();
+                const deduplicatedOrder = selectionOrder.filter(id => {
+                    if (seen.has(id)) return false;
+                    seen.add(id);
+                    return true;
+                });
+                
+                // Filter to only include currently selected items
+                const ordered = deduplicatedOrder.filter(id => allSelectedIds.has(id));
+                // Add any newly selected items that aren't in the order yet (shouldn't happen, but safety)
+                const unordered = Array.from(allSelectedIds).filter(id => !ordered.includes(id));
+                return [...ordered, ...unordered];
+            }
+
+            // Fallback to array concatenation order if no selection order tracked
+            return Array.from(allSelectedIds);
+        })(),
+
         // Effective Canvas Text Selection
         effectiveSelectedCanvasTextId,
         effectiveSetSelectedCanvasTextId,
@@ -231,6 +345,10 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
         contextMenuImageIndex, setContextMenuImageIndex,
         contextMenuModalId, setContextMenuModalId,
         contextMenuModalType, setContextMenuModalType,
+
+        // Selection Order
+        selectionOrder,
+        setSelectionOrder,
 
         // Actions
         clearAllSelections,

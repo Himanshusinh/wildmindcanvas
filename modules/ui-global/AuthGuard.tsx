@@ -28,7 +28,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
       // Prevent multiple simultaneous checks
       if (checkedRef.current) return;
       checkedRef.current = true;
-      
+
       // Check if auth token was passed via URL hash (from parent window)
       let passedToken: string | null = null;
       if (typeof window !== 'undefined') {
@@ -92,7 +92,9 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
           apiBase: process.env.NEXT_PUBLIC_API_BASE_URL || 'NOT SET',
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent.substring(0, 100),
-          cookieEnabled: navigator.cookieEnabled
+          cookieEnabled: navigator.cookieEnabled,
+          sharedArrayBufferAvailable: typeof SharedArrayBuffer !== 'undefined',
+          crossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : 'unknown'
         });
 
         // Log all cookies with detailed analysis
@@ -108,16 +110,16 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               valuePreview: parts[1] ? (parts[1].length > 30 ? parts[1].substring(0, 30) + '...' : parts[1]) : '(empty)'
             };
           });
-          
-          logDebug('[AuthGuard] All cookies', { 
+
+          logDebug('[AuthGuard] All cookies', {
             cookies: allCookies,
             cookieCount: cookieArray.length,
             cookieDetails,
             hasAppSession: cookieArray.some(c => c.startsWith('app_session=')),
             note: 'httpOnly cookies (like app_session) are NOT visible in document.cookie - this is normal and secure'
           });
-          
-          logDebug('[AuthGuard] Parsed cookies', { 
+
+          logDebug('[AuthGuard] Parsed cookies', {
             cookieArray,
             analysis: {
               totalCookies: cookieArray.length,
@@ -168,10 +170,10 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
 
           try {
             logDebug('[AuthGuard] Prod mode: calling checkAuthStatus (will check for cookie via API, with Bearer token fallback)');
-            
+
             // Give a small delay to allow cookies to be sent (sometimes there's a race condition)
             await new Promise(resolve => setTimeout(resolve, 100));
-            
+
             const isValid = await checkAuthStatus();
             logDebug('[AuthGuard] Prod mode: checkAuthStatus result', { isValid });
 
@@ -180,7 +182,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               try {
                 const user = await getCurrentUser();
                 logDebug('[AuthGuard] Prod mode: fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
-                
+
                 if (user && user.uid) {
                   if (onUserLoaded) {
                     onUserLoaded(user);
@@ -198,27 +200,27 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
               }
             } else {
               logDebug('[AuthGuard] Prod mode: checkAuthStatus returned false - no valid session (cookie or Bearer token)');
-              
+
               // Check if we have a token in localStorage that we can try
               const hasToken = typeof window !== 'undefined' && (
                 localStorage.getItem('authToken') ||
                 localStorage.getItem('idToken') ||
                 localStorage.getItem('user')
               );
-              
+
               if (hasToken) {
                 logDebug('[AuthGuard] Prod mode: Token found in localStorage but API check failed - retrying once more...');
-                
+
                 // Retry once more after a short delay (cookie might need time to be sent)
                 await new Promise(resolve => setTimeout(resolve, 500));
                 const retryIsValid = await checkAuthStatus();
                 logDebug('[AuthGuard] Prod mode: Retry checkAuthStatus result', { retryIsValid });
-                
+
                 if (retryIsValid) {
                   try {
                     const user = await getCurrentUser();
                     logDebug('[AuthGuard] Prod mode: Retry succeeded, fetched user', { uid: user?.uid, username: user?.username, hasUser: !!user });
-                    
+
                     if (user && user.uid) {
                       if (onUserLoaded) {
                         onUserLoaded(user);
@@ -250,7 +252,7 @@ export function AuthGuard({ children, onUserLoaded }: AuthGuardProps) {
 
           // Also check for cookie locally (for logging)
           const hasCookie = isAuthenticated();
-          
+
           // Try to check cookies from parent domain (www.wildmindai.com)
           // This won't work due to same-origin policy, but we can log the attempt
           logDebug('[AuthGuard] Prod mode: Local cookie check', {

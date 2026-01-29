@@ -159,7 +159,7 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
               Promise.resolve(onPersistExpandModalCreate(duplicated)).catch(console.error);
             }
           }}
-          isSelected={selectedExpandModalId === modalState.id}
+          isSelected={selectedExpandModalId === modalState.id || (selectedExpandModalIds || []).includes(modalState.id)}
           connections={connections}
           imageModalStates={imageModalStates}
           images={images}

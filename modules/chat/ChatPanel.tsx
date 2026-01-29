@@ -1,10 +1,24 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, X, MessageSquare, ChevronDown, Check, Trash2, Zap, Mic, MicOff, RefreshCcw } from 'lucide-react';
+import {
+  Send,
+  Sparkles,
+  X,
+  MessageSquare,
+  ChevronRight,
+  Check,
+  Zap,
+  Mic,
+  MicOff,
+  RefreshCcw,
+  Video,
+} from 'lucide-react';
 import { useChatEngine, ChatMessage } from './useChatEngine';
 import { useIntentExecutor } from './useIntentExecutor';
 import { useSpeechToText } from './useSpeechToText';
+import { FormattedMessage } from './FormattedMessage';
+import { Option } from './messageFormatter';
 
 interface ChatPanelProps {
     canvasState: any;
@@ -13,6 +27,8 @@ interface ChatPanelProps {
     viewportSize: { width: number; height: number };
     position: { x: number; y: number };
     scale: number;
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -22,238 +38,421 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     viewportSize,
     position,
     scale,
+    isOpen,
+    setIsOpen,
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
     const [inputValue, setInputValue] = useState('');
-    const chatEngine = useChatEngine({ canvasState, canvasSelection });
-    const executor = useIntentExecutor({
-        canvasState,
-        canvasSelection,
-        props,
-        viewportSize,
-        position,
-        scale,
-    });
+    const [isInputFocused, setIsInputFocused] = useState(false);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
-    const { isListening, toggleListening, isSupported } = useSpeechToText({
-        onTranscriptChange: (text) => setInputValue(text),
-        continuous: false,
-        interimResults: true
-    });
+    const chatEngine = useChatEngine({ canvasState, canvasSelection });
+  const executor = useIntentExecutor({ canvasState, canvasSelection, props, viewportSize, position, scale });
+
+  const { isListening, toggleListening, isSupported } = useSpeechToText({
+    onTranscriptChange: (text) => setInputValue(text),
+    onFinalTranscript: (text) => {
+      // Voice UX: auto-send when recognition ends, so no click is required.
+      if (!text.trim()) return;
+      chatEngine.sendMessage(text);
+      setInputValue('');
+    },
+    continuous: false,
+    interimResults: true,
+  });
+
+  // Attachment counts (used by UI only)
+    const attachmentCounts = React.useMemo(() => {
+        const ids = new Set(canvasSelection?.selectedIds || []);
+        if (ids.size === 0) return { imageCount: 0, videoCount: 0, total: 0 };
+
+        const countedImageIds = new Set<string>();
+        const countedVideoIds = new Set<string>();
+
+    const imageArrays = [canvasState?.images, canvasState?.imageGenerators, canvasState?.imageModalStates];
+    const videoArrays = [canvasState?.videoGenerators, canvasState?.videoModalStates];
+
+        imageArrays.forEach(arr => {
+      if (!Array.isArray(arr)) return;
+                arr.forEach((item: any) => {
+        if (item?.id && ids.has(item.id) && !countedImageIds.has(item.id)) countedImageIds.add(item.id);
+                });
+        });
+
+        videoArrays.forEach(arr => {
+      if (!Array.isArray(arr)) return;
+                arr.forEach((item: any) => {
+        if (item?.id && ids.has(item.id) && !countedVideoIds.has(item.id)) countedVideoIds.add(item.id);
+                });
+        });
+
+        const imageCount = countedImageIds.size;
+        const videoCount = countedVideoIds.size;
+    return { imageCount, videoCount, total: imageCount + videoCount };
+    }, [canvasSelection?.selectedIds, canvasState]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [chatEngine.messages]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [chatEngine.messages.length, chatEngine.isProcessing]);
 
-    const handleSend = () => {
-        if (!inputValue.trim()) return;
-        chatEngine.sendMessage(inputValue);
+    useEffect(() => {
+        const textarea = textareaRef.current;
+    if (!textarea) return;
+            textarea.style.height = 'auto';
+            const scrollHeight = textarea.scrollHeight;
+    const maxHeight = 96;
+            textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+    }, [inputValue]);
+
+  // Prevent the canvas from reacting to trackpad/mouse wheel when the pointer is over the chat,
+  // while still allowing the chat history to scroll.
+  //
+  // We do this by:
+  // - capturing wheel events at the window level (so Konva/canvas doesn't see them)
+  // - preventing default (so the canvas doesn't zoom/pan)
+  // - manually scrolling the chat container
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const stopPointerBubble = (e: Event) => {
+      e.stopPropagation();
+      (e as any).stopImmediatePropagation?.();
+    };
+
+    const onWindowWheelCapture = (e: WheelEvent) => {
+      // Only intercept wheel events that originate within the chat panel.
+      // Using composedPath is more reliable than hover flags for trackpads.
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+      const isInPanel = path.includes(panel) || (e.target instanceof Node && panel.contains(e.target));
+      if (!isInPanel) return;
+
+      // Block canvas/Konva wheel handlers, but keep chat scrolling by manually adjusting scrollTop.
+      e.preventDefault();
+      e.stopPropagation();
+      (e as any).stopImmediatePropagation?.();
+
+      const scroller = scrollRef.current;
+      if (scroller) {
+        // Use scrollTop directly (more reliable than scrollBy across browsers).
+        scroller.scrollTop += e.deltaY;
+        scroller.scrollLeft += e.deltaX || 0;
+      }
+    };
+
+    window.addEventListener('wheel', onWindowWheelCapture, { passive: false, capture: true });
+    panel.addEventListener('pointerdown', stopPointerBubble);
+    panel.addEventListener('mousedown', stopPointerBubble);
+
+    return () => {
+      window.removeEventListener('wheel', onWindowWheelCapture as any, true);
+      panel.removeEventListener('pointerdown', stopPointerBubble as any);
+      panel.removeEventListener('mousedown', stopPointerBubble as any);
+    };
+  }, [isOpen]);
+
+  const handleSend = async () => {
+    if (!inputValue.trim()) return;
+    chatEngine.sendMessage(inputValue);
         setInputValue('');
     };
+    
+  const handleExecute = (message: ChatMessage) => {
+    if (message.action) executor.executeIntent(message.action);
+  };
 
-    const handleExecute = (message: ChatMessage) => {
-        if (message.action) {
-            executor.executeIntent(message.action);
-        }
-    };
+  const handleOptionSelect = (messageId: string, option: Option) => {
+    setSelectedOptions(prev => ({ ...prev, [messageId]: option.label }));
+    chatEngine.sendMessage(option.label);
+  };
 
-    const panelRef = useRef<HTMLDivElement>(null);
-    useEffect(() => {
-        const panel = panelRef.current;
-        if (!panel) return;
-        // Stop wheel events from bubbling to the canvas container
-        const stopPropagation = (e: WheelEvent) => {
-            e.stopPropagation();
-        };
-        // Use capture phase or just typical bubbling? 
-        // Bubbling from panel -> container. Panel listener fires first.
-        panel.addEventListener('wheel', stopPropagation, { passive: false });
-        // Also stop pointer events if needed? Canvas usually uses pointer/mouse events.
-        // But the user specifically mentioned scrolling (wheel).
-        // Let's also stop mousedown propagation to prevent canvas selection/deselection when clicking chat
-        const stopPointerPropagation = (e: PointerEvent | MouseEvent) => {
-            e.stopPropagation();
-        };
-        panel.addEventListener('pointerdown', stopPointerPropagation);
-        panel.addEventListener('mousedown', stopPointerPropagation);
-
-        return () => {
-            panel.removeEventListener('wheel', stopPropagation);
-            panel.removeEventListener('pointerdown', stopPointerPropagation);
-            panel.removeEventListener('mousedown', stopPointerPropagation);
-        };
-    }, []);
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-10000 h-14 w-10 rounded-l-xl bg-[#0a1428]/90 hover:bg-[#0a1428] border border-white/10 border-r-0 shadow-lg backdrop-blur-xl transition-all flex items-center justify-center"
+        title="Open"
+      >
+        <ChevronRight size={18} />
+      </button>
+    );
+  }
 
     return (
-        <div
-            ref={panelRef}
-            className="fixed bottom-6 right-6 z-[10000] flex flex-col items-end"
-        >
-            {/* Chat Window */}
-            {isOpen && (
-                <div
-                    className="mb-4 w-96 h-[500px] flex flex-col overflow-hidden transition-all duration-300 transform origin-bottom-right scale-100 opacity-100"
-                    style={{
-                        background: 'transparent',
-                    }}
-                >
-                    {/* Messages Area with Content-Aware Fade */}
-                    <div className="flex-1 relative overflow-hidden group/list">
-                        {/* More subtle top fade for floating UI */}
+    <div
+      ref={panelRef}
+      className="fixed top-0 bottom-0 right-0 z-10000 w-96 bg-black/95 border border-white/10 rounded-l-2xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden"
+    >
+      {/* Side collapse handle (matches screenshot tab) */}
+                    <button
+                        onClick={() => setIsOpen(false)}
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full z-30 h-14 w-10 rounded-l-xl bg-[#0a1428]/90 hover:bg-[#0a1428] border border-white/10 border-r-0 shadow-lg backdrop-blur-xl transition-all flex items-center justify-center"
+        title="Collapse"
+                    >
+        <ChevronRight size={18} className="text-white/70" />
+                    </button>
+
+                    {/* Header / Top Area */}
+                    <div className="flex items-center justify-between p-6 pb-2 z-20">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+                                <Sparkles size={16} className="text-blue-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-medium text-white/90 tracking-wide">WILDMIND</h2>
+                                <p className="text-[10px] text-blue-400/60 uppercase tracking-widest">System Online</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setIsOpen(false)}
+                            className="p-2 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors"
+          title="Close"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+
+      {/* Messages Area */}
+                    <div className="flex-1 relative overflow-hidden group/list z-10">
+                        {/* subtle top fade */}
                         <div
-                            className="absolute top-0 left-0 right-0 h-20 z-10 pointer-events-none"
-                            style={{
-                                background: 'linear-gradient(to bottom, transparent 0%, transparent 100%)'
-                            }}
+                            className="absolute top-0 left-0 right-0 h-12 z-10 pointer-events-none"
+          style={{ background: 'linear-gradient(to bottom, rgba(10,20,40,0) 0%, transparent 100%)' }}
                         />
 
-                        {/* Refresh/Clear Button */}
-                        <div className="absolute top-4 right-4 z-20">
+                        {/* Clear Button */}
+                        <div className="absolute top-2 right-4 z-20 opacity-0 group-hover/list:opacity-100 transition-opacity duration-300">
                             <button
                                 onClick={() => chatEngine.clearMessages()}
-                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/20 hover:text-white/60 border border-white/5 transition-all group/refresh"
-                                title="Clear history & refresh context"
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/20 hover:text-white/60 border border-white/5 transition-all"
+                                title="Clear history"
                             >
-                                <RefreshCcw size={14} className="group-hover/refresh:rotate-180 transition-transform duration-500" />
+                                <RefreshCcw size={12} />
                             </button>
                         </div>
 
-                        <div
-                            ref={scrollRef}
-                            className="h-full overflow-y-auto p-4 pt-4 space-y-4 custom-scrollbar"
-                            style={{
-                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)',
-                                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)'
-                            }}
-                        >
-                            {chatEngine.messages.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/5 border border-white/5">
-                                        <MessageSquare size={24} />
+        <div
+          ref={scrollRef}
+          className="h-full overflow-y-auto p-4 pt-2 space-y-4 custom-scrollbar overscroll-contain"
+        >
+          {chatEngine.messages.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 opacity-50">
+                                    <div className="w-16 h-16 rounded-3xl bg-blue-500/5 flex items-center justify-center text-blue-400/20 border border-blue-500/10">
+                                        <MessageSquare size={32} />
                                     </div>
-                                    <p className="text-white/10 text-[10px] font-light tracking-[0.3em] uppercase">
-                                        System Ready
+                                    <p className="text-blue-200/20 text-[10px] font-light tracking-[0.3em] uppercase">
+                                        Awaiting Command
                                     </p>
                                 </div>
                             ) : (
                                 chatEngine.messages.map((msg) => (
-                                    <div
-                                        key={msg.id}
-                                        className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                                    >
+              <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         <div
-                                            className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-[12px] font-light leading-relaxed tracking-wide transition-all ${msg.role === 'user'
-                                                ? 'bg-blue-500/20 text-blue-100 border border-blue-500/30 rounded-tr-none backdrop-blur-sm'
-                                                : 'bg-white/5 text-white/60 border border-white/10 rounded-tl-none shadow-sm backdrop-blur-md'
+                                            className={`max-w-[90%] px-4 py-3 rounded-2xl text-[13px] font-light leading-relaxed tracking-wide shadow-sm backdrop-blur-md ${msg.role === 'user'
+                                                ? 'bg-blue-600/20 text-blue-50 border border-blue-500/30 rounded-tr-sm'
+                                                : 'bg-white/5 text-white/80 border border-white/10 rounded-tl-sm'
                                                 }`}
                                         >
-                                            {msg.content}
+                  {msg.role === 'assistant' ? (
+                    <FormattedMessage
+                      content={msg.content}
+                      onOptionSelect={(option) => handleOptionSelect(msg.id, option)}
+                      selectedOption={selectedOptions[msg.id] || null}
+                    />
+                  ) : (
+                    msg.content
+                  )}
                                         </div>
 
-                                        {/* Action Verification Segment */}
-                                        {msg.role === 'assistant' && msg.action && (
-                                            <div className="mt-3 w-full max-w-[90%] p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3 backdrop-blur-sm">
-                                                <div className="flex items-center gap-2 text-[9px] font-medium text-white/20 uppercase tracking-[0.3em]">
-                                                    <span>Automation Plan</span>
+                {/* Action Plan */}
+                                        {msg.role === 'assistant' && msg.action?.intent === 'EXECUTE_PLAN' && (
+                                            <div className="mt-2 w-full max-w-[95%] p-4 rounded-xl bg-blue-950/30 border border-blue-500/10 space-y-4 backdrop-blur-sm">
+                                                <div className="flex items-center gap-2 text-[9px] font-medium text-blue-300/40 uppercase tracking-[0.2em]">
+                                                    <Zap size={10} />
+                                                    <span>Action Plan</span>
                                                 </div>
 
-                                                <button
-                                                    onClick={() => handleExecute(msg)}
-                                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300/80 border border-blue-500/20 transition-all font-medium text-[11px] uppercase tracking-widest"
-                                                >
-                                                    <Zap size={13} className="opacity-50" />
-                                                    Generate
-                                                </button>
+                                                {msg.action.intent === 'EXECUTE_PLAN' && (
+                                                    <div className="space-y-2">
+                                                        {(() => {
+                                                            const preview = (msg.action?.payload as any)?.__preview as any;
+                                                            const warnings: string[] = Array.isArray(preview?.warnings) ? preview.warnings : [];
+                                                            const fixes: any[] = Array.isArray(preview?.fixes) ? preview.fixes : [];
+                                                            const timeline = preview?.timeline as any;
+
+                                                            return (
+                                                                <>
+                                                                    {warnings.length > 0 && (
+                                                                        <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 p-3">
+                                                                            <div className="text-[10px] text-yellow-200/70 font-medium mb-2">Warnings:</div>
+                                                                            <div className="space-y-1.5 text-[10px] text-yellow-100/70">
+                                                                                {warnings.map((w, idx) => (
+                                                                                    <div key={idx} className="flex items-start gap-2">
+                                                                                        <span className="mt-0.5 text-yellow-300/60">•</span>
+                                                                                        <span>{w}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {timeline?.boundaryMarks && (
+                                                                        <div className="rounded-lg bg-white/5 border border-white/10 p-3">
+                                                                            <div className="text-[10px] text-white/60 font-medium mb-2">Timeline:</div>
+                                                                            <div className="text-[10px] text-white/70 leading-relaxed">
+                                                                                {timeline.boundaryMarks}
+                                                                            </div>
+                                                                            {Array.isArray(timeline.clips) && timeline.clips.length > 0 && (
+                                                                                <div className="mt-2 space-y-1 text-[10px] text-white/60">
+                                                                                    {timeline.clips.slice(0, 6).map((c: any) => (
+                                                                                        <div key={c.index} className="flex gap-2">
+                                                                                            <span className="text-blue-300/50">{c.start}s–{c.end}s</span>
+                                                                                            <span className="truncate">{c.prompt || `Clip ${c.index}`}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+
+                                                                    {fixes.length > 0 && (
+                                                                        <div className="rounded-lg bg-blue-500/5 border border-blue-500/15 p-3">
+                                                                            <div className="text-[10px] text-blue-200/60 font-medium mb-2">Auto-fix:</div>
+                                                                            <div className="flex flex-wrap gap-2">
+                                                                                {fixes.map((f: any) => (
+                                                                                    <button
+                                                                                        key={f.id || f.label}
+                                                                                        onClick={() => chatEngine.applyAutoFix(f)}
+                                                                                        className="px-2.5 py-1.5 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-100/80 border border-blue-500/20 text-[10px] transition-all"
+                                                                                    >
+                                                                                        {f.label}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                        <div className="text-[11px] text-white/70 font-medium mb-2">Summary:</div>
+                                                        <div className="text-[11px] text-white/80 font-light leading-relaxed pl-3 border-l-2 border-blue-500/40 space-y-1.5">
+                          {String(msg.action.payload?.summary || '')
+                            .split('\n')
+                            .filter(Boolean)
+                            .map((line: string, idx: number) => (
+                                                                <div key={idx} className="flex items-start gap-2">
+                                                                    <span className="text-blue-400/60 mt-0.5">•</span>
+                                                                    <span>{line}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="pt-2 border-t border-blue-500/10">
+                                                    <div className="text-[10px] text-blue-300/60 mb-3 text-center">
+                                                        Click "Proceed" to start generating, or type any changes below.
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleExecute(msg)}
+                                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-500/30 transition-all font-medium text-[10px] uppercase tracking-wider hover:shadow-lg hover:shadow-blue-500/10"
+                                                    >
+                                                        <Check size={12} />
+                                                        Proceed
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 ))
                             )}
+
                             {chatEngine.isProcessing && (
-                                <div className="flex items-center gap-1.5 text-blue-400/20 ml-2">
-                                    <div className="w-1 h-1 rounded-full bg-current animate-pulse" />
-                                    <div className="w-1 h-1 rounded-full bg-current animate-pulse [animation-delay:0.2s]" />
-                                    <div className="w-1 h-1 rounded-full bg-current animate-pulse [animation-delay:0.4s]" />
+                                <div className="flex items-center gap-1.5 text-blue-400 pl-4">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:0.1s]" />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:0.2s]" />
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Input Field - Fully Transparent */}
-                    <div className="p-4 bg-transparent mt-auto">
+                    {/* Input Area */}
+                    <div className="p-4 pt-2 z-20">
+                        {/* Attachment Count Indicator */}
+                        {attachmentCounts.total > 0 && (
+                            <div className="mb-2 px-1 opacity-0 animate-[fadeIn_0.2s_ease-in-out_forwards]">
+                                <div className="flex items-center gap-2 text-xs text-blue-300/90 font-medium bg-blue-950/30 px-2 py-1 rounded-md border border-blue-500/20">
+                                    {attachmentCounts.imageCount > 0 && (
+                                        <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_4px_rgba(96,165,250,0.6)]" />
+                  {attachmentCounts.imageCount === 1 ? '1 image attached' : `${attachmentCounts.imageCount} images attached`}
+                                        </span>
+                                    )}
+                                    {attachmentCounts.imageCount > 0 && attachmentCounts.videoCount > 0 && (
+                                        <span className="text-blue-200/40 mx-0.5">•</span>
+                                    )}
+                                    {attachmentCounts.videoCount > 0 && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Video size={12} className="text-blue-400" />
+                  {attachmentCounts.videoCount === 1 ? '1 video attached' : `${attachmentCounts.videoCount} videos attached`}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="relative group">
-                            <input
-                                type="text"
+                            <textarea
+                                ref={textareaRef}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                placeholder={isListening ? "Listening..." : "Enter system command..."}
-                                className={`w-full bg-white/5 border ${isListening ? 'border-blue-500/50 shadow-[0_0_15px_-5px_rgba(59,130,246,0.3)]' : 'border-white/10'} focus:border-blue-500/30 rounded-2xl py-3.5 pl-4 pr-20 text-[12px] text-white placeholder-white/10 outline-none transition-all focus:shadow-[0_0_20px_-5px_rgba(59,130,246,0.1)]`}
-                            />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                onFocus={() => setIsInputFocused(true)}
+                                onBlur={() => setIsInputFocused(false)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                placeholder={isListening ? "Listening..." : "Type a command..."}
+                                rows={1}
+            style={{ minHeight: '40px', maxHeight: '96px' }}
+            className={`w-full resize-none rounded-xl px-4 py-3 pr-20 text-[13px] leading-relaxed bg-white/5 text-white/80 placeholder:text-white/25 border outline-none transition-all ${isInputFocused ? 'border-blue-500/30' : 'border-white/10'}`}
+          />
+
+          <div className="absolute right-2 bottom-2 flex items-center gap-2">
                                 {isSupported && (
                                     <button
                                         onClick={toggleListening}
-                                        className={`p-2 rounded-xl transition-all ${isListening
-                                            ? 'bg-blue-500/20 text-blue-400 animate-pulse'
-                                            : 'bg-transparent hover:bg-white/5 text-white/20 hover:text-white/60'
+                                        className={`p-2 rounded-lg transition-all ${isListening
+                  ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                  : 'bg-white/5 text-white/50 border border-white/10 hover:bg-white/10'
                                             }`}
-                                        title={isListening ? "Stop listening" : "Start voice input"}
+                title={isListening ? 'Stop listening' : 'Start voice input'}
                                     >
                                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                                     </button>
                                 )}
+
                                 <button
                                     onClick={handleSend}
                                     disabled={!inputValue.trim() || isListening}
-                                    className="p-2 rounded-xl bg-transparent hover:bg-white/5 text-white/10 hover:text-blue-400 disabled:opacity-0 transition-all font-medium"
-                                >
-                                    <Send size={16} />
+              className={`p-2 rounded-lg transition-all ${!inputValue.trim() || isListening
+                ? 'bg-white/5 text-white/20 border border-white/10 cursor-not-allowed'
+                : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-500/30'
+                }`}
+              title="Send"
+            >
+              <Send size={16} />
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* Terminal Access Toggle */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`group relative flex items-center justify-center w-11 h-11 rounded-xl shadow-2xl transition-all duration-700 ${isOpen
-                    ? 'rotate-90 bg-white/10 text-white'
-                    : 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 backdrop-blur-xl'
-                    }`}
-            >
-                {isOpen ? (
-                    <X size={20} />
-                ) : (
-                    <>
-                        <Sparkles size={20} className="transition-transform group-hover:scale-110 duration-500 text-blue-400/80" />
-                        <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping opacity-50" />
-                        <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                    </>
-                )}
-            </button>
-
-            <style jsx global>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                  width: 3px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                  background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                  background: rgba(255, 255, 255, 0.05);
-                  border-radius: 20px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                  background: rgba(255, 255, 255, 0.1);
-                }
-            `}</style>
         </div>
     );
 };

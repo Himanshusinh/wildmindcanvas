@@ -24,7 +24,7 @@ interface CanvasVideoNodeProps {
     videoState: VideoModalState;
     index: number;
     onUpdate?: (updates: Partial<VideoModalState>) => void;
-    onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
+    onSelect?: (e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
     isSelected?: boolean;
     stageRef?: React.RefObject<any>;
     position?: { x: number; y: number };
@@ -190,6 +190,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
             onSelect({
                 ctrlKey: e.evt.ctrlKey,
                 metaKey: e.evt.metaKey,
+                shiftKey: e.evt.shiftKey,
             });
         }
     };
@@ -198,6 +199,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
 
     return (
         <Group
+            id={videoState.id}
             x={videoState.x}
             y={videoState.y}
             draggable={isDraggable}
@@ -210,7 +212,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 image={videoElement}
                 width={videoState.frameWidth || 600}
                 height={videoState.frameHeight || 400} // Default fallback
-                stroke={isSelected ? '#437eb5' : 'transparent'}
+                stroke={isSelected ? '#4C83FF' : 'transparent'}
                 strokeWidth={2}
                 cornerRadius={16} // Match CSS border radius
             />

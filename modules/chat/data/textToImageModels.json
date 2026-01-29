@@ -1,0 +1,554 @@
+{
+  "metadata": {
+    "description": "Complete list of all Text-to-Image and Image-to-Image models available in WildMind AI with their capabilities, parameters, and supported features",
+    "version": "1.0.0",
+    "lastUpdated": "2025-01-23",
+    "source": "capabilityRegistry.ts"
+  },
+  "features": {
+    "textToImage": {
+      "name": "Text-to-Image (T2I)",
+      "description": "Generate images from text descriptions/prompts",
+      "supported": true,
+      "modelsCount": 17,
+      "useCase": "Create new images from scratch using text descriptions"
+    },
+    "imageToImage": {
+      "name": "Image-to-Image (I2I)",
+      "description": "Transform or modify existing images using text prompts",
+      "supported": true,
+      "modelsCount": 8,
+      "useCase": "Edit, enhance, or transform existing images with AI"
+    },
+    "batchGeneration": {
+      "name": "Batch Generation",
+      "description": "Generate multiple images in a single request",
+      "supported": true,
+      "maxBatchSize": 4,
+      "useCase": "Create multiple variations or iterations efficiently"
+    },
+    "highResolution": {
+      "name": "High Resolution",
+      "description": "Generate images at 2K, 4K, or higher resolutions",
+      "supported": true,
+      "modelsCount": 13,
+      "resolutions": ["1K", "2K", "4K", "1024", "1440", "1024x1024", "1024x2048"],
+      "useCase": "Professional quality images for print, web, or presentations"
+    },
+    "aspectRatioControl": {
+      "name": "Aspect Ratio Control",
+      "description": "Control the width-to-height ratio of generated images",
+      "supported": true,
+      "supportedRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "16:10", "10:16"],
+      "useCase": "Create images optimized for specific platforms (Instagram, YouTube, banners, etc.)"
+    },
+    "resolutionControl": {
+      "name": "Resolution Control",
+      "description": "Select specific resolution for image output",
+      "supported": true,
+      "availableResolutions": ["512", "768", "1024", "1280", "1440", "1K", "2K", "4K"],
+      "useCase": "Optimize file size and quality based on intended use"
+    },
+    "turboMode": {
+      "name": "Turbo/Fast Generation",
+      "description": "Faster image generation with reduced wait times",
+      "supported": true,
+      "modelsCount": 5,
+      "useCase": "Quick iterations and rapid prototyping"
+    },
+    "qualityTiers": {
+      "name": "Quality Tiers",
+      "description": "Different quality levels from standard to cinematic",
+      "supported": true,
+      "tiers": ["standard", "cinematic", "premium"],
+      "useCase": "Match quality to project requirements and budget"
+    }
+  },
+  "models": [
+    {
+      "id": "z-image-turbo",
+      "name": "Z Image Turbo",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1024"],
+      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "maxBatch": 4,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": true,
+      "strengths": ["fast", "turbo", "draft"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "google-nano-banana",
+      "name": "Google Nano Banana",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1024", "1440"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "maxBatch": 4,
+      "isDefault": true,
+      "isHighRes": false,
+      "isTurbo": true,
+      "strengths": ["fast", "sketch", "draft"],
+      "imageToImage": true
+    },
+    {
+      "id": "google-nano-banana-pro",
+      "name": "Google nano banana pro",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K", "4K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "maxBatch": 4,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["balanced", "standard"],
+      "imageToImage": true
+    },
+    {
+      "id": "flux-2-pro",
+      "name": "Flux 2 pro",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K", "1024x2048"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "16:10", "10:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["quality", "rich", "detailed"],
+      "imageToImage": true
+    },
+    {
+      "id": "flux-kontext-max",
+      "name": "Flux Kontext Max",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K"],
+      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["context", "large-scale"],
+      "imageToImage": true
+    },
+    {
+      "id": "flux-kontext-pro",
+      "name": "Flux Kontext Pro",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K"],
+      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "imageToImage": true
+    },
+    {
+      "id": "seedream-v4",
+      "name": "Seedream v4",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1K", "2K", "4K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["artistic", "surreal", "dreamy"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "seedream-v4-4k",
+      "name": "Seedream v4 4K",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K", "4K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["4k", "ultra-hd"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": true
+    },
+    {
+      "id": "flux-1.1-pro",
+      "name": "Flux 1.1 Pro",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1024x1024", "1024x768", "768x1024"],
+      "aspectRatios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+      "maxBatch": 4,
+      "isDefault": true,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["realistic", "prompt-adherence", "text-rendering"],
+      "qualityTier": "standard",
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "midjourney-v6",
+      "name": "Midjourney v6",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1024x1024"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "2:3", "3:2"],
+      "maxBatch": 4,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["artistic", "lighting", "composition"],
+      "qualityTier": "cinematic",
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "seedream-4.5",
+      "name": "Seedream 4.5",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1K", "2K", "4K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["latest", "vibrant"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": true
+    },
+    {
+      "id": "imagen-4",
+      "name": "Imagen 4",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1K", "2K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["photorealistic", "google"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "imagen-4-fast",
+      "name": "Imagen 4 Fast",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": [],
+      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "maxBatch": 4,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": true,
+      "strengths": ["speed", "quick"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "imagen-4-ultra",
+      "name": "Imagen 4 Ultra",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1K", "2K", "4K"],
+      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "strengths": ["ultra-quality", "premium"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "flux-pro-1.1",
+      "name": "Flux Pro 1.1",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1K", "2K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "21:9", "9:21"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "flux-pro-1.1-ultra",
+      "name": "Flux Pro 1.1 Ultra",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["1K", "2K"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "21:9", "9:21"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": true,
+      "isTurbo": false,
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    },
+    {
+      "id": "chatgpt-1.5",
+      "name": "ChatGPT 1.5",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": true,
+        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+      },
+      "resolutions": ["1024"],
+      "aspectRatios": ["1:1", "3:2", "2:3"],
+      "maxBatch": 1,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": false,
+      "strengths": ["dalle", "conversational"],
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": true
+    },
+    {
+      "id": "p-image",
+      "name": "P-Image",
+      "inputType": "text",
+      "outputType": "image",
+      "supports": {
+        "textToContent": true,
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
+      },
+      "resolutions": ["512", "768", "1024", "1280", "1440"],
+      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],
+      "maxBatch": 4,
+      "isDefault": false,
+      "isHighRes": false,
+      "isTurbo": true,
+      "contracts": {
+        "accepts": ["text"],
+        "produces": ["image"]
+      },
+      "imageToImage": false
+    }
+  ],
+  "imageToImageModels": [
+    {
+      "id": "google-nano-banana",
+      "name": "Google Nano Banana",
+      "description": "Default model with T2I and I2I support, fast generation"
+    },
+    {
+      "id": "google-nano-banana-pro",
+      "name": "Google nano banana pro",
+      "description": "Pro version with high-res support (1K, 2K, 4K) and I2I"
+    },
+    {
+      "id": "flux-2-pro",
+      "name": "Flux 2 pro",
+      "description": "High-quality model with extensive aspect ratio support and I2I"
+    },
+    {
+      "id": "flux-kontext-max",
+      "name": "Flux Kontext Max",
+      "description": "Premium context-aware model with I2I support"
+    },
+    {
+      "id": "flux-kontext-pro",
+      "name": "Flux Kontext Pro",
+      "description": "Professional context model with I2I capabilities"
+    },
+    {
+      "id": "seedream-v4-4k",
+      "name": "Seedream v4 4K",
+      "description": "4K capable model with I2I support"
+    },
+    {
+      "id": "seedream-4.5",
+      "name": "Seedream 4.5",
+      "description": "Latest Seedream version with I2I support"
+    },
+    {
+      "id": "chatgpt-1.5",
+      "name": "ChatGPT 1.5",
+      "description": "DALL-E powered model with I2I support"
+    }
+  ],
+  "summary": {
+    "totalModels": 17,
+    "modelsByCapability": {
+      "textToImageOnly": 10,
+      "textToImageAndImageToImage": 7,
+      "imageToImageOnly": 0,
+      "imageToImageSupported": 7
+    },
+    "modelsByResolution": {
+      "supports1K": 15,
+      "supports2K": 12,
+      "supports4K": 6,
+      "supportsHighRes": 13
+    },
+    "modelsBySpeed": {
+      "turbo": 5,
+      "standard": 12
+    },
+    "defaultModels": 2,
+    "maxBatchSizes": {
+      "1": 10,
+      "4": 7
+    },
+    "imageToImageModelsCount": 7
+  },
+  "fieldDescriptions": {
+    "id": "Unique identifier for the model (used in API calls)",
+    "name": "Display name of the model",
+    "inputType": "Primary input type required (text, image, video, audio, none)",
+    "outputType": "Type of content produced (image, video, audio, text)",
+    "supports": {
+      "textToContent": "Whether the model supports Text-to-Image generation",
+      "contentToContent": "Whether the model supports Image-to-Image transformation",
+      "description": "Human-readable description of supported capabilities"
+    },
+    "resolutions": "List of supported resolutions (e.g., '1K', '2K', '4K', '1024', '1024x1024')",
+    "aspectRatios": "List of supported aspect ratios (e.g., '1:1', '16:9', '9:16')",
+    "maxBatch": "Maximum number of images that can be generated in a single batch request",
+    "isDefault": "Whether this model is set as default for new users",
+    "isHighRes": "Whether this model supports high-resolution output",
+    "isTurbo": "Whether this is a fast/turbo variant of the model",
+    "strengths": "Array of keywords describing the model's strengths (e.g., 'fast', 'quality', 'artistic')",
+    "qualityTier": "Quality classification (e.g., 'standard', 'cinematic', 'premium')",
+    "imageToImage": "Boolean indicating if this model supports Image-to-Image transformation",
+    "contracts": {
+      "accepts": "List of input types the model accepts",
+      "produces": "List of output types the model produces",
+      "requires": "List of required inputs (if any)",
+      "optional": "List of optional inputs (if any)"
+    }
+  }
+}

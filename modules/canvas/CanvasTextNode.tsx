@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { Text, Group, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { CanvasTextState } from '@/modules/canvas-overlays/types';
@@ -6,7 +7,7 @@ import { CanvasTextState } from '@/modules/canvas-overlays/types';
 interface CanvasTextNodeProps {
     data: CanvasTextState;
     isSelected: boolean;
-    onSelect: (id: string) => void;
+    onSelect: (id: string, e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => void;
     onChange: (id: string, updates: Partial<CanvasTextState>) => void;
     stageScale: number;
     onInteractionStart?: () => void;
@@ -285,6 +286,8 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
         <>
             <Group
                 ref={groupRef}
+                id={data.id}
+                data-type="text"
                 x={data.x}
                 y={data.y}
                 rotation={data.rotation}
@@ -292,11 +295,21 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                 onDblClick={handleDblClick}
                 onDblTap={handleDblClick}
                 onClick={(e) => {
-                    onSelect(data.id);
+                    const evt = e.evt as any;
+                    onSelect(data.id, {
+                        ctrlKey: evt.ctrlKey,
+                        metaKey: evt.metaKey,
+                        shiftKey: evt.shiftKey,
+                    });
                     e.cancelBubble = true;
                 }}
                 onTap={(e) => {
-                    onSelect(data.id);
+                    const evt = e.evt as any;
+                    onSelect(data.id, {
+                        ctrlKey: evt.ctrlKey,
+                        metaKey: evt.metaKey,
+                        shiftKey: evt.shiftKey,
+                    });
                     e.cancelBubble = true;
                 }}
                 onDragStart={() => onInteractionStart?.()}
@@ -353,10 +366,10 @@ export const CanvasTextNode: React.FC<CanvasTextNodeProps> = ({
                     ref={trRef}
                     rotateEnabled={true}
                     anchorSize={8}
-                    anchorFill="#4C83FF"
+                    anchorFill={SELECTION_COLOR}
                     anchorStroke="#ffffff"
                     anchorCornerRadius={0}
-                    borderStroke="#4C83FF"
+                    borderStroke={SELECTION_COLOR}
                     borderStrokeWidth={1}
                     borderDash={[4, 4]}
                     padding={0}
