@@ -136,7 +136,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             // During interaction, use previous state to avoid lag
             return prevVirtualizedImageRef.current;
         }
-        const filtered = imageModalStates.filter(m =>
+        const filtered = imageModalStates.filter((m: { x: number; y: number; frameWidth?: number; frameHeight?: number }) =>
             isRectInViewport(
                 m.x,
                 m.y,
@@ -153,7 +153,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             // During interaction, use previous state to avoid lag
             return prevVirtualizedVideoRef.current;
         }
-        const filtered = videoModalStates.filter(m =>
+        const filtered = videoModalStates.filter((m: { x: number; y: number; frameWidth?: number; frameHeight?: number }) =>
             isRectInViewport(
                 m.x,
                 m.y,
