@@ -1616,6 +1616,44 @@ export async function expandImageForCanvas(
 }
 
 /**
+ * General conversational chat (no canvas context)
+ * Calls the /chat/general endpoint for pure general questions without any platform context
+ */
+export async function queryGeneralChat(
+  message: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+): Promise<string> {
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/chat/general`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message.trim(),
+        conversationHistory,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to get response' }));
+      throw new Error(error.message || 'Failed to get response');
+    }
+
+    const result = await response.json();
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to get response');
+    }
+
+    return result.data?.response || result.response || 'I apologize, but I could not generate a response.';
+  } catch (error: any) {
+    console.error('[queryGeneralChat] Error:', error);
+    throw error;
+  }
+}
+
+/**
  * Query canvas prompt enhancement
  * Calls the /canvas/query endpoint to enhance prompts or get answers
  */

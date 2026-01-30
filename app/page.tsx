@@ -203,7 +203,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const prevProjectIdRef = useRef<string | null>(null);
 
   // Clear all state when project changes (new project or switching projects)
-  // Clear all state when project changes (new project or switching projects)
   useEffect(() => {
     // Only clear if projectId actually changed (not on initial mount with same projectId)
     if (projectId && prevProjectIdRef.current !== projectId) {
@@ -212,6 +211,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         from: prevProjectIdRef.current,
         to: projectId,
       });
+      
+      // CRITICAL: Reset snapshot loaded flag so new project can load
+      snapshotLoadedRef.current = false;
+      
       // Reset viewport to center
       viewportCenterRef.current = {
         x: 25000,
@@ -222,10 +225,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
       // Update ref to track current projectId
       prevProjectIdRef.current = projectId;
     } else if (!projectId) {
-      // If projectId is cleared, reset the ref
+      // If projectId is cleared, reset the ref and loaded flag
       prevProjectIdRef.current = null;
+      snapshotLoadedRef.current = false;
     }
-  }, [projectId, loadSnapshot]); // Only run when projectId changes
+  }, [projectId]); // Only run when projectId changes
 
 
 
@@ -380,16 +384,35 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (!projectId || !snapshotLoadedRef.current) return;
 
     const timeout = setTimeout(async () => {
+      // CRITICAL: Check if projectId changed during debounce
+      if (projectId !== docRef.current.id) {
+        console.log('[AutoSave] ProjectId changed during save, aborting:', {
+          expected: projectId,
+          docId: docRef.current.id
+        });
+        return;
+      }
+      
       if (docRef.current.version === 0) return;
 
       const nodeCount = Object.keys(docRef.current.nodes).length;
       console.log('[AutoSave] Saving snapshot...', {
         projectId,
+        docId: docRef.current.id,
         version: docRef.current.version,
         nodeCount,
         nodesKeys: Object.keys(docRef.current.nodes),
         nodes: docRef.current.nodes
       });
+
+      // CRITICAL: Double-check projectId matches before saving
+      if (projectId !== docRef.current.id) {
+        console.error('[AutoSave] ProjectId mismatch, aborting save:', {
+          projectId,
+          docId: docRef.current.id
+        });
+        return;
+      }
 
       if (nodeCount === 0 && (imageGenerators.length > 0 || videoGenerators.length > 0)) {
         console.error('[AutoSave] 🚨 CRITICAL STATE MISMATCH: Doc nodes empty but generators exist in compatibility view!', {
@@ -838,6 +861,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
 
   const handleProjectSelect = (project: CanvasProject) => {
+    // CRITICAL: Reset snapshot loaded flag when selecting a project
+    snapshotLoadedRef.current = false;
     setProjectId(project?.id || null);
     setShowProjectSelector(false);
   };

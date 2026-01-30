@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Konva from 'konva';
 import { ModalOverlaysProps } from './types';
 import { useConnectionManager } from './useConnectionManager';
@@ -243,16 +243,53 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   projectId,
   setGenerationQueue,
   isChatOpen,
+  viewportSize,
+  showFineDetails,
+  showLabelsOnly,
+  isZoomedOut,
+  isInteracting = false,
+  setIsComponentDragging,
 }) => {
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
+  const lastUpdateRef = useRef({ x: 0, y: 0, scale: 1 });
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Force recalculation when viewport changes
+  // Throttle viewport updates during interaction to prevent lag
   useEffect(() => {
-    const rafId = requestAnimationFrame(() => {
+    if (isInteracting) {
+      // During interaction, skip updates to prevent lag
+      return;
+    }
+    
+    // Only update if position or scale actually changed
+    const hasChanged = 
+      lastUpdateRef.current.x !== position.x ||
+      lastUpdateRef.current.y !== position.y ||
+      lastUpdateRef.current.scale !== scale;
+    
+    if (!hasChanged) {
+      return;
+    }
+    
+    // Clear any pending timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    // Update ref immediately to prevent duplicate updates
+    lastUpdateRef.current = { x: position.x, y: position.y, scale };
+    
+    // Debounce the update to prevent rapid-fire updates
+    updateTimeoutRef.current = setTimeout(() => {
       setViewportUpdateKey(prev => prev + 1);
-    });
-    return () => cancelAnimationFrame(rafId);
-  }, [position.x, position.y, scale]);
+    }, 16); // ~60fps
+    
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [position.x, position.y, scale, isInteracting]);
 
   const connectionManager = useConnectionManager({
     connections: externalConnections ?? [],
@@ -289,6 +326,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         position={position}
         scale={scale}
+        isInteracting={isInteracting}
         textInputStates={textInputStates}
         imageModalStates={imageModalStates}
         videoModalStates={videoModalStates}
@@ -354,6 +392,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         isChatOpen={isChatOpen}
         selectedIds={selectedIds}
         setSelectionOrder={setSelectionOrder}
+        showFineDetails={showFineDetails}
+        showLabelsOnly={showLabelsOnly}
+        isZoomedOut={isZoomedOut}
       />
 
       <VideoModalOverlays
@@ -380,6 +421,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         isChatOpen={isChatOpen}
         selectedIds={selectedIds}
         setSelectionOrder={setSelectionOrder}
+        showFineDetails={showFineDetails}
+        showLabelsOnly={showLabelsOnly}
+        isZoomedOut={isZoomedOut}
       />
 
       <VideoEditorModalOverlays

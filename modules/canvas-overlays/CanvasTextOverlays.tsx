@@ -12,7 +12,7 @@ interface CanvasTextOverlaysProps {
     position: { x: number; y: number };
 }
 
-export const CanvasTextOverlays: React.FC<CanvasTextOverlaysProps> = ({
+export const CanvasTextOverlays: React.FC<CanvasTextOverlaysProps> = React.memo(({
     canvasTextStates,
     selectedCanvasTextId,
     onSelect,
@@ -21,30 +21,15 @@ export const CanvasTextOverlays: React.FC<CanvasTextOverlaysProps> = ({
     scale,
     position,
 }) => {
-    console.log('[CanvasTextOverlays] Rendering with states:', canvasTextStates, 'count:', canvasTextStates?.length, 'scale:', scale, 'position:', position);
-
     if (!canvasTextStates || canvasTextStates.length === 0) {
-        console.log('[CanvasTextOverlays] No text states to render - array is empty or undefined');
         return null;
     }
-
-    console.log('[CanvasTextOverlays] Rendering', canvasTextStates.length, 'text element(s)');
 
     return (
         <>
             {canvasTextStates.map((textState) => {
                 const screenX = textState.x * scale + position.x;
                 const screenY = textState.y * scale + position.y;
-                console.log('[CanvasTextOverlays] Rendering text:', {
-                    id: textState.id,
-                    canvasX: textState.x,
-                    canvasY: textState.y,
-                    screenX,
-                    screenY,
-                    scale,
-                    position,
-                    isSelected: selectedCanvasTextId === textState.id
-                });
                 return (
                     <CanvasText
                         key={textState.id}
@@ -60,4 +45,16 @@ export const CanvasTextOverlays: React.FC<CanvasTextOverlaysProps> = ({
             })}
         </>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison to prevent unnecessary re-renders
+    return (
+        prevProps.canvasTextStates === nextProps.canvasTextStates &&
+        prevProps.selectedCanvasTextId === nextProps.selectedCanvasTextId &&
+        prevProps.scale === nextProps.scale &&
+        prevProps.position.x === nextProps.position.x &&
+        prevProps.position.y === nextProps.position.y &&
+        prevProps.onSelect === nextProps.onSelect &&
+        prevProps.onUpdate === nextProps.onUpdate &&
+        prevProps.onDelete === nextProps.onDelete
+    );
+});

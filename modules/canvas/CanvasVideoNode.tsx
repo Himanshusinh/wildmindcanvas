@@ -45,9 +45,16 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
 }) => {
     const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [currentX, setCurrentX] = useState(videoState.x || 50);
+    const [currentY, setCurrentY] = useState(videoState.y || 50);
     const imageRef = useRef<Konva.Image>(null);
     const animRef = useRef<number | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const groupRef = useRef<Konva.Group>(null);
+    const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const currentPositionRef = useRef<{ x: number; y: number }>({ x: videoState.x || 50, y: videoState.y || 50 });
+    const justFinishedDragRef = useRef(false);
 
     // Register/Unregister video element
     useEffect(() => {
@@ -60,6 +67,69 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
             }
         };
     }, [videoElement, videoState.id]);
+
+    // Sync position from parent when not dragging
+    useEffect(() => {
+        if (isDragging || justFinishedDragRef.current) return;
+        const incomingX = videoState.x || 50;
+        const incomingY = videoState.y || 50;
+        setCurrentX(incomingX);
+        setCurrentY(incomingY);
+    currentPositionRef.current = { x: incomingX, y: incomingY };
+    }, [videoState.x, videoState.y, isDragging]);
+
+  // Manual drag handling (same pattern as music modal)
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const stage = stageRef?.current;
+      if (!stage) return;
+
+      stage.setPointersPositions(e as any);
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      const worldX = (pointer.x - position.x) / scale;
+      const worldY = (pointer.y - position.y) / scale;
+      const newX = worldX - dragOffsetRef.current.x;
+      const newY = worldY - dragOffsetRef.current.y;
+
+      setCurrentX(newX);
+      setCurrentY(newY);
+      currentPositionRef.current = { x: newX, y: newY };
+    };
+
+    const handleMouseUp = () => {
+      if (!isDragging) return;
+
+      const finalX = currentPositionRef.current.x;
+      const finalY = currentPositionRef.current.y;
+
+      setIsDragging(false);
+      justFinishedDragRef.current = true;
+
+      onUpdate?.({ x: finalX, y: finalY });
+
+      setTimeout(() => {
+        justFinishedDragRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('touchmove', handleMouseMove, { capture: true, passive: false });
+    window.addEventListener('touchend', handleMouseUp, true);
+    window.addEventListener('touchcancel', handleMouseUp, true);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('touchmove', handleMouseMove, true as any);
+      window.removeEventListener('touchend', handleMouseUp, true);
+      window.removeEventListener('touchcancel', handleMouseUp, true);
+    };
+  }, [isDragging, position.x, position.y, scale, onUpdate, stageRef]);
 
     useEffect(() => {
         let mounted = true;
@@ -171,17 +241,6 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
         }
     }, [isPlaying, videoElement]);
 
-    // Dragging logic
-    const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-        const node = e.target;
-        const newX = node.x();
-        const newY = node.y();
-
-        if (onUpdate) {
-            onUpdate({ x: newX, y: newY });
-        }
-    };
-
     const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
         // Prevent selecting if we are dragging
         if (e.target.getStage()?.isDragging()) return;
@@ -200,10 +259,43 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
     return (
         <Group
             id={videoState.id}
-            x={videoState.x}
-            y={videoState.y}
-            draggable={isDraggable}
-            onDragEnd={handleDragEnd}
+            ref={groupRef}
+            x={currentX}
+            y={currentY}
+            draggable={false}
+            onMouseDown={(e) => {
+                if (!isDraggable) return;
+                if (e.evt.button !== undefined && e.evt.button !== 0) return;
+
+                const stage = stageRef?.current;
+                if (!stage) return;
+
+                stage.setPointersPositions(e.evt);
+                const pointer = stage.getPointerPosition();
+                if (!pointer) return;
+
+                const worldX = (pointer.x - position.x) / scale;
+                const worldY = (pointer.y - position.y) / scale;
+                dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
+
+                setIsDragging(true);
+            }}
+            onTouchStart={(e) => {
+                if (!isDraggable) return;
+
+                const stage = stageRef?.current;
+                if (!stage) return;
+
+                stage.setPointersPositions(e.evt);
+                const pointer = stage.getPointerPosition();
+                if (!pointer) return;
+
+                const worldX = (pointer.x - position.x) / scale;
+                const worldY = (pointer.y - position.y) / scale;
+                dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
+
+                setIsDragging(true);
+            }}
             onClick={handleClick}
             onTap={handleClick}
         >

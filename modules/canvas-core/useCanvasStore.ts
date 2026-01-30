@@ -34,23 +34,47 @@ export function useCanvasStore(projectId: string | null) {
     const historyRef = useRef(new HistoryManager());
     const [historyVersion, setHistoryVersion] = useState(0);
 
-    // Initialization
+    // Initialization - Reset store when projectId changes
     useEffect(() => {
-        if (!projectId) return;
-        const loaded = loadSnapshot();
-        if (loaded) {
+        if (!projectId) {
+            // Clear doc when no projectId
+            setDoc({
+                id: 'default',
+                version: 0,
+                nodes: {},
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            });
+            historyRef.current = new HistoryManager();
+            setHistoryVersion(0);
+            return;
+        }
+        
+        // Load project-specific snapshot
+        const loaded = loadSnapshot(projectId);
+        if (loaded && loaded.id === projectId) {
+            // Only use loaded doc if it matches the current projectId
             setDoc(loaded);
         } else {
-            setDoc(prev => ({ ...prev, id: projectId }));
+            // Reset to empty doc for new project
+            setDoc({
+                id: projectId,
+                version: 0,
+                nodes: {},
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            });
+            historyRef.current = new HistoryManager();
+            setHistoryVersion(0);
         }
     }, [projectId]);
 
-    // Persistence Auto-Save
+    // Persistence Auto-Save - Only save if projectId matches doc.id
     useEffect(() => {
-        if (doc.version > 0) {
-            saveSnapshot(doc);
+        if (doc.version > 0 && projectId && doc.id === projectId) {
+            saveSnapshot(doc, projectId);
         }
-    }, [doc]);
+    }, [doc, projectId]);
 
     // Command Executor
     const execute = useCallback((cmd: Command) => {

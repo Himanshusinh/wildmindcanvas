@@ -72,6 +72,10 @@ interface VideoModalOverlaysProps {
   isChatOpen?: boolean;
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
+  // Level-of-detail flags (optional)
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
 }
 
 export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
@@ -98,6 +102,9 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   isChatOpen,
   selectedIds,
   setSelectionOrder,
+  showFineDetails,
+  showLabelsOnly,
+  isZoomedOut,
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

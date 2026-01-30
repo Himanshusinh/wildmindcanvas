@@ -9,41 +9,56 @@ export interface Snapshot {
 let saveTimeout: NodeJS.Timeout | null = null;
 const SAVE_DELAY = 50; // 50ms debounce for responsive but non-blocking saves
 
-export function saveSnapshot(doc: CanvasDocument) {
-    if (typeof window === 'undefined') return;
+// Store timeout per projectId to prevent cross-project interference
+const saveTimeouts = new Map<string, NodeJS.Timeout>();
 
-    // Clear existing timer
-    if (saveTimeout) {
-        clearTimeout(saveTimeout);
+export function saveSnapshot(doc: CanvasDocument, projectId: string | null) {
+    if (typeof window === 'undefined') return;
+    if (!projectId) return; // Don't save if no projectId
+
+    // Clear existing timer for this project
+    const existingTimeout = saveTimeouts.get(projectId);
+    if (existingTimeout) {
+        clearTimeout(existingTimeout);
     }
 
-    // Set new timer
-    saveTimeout = setTimeout(() => {
-        console.log('[Persistence] Saving snapshot (Debounced):', doc.id, 'Nodes:', Object.keys(doc.nodes).length, 'Version:', doc.version);
+    // Set new timer for this project
+    const timeout = setTimeout(() => {
+        console.log('[Persistence] Saving snapshot (Debounced):', projectId, 'Nodes:', Object.keys(doc.nodes).length, 'Version:', doc.version);
         try {
+            // Use project-specific key
+            const key = `canvas:snapshot:${projectId}`;
             localStorage.setItem(
-                "canvas:snapshot",
+                key,
                 JSON.stringify({
                     document: doc,
                     createdAt: Date.now(),
                 })
             );
+            saveTimeouts.delete(projectId);
         } catch (e) {
             console.error('[Persistence] Failed to save snapshot:', e);
+            saveTimeouts.delete(projectId);
         }
     }, SAVE_DELAY);
+    
+    saveTimeouts.set(projectId, timeout);
 }
 
-export function loadSnapshot(): CanvasDocument | null {
+export function loadSnapshot(projectId: string | null): CanvasDocument | null {
     if (typeof window === 'undefined') return null;
-    const raw = localStorage.getItem("canvas:snapshot");
+    if (!projectId) return null; // Don't load if no projectId
+
+    // Use project-specific key
+    const key = `canvas:snapshot:${projectId}`;
+    const raw = localStorage.getItem(key);
     if (!raw) {
-        console.log('[Persistence] No snapshot found');
+        console.log('[Persistence] No snapshot found for project:', projectId);
         return null;
     }
     try {
         const doc = JSON.parse(raw).document;
-        console.log('[Persistence] Loaded snapshot:', doc.id, 'Nodes:', Object.keys(doc.nodes).length, 'Version:', doc.version);
+        console.log('[Persistence] Loaded snapshot for project:', projectId, 'Nodes:', Object.keys(doc.nodes).length, 'Version:', doc.version);
         return doc;
     } catch (e) {
         console.error("Failed to parse snapshot", e);

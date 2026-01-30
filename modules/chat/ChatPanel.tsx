@@ -13,12 +13,15 @@ import {
   MicOff,
   RefreshCcw,
   Video,
+  ChevronDown,
 } from 'lucide-react';
 import { useChatEngine, ChatMessage } from './useChatEngine';
 import { useIntentExecutor } from './useIntentExecutor';
 import { useSpeechToText } from './useSpeechToText';
 import { FormattedMessage } from './FormattedMessage';
 import { Option } from './messageFormatter';
+
+type ChatMode = 'agent' | 'general';
 
 interface ChatPanelProps {
     canvasState: any;
@@ -44,6 +47,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const [inputValue, setInputValue] = useState('');
     const [isInputFocused, setIsInputFocused] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [chatMode, setChatMode] = useState<ChatMode>('agent');
+  const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
 
     const chatEngine = useChatEngine({ canvasState, canvasSelection });
   const executor = useIntentExecutor({ canvasState, canvasSelection, props, viewportSize, position, scale });
@@ -157,7 +162,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
-    chatEngine.sendMessage(inputValue);
+    chatEngine.sendMessage(inputValue, chatMode);
         setInputValue('');
     };
     
@@ -167,7 +172,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleOptionSelect = (messageId: string, option: Option) => {
     setSelectedOptions(prev => ({ ...prev, [messageId]: option.label }));
-    chatEngine.sendMessage(option.label);
+    chatEngine.sendMessage(option.label, chatMode);
   };
 
   if (!isOpen) {
@@ -383,6 +388,70 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                     {/* Input Area */}
                     <div className="p-4 pt-2 z-20">
+                        {/* Mode Selector */}
+                        <div className="mb-2 relative">
+                            <button
+                                onClick={() => setIsModeDropdownOpen(!isModeDropdownOpen)}
+                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 text-xs transition-all"
+                            >
+                                <span className="flex items-center gap-2">
+                                    {chatMode === 'agent' ? (
+                                        <>
+                                            <Sparkles size={14} className="text-blue-400" />
+                                            <span>Agent Mode</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <MessageSquare size={14} className="text-green-400" />
+                                            <span>General Question</span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={14} className={`transition-transform ${isModeDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isModeDropdownOpen && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-30" 
+                                        onClick={() => setIsModeDropdownOpen(false)}
+                                    />
+                                    <div className="absolute top-full left-0 right-0 mt-1 rounded-lg bg-black/95 border border-white/10 shadow-xl backdrop-blur-xl z-40 overflow-hidden">
+                                        <button
+                                            onClick={() => {
+                                                setChatMode('agent');
+                                                setIsModeDropdownOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${
+                                                chatMode === 'agent' 
+                                                    ? 'bg-blue-500/20 text-blue-200 border-l-2 border-blue-500' 
+                                                    : 'text-white/70 hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <Sparkles size={14} className="text-blue-400" />
+                                            <span>Agent Mode</span>
+                                            <span className="ml-auto text-[10px] text-white/40">Generate videos/images</span>
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setChatMode('general');
+                                                setIsModeDropdownOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all border-t border-white/5 ${
+                                                chatMode === 'general' 
+                                                    ? 'bg-green-500/20 text-green-200 border-l-2 border-green-500' 
+                                                    : 'text-white/70 hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <MessageSquare size={14} className="text-green-400" />
+                                            <span>General Question</span>
+                                            <span className="ml-auto text-[10px] text-white/40">Ask anything</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
                         {/* Attachment Count Indicator */}
                         {attachmentCounts.total > 0 && (
                             <div className="mb-2 px-1 opacity-0 animate-[fadeIn_0.2s_ease-in-out_forwards]">
@@ -419,7 +488,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                         handleSend();
                                     }
                                 }}
-                                placeholder={isListening ? "Listening..." : "Type a command..."}
+                                placeholder={isListening ? "Listening..." : (chatMode === 'general' ? "Ask a question..." : "Type a command...")}
                                 rows={1}
             style={{ minHeight: '40px', maxHeight: '96px' }}
             className={`w-full resize-none rounded-xl px-4 py-3 pr-20 text-[13px] leading-relaxed bg-white/5 text-white/80 placeholder:text-white/25 border outline-none transition-all ${isInputFocused ? 'border-blue-500/30' : 'border-white/10'}`}

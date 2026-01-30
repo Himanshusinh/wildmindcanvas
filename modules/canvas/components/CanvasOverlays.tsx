@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo, useRef } from 'react';
 import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { useCanvasSelection } from '../hooks/useCanvasSelection';
@@ -30,6 +30,8 @@ interface CanvasOverlaysProps {
     onFitView: () => void;
     setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
     isChatOpen?: boolean;
+    isInteracting?: boolean;
+    setIsComponentDragging?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -48,7 +50,9 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     activeGenerationCount,
     onFitView,
     setGenerationQueue,
-    isChatOpen
+    isChatOpen,
+    isInteracting = false,
+    setIsComponentDragging
 }) => {
     const {
         images,
@@ -96,6 +100,71 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         setSelectionOrder,
     } = canvasSelection;
 
+    // --- VIEWPORT-BASED VIRTUALIZATION ---
+    const viewX = (-position.x) / scale;
+    const viewY = (-position.y) / scale;
+    const viewW = viewportSize.width / scale;
+    const viewH = viewportSize.height / scale;
+    const PADDING = 1200; // world units around viewport
+
+    const viewportBounds = {
+        minX: viewX - PADDING,
+        minY: viewY - PADDING,
+        maxX: viewX + viewW + PADDING,
+        maxY: viewY + viewH + PADDING,
+    };
+
+    const isRectInViewport = (
+        x: number,
+        y: number,
+        w: number = 600,
+        h: number = 400,
+    ) => {
+        const { minX, minY, maxX, maxY } = viewportBounds;
+        const rX2 = x + w;
+        const rY2 = y + h;
+        return !(rX2 < minX || x > maxX || rY2 < minY || y > maxY);
+    };
+
+    // Virtualize image and video modals based on viewport
+    // Skip recalculation during interaction to prevent lag
+    const prevVirtualizedImageRef = useRef<typeof imageModalStates>([]);
+    const prevVirtualizedVideoRef = useRef<typeof videoModalStates>([]);
+    
+    const virtualizedImageModalStates = useMemo(() => {
+        if (isInteracting) {
+            // During interaction, use previous state to avoid lag
+            return prevVirtualizedImageRef.current;
+        }
+        const filtered = imageModalStates.filter(m =>
+            isRectInViewport(
+                m.x,
+                m.y,
+                m.frameWidth ?? 600,
+                m.frameHeight ?? 400,
+            )
+        );
+        prevVirtualizedImageRef.current = filtered;
+        return filtered;
+    }, [imageModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY, isInteracting]);
+
+    const virtualizedVideoModalStates = useMemo(() => {
+        if (isInteracting) {
+            // During interaction, use previous state to avoid lag
+            return prevVirtualizedVideoRef.current;
+        }
+        const filtered = videoModalStates.filter(m =>
+            isRectInViewport(
+                m.x,
+                m.y,
+                m.frameWidth ?? 600,
+                m.frameHeight ?? 400,
+            )
+        );
+        prevVirtualizedVideoRef.current = filtered;
+        return filtered;
+    }, [videoModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY, isInteracting]);
+
     const {
         onPersistImageModalCreate, onPersistImageModalMove, onPersistImageModalDelete,
         onPersistVideoModalCreate, onPersistVideoModalMove, onPersistVideoModalDelete,
@@ -140,9 +209,15 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 stageRef={stageRef as any}
                 scale={scale}
                 position={position}
+                viewportSize={viewportSize}
+                showFineDetails={scale >= 0.8}
+                showLabelsOnly={scale >= 0.4 && scale < 0.8}
+                isZoomedOut={scale < 0.4}
+                isInteracting={isInteracting}
+                setIsComponentDragging={setIsComponentDragging}
                 textInputStates={textInputStates}
-                imageModalStates={imageModalStates}
-                videoModalStates={videoModalStates}
+                imageModalStates={virtualizedImageModalStates}
+                videoModalStates={virtualizedVideoModalStates}
                 videoEditorModalStates={videoEditorModalStates}
                 imageEditorModalStates={imageEditorModalStates}
                 musicModalStates={musicModalStates}

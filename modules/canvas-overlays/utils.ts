@@ -57,7 +57,8 @@ export const computeNodeCenter = (
   storyboardModalStates?: StoryboardModalState[],
   scriptFrameModalStates?: ScriptFrameModalState[],
   sceneFrameModalStates?: any[],
-  domCache?: Map<string, Element | null>
+  domCache?: Map<string, Element | null>,
+  preferStateCalculation?: boolean // When true, prefer state-based calculation over DOM reads
 ): { x: number; y: number } | null => {
   if (!id) return null;
 
@@ -71,6 +72,67 @@ export const computeNodeCenter = (
     }
     return document.querySelector(query);
   };
+
+  // Helper to find modal state
+  const findModal = () => {
+    const t = textInputStates.find(t => t.id === id);
+    if (t) return { x: t.x, y: t.y, width: 300, height: 100 };
+    const im = imageModalStates.find(m => m.id === id);
+    if (im) return { x: im.x, y: im.y, width: im.frameWidth || 600, height: im.frameHeight || 400 };
+    const vm = videoModalStates.find(m => m.id === id);
+    if (vm) return { x: vm.x, y: vm.y, width: vm.frameWidth || 600, height: vm.frameHeight || 338 };
+    const mm = musicModalStates.find(m => m.id === id);
+    if (mm) return { x: mm.x, y: mm.y, width: mm.frameWidth || 600, height: mm.frameHeight || 300 };
+    const um = upscaleModalStates?.find(m => m.id === id);
+    if (um) return { x: um.x, y: um.y, width: um.frameWidth || 400, height: um.frameHeight || 500 };
+    const mcm = multiangleCameraModalStates?.find(m => m.id === id);
+    if (mcm) return { x: mcm.x, y: mcm.y, width: 400, height: 500 };
+    const rm = removeBgModalStates?.find(m => m.id === id);
+    if (rm) return { x: rm.x, y: rm.y, width: rm.frameWidth || 400, height: rm.frameHeight || 500 };
+    const em = eraseModalStates?.find(m => m.id === id);
+    if (em) return { x: em.x, y: em.y, width: em.frameWidth || 400, height: em.frameHeight || 500 };
+    const ep = expandModalStates?.find(m => m.id === id);
+    if (ep) return { x: ep.x, y: ep.y, width: ep.frameWidth || 400, height: ep.frameHeight || 500 };
+    const vzm = vectorizeModalStates?.find(m => m.id === id);
+    if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
+    const nsm = nextSceneModalStates?.find(m => m.id === id);
+    if (nsm) return { x: nsm.x, y: nsm.y, width: nsm.frameWidth || 400, height: nsm.frameHeight || 500 };
+    const sb = storyboardModalStates?.find(m => m.id === id);
+    if (sb) return { x: sb.x, y: sb.y, width: sb.frameWidth || 400, height: sb.frameHeight || 500 };
+    const sfModal = scriptFrameModalStates?.find(m => m.id === id);
+    if (sfModal) return { x: sfModal.x, y: sfModal.y, width: sfModal.frameWidth || 360, height: sfModal.frameHeight || 260 };
+    const sf = sceneFrameModalStates?.find(m => m.id === id);
+    if (sf) return { x: sf.x, y: sf.y, width: sf.frameWidth || 400, height: sf.frameHeight || 500 };
+    return null;
+  };
+
+  // During interaction, prefer state-based calculation for smoother updates
+  if (preferStateCalculation) {
+    try {
+      const stage = stageRef?.current as any;
+      if (stage && typeof stage.container === 'function') {
+        const containerRect = stage.container().getBoundingClientRect();
+        const modal = findModal();
+        if (modal) {
+          const screenX = containerRect.left + (modal.x * scale) + position.x;
+          const screenY = containerRect.top + (modal.y * scale) + position.y;
+          const screenWidth = modal.width * scale;
+          const screenHeight = modal.height * scale;
+          
+          const centerX = Math.round(screenX + screenWidth / 2);
+          const centerY = Math.round(screenY + screenHeight / 2);
+          
+          if (side === 'send') {
+            return { x: Math.round(centerX + screenWidth / 2), y: centerY };
+          } else {
+            return { x: Math.round(centerX - screenWidth / 2), y: centerY };
+          }
+        }
+      }
+    } catch (err) {
+      // Fall through to DOM reads
+    }
+  }
 
   // First, try to use the actual node element position (most accurate for plugins with circular nodes)
   const el = cachedQuery(`[data-node-id="${id}"][data-node-side="${side}"]`);
@@ -105,44 +167,28 @@ export const computeNodeCenter = (
     const stage = stageRef?.current as any;
     if (stage && typeof stage.container === 'function') {
       const containerRect = stage.container().getBoundingClientRect();
-      // Try to find modal state by id to get its canvas coords and size
-      const findModal = () => {
-        const t = textInputStates.find(t => t.id === id);
-        if (t) return { x: t.x, y: t.y, width: 300, height: 100 };
-        const im = imageModalStates.find(m => m.id === id);
-        if (im) return { x: im.x, y: im.y, width: im.frameWidth || 600, height: im.frameHeight || 400 };
-        const vm = videoModalStates.find(m => m.id === id);
-        if (vm) return { x: vm.x, y: vm.y, width: vm.frameWidth || 600, height: vm.frameHeight || 338 };
-        const mm = musicModalStates.find(m => m.id === id);
-        if (mm) return { x: mm.x, y: mm.y, width: mm.frameWidth || 600, height: mm.frameHeight || 300 };
-        const um = upscaleModalStates?.find(m => m.id === id);
-        if (um) return { x: um.x, y: um.y, width: um.frameWidth || 400, height: um.frameHeight || 500 };
-        const mcm = multiangleCameraModalStates?.find(m => m.id === id);
-        if (mcm) return { x: mcm.x, y: mcm.y, width: 400, height: 500 };
-        const rm = removeBgModalStates?.find(m => m.id === id);
-        if (rm) return { x: rm.x, y: rm.y, width: rm.frameWidth || 400, height: rm.frameHeight || 500 };
-        const em = eraseModalStates?.find(m => m.id === id);
-        if (em) return { x: em.x, y: em.y, width: em.frameWidth || 400, height: em.frameHeight || 500 };
-        const ep = expandModalStates?.find(m => m.id === id);
-        if (ep) return { x: ep.x, y: ep.y, width: ep.frameWidth || 400, height: ep.frameHeight || 500 };
-        const vzm = vectorizeModalStates?.find(m => m.id === id);
-        if (vzm) return { x: vzm.x, y: vzm.y, width: vzm.frameWidth || 400, height: vzm.frameHeight || 500 };
-        const nsm = nextSceneModalStates?.find(m => m.id === id);
-        if (nsm) return { x: nsm.x, y: nsm.y, width: nsm.frameWidth || 400, height: nsm.frameHeight || 500 };
-        const sb = storyboardModalStates?.find(m => m.id === id);
-        if (sb) return { x: sb.x, y: sb.y, width: sb.frameWidth || 400, height: sb.frameHeight || 500 };
-        const sfModal = scriptFrameModalStates?.find(m => m.id === id);
-        if (sfModal) return { x: sfModal.x, y: sfModal.y, width: sfModal.frameWidth || 360, height: sfModal.frameHeight || 260 };
-        const sf = sceneFrameModalStates?.find(m => m.id === id);
-        if (sf) return { x: sf.x, y: sf.y, width: sf.frameWidth || 400, height: sf.frameHeight || 500 };
-        return null;
-      };
       const modal = findModal();
       if (modal) {
-        const centerX = Math.round(containerRect.left + position.x + (modal.x * scale) + ((modal.width * scale) / 2));
-        const centerY = Math.round(containerRect.top + position.y + (modal.y * scale) + ((modal.height * scale) / 2));
-        if (side === 'send') return { x: Math.round(centerX + (modal.width * scale) / 2), y: centerY };
-        return { x: Math.round(centerX - (modal.width * scale) / 2), y: centerY };
+        // Transform canvas coordinates to screen coordinates
+        // position.x/y are Konva stage positions (negative when panned)
+        // modal.x/y are canvas/world coordinates
+        // scale is the zoom level
+        // Formula: screenX = containerLeft + (canvasX * scale) + stagePosition
+        const screenX = containerRect.left + (modal.x * scale) + position.x;
+        const screenY = containerRect.top + (modal.y * scale) + position.y;
+        const screenWidth = modal.width * scale;
+        const screenHeight = modal.height * scale;
+        
+        const centerX = Math.round(screenX + screenWidth / 2);
+        const centerY = Math.round(screenY + screenHeight / 2);
+        
+        if (side === 'send') {
+          // Right side (send): center + half width
+          return { x: Math.round(centerX + screenWidth / 2), y: centerY };
+        } else {
+          // Left side (receive): center - half width
+          return { x: Math.round(centerX - screenWidth / 2), y: centerY };
+        }
       }
     }
   } catch (err) {

@@ -299,15 +299,22 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
   // Ref for the selection box group (for Transformer)
   const selectionGroupRef = React.useRef<Konva.Group>(null);
+  const smartSelectRectRef = React.useRef<Konva.Rect>(null);
 
   const arrangeStateRef = useRef<{ selectionKey: string; order: string[]; bounds?: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null);
   const arrangeAnimationFrameRef = useRef<number | null>(null);
+  const dragMoveRafRef = useRef<number | null>(null);
+  const pendingDragDeltaRef = useRef<{ dx: number; dy: number } | null>(null);
 
   useEffect(() => {
     return () => {
       if (arrangeAnimationFrameRef.current) {
         cancelAnimationFrame(arrangeAnimationFrameRef.current);
         arrangeAnimationFrameRef.current = null;
+      }
+      if (dragMoveRafRef.current) {
+        cancelAnimationFrame(dragMoveRafRef.current);
+        dragMoveRafRef.current = null;
       }
     };
   }, []);
@@ -1364,6 +1371,31 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   };
 
 
+  // Ensure smart select appears on top of all components - update continuously during drag
+  useEffect(() => {
+    if (!isSelecting || !smartSelectRectRef.current) return;
+    
+    let rafId: number;
+    const updateZIndex = () => {
+      if (smartSelectRectRef.current && isSelecting) {
+        smartSelectRectRef.current.moveToTop();
+        const layer = smartSelectRectRef.current.getLayer();
+        if (layer) {
+          layer.batchDraw();
+        }
+      }
+      if (isSelecting) {
+        rafId = requestAnimationFrame(updateZIndex);
+      }
+    };
+    
+    rafId = requestAnimationFrame(updateZIndex);
+    
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [isSelecting, selectionBox]);
+
   // Show SelectionBox if:
   // 1. There's a selection rect AND it's a drag selection with 2+ components, OR
   // 2. There's a selection rect AND a group is selected (for group dragging and ungroup button)
@@ -1371,22 +1403,6 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
       <>
-        {/* Keep the normal marquee visible with subtle styling to indicate parallel selection */}
-        {selectionBox && (
-          <Rect
-            x={Math.min(selectionBox.startX, selectionBox.currentX)}
-            y={Math.min(selectionBox.startY, selectionBox.currentY)}
-            width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-            height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-            fill={hasRichText ? "transparent" : "rgba(100,149,237,0.08)"}
-            stroke={SELECTION_COLOR}
-            strokeWidth={3}
-            dash={[8, 6]}
-            listening={false}
-            globalCompositeOperation="source-over"
-            cornerRadius={0}
-          />
-        )}
         <Group
           ref={selectionGroupRef}
           x={selectionTightRect.x}
@@ -1785,68 +1801,77 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             const deltaX = newX - origin.x;
             const deltaY = newY - origin.y;
 
-            // Move all selected images by delta in real-time (from original positions)
-            selectedImageIndices.forEach(idx => {
-              const originalPos = originalPositions.images.get(idx);
-              if (originalPos) {
-                handleImageUpdateWithGroup(idx, { x: originalPos.x + deltaX, y: originalPos.y + deltaY });
-              }
-            });
+            // Throttle drag-move updates to at most once per animation frame.
+            // Doing dozens of setState(map()) calls per pointer event makes dragging feel "stuck".
+            pendingDragDeltaRef.current = { dx: deltaX, dy: deltaY };
+            if (dragMoveRafRef.current) return;
 
-            // Move all selected text inputs by delta in real-time (from original positions)
-            selectedTextInputIds.forEach(textId => {
-              const originalPos = originalPositions.textInputs.get(textId);
-              if (originalPos) {
-                setTextInputStates((prev) =>
-                  prev.map((textState) =>
-                    textState.id === textId
-                      ? { ...textState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : textState
-                  )
-                );
-              }
-            });
+            dragMoveRafRef.current = requestAnimationFrame(() => {
+              dragMoveRafRef.current = null;
+              const pending = pendingDragDeltaRef.current;
+              if (!pending) return;
+              pendingDragDeltaRef.current = null;
 
-            // Move all selected rich text nodes by delta in real-time
-            selectedRichTextIds.forEach(textId => {
-              const originalPos = originalPositions.richTexts.get(textId);
-              if (originalPos) {
-                if (setRichTextStates) {
-                  setRichTextStates((prev) =>
-                    prev.map((textState) =>
-                      textState.id === textId
-                        ? { ...textState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                        : textState
-                    )
-                  );
+              const dx = pending.dx;
+              const dy = pending.dy;
+
+              // Move all selected images by delta (from original positions)
+              selectedImageIndices.forEach(idx => {
+                const originalPos = originalPositions.images.get(idx);
+                if (originalPos) {
+                  handleImageUpdateWithGroup(idx, { x: originalPos.x + dx, y: originalPos.y + dy });
                 }
-              }
-            });
+              });
 
-            // Move all selected image modals by delta in real-time (from original positions)
-            selectedImageModalIds.forEach(modalId => {
-              const originalPos = originalPositions.imageModals.get(modalId);
-              if (originalPos) {
-                setImageModalStates((prev) =>
-                  prev.map((modalState) =>
-                    modalState.id === modalId
-                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : modalState
-                  )
+              // Move all selected text inputs by delta (from original positions)
+              if (setTextInputStates) {
+                const ids = new Set(selectedTextInputIds);
+                setTextInputStates((prev) =>
+                  prev.map((textState) => {
+                    if (!ids.has(textState.id)) return textState;
+                    const originalPos = originalPositions.textInputs.get(textState.id);
+                    if (!originalPos) return textState;
+                    return { ...textState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
                 );
               }
-            });
 
-            // Move all selected video modals by delta in real-time (from original positions)
-            selectedVideoModalIds.forEach(modalId => {
-              const originalPos = originalPositions.videoModals.get(modalId);
-              if (originalPos) {
+              // Move all selected rich text nodes by delta
+              if (setRichTextStates) {
+                const ids = new Set(selectedRichTextIds);
+                setRichTextStates((prev) =>
+                  prev.map((textState) => {
+                    if (!ids.has(textState.id)) return textState;
+                    const originalPos = originalPositions.richTexts.get(textState.id);
+                    if (!originalPos) return textState;
+                    return { ...textState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
+                );
+              }
+
+              // Move selected image modals by delta
+              if (setImageModalStates) {
+                const ids = new Set(selectedImageModalIds);
+                setImageModalStates((prev) =>
+                  prev.map((modalState) => {
+                    if (!ids.has(modalState.id)) return modalState;
+                    const originalPos = originalPositions.imageModals.get(modalState.id);
+                    if (!originalPos) return modalState;
+                    return { ...modalState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
+                );
+              }
+
+              // Move selected video modals by delta
+              if (setVideoModalStates) {
+                const ids = new Set(selectedVideoModalIds);
                 setVideoModalStates((prev) =>
-                  prev.map((modalState) =>
-                    modalState.id === modalId
-                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : modalState
-                  )
+                  prev.map((modalState) => {
+                    if (!ids.has(modalState.id)) return modalState;
+                    const originalPos = originalPositions.videoModals.get(modalState.id);
+                    if (!originalPos) return modalState;
+                    return { ...modalState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
                 );
               }
             });
@@ -2415,18 +2440,30 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             </Html>
           )}
 
-        </Group>
-
-        {(totalSelected > 1) && selectionTransformerRect && (
+          {/* Blue background that moves with the group - matching smart select */}
           <Rect
-            x={selectionTransformerRect.x - 4} // Match Transformer padding
-            y={selectionTransformerRect.y - 4}
-            width={selectionTransformerRect.width + 8}
-            height={selectionTransformerRect.height + 8}
-            fill="rgba(76, 131, 255, 0.12)" // Theme blue with transparency
+            x={0}
+            y={0}
+            width={selectionTightRect.width}
+            height={selectionTightRect.height}
+            fill="rgba(59, 130, 246, 0.1)" // Same color and opacity as smart select
             listening={false}
           />
-        )}
+          
+          {/* Selection border - dashed rectangle that moves with the group - matching smart select */}
+          <Rect
+            x={0}
+            y={0}
+            width={selectionTightRect.width}
+            height={selectionTightRect.height}
+            fill="transparent"
+            stroke="rgba(76, 131, 255, 0.6)" // Same color and opacity as smart select
+            strokeWidth={2}
+            dash={[4, 4]}
+            listening={false}
+            globalCompositeOperation="source-over"
+          />
+        </Group>
 
         {(totalSelected > 1) && selectionTransformerRect && (
           <Transformer
@@ -2437,9 +2474,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             boundBoxFunc={(oldBox: { x: number; y: number; width: number; height: number; rotation: number }, newBox: { x: number; y: number; width: number; height: number; rotation: number }) => {
               return oldBox; // Prevent any resizing logic just in case
             }}
-            borderStroke={SELECTION_COLOR}
-            borderStrokeWidth={1}
-            borderDash={[4, 4]} // Keep dashed as per "smart selected" typical look
+            borderStroke="transparent" // Hide Transformer border since we have border in Group
+            borderStrokeWidth={0}
+            borderDash={[]}
             padding={4}
             onTransformEnd={handleTransformEnd}
           />
@@ -2449,15 +2486,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   }
 
   if (isSelecting && selectionBox) {
-    // While dragging, show live marquee box
+    // While dragging, show live marquee box (should appear on top of all components)
     return (
       <Rect
+        ref={smartSelectRectRef}
         x={Math.min(selectionBox.startX, selectionBox.currentX)}
         y={Math.min(selectionBox.startY, selectionBox.currentY)}
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-        fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.2)"}
-        stroke={isOnlyText ? "transparent" : SELECTION_COLOR}
+        fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.1)"}
+        stroke={isOnlyText ? "transparent" : "rgba(76, 131, 255, 0.6)"}
         strokeWidth={2}
         dash={[4, 4]}
         listening={false}

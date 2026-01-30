@@ -526,6 +526,39 @@ export function useCanvasEvents(
         }
     };
 
+    // Window-level mouse move handler to update selection box even when mouse is over HTML modals
+    useEffect(() => {
+        if (!isSelecting || !selectionBox) return;
+
+        const handleWindowMouseMove = (e: MouseEvent) => {
+            if (!stageRef.current) return;
+
+            // Get pointer position relative to stage
+            const stage = stageRef.current;
+            const stageContainer = stage.container();
+            if (!stageContainer) return;
+
+            const rect = stageContainer.getBoundingClientRect();
+            const pointerX = e.clientX - rect.left;
+            const pointerY = e.clientY - rect.top;
+
+            // Convert to canvas coordinates
+            const currentX = (pointerX - position.x) / scale;
+            const currentY = (pointerY - position.y) / scale;
+
+            setSelectionBox({
+                ...selectionBox,
+                currentX,
+                currentY
+            });
+        };
+
+        window.addEventListener('mousemove', handleWindowMouseMove, { passive: true });
+        return () => {
+            window.removeEventListener('mousemove', handleWindowMouseMove);
+        };
+    }, [isSelecting, selectionBox, position.x, position.y, scale, stageRef]);
+
     const handleStageMouseUp = (e: KonvaEventObject<MouseEvent>) => {
         if (e.evt.button === 1) {
             setIsMiddleButtonPressed(false);
@@ -1120,7 +1153,13 @@ export function useCanvasEvents(
                 requestAnimationFrame(() => {
                     setPosition(prev => {
                         const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-                        setTimeout(() => updateViewportCenter?.(newPos, scaleRef.current), 0);
+                        // Only call updateViewportCenter if it's provided and values actually changed
+                        if (updateViewportCenter && (prev.x !== newPos.x || prev.y !== newPos.y)) {
+                            setTimeout(() => {
+                                // Use the callback form to ensure we have the latest values
+                                updateViewportCenter(newPos, scaleRef.current);
+                            }, 0);
+                        }
                         return newPos;
                     });
                 });
@@ -1139,8 +1178,19 @@ export function useCanvasEvents(
 
             setScale(clampedScale);
             const newPos = { x: pointer.x - mousePointTo.x * clampedScale, y: pointer.y - mousePointTo.y * clampedScale };
-            setPosition(newPos);
-            setTimeout(() => updateViewportCenter?.(newPos, clampedScale), 0);
+            setPosition(prev => {
+                // Only update if position actually changed
+                if (prev.x === newPos.x && prev.y === newPos.y) {
+                    return prev;
+                }
+                // Only call updateViewportCenter if values actually changed
+                if (updateViewportCenter && (oldScale !== clampedScale || prev.x !== newPos.x || prev.y !== newPos.y)) {
+                    setTimeout(() => {
+                        updateViewportCenter(newPos, clampedScale);
+                    }, 0);
+                }
+                return newPos;
+            });
         };
 
         const container = containerRef.current;

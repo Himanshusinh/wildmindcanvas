@@ -91,6 +91,10 @@ interface ImageModalOverlaysProps {
   isChatOpen?: boolean;
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
+  // Level-of-detail flags (optional)
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
 }
 
 
@@ -122,6 +126,9 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   isChatOpen,
   selectedIds,
   setSelectionOrder,
+  showFineDetails,
+  showLabelsOnly,
+  isZoomedOut,
 }) => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -205,16 +212,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           modalState.generatedImageUrl === sourceImageUrlForDisplayCheck &&
           modalState.model !== 'Uploaded Image';
 
-        if (isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))) {
-          console.log('[ImageModalOverlays] Render Debug:', {
-            id: modalState.id,
-            selectedIds: selectedIds || 'undefined',
-            selectedImageModalIds,
-            indexInAll: selectedIds ? selectedIds.indexOf(modalState.id) : -1,
-            indexInLocal: selectedImageModalIds.indexOf(modalState.id),
-            isShiftPressed
-          });
-        }
+        // Removed excessive console.log to prevent performance issues
 
         return (
           <ImageUploadModal
@@ -260,14 +258,6 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             refImages={refImages}
             sourceImageUrl={(() => {
               const sourceUrl = modalState.sourceImageUrl;
-              console.log('[ImageModalOverlays] 🚨 CRITICAL: About to render ImageUploadModal:', {
-                modalId: modalState.id,
-                hasSourceImageUrlInModalState: !!sourceUrl,
-                sourceImageUrlValue: sourceUrl || 'UNDEFINED/NULL',
-                sourceImageUrlPreview: sourceUrl ? sourceUrl.substring(0, 100) + '...' : 'UNDEFINED/NULL',
-                modalStateKeys: Object.keys(modalState),
-                fullModalState: modalState,
-              });
               // Belt-and-suspenders: allow only stitched refs; drop legacy comma lists
               if (!sourceUrl) return undefined;
               if (sourceUrl.includes('reference-stitched')) return sourceUrl;

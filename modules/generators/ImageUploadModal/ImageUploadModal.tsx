@@ -123,6 +123,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Removed local isPinned state to use prop
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   // Track initial mouse position to distinguish clicks from drags
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -281,8 +282,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const effectivePrompt = prompt;
 
   // Convert canvas coordinates to screen coordinates
-  const screenX = x * scale + position.x;
-  const screenY = y * scale + position.y;
+  // Clear drag position when props have caught up
+  useEffect(() => {
+    if (!isDraggingContainer && dragPosition) {
+      // Check if props have updated to match drag position (within 1px tolerance)
+      if (Math.abs(x - dragPosition.x) < 1 && Math.abs(y - dragPosition.y) < 1) {
+        setDragPosition(null);
+      }
+    }
+  }, [x, y, isDraggingContainer, dragPosition]);
+
+  // Use drag position during drag for immediate visual feedback, otherwise use props
+  const effectiveX = dragPosition ? dragPosition.x : x;
+  const effectiveY = dragPosition ? dragPosition.y : y;
+  const screenX = effectiveX * scale + position.x;
+  const screenY = effectiveY * scale + position.y;
   const frameBorderColor = isSelected ? '#4C83FF' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
@@ -398,17 +412,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Priority 2: If this frame is empty but has a connected image source, use that (for image-to-image from external source)
   // Priority 3: No source (text-to-image)
   const finalSourceImageUrl = hasExistingImage ? generatedImageUrl : (sourceImageUrl || null);
-
-  console.log('[ImageUploadModal] 🔍 sourceImageUrl prop check:', {
-    modalId: id,
-    hasSourceImageUrlProp: !!sourceImageUrl,
-    sourceImageUrlProp: sourceImageUrl || 'NONE',
-    sourceImageUrlPreview: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-    hasExistingImage,
-    generatedImageUrl: generatedImageUrl || 'NONE',
-    finalSourceImageUrl: finalSourceImageUrl || 'NONE',
-    finalSourceImageUrlPreview: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NONE',
-  });
 
   // Track if we've already initialized the model for image-to-image mode
   const hasInitializedImageToImageModel = useRef(false);
@@ -1648,6 +1651,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isControls) {
+      setIsDraggingContainer(true); // Set immediately like TextInput
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({
@@ -1655,30 +1659,28 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           y: e.clientY - rect.top,
         });
       }
-      e.preventDefault();
+      // Only prevent default for left mouse button (allow right-click context menu, etc.)
+      if (e.button === 0) {
+        e.preventDefault();
+      }
       e.stopPropagation();
-      // Don't set isDraggingContainer immediately - wait to see if mouse moves
     }
   };
 
-  // Handle drag move - only start dragging if mouse actually moves
+  // Handle drag move - use RAF for smooth updates
   useEffect(() => {
-    if (!mouseDownPosRef.current) return;
+    if (!isDraggingContainer) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!mouseDownPosRef.current) return;
-      
-      // Check if mouse has moved enough to consider it a drag (not just a click)
-      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
-      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-      
-      // Only start dragging if mouse moved more than 5 pixels
-      if ((dx > 5 || dy > 5) && !isDraggingContainer) {
-        setIsDraggingContainer(true);
-      }
+    let rafId: number | null = null;
+    let pendingEvent: MouseEvent | null = null;
 
-      // If dragging, update position
-      if (isDraggingContainer && containerRef.current && onPositionChange) {
+    const flush = () => {
+      if (!pendingEvent) return;
+      const e = pendingEvent;
+      pendingEvent = null;
+      
+      if (!containerRef.current || !onPositionChange) return;
+
       // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
@@ -1687,18 +1689,35 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       const newCanvasX = (newScreenX - position.x) / scale;
       const newCanvasY = (newScreenY - position.y) / scale;
 
+      // Update local position immediately for smooth visual feedback
+      setDragPosition({ x: newCanvasX, y: newCanvasY });
+      
       onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
+      rafId = null;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current || !onPositionChange) return;
+      
+      // Store the event and schedule RAF if not already scheduled
+      pendingEvent = e;
+      if (rafId == null) {
+        rafId = requestAnimationFrame(flush);
       }
     };
 
     const handleMouseUp = () => {
-      if (isDraggingContainer && onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
       setIsDraggingContainer(false);
-      // Don't clear mouseDownPosRef here - we need it for the click event
-      // It will be cleared in the click handler after we check it
+      // Don't clear dragPosition immediately - wait for props to update
+      // This prevents the flicker when dropping the frame
+      if (onPositionCommit && lastCanvasPosRef.current) {
+        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -1708,8 +1727,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
+      if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange]);
+  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
 
   if (!isOpen) return null;
 
@@ -1723,6 +1743,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={(e) => {
+        // Allow keyboard events to bubble up for shortcuts (like 'z' for zoom)
+        // Don't stop propagation or prevent default for keyboard events
+      }}
       style={{
         position: 'absolute',
         left: `${screenX}px`,

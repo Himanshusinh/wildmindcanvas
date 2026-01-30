@@ -124,6 +124,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   // Track initial mouse position to distinguish clicks from drags
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -237,8 +238,21 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   const isDark = useIsDarkTheme();
 
   // Convert canvas coordinates to screen coordinates
-  const screenX = x * scale + position.x;
-  const screenY = y * scale + position.y;
+  // Clear drag position when props have caught up
+  useEffect(() => {
+    if (!isDraggingContainer && dragPosition) {
+      // Check if props have updated to match drag position (within 1px tolerance)
+      if (Math.abs(x - dragPosition.x) < 1 && Math.abs(y - dragPosition.y) < 1) {
+        setDragPosition(null);
+      }
+    }
+  }, [x, y, isDraggingContainer, dragPosition]);
+
+  // Use drag position during drag for immediate visual feedback, otherwise use props
+  const effectiveX = dragPosition ? dragPosition.x : x;
+  const effectiveY = dragPosition ? dragPosition.y : y;
+  const screenX = effectiveX * scale + position.x;
+  const screenY = effectiveY * scale + position.y;
   const frameBorderColor = isSelected
     ? SELECTION_COLOR
     : (isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)');
@@ -466,48 +480,90 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   useEffect(() => { if (typeof initialDuration === 'number' && initialDuration !== selectedDuration) setSelectedDuration(initialDuration); }, [initialDuration]);
 
   // Load video and get its resolution (works for both generated and uploaded videos)
+  // Use refs to access current values without including them in dependencies
+  const selectedAspectRatioRef = useRef(selectedAspectRatio);
+  const selectedModelRef = useRef(selectedModel);
+  const selectedFrameRef = useRef(selectedFrame);
+  const promptRef = useRef(prompt);
+  const selectedDurationRef = useRef(selectedDuration);
+  const selectedResolutionRef = useRef(selectedResolution);
+  const lastProcessedUrlRef = useRef<string | null>(null);
+
+  // Update refs when values change (onOptionsChangeRef is already declared above)
   useEffect(() => {
-    if (proxiedVideoUrl) {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous'; // Allow CORS for external videos
-      video.preload = 'metadata'; // Only load metadata, not the full video
-      video.onloadedmetadata = () => {
-        if (video.videoWidth > 0 && video.videoHeight > 0) {
-          setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+    selectedAspectRatioRef.current = selectedAspectRatio;
+    selectedModelRef.current = selectedModel;
+    selectedFrameRef.current = selectedFrame;
+    promptRef.current = prompt;
+    selectedDurationRef.current = selectedDuration;
+    selectedResolutionRef.current = selectedResolution;
+    // onOptionsChangeRef is already updated in the useEffect above (line 202-204)
+  }, [selectedAspectRatio, selectedModel, selectedFrame, prompt, selectedDuration, selectedResolution]);
 
-          // For uploaded videos, automatically set aspect ratio from video dimensions
-          if (isUploadedVideo) {
-            const width = video.videoWidth;
-            const height = video.videoHeight;
-            const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
-            const divisor = gcd(width, height);
-            const aspectWidth = width / divisor;
-            const aspectHeight = height / divisor;
-            const calculatedAspectRatio = `${aspectWidth}:${aspectHeight}`;
+  useEffect(() => {
+    if (!proxiedVideoUrl) {
+      setVideoResolution(null);
+      lastProcessedUrlRef.current = null;
+      return;
+    }
 
-            // Update aspect ratio if it's different from current
-            if (calculatedAspectRatio !== selectedAspectRatio) {
-              setSelectedAspectRatio(calculatedAspectRatio);
-              onOptionsChange?.({
-                model: selectedModel,
-                aspectRatio: calculatedAspectRatio,
-                frame: selectedFrame,
-                prompt,
-                duration: selectedDuration,
-                resolution: selectedResolution
-              });
-            }
+    // Prevent re-processing the same URL
+    if (lastProcessedUrlRef.current === proxiedVideoUrl) {
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous'; // Allow CORS for external videos
+    video.preload = 'metadata'; // Only load metadata, not the full video
+    
+    let isCancelled = false;
+    
+    video.onloadedmetadata = () => {
+      if (isCancelled) return;
+      
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
+        lastProcessedUrlRef.current = proxiedVideoUrl;
+
+        // For uploaded videos, automatically set aspect ratio from video dimensions
+        if (isUploadedVideo) {
+          const width = video.videoWidth;
+          const height = video.videoHeight;
+          const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+          const divisor = gcd(width, height);
+          const aspectWidth = width / divisor;
+          const aspectHeight = height / divisor;
+          const calculatedAspectRatio = `${aspectWidth}:${aspectHeight}`;
+
+          // Update aspect ratio if it's different from current (using ref to avoid dependency)
+          if (calculatedAspectRatio !== selectedAspectRatioRef.current) {
+            setSelectedAspectRatio(calculatedAspectRatio);
+            onOptionsChangeRef.current?.({
+              model: selectedModelRef.current,
+              aspectRatio: calculatedAspectRatio,
+              frame: selectedFrameRef.current,
+              prompt: promptRef.current,
+              duration: selectedDurationRef.current,
+              resolution: selectedResolutionRef.current
+            });
           }
         }
-      };
-      video.onerror = () => {
-        setVideoResolution(null);
-      };
-      video.src = proxiedVideoUrl;
-    } else {
+      }
+    };
+    
+    video.onerror = () => {
+      if (isCancelled) return;
       setVideoResolution(null);
-    }
-  }, [proxiedVideoUrl, isUploadedVideo, selectedAspectRatio, selectedModel, selectedFrame, prompt, selectedDuration, selectedResolution, onOptionsChange]);
+      lastProcessedUrlRef.current = null;
+    };
+    
+    video.src = proxiedVideoUrl;
+
+    return () => {
+      isCancelled = true;
+      video.src = ''; // Cancel loading
+    };
+  }, [proxiedVideoUrl, isUploadedVideo]);
 
 
   // Listen for frame dim events (when dragging connection near disallowed frame)
@@ -654,67 +710,76 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     }
 
     if (!isInput && !isButton && !isControls) {
+      setIsDraggingContainer(true); // Set immediately like TextInput
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       }
-      e.preventDefault();
+      // Only prevent default for left mouse button (allow right-click context menu, etc.)
+      if (e.button === 0) {
+        e.preventDefault();
+      }
       e.stopPropagation();
-      // Don't set isDraggingContainer immediately - wait to see if mouse moves
     }
   };
 
-  // Handle drag move - only start dragging if mouse actually moves
+  // Handle drag move - use RAF for smooth updates
   useEffect(() => {
-    if (!mouseDownPosRef.current) return;
+    if (!isDraggingContainer) return;
+
     let rafId: number | null = null;
     let pendingEvent: MouseEvent | null = null;
+
     const flush = () => {
       if (!pendingEvent) return;
       const e = pendingEvent;
       pendingEvent = null;
+      
       if (!containerRef.current || !onPositionChange) return;
+
+      // Calculate new screen position
       const newScreenX = e.clientX - dragOffset.x;
       const newScreenY = e.clientY - dragOffset.y;
+
+      // Convert screen coordinates back to canvas coordinates
       const newCanvasX = (newScreenX - position.x) / scale;
       const newCanvasY = (newScreenY - position.y) / scale;
+
+      // Update local position immediately for smooth visual feedback
+      setDragPosition({ x: newCanvasX, y: newCanvasY });
+
       onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
       rafId = null;
     };
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!mouseDownPosRef.current) return;
-      
-      // Check if mouse has moved enough to consider it a drag (not just a click)
-      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
-      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-      
-      // Only start dragging if mouse moved more than 5 pixels
-      if ((dx > 5 || dy > 5) && !isDraggingContainer) {
-        setIsDraggingContainer(true);
-      }
 
-      // If dragging, update position
-      if (isDraggingContainer) {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current || !onPositionChange) return;
+      
+      // Store the event and schedule RAF if not already scheduled
       pendingEvent = e;
       if (rafId == null) {
         rafId = requestAnimationFrame(flush);
-        }
       }
     };
+
     const handleMouseUp = () => {
-      if (rafId != null) cancelAnimationFrame(rafId);
-      rafId = null;
-      if (isDraggingContainer && onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
       setIsDraggingContainer(false);
-      // Don't clear mouseDownPosRef here - we need it for the click event
-      // It will be cleared in the click handler after we check it
+      // Don't clear dragPosition immediately - wait for props to update
+      // This prevents the flicker when dropping the frame
+      if (onPositionCommit && lastCanvasPosRef.current) {
+        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      }
     };
+
     window.addEventListener('mousemove', handleMouseMove);
     // Capture so child stopPropagation (e.g. connection nodes) can't block drag end
     window.addEventListener('mouseup', handleMouseUp, true);
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
@@ -734,6 +799,10 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       onContextMenu={onContextMenu}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={(e) => {
+        // Allow keyboard events to bubble up for shortcuts (like 'z' for zoom)
+        // Don't stop propagation or prevent default for keyboard events
+      }}
       style={{
         position: 'absolute',
         left: `${screenX}px`,

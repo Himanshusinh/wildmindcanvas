@@ -51,16 +51,21 @@ export function ProjectSelector({ onProjectSelect, currentProjectId, startWithCr
   };
 
   const handeOpenCreateModal = useCallback(() => {
-    setNewProjectName(getUniqueProjectName(projects));
+    // Always generate a fresh unique name when opening the modal
+    const uniqueName = getUniqueProjectName(projects);
+    console.log('[ProjectSelector] Opening create modal with unique name:', uniqueName);
+    setNewProjectName(uniqueName);
     setShowCreateModal(true);
   }, [projects]);
+
 
   // Handle startWithCreate prop - open modal once projects are loaded
   useEffect(() => {
     if (startWithCreate && !loading && !hasOpenedCreate && projects) {
       setHasOpenedCreate(true);
-      // We need to pass the projects explicitly because state might not be updated in closure if we relied on 'projects' dependency only
-      setNewProjectName(getUniqueProjectName(projects));
+      // Always generate a fresh unique name when opening the modal
+      const uniqueName = getUniqueProjectName(projects);
+      setNewProjectName(uniqueName);
       setShowCreateModal(true);
     }
   }, [startWithCreate, loading, hasOpenedCreate, projects]);
@@ -126,13 +131,30 @@ export function ProjectSelector({ onProjectSelect, currentProjectId, startWithCr
         window.history.replaceState({}, '', newUrl.toString());
       }
 
-      console.log('[ProjectSelector] Creating new project:', newProjectName.trim());
-      const project = await createProject(newProjectName.trim());
+      // Capture the project name before creating to ensure we use the correct name
+      const projectNameToCreate = newProjectName.trim();
+      console.log('[ProjectSelector] Creating new project:', projectNameToCreate);
+      
+      const project = await createProject(projectNameToCreate);
       console.log('[ProjectSelector] New project created:', { id: project.id, name: project.name });
 
-      setProjects(prev => [project, ...prev]);
+      // Verify the project was created with the correct name
+      if (project.name !== projectNameToCreate) {
+        console.warn('[ProjectSelector] Project name mismatch:', {
+          requested: projectNameToCreate,
+          received: project.name
+        });
+      }
+
+      // Update projects list with the new project
+      setProjects(prev => {
+        const updated = [project, ...prev];
+        // Reset to a fresh unique name for next time using the updated list
+        setNewProjectName(getUniqueProjectName(updated));
+        return updated;
+      });
+      
       setShowCreateModal(false);
-      setNewProjectName('Untitled');
 
       // Select the newly created project immediately (no delay needed since we already cleared localStorage)
       console.log('[ProjectSelector] Selecting newly created project:', project.id);
@@ -233,7 +255,11 @@ export function ProjectSelector({ onProjectSelect, currentProjectId, startWithCr
 
             <div className="flex gap-3 pt-4">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  // Reset to a fresh unique name when closing
+                  setNewProjectName(getUniqueProjectName(projects));
+                }}
                 className="flex-1 px-4 py-3 rounded-xl font-semibold transition-all hover:bg-white/5 active:scale-95 flex items-center justify-center gap-2 border border-transparent hover:border-white/10"
                 style={{ color: subTextColor }}
                 disabled={isCreating}

@@ -232,15 +232,47 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  // --- VIEWPORT-BASED VIRTUALIZATION & LOD ---
+  // Compute world-space viewport bounds (same math as CanvasStage)
+  const viewX = (-position.x) / scale;
+  const viewY = (-position.y) / scale;
+  const viewW = viewportSize.width / scale;
+  const viewH = viewportSize.height / scale;
+
+  const VIRTUALIZATION_PADDING = 1200; // world units of padding around viewport
+
+  const viewportBounds = {
+    minX: viewX - VIRTUALIZATION_PADDING,
+    minY: viewY - VIRTUALIZATION_PADDING,
+    maxX: viewX + viewW + VIRTUALIZATION_PADDING,
+    maxY: viewY + viewH + VIRTUALIZATION_PADDING,
+  };
+
+  const isRectInViewport = (
+    x: number,
+    y: number,
+    w: number = 600,
+    h: number = 400,
+  ) => {
+    const { minX, minY, maxX, maxY } = viewportBounds;
+    const rX2 = x + w;
+    const rY2 = y + h;
+    return !(rX2 < minX || x > maxX || rY2 < minY || y > maxY);
+  };
+
+  // Level-of-detail flags based on zoom level
+  const showFineDetails = scale >= 0.8;
+  const showLabelsOnly = scale >= 0.4 && scale < 0.8;
+  const isZoomedOut = scale < 0.4;
+
   // --- HOOKS ---
   const canvasSelection = useCanvasSelection(props, canvasItemsData as any);
 
   const groupLogic = useGroupLogic(canvasState, canvasSelection, props);
 
   const updateViewportCenter = useCallback((pos: { x: number; y: number }, s: number) => {
-    setScale(s);
-    setPosition(pos);
-    // Convert stage position to world center coordinates
+    // Don't set state here - it's already set by the wheel handler
+    // Just call the callback to notify parent components
     const worldCenter = {
       x: (viewportSize.width / 2 - pos.x) / s,
       y: (viewportSize.height / 2 - pos.y) / s
@@ -266,6 +298,61 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       navigationMode: 'trackpad'
     }
   );
+
+  // Track component dragging state
+  const [isComponentDragging, setIsComponentDragging] = React.useState(false);
+  
+  // Combined interaction state: panning OR component dragging
+  const isInteracting = events.isPanning || isComponentDragging;
+
+  // Detect component dragging via global mouse events
+  React.useEffect(() => {
+    if (!setIsComponentDragging) return;
+    
+    let isDragging = false;
+    let dragStartTime = 0;
+    
+    const handleMouseDown = (e: MouseEvent) => {
+      // Check if clicking on a modal component
+      const target = e.target as HTMLElement;
+      const modalElement = target.closest('[data-overlay-id], [data-frame-id]');
+      if (modalElement && !target.closest('input, textarea, button, [role="button"]')) {
+        isDragging = true;
+        dragStartTime = Date.now();
+        setIsComponentDragging(true);
+      }
+    };
+    
+    const handleMouseMove = () => {
+      if (isDragging && Date.now() - dragStartTime > 50) {
+        // Only set dragging if mouse moved after initial click (prevents false positives)
+        setIsComponentDragging(true);
+      }
+    };
+    
+    const endDrag = () => {
+      if (isDragging) {
+        isDragging = false;
+        // Small delay to ensure smooth transition
+        setTimeout(() => setIsComponentDragging(false), 50);
+      }
+    };
+    
+    window.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', endDrag, true);
+    // Safety: if pointer is cancelled or window loses focus, ensure we end drag
+    window.addEventListener('pointercancel', endDrag as any, true);
+    window.addEventListener('blur', endDrag as any);
+    
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', endDrag as any, true);
+      window.removeEventListener('pointercancel', endDrag as any, true);
+      window.removeEventListener('blur', endDrag as any);
+    };
+  }, [setIsComponentDragging]);
 
   // --- EFFECTIVE DATA (Group Displacements) ---
   const effectiveImages = groupLogic.getEffectiveStates(images, 'image');
@@ -832,6 +919,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         onFitView={handleFitView}
         setGenerationQueue={setGenerationQueue}
         isChatOpen={isChatOpen}
+        isInteracting={isInteracting}
+        setIsComponentDragging={setIsComponentDragging}
       />
 
       {!isUIHidden && (

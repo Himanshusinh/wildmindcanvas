@@ -352,6 +352,14 @@ export interface ModalOverlaysProps {
   onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
   onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
 
+  // Viewport / LOD flags (optional)
+  viewportSize?: { width: number; height: number };
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
+  isInteracting?: boolean;
+  setIsComponentDragging?: React.Dispatch<React.SetStateAction<boolean>>;
+
   // Multiangle Camera Plugin
   multiangleCameraModalStates?: MultiangleCameraModalState[];
   selectedMultiangleCameraModalId?: string | null;

@@ -18,35 +18,16 @@ export const CanvasImageConnectionNodes: React.FC<CanvasImageConnectionNodesProp
   scale,
   selectedImageIndices,
 }) => {
-  const [stageState, setStageState] = useState({
-    x: 0,
-    y: 0,
-    scale: 1,
-  });
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [hoveredIndices, setHoveredIndices] = useState<Set<number>>(new Set());
 
-  // Update stage state when stage moves or zooms
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const updateState = () => {
-      setStageState({
-        x: stage.x(),
-        y: stage.y(),
-        scale: stage.scaleX(),
-      });
-    };
-
-    // Initial state
-    updateState();
-
-    // Listen for stage changes
-    const interval = setInterval(updateState, 16); // ~60fps
-
-    return () => clearInterval(interval);
-  }, [stageRef]);
+  // Use position and scale props directly instead of polling stage
+  // This prevents infinite loops and is more efficient
+  const stageState = {
+    x: position.x,
+    y: position.y,
+    scale: scale,
+  };
 
   // Listen for global node-drag active state
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { IntentAction } from './intentSchemas';
-import { queryCanvasPrompt } from '@/core/api/api';
+import { queryCanvasPrompt, queryGeneralChat } from '@/core/api/api';
 import { detectIntent } from './agent/intentAgent';
 import { AgentSessionState, AgentTask, RequirementQuestion, VideoMode } from './agent/types';
 import { buildRequirementQuestions, applyRequirementAnswer } from './agent/requirements';
@@ -492,7 +492,7 @@ export const useChatEngine = (context: CanvasContext) => {
         }]);
     }, []);
 
-    const sendMessage = useCallback(async (text: string) => {
+    const sendMessage = useCallback(async (text: string, mode: 'agent' | 'general' = 'agent') => {
         if (!text.trim()) return;
 
         const userMsg: ChatMessage = {
@@ -509,6 +509,37 @@ export const useChatEngine = (context: CanvasContext) => {
             const selectedImageIds = getSelectedImageIds(context);
             const session = sessionRef.current;
             session.lastUserMessage = text;
+
+            // If mode is 'general', skip intent detection and go straight to general question handler
+            // Use pure conversational chat without any canvas/website context
+            if (mode === 'general') {
+                try {
+                    // Build conversation history from recent messages for context
+                    const recentMessages = messages.slice(-10).map(msg => ({
+                        role: msg.role,
+                        content: msg.content,
+                    })) as Array<{ role: 'user' | 'assistant'; content: string }>;
+                    
+                    const answer = await queryGeneralChat(text, recentMessages);
+                    
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: answer,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                } catch (error: any) {
+                    console.error('[ChatEngine] Error handling general question:', error);
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: error.message || "I apologize, but I encountered an error. Please try again.",
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+            }
 
             // Phase: confirm a proposed plan edit (voice-friendly)
             if (session.phase === 'EDIT_CONFIRMATION' && session.pendingPlanEdits && session.graphPlan) {
@@ -1453,6 +1484,32 @@ export const useChatEngine = (context: CanvasContext) => {
                 needsScript: intent.needsScript,
                 referenceImageIds: selectedImageIds,
             };
+
+            // Handle general questions (unknown or explain tasks) - provide conversational response
+            if (intent.task === 'unknown' || intent.task === 'explain') {
+                try {
+                    const response = await queryCanvasPrompt(text, 500);
+                    const answer = response.response || response.enhanced_prompt || intent.explanation || "I'm here to help! You can ask me to generate images, create videos, or ask general questions. What would you like to do?";
+                    
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: answer,
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                } catch (error: any) {
+                    console.error('[ChatEngine] Error handling general question:', error);
+                    // Fallback to explanation from intent
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: intent.explanation || "I'm here to help! You can ask me to generate images, create videos, or ask general questions. What would you like to do?",
+                        timestamp: Date.now(),
+                    }]);
+                    return;
+                }
+            }
 
             // Plugin Action: create plugin node plan
             if (intent.task === 'plugin_action') {
