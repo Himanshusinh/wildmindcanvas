@@ -266,7 +266,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSelectionTransformerRect,
 }) => {
   // Calculate UI scale based on canvas scale (inverse scaling)
-  const MAX_UI_SCALE = 3;
+  const MAX_UI_SCALE = 1.5; // Reduced from 3 to prevent huge UI elements
   const inverseScale = 1 / Math.max(scale, 0.001);
   const uiScale = Math.min(inverseScale, MAX_UI_SCALE);
   // Remove htmlScale calculation, use uiScale directly for CSS transform to counteract zoom
@@ -2327,40 +2327,41 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       position: absolute;
                       display: flex;
                       align-items: center;
-                      gap: 6px;
+                      gap: 4px;
                       background: rgba(26, 26, 26, 0.95);
                       backdrop-filter: blur(10px);
                       -webkit-backdrop-filter: blur(10px);
                       border: 1px solid rgba(255, 255, 255, 0.1);
-                      border-radius: 10px;
-                      padding: 8px 12px;
+                      border-radius: 8px;
+                      padding: 6px 8px;
                       z-index: 1000;
                       box-shadow: 
                           0 4px 6px -1px rgba(0, 0, 0, 0.1),
                           0 2px 4px -1px rgba(0, 0, 0, 0.06);
-                      transform: translate(-50%, -100%) scale(${uiScale});
+                      transform: translate(-50%, -100%) scale(${Math.min(uiScale, 1.2)});
                       transform-origin: bottom center;
                       left: ${selectionTightRect.width / 2}px;
-                      top: -45px;
-                      min-width: max-content;
+                      top: -40px;
+                      max-width: ${Math.min(selectionTightRect.width * 0.9, 300)}px;
                       animation: fadeIn 0.15s ease-out;
                   }
                   @keyframes fadeIn {
-                      from { opacity: 0; transform: translate(-50%, -90%) scale(${uiScale}); }
-                      to { opacity: 1; transform: translate(-50%, -100%) scale(${uiScale}); }
+                      from { opacity: 0; transform: translate(-50%, -90%) scale(${Math.min(uiScale, 1.2)}); }
+                      to { opacity: 1; transform: translate(-50%, -100%) scale(${Math.min(uiScale, 1.2)}); }
                   }
                   .toolbar-btn {
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      width: 36px;
-                      height: 36px;
-                      border-radius: 8px;
+                      width: 28px;
+                      height: 28px;
+                      border-radius: 6px;
                       border: 1px solid transparent;
                       background: transparent;
                       color: #a1a1aa;
                       cursor: pointer;
                       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                      font-size: 12px;
                   }
                   .toolbar-btn:hover {
                       background: rgba(255, 255, 255, 0.1);
@@ -2369,9 +2370,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   }
                   .toolbar-divider {
                       width: 1px;
-                      height: 20px;
+                      height: 16px;
                       background: rgba(255, 255, 255, 0.15);
-                      margin: 0 4px;
+                      margin: 0 2px;
                   }
                   `}
                 </style>
@@ -2384,7 +2385,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       onClick={() => onCreateGroup?.()}
                       title="Group Selection"
                     >
-                      <GroupIcon size={20} />
+                      <GroupIcon size={16} />
                     </button>
                   )}
 
@@ -2402,7 +2403,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       }}
                       title="Arrange Grid"
                     >
-                      <LayoutGrid size={20} />
+                      <LayoutGrid size={16} />
                     </button>
                   )}
                 </div>
@@ -2432,8 +2433,8 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                     (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.textAlign) || 'left'}
                   onChange={handleMultiTextChange}
                   position={{
-                    x: selectionTightRect.width / 2,
-                    y: -60 // Slightly higher to clear handles
+                    x: Math.min(selectionTightRect.width / 2, selectionTightRect.width - 150),
+                    y: Math.max(-60, -selectionTightRect.height - 10) // Ensure it doesn't go too far up
                   }}
                 />
               </div>

@@ -877,7 +877,8 @@ export function useCanvasEvents(
                     const modal = nextSceneModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('nextSceneModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -886,7 +887,8 @@ export function useCanvasEvents(
                     const modal = multiangleCameraModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('multiangleCameraModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -895,7 +897,8 @@ export function useCanvasEvents(
                     const modal = videoEditorModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('videoEditorModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -904,7 +907,8 @@ export function useCanvasEvents(
                     const modal = imageEditorModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('imageEditorModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -913,7 +917,8 @@ export function useCanvasEvents(
                     const modal = vectorizeModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('vectorizeModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -922,7 +927,8 @@ export function useCanvasEvents(
                     const modal = removeBgModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('removeBgModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -931,7 +937,8 @@ export function useCanvasEvents(
                     const modal = upscaleModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('upscaleModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -940,7 +947,8 @@ export function useCanvasEvents(
                     const modal = eraseModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('eraseModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -949,7 +957,8 @@ export function useCanvasEvents(
                     const modal = expandModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('expandModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
@@ -958,7 +967,8 @@ export function useCanvasEvents(
                     const modal = compareModalStates.find((m: any) => m.id === id);
                     if (modal) {
                         const dims = getComponentDimensions('compareModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
+                        // Only apply offset if modal is expanded (width > 100)
+                        const offsetX = dims.width > 100 ? (dims.width - 100) / 2 : 0;
                         updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });

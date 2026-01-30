@@ -60,7 +60,9 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                 top: position.y - 12,
                 transform: 'translate(-50%, -100%)',
                 minWidth: 'max-content',
-                pointerEvents: 'auto'
+                maxWidth: '90vw',
+                pointerEvents: 'auto',
+                fontSize: '12px'
             }}
             onMouseDown={preventBlur}
         >
@@ -71,10 +73,10 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-white transition-all duration-200 cursor-pointer"
                 >
-                    <span className="text-[13px] font-medium w-24 text-left truncate" style={{ fontFamily }}>
+                    <span className="text-[11px] font-medium w-20 text-left truncate" style={{ fontFamily }}>
                         {FONT_FAMILIES.find(f => f.value === fontFamily)?.label || fontFamily}
                     </span>
-                    <Type size={14} className="opacity-50 pointer-events-none" />
+                    <Type size={12} className="opacity-50 pointer-events-none" />
                 </button>
                 {isFontDropdownOpen && (
                     <div
@@ -89,7 +91,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                                     onChange({ fontFamily: font.value });
                                     setIsFontDropdownOpen(false);
                                 }}
-                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${fontFamily === font.value ? 'text-blue-400 bg-blue-400/10' : 'text-zinc-300'}`}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors ${fontFamily === font.value ? 'text-blue-400 bg-blue-400/10' : 'text-zinc-300'}`}
                                 style={{ fontFamily: font.value }}
                             >
                                 {font.label}
@@ -112,7 +114,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                 >
                     <span className="text-lg leading-none pointer-events-none">-</span>
                 </button>
-                <div className="w-10 text-center text-[13px] font-medium text-white">
+                <div className="w-8 text-center text-[11px] font-medium text-white">
                     {fontSize}
                 </div>
                 <button
@@ -138,7 +140,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${fontWeight === 'bold' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Bold"
                 >
-                    <Bold size={16} className="pointer-events-none" />
+                    <Bold size={14} className="pointer-events-none" />
                 </button>
                 <button
                     onMouseDown={preventBlur}
@@ -148,7 +150,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${fontStyle === 'italic' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Italic"
                 >
-                    <Italic size={16} className="pointer-events-none" />
+                    <Italic size={14} className="pointer-events-none" />
                 </button>
                 <button
                     onMouseDown={preventBlur}
@@ -158,7 +160,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${textDecoration === 'underline' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Underline"
                 >
-                    <Underline size={16} className="pointer-events-none" />
+                    <Underline size={14} className="pointer-events-none" />
                 </button>
             </div>
 
@@ -178,7 +180,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                         className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${align === value ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                         title={`Align ${label}`}
                     >
-                        <Icon size={16} className="pointer-events-none" />
+                        <Icon size={14} className="pointer-events-none" />
                     </button>
                 ))}
             </div>
@@ -193,7 +195,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex flex-col items-center gap-0.5 cursor-pointer"
                     title="Text Color"
                 >
-                    <Palette size={16} className="pointer-events-none" />
+                    <Palette size={14} className="pointer-events-none" />
                     <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: fill === 'transparent' ? '#fff' : fill }}></div>
                 </button>
                 {isColorPickerOpen && (
@@ -227,7 +229,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex flex-col items-center gap-0.5"
                     title="Background Color"
                 >
-                    <Baseline size={16} className="pointer-events-none" />
+                    <Baseline size={14} className="pointer-events-none" />
                     <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: backgroundColor || 'transparent', border: backgroundColor === 'transparent' ? '1px solid rgba(255,255,255,0.2)' : 'none' }}></div>
                 </button>
                 {isBgPickerOpen && (
