@@ -38,6 +38,77 @@ function parseImageCountFromText(text: string): number | null {
     return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Parse image reference from user message (e.g., "2nd image", "image 2", "second image")
+ * Returns the 1-based index of the referenced image, or null if no reference found
+ */
+function parseImageReference(text: string): number | null {
+    const lowerText = text.toLowerCase();
+    
+    // Pattern 1: "2nd image", "3rd image", "1st image", etc.
+    const ordinalMatch = lowerText.match(/\b(\d+)(?:st|nd|rd|th)\s+(?:image|pic|picture)\b/);
+    if (ordinalMatch?.[1]) {
+        const idx = Number(ordinalMatch[1]);
+        if (Number.isFinite(idx) && idx > 0) return idx;
+    }
+    
+    // Pattern 2: "image 2", "pic 3", "picture 1", etc.
+    const numberAfterMatch = lowerText.match(/\b(?:image|pic|picture)\s+(\d+)\b/);
+    if (numberAfterMatch?.[1]) {
+        const idx = Number(numberAfterMatch[1]);
+        if (Number.isFinite(idx) && idx > 0) return idx;
+    }
+    
+    // Pattern 3: "second image", "third image", "first image", etc.
+    const wordToNumber: Record<string, number> = {
+        'first': 1, 'second': 2, 'third': 3, 'fourth': 4, 'fifth': 5,
+        'sixth': 6, 'seventh': 7, 'eighth': 8, 'ninth': 9, 'tenth': 10,
+        'eleventh': 11, 'twelfth': 12, 'thirteenth': 13, 'fourteenth': 14, 'fifteenth': 15, 'sixteenth': 16
+    };
+    
+    for (const [word, num] of Object.entries(wordToNumber)) {
+        if (lowerText.includes(`${word} image`) || lowerText.includes(`${word} pic`) || lowerText.includes(`${word} picture`)) {
+            return num;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Extract image reference and remaining text from user message
+ * Returns { imageIndex: 1-based index or null, remainingText: text without image reference }
+ */
+function extractImageReference(text: string): { imageIndex: number | null; remainingText: string } {
+    const imageIndex = parseImageReference(text);
+    if (!imageIndex) {
+        return { imageIndex: null, remainingText: text };
+    }
+    
+    // Remove the image reference from the text
+    let remainingText = text;
+    const lowerText = text.toLowerCase();
+    
+    // Remove ordinal patterns
+    remainingText = remainingText.replace(/\b\d+(?:st|nd|rd|th)\s+(?:image|pic|picture)\b/gi, '').trim();
+    // Remove "image X" patterns
+    remainingText = remainingText.replace(/\b(?:image|pic|picture)\s+\d+\b/gi, '').trim();
+    // Remove word-based patterns
+    const wordToNumber: Record<string, number> = {
+        'first': 1, 'second': 2, 'third': 3, 'fourth': 4, 'fifth': 5,
+        'sixth': 6, 'seventh': 7, 'eighth': 8, 'ninth': 9, 'tenth': 10,
+        'eleventh': 11, 'twelfth': 12, 'thirteenth': 13, 'fourteenth': 14, 'fifteenth': 15, 'sixteenth': 16
+    };
+    for (const [word] of Object.entries(wordToNumber)) {
+        remainingText = remainingText.replace(new RegExp(`\\b${word}\\s+(?:image|pic|picture)\\b`, 'gi'), '').trim();
+    }
+    
+    // Clean up extra spaces
+    remainingText = remainingText.replace(/\s+/g, ' ').trim();
+    
+    return { imageIndex, remainingText };
+}
+
 function parseVideoDurationSecondsFromText(text: string): number | null {
     const t = text.toLowerCase();
     const sec = t.match(/(\d+)\s*(seconds?|sec|s)\b/);
@@ -302,7 +373,7 @@ const getSelectedImageIds = (context: CanvasContext): string[] => {
     return Array.from(new Set(selected));
 };
 
-const buildCanvasContextString = (context: CanvasContext): string => {
+const buildCanvasContextString = (context: CanvasContext, selectedImageIds?: string[]): string => {
     const { canvasState, canvasSelection } = context;
     const summaries: string[] = [];
 
@@ -316,6 +387,20 @@ const buildCanvasContextString = (context: CanvasContext): string => {
     const selectedIds = canvasSelection?.selectedIds || [];
     if (selectedIds.length) {
         summaries.push(`Currently Selected Item IDs: ${selectedIds.join(', ')}`);
+    }
+    
+    // Add image numbering information for agent mode
+    if (selectedImageIds && selectedImageIds.length > 0) {
+        const imageNumbering: string[] = [];
+        selectedImageIds.forEach((id, index) => {
+            const imageNumber = index + 1;
+            const imageInfo = `Image ${imageNumber} (ID: ${id})`;
+            imageNumbering.push(imageInfo);
+        });
+        if (imageNumbering.length > 0) {
+            summaries.push(`Selected Images (numbered): ${imageNumbering.join(', ')}`);
+            summaries.push(`Note: Users can reference images by number (e.g., "apply this to 2nd image", "modify image 3", "use the first image").`);
+        }
     }
 
     return summaries.join('\n');
@@ -495,10 +580,14 @@ export const useChatEngine = (context: CanvasContext) => {
     const sendMessage = useCallback(async (text: string, mode: 'agent' | 'general' = 'agent') => {
         if (!text.trim()) return;
 
+        // Parse image reference from user message (e.g., "apply this to 2nd image")
+        const { imageIndex, remainingText } = extractImageReference(text);
+        const processedText = remainingText || text; // Use remaining text if reference was found
+        
         const userMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
-            content: text,
+            content: text, // Keep original text for display
             timestamp: Date.now()
         };
 
@@ -508,7 +597,44 @@ export const useChatEngine = (context: CanvasContext) => {
         try {
             const selectedImageIds = getSelectedImageIds(context);
             const session = sessionRef.current;
-            session.lastUserMessage = text;
+            session.lastUserMessage = processedText; // Use processed text for agent processing
+            
+            // If user referenced a specific image, map it to the actual image ID
+            let targetImageId: string | null = null;
+            if (imageIndex !== null && selectedImageIds.length > 0) {
+                // imageIndex is 1-based, convert to 0-based array index
+                const arrayIndex = imageIndex - 1;
+                if (arrayIndex >= 0 && arrayIndex < selectedImageIds.length) {
+                    targetImageId = selectedImageIds[arrayIndex];
+                    // Store the target image ID in session for use in execution
+                    (session as any).targetImageId = targetImageId;
+                    (session as any).targetImageIndex = imageIndex;
+                } else {
+                    // Invalid image index - notify user
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: `I found a reference to image ${imageIndex}, but you only have ${selectedImageIds.length} image(s) selected. Please select the correct number of images.`,
+                        timestamp: Date.now(),
+                    }]);
+                    setIsProcessing(false);
+                    return;
+                }
+            } else if (imageIndex !== null && selectedImageIds.length === 0) {
+                // User referenced an image but none are selected
+                setMessages(prev => [...prev, {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: `You referenced image ${imageIndex}, but no images are currently selected. Please select the image(s) you want to work with.`,
+                    timestamp: Date.now(),
+                }]);
+                setIsProcessing(false);
+                return;
+            } else {
+                // Clear any previous target image
+                (session as any).targetImageId = null;
+                (session as any).targetImageIndex = null;
+            }
 
             // If mode is 'general', skip intent detection and go straight to general question handler
             // Use pure conversational chat without any canvas/website context
@@ -1467,8 +1593,22 @@ export const useChatEngine = (context: CanvasContext) => {
                 }
 
             // Phase 1: intent detection
-            const intent = await detectIntent(text, { selectedImageCount: selectedImageIds.length });
+            // Use processedText (with image reference removed) for intent detection
+            // Pass selectedImageIds for image numbering context
+            const intent = await detectIntent(processedText, { 
+                selectedImageCount: selectedImageIds.length,
+                selectedImageIds: selectedImageIds 
+            });
             session.intent = intent;
+            
+            // If user referenced a specific image, use only that image
+            let referenceImageIds = selectedImageIds;
+            if (targetImageId) {
+                referenceImageIds = [targetImageId];
+                // Add context about which image was referenced
+                (session as any).referencedImageIndex = imageIndex;
+            }
+            
             session.requirements = {
                 task: intent.task,
                 goal: intent.goal,
@@ -1482,7 +1622,7 @@ export const useChatEngine = (context: CanvasContext) => {
                 resolution: intent.resolution ?? null,
                 model: intent.model ?? null,
                 needsScript: intent.needsScript,
-                referenceImageIds: selectedImageIds,
+                referenceImageIds: referenceImageIds, // Use specific image if referenced
             };
 
             // Handle general questions (unknown or explain tasks) - provide conversational response
@@ -1654,8 +1794,11 @@ export const useChatEngine = (context: CanvasContext) => {
                 let refWidth: number | null = null;
                 let refHeight: number | null = null;
                 
-                if (isImg2Img && selectedImageIds.length > 0) {
-                    const srcId = selectedImageIds[0];
+                // Use targetImageId if user referenced a specific image, otherwise use first selected
+                const imageIdsToUse = targetImageId ? [targetImageId] : selectedImageIds;
+                
+                if (isImg2Img && imageIdsToUse.length > 0) {
+                    const srcId = imageIdsToUse[0];
                     const srcModal = context.canvasState?.imageModalStates?.find((m: any) => m.id === srcId);
                     const srcUpload = context.canvasState?.images?.find((img: any) => img.elementId === srcId || img.id === srcId);
                     inferredAspect = srcModal?.aspectRatio || null;
@@ -1724,8 +1867,9 @@ export const useChatEngine = (context: CanvasContext) => {
                 }
                 
                 // Use structured prompt builder for img2img, regular prompt for t2i
+                // Use processedText (with image reference removed) for prompt building
                 const basePrompt = isImg2Img
-                    ? buildImg2ImgPrompt(text.trim(), style)
+                    ? buildImg2ImgPrompt(processedText.trim(), style)
                     : `${topic} in ${style} style`;
                 
                 // Generate batch variations if count > 1
@@ -1800,8 +1944,12 @@ export const useChatEngine = (context: CanvasContext) => {
                 if (isImg2Img) {
                     displayParts.push(`- **Structured Prompt**:`);
                     displayParts.push(`  • Preserve original composition and structure`);
-                    displayParts.push(`  • Apply: ${text.trim()}`);
+                    displayParts.push(`  • Apply: ${processedText.trim()}`);
                     displayParts.push(`  • Maintain consistent lighting and ${style} style`);
+                    // Show which image is being used if a specific one was referenced
+                    if (targetImageId && imageIndex !== null) {
+                        displayParts.push(`  • Using: Image ${imageIndex} (from your selection)`);
+                    }
                 } else {
                     displayParts.push(`- **Prompt**: ${basePrompt}`);
                 }

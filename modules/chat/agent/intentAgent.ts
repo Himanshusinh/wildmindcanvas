@@ -34,8 +34,15 @@ Rules:
 - For general questions, provide a helpful explanation in the "explanation" field.
 `;
 
-export async function detectIntent(userMessage: string, ctx: { selectedImageCount: number }): Promise<IntentResult> {
-  const payload = `${INTENT_PROMPT}\n\nContext:\n- selectedImageCount=${ctx.selectedImageCount}\n\nUser:\n${userMessage}`;
+export async function detectIntent(userMessage: string, ctx: { selectedImageCount: number; selectedImageIds?: string[] }): Promise<IntentResult> {
+  // Build context with image numbering information
+  const contextParts = [`selectedImageCount=${ctx.selectedImageCount}`];
+  if (ctx.selectedImageIds && ctx.selectedImageIds.length > 0) {
+    const imageNumbering = ctx.selectedImageIds.map((id, index) => `Image ${index + 1}: ${id}`).join(', ');
+    contextParts.push(`selectedImageIds (numbered): ${imageNumbering}`);
+    contextParts.push(`Note: User can reference images by number (e.g., "2nd image", "image 2", "second image").`);
+  }
+  const payload = `${INTENT_PROMPT}\n\nContext:\n- ${contextParts.join('\n- ')}\n\nUser:\n${userMessage}`;
   const raw = await queryCanvasPrompt(payload);
   const text = typeof raw === 'string' ? raw : (raw.response || '');
   const parsed = extractFirstJsonObject<any>(text);
