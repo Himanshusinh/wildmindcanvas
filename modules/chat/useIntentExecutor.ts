@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { IntentAction } from './intentSchemas';
 import { CanvasInstructionPlan } from './compiler/types';
+import { getStorageInfo, getCurrentUser } from '@/core/api/api';
 
 interface IntentExecutorProps {
     canvasState: any;
@@ -11,6 +12,7 @@ interface IntentExecutorProps {
     viewportSize: { width: number; height: number };
     position: { x: number; y: number };
     scale: number;
+    onShowStorageWarning?: () => void;
 }
 
 export function useIntentExecutor({
@@ -20,6 +22,7 @@ export function useIntentExecutor({
     viewportSize,
     position,
     scale,
+    onShowStorageWarning,
 }: IntentExecutorProps) {
 
     const getViewportCenter = useCallback(() => {
@@ -31,6 +34,26 @@ export function useIntentExecutor({
 
     const executeIntent = useCallback(async (action: IntentAction) => {
         console.log('[IntentExecutor] Executing action:', action);
+
+        // Storage Validation
+        if (action.intent === 'EXECUTE_PLAN' && onShowStorageWarning) {
+             try {
+                const user = await getCurrentUser();
+                if (user?.uid) {
+                    const storageInfo = await getStorageInfo(user.uid);
+                    const quota = BigInt(storageInfo.quotaBytes);
+                    const used = BigInt(storageInfo.usedBytes);
+                    
+                    if (quota > 0 && used >= quota) {
+                        console.warn('[IntentExecutor] Storage limit reached. Blocking execution.');
+                        onShowStorageWarning();
+                        return;
+                    }
+                }
+             } catch (error) {
+                 console.error('[IntentExecutor] Storage check failed:', error);
+             }
+        }
 
         const center = getViewportCenter();
         const resolveCanvasImageNodeId = (rawId: string): string => {

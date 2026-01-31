@@ -29,6 +29,7 @@ interface ChatPanelProps {
     scale: number;
     isOpen: boolean;
     setIsOpen: (isOpen: boolean) => void;
+    onShowStorageWarning?: () => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -40,13 +41,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     scale,
     isOpen,
     setIsOpen,
+    onShowStorageWarning,
 }) => {
     const [inputValue, setInputValue] = useState('');
     const [isInputFocused, setIsInputFocused] = useState(false);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
     const chatEngine = useChatEngine({ canvasState, canvasSelection });
-  const executor = useIntentExecutor({ canvasState, canvasSelection, props, viewportSize, position, scale });
+  const executor = useIntentExecutor({ canvasState, canvasSelection, props, viewportSize, position, scale, onShowStorageWarning });
 
   const { isListening, toggleListening, isSupported } = useSpeechToText({
     onTranscriptChange: (text) => setInputValue(text),

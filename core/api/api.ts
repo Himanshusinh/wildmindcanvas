@@ -2676,3 +2676,45 @@ export async function qwenMultipleAnglesForCanvas(
     throw new Error('Failed to generate multiple angles. Please check your connection and try again.');
   }
 }
+
+export interface StorageInfo {
+  quotaBytes: string;
+  usedBytes: string;
+  availableBytes: string;
+  usagePercent: number;
+  fileCount: number;
+  files: Array<{
+    id: string;
+    storageKey: string;
+    sizeBytes: string;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+}
+
+/**
+ * Get storage information for user
+ */
+export async function getStorageInfo(userId: string): Promise<StorageInfo> {
+  const bearerToken = await getBearerTokenForCanvas();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (bearerToken) {
+    headers['Authorization'] = `Bearer ${bearerToken}`;
+  }
+
+  const response = await fetch(`${API_GATEWAY_URL}/storage/me/${userId}`, {
+    method: 'GET',
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch storage info');
+  }
+
+  const result = await response.json();
+  return result.data;
+}

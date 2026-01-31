@@ -91,6 +91,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     redo = () => { },
     canUndo = false,
     canRedo = false,
+    onShowStorageWarning,
   } = props;
 
   // Refs
@@ -850,6 +851,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
             scale={scale}
             isOpen={isChatOpen}
             setIsOpen={setIsChatOpen}
+            onShowStorageWarning={onShowStorageWarning}
           />
         </>
       )}

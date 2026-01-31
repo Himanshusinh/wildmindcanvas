@@ -27,6 +27,7 @@ export interface CanvasProps {
     canRedo?: boolean;
     selectedTool?: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text';
     onToolSelect?: (tool: 'cursor' | 'move' | 'text' | 'image' | 'video' | 'music' | 'library' | 'plugin' | 'canvas-text' | 'rich-text') => void;
+    onShowStorageWarning?: () => void;
     onTextCreate?: (text: string, x: number, y: number) => void;
     toolClickCounter?: number;
     isImageModalOpen?: boolean;

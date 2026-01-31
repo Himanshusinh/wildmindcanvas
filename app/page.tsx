@@ -11,7 +11,7 @@ import { Profile } from '@/modules/ui-global/Profile/Profile';
 import LibrarySidebar from '@/modules/canvas/LibrarySidebar';
 import PluginSidebar from '@/modules/canvas/PluginSidebar';
 import { ImageUpload } from '@/core/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/core/api/api';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem, getStorageInfo, StorageInfo } from '@/core/api/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/core/api/canvasApi';
 import { ProjectSelector } from '@/modules/ui-global/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/core/api/canvasApi';
@@ -26,6 +26,7 @@ import { createPluginHandlers } from '@/modules/handlers/pluginHandlers';
 import { CanvasAppState, CanvasAppSetters, ScriptFrameGenerator, SceneFrameGenerator, NextSceneGenerator } from '@/modules/canvas-app/types';
 import { CanvasTextState, ImageModalState, VideoModalState, MusicModalState, TextModalState } from '@/modules/canvas-overlays/types';
 import { MobileRestrictionScreen } from '@/modules/ui-global/MobileRestrictionScreen';
+import { StorageUpgradeModal } from '@/modules/ui-global/StorageUpgradeModal';
 import { useCanvasStore } from '@/modules/canvas-core/useCanvasStore';
 import { SetNodesCommand } from '@/modules/canvas-core/commands';
 import { convertLegacySnapshot } from '@/modules/canvas-core/utils';
@@ -78,6 +79,21 @@ export function CanvasApp({ user }: CanvasAppProps) {
     setShowProjectSelector,
     startWithCreate,
   } = useProject({ currentUser });
+
+  // Storage Warning State
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+  const [storageStats, setStorageStats] = useState<StorageInfo | null>(null);
+
+  const handleShowStorageWarning = useCallback(async () => {
+    if (!currentUser?.uid) return;
+    try {
+      const info = await getStorageInfo(currentUser.uid);
+      setStorageStats(info);
+      setIsStorageModalOpen(true);
+    } catch (error) {
+       console.error('Failed to load storage info', error);
+    }
+  }, [currentUser]);
 
   // --- LOCAL STATE MANAGEMENT (User Request: Remove strict snapshot & undo/redo) ---
   // --- STORE INTEGRATION (Replaced Legacy State) ---
@@ -1233,6 +1249,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           <>
             <Canvas
               key={projectId}
+              onShowStorageWarning={handleShowStorageWarning}
               isUIHidden={isUIHidden}
               initialGroupContainerStates={groupContainerStates}
               // Removed initialCenter/Scale (undefined/legacy - handled by snapshot viewport)
@@ -1538,6 +1555,12 @@ export function CanvasApp({ user }: CanvasAppProps) {
           </div>
         )}
       </div>
+      <StorageUpgradeModal
+        isOpen={isStorageModalOpen}
+        onClose={() => setIsStorageModalOpen(false)}
+        storageUsed={storageStats ? Number(storageStats.usedBytes) : 0}
+        storageQuota={storageStats ? Number(storageStats.quotaBytes) : 0}
+      />
       <GenerationQueue items={generationQueue} />
       <LibrarySidebar
         isOpen={isLibraryOpen}
