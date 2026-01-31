@@ -28,6 +28,8 @@ interface UpscaleModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
@@ -51,6 +53,8 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -95,6 +99,20 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedUpscaleModalId === modalState.id || (selectedUpscaleModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedUpscaleModalIds && selectedUpscaleModalIds.includes(modalState.id)) {
+                    return selectedUpscaleModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

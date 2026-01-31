@@ -52,6 +52,8 @@ interface StoryboardModalOverlaysProps {
     isAiMode?: boolean;
     manualScript?: string;
   }) => void;
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = ({
@@ -74,6 +76,8 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
   sceneFrameModalStates = [],
   images = [],
   onGenerateStoryboard,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -146,6 +150,20 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
             key={modalState.id}
             isOpen={true}
             id={modalState.id}
+            isAttachedToChat={isChatOpen && (selectedStoryboardModalId === modalState.id || (selectedStoryboardModalIds || []).includes(modalState.id))}
+            selectionOrder={
+              isChatOpen
+                ? (() => {
+                    if (selectedIds && selectedIds.includes(modalState.id)) {
+                      return selectedIds.indexOf(modalState.id) + 1;
+                    }
+                    if (selectedStoryboardModalIds && selectedStoryboardModalIds.includes(modalState.id)) {
+                      return selectedStoryboardModalIds.indexOf(modalState.id) + 1;
+                    }
+                    return undefined;
+                  })()
+                : undefined
+            }
             onContextMenu={(e: React.MouseEvent) => {
               e.preventDefault();
               e.stopPropagation();

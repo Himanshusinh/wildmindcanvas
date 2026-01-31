@@ -14,6 +14,7 @@ import {
   RefreshCcw,
   Video,
   ChevronDown,
+  Music,
 } from 'lucide-react';
 import { useChatEngine, ChatMessage } from './useChatEngine';
 import { useIntentExecutor } from './useIntentExecutor';
@@ -68,13 +69,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // Attachment counts (used by UI only)
     const attachmentCounts = React.useMemo(() => {
         const ids = new Set(canvasSelection?.selectedIds || []);
-        if (ids.size === 0) return { imageCount: 0, videoCount: 0, total: 0 };
+        if (ids.size === 0) return { imageCount: 0, videoCount: 0, musicCount: 0, pluginCount: 0, total: 0 };
 
         const countedImageIds = new Set<string>();
         const countedVideoIds = new Set<string>();
+        const countedMusicIds = new Set<string>();
+        const countedPluginIds = new Set<string>();
 
     const imageArrays = [canvasState?.images, canvasState?.imageGenerators, canvasState?.imageModalStates];
     const videoArrays = [canvasState?.videoGenerators, canvasState?.videoModalStates];
+    const musicArrays = [canvasState?.musicGenerators, canvasState?.musicModalStates];
+    const pluginArrays = [
+      canvasState?.upscaleModalStates,
+      canvasState?.removeBgModalStates,
+      canvasState?.eraseModalStates,
+      canvasState?.expandModalStates,
+      canvasState?.vectorizeModalStates,
+      canvasState?.nextSceneModalStates,
+      canvasState?.compareModalStates,
+      canvasState?.multiangleCameraModalStates,
+      canvasState?.storyboardModalStates,
+      canvasState?.scriptFrameModalStates,
+      canvasState?.sceneFrameModalStates,
+      canvasState?.imageEditorModalStates,
+      canvasState?.videoEditorModalStates,
+    ];
 
         imageArrays.forEach(arr => {
       if (!Array.isArray(arr)) return;
@@ -90,9 +109,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 });
         });
 
+        musicArrays.forEach(arr => {
+      if (!Array.isArray(arr)) return;
+                arr.forEach((item: any) => {
+        if (item?.id && ids.has(item.id) && !countedMusicIds.has(item.id)) countedMusicIds.add(item.id);
+                });
+        });
+
+        pluginArrays.forEach(arr => {
+      if (!Array.isArray(arr)) return;
+                arr.forEach((item: any) => {
+        if (item?.id && ids.has(item.id) && !countedPluginIds.has(item.id)) countedPluginIds.add(item.id);
+                });
+        });
+
         const imageCount = countedImageIds.size;
         const videoCount = countedVideoIds.size;
-    return { imageCount, videoCount, total: imageCount + videoCount };
+        const musicCount = countedMusicIds.size;
+        const pluginCount = countedPluginIds.size;
+    return { imageCount, videoCount, musicCount, pluginCount, total: imageCount + videoCount + musicCount + pluginCount };
     }, [canvasSelection?.selectedIds, canvasState]);
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -387,7 +422,48 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 pt-2 z-20">
+                    <div className="p-4 pt-2 z-20 overflow-hidden">
+                        {/* Attachment Count Indicator - Above Mode Selector */}
+                        {attachmentCounts.total > 0 && (
+                            <div className="mb-2 mt-2 flex items-center justify-end opacity-0 animate-[fadeIn_0.2s_ease-in-out_forwards]">
+                                <div className="flex items-center gap-1.5 text-[10px] text-blue-300/70 font-medium">
+                                    {attachmentCounts.imageCount > 0 && (
+                                        <span className="flex items-center gap-1">
+                                            <span className="w-1 h-1 rounded-full bg-blue-400 shadow-[0_0_2px_rgba(96,165,250,0.6)]" />
+                                            <span>{attachmentCounts.imageCount}</span>
+                                        </span>
+                                    )}
+                                    {attachmentCounts.imageCount > 0 && (attachmentCounts.videoCount > 0 || attachmentCounts.musicCount > 0 || attachmentCounts.pluginCount > 0) && (
+                                        <span className="text-blue-200/30 mx-0.5">•</span>
+                                    )}
+                                    {attachmentCounts.videoCount > 0 && (
+                                        <span className="flex items-center gap-1">
+                                            <Video size={10} className="text-blue-400" />
+                                            <span>{attachmentCounts.videoCount}</span>
+                                        </span>
+                                    )}
+                                    {attachmentCounts.videoCount > 0 && (attachmentCounts.musicCount > 0 || attachmentCounts.pluginCount > 0) && (
+                                        <span className="text-blue-200/30 mx-0.5">•</span>
+                                    )}
+                                    {attachmentCounts.musicCount > 0 && (
+                                        <span className="flex items-center gap-1">
+                                            <Music size={10} className="text-blue-400" />
+                                            <span>{attachmentCounts.musicCount}</span>
+                                        </span>
+                                    )}
+                                    {attachmentCounts.musicCount > 0 && attachmentCounts.pluginCount > 0 && (
+                                        <span className="text-blue-200/30 mx-0.5">•</span>
+                                    )}
+                                    {attachmentCounts.pluginCount > 0 && (
+                                        <span className="flex items-center gap-1">
+                                            <Zap size={10} className="text-blue-400" />
+                                            <span>{attachmentCounts.pluginCount}</span>
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Mode Selector */}
                         <div className="mb-2 relative">
                             <button
@@ -451,29 +527,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                                 </>
                             )}
                         </div>
-
-                        {/* Attachment Count Indicator */}
-                        {attachmentCounts.total > 0 && (
-                            <div className="mb-2 px-1 opacity-0 animate-[fadeIn_0.2s_ease-in-out_forwards]">
-                                <div className="flex items-center gap-2 text-xs text-blue-300/90 font-medium bg-blue-950/30 px-2 py-1 rounded-md border border-blue-500/20">
-                                    {attachmentCounts.imageCount > 0 && (
-                                        <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_4px_rgba(96,165,250,0.6)]" />
-                  {attachmentCounts.imageCount === 1 ? '1 image attached' : `${attachmentCounts.imageCount} images attached`}
-                                        </span>
-                                    )}
-                                    {attachmentCounts.imageCount > 0 && attachmentCounts.videoCount > 0 && (
-                                        <span className="text-blue-200/40 mx-0.5">•</span>
-                                    )}
-                                    {attachmentCounts.videoCount > 0 && (
-                                        <span className="flex items-center gap-1.5">
-                                            <Video size={12} className="text-blue-400" />
-                  {attachmentCounts.videoCount === 1 ? '1 video attached' : `${attachmentCounts.videoCount} videos attached`}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
                         <div className="relative group">
                             <textarea

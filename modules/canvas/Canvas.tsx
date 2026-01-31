@@ -660,6 +660,15 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     setSelectedVideoEditorModalIds: canvasSelection.setSelectedVideoEditorModalIds,
     onPersistVideoEditorModalDelete: props.onPersistVideoEditorModalDelete,
 
+    // Image Editor Deletion
+    selectedImageEditorModalIds: canvasSelection.selectedImageEditorModalIds,
+    selectedImageEditorModalId: canvasSelection.selectedImageEditorModalId,
+    imageEditorModalStates: canvasState.imageEditorModalStates,
+    setImageEditorModalStates: canvasState.setImageEditorModalStates,
+    setSelectedImageEditorModalId: canvasSelection.setSelectedImageEditorModalId,
+    setSelectedImageEditorModalIds: canvasSelection.setSelectedImageEditorModalIds,
+    onPersistImageEditorModalDelete: props.onPersistImageEditorModalDelete,
+
     // Music Deletion
     selectedMusicModalId: canvasSelection.selectedMusicModalId,
     setSelectedMusicModalId: canvasSelection.setSelectedMusicModalId,

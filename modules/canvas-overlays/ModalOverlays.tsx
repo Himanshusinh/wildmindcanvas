@@ -440,6 +440,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onOpenVideoEditor={onOpenVideoEditor}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <ImageEditorModalOverlays
@@ -456,6 +458,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onOpenImageEditor={onOpenImageEditor}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <MusicModalOverlays
@@ -477,6 +481,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         connections={externalConnections ?? []}
         textInputStates={textInputStates}
         projectId={projectId ?? undefined}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <UpscaleModalOverlays
@@ -495,6 +501,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistImageModalMove={onPersistImageModalMove}
         connections={externalConnections ?? []}
         imageModalStates={imageModalStates}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
         images={images}
         onPersistConnectorCreate={onPersistConnectorCreate}
         stageRef={stageRef}
@@ -522,6 +530,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
       <EraseModalOverlays
         eraseModalStates={eraseModalStates ?? []}
@@ -544,6 +554,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <ExpandModalOverlays
@@ -567,6 +579,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <VectorizeModalOverlays
@@ -590,6 +604,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <MultiangleCameraModalOverlays
@@ -614,6 +630,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <NextSceneModalOverlays
@@ -636,6 +654,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         stageRef={stageRef}
         scale={scale}
         position={position}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
 
       <StoryboardModalOverlays
@@ -657,6 +677,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         imageModalStates={imageModalStates}
         images={images}
         onGenerateStoryboard={onGenerateStoryboard}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
       {/* Canvas Text Overlays */}
 
@@ -752,6 +774,8 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistImageModalCreate={onPersistImageModalCreate}
         onUpdateImageModalState={onUpdateImageModalState}
         onPersistConnectorCreate={onPersistConnectorCreate}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
       />
     </>
   );

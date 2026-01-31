@@ -23,10 +23,12 @@ interface NextSceneModalOverlaysProps {
     connections: Connection[];
     imageModalStates: ImageModalState[];
     images?: Array<{ elementId?: string; url?: string; type?: string }>;
-    onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
-    stageRef: React.RefObject<Konva.Stage | null>;
-    scale: number;
-    position: { x: number; y: number };
+  onPersistConnectorCreate?: (connector: Connection) => void | Promise<void>;
+  stageRef: React.RefObject<Konva.Stage | null>;
+  scale: number;
+  position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
@@ -45,10 +47,12 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
     connections,
     imageModalStates,
     images,
-    onPersistConnectorCreate,
-    stageRef,
-    scale,
-    position,
+  onPersistConnectorCreate,
+  stageRef,
+  scale,
+  position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -93,6 +97,20 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     isOpen={true}
                     isExpanded={modalState.isExpanded}
                     id={modalState.id}
+                    isAttachedToChat={isChatOpen && (selectedNextSceneModalId === modalState.id || (selectedNextSceneModalIds || []).includes(modalState.id))}
+                    selectionOrder={
+                      isChatOpen
+                        ? (() => {
+                            if (selectedIds && selectedIds.includes(modalState.id)) {
+                              return selectedIds.indexOf(modalState.id) + 1;
+                            }
+                            if (selectedNextSceneModalIds && selectedNextSceneModalIds.includes(modalState.id)) {
+                              return selectedNextSceneModalIds.indexOf(modalState.id) + 1;
+                            }
+                            return undefined;
+                          })()
+                        : undefined
+                    }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

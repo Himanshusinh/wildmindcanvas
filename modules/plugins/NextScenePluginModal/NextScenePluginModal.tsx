@@ -73,6 +73,8 @@ interface NextScenePluginModalProps {
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
@@ -110,6 +112,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   images = [],
   onPersistConnectorCreate,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -388,6 +392,22 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={onContextMenu}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div 
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}

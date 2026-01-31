@@ -28,6 +28,8 @@ interface VectorizeModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
@@ -51,6 +53,8 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -95,6 +99,20 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedVectorizeModalId === modalState.id || (selectedVectorizeModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedVectorizeModalIds && selectedVectorizeModalIds.includes(modalState.id)) {
+                    return selectedVectorizeModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

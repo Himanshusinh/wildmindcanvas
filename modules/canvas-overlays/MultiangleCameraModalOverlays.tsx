@@ -36,6 +36,8 @@ interface MultiangleCameraModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverlaysProps> = ({
@@ -60,6 +62,8 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -104,6 +108,20 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedMultiangleCameraModalId === modalState.id || (selectedMultiangleCameraModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.includes(modalState.id)) {
+                    return selectedMultiangleCameraModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

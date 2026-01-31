@@ -21,6 +21,8 @@ interface CompareModalOverlaysProps {
     onUpdateImageModalState?: (id: string, updates: any) => void;
     onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
     projectId?: string | null;
+    isChatOpen?: boolean;
+    selectedIds?: string[];
 }
 
 export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
@@ -41,6 +43,8 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
     onPersistImageModalCreate,
     onUpdateImageModalState,
     onPersistConnectorCreate,
+    isChatOpen = false,
+    selectedIds = [],
 }) => {
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -93,6 +97,20 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     stageRef={stageRef}
                     scale={scale}
                     position={position}
+                    isAttachedToChat={isChatOpen && (selectedCompareModalId === modalState.id || selectedCompareModalIds.includes(modalState.id))}
+                    selectionOrder={
+                      isChatOpen
+                        ? (() => {
+                            if (selectedIds && selectedIds.includes(modalState.id)) {
+                              return selectedIds.indexOf(modalState.id) + 1;
+                            }
+                            if (selectedCompareModalIds && selectedCompareModalIds.includes(modalState.id)) {
+                              return selectedCompareModalIds.indexOf(modalState.id) + 1;
+                            }
+                            return undefined;
+                          })()
+                        : undefined
+                    }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

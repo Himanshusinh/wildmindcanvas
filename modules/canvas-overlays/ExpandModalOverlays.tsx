@@ -27,6 +27,8 @@ interface ExpandModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
@@ -50,6 +52,8 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -94,6 +98,20 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedExpandModalId === modalState.id || (selectedExpandModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedExpandModalIds && selectedExpandModalIds.includes(modalState.id)) {
+                    return selectedExpandModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

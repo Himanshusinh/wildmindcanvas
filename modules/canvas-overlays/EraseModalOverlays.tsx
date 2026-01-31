@@ -28,6 +28,8 @@ interface EraseModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
@@ -51,6 +53,8 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -95,6 +99,20 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedEraseModalId === modalState.id || (selectedEraseModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedEraseModalIds && selectedEraseModalIds.includes(modalState.id)) {
+                    return selectedEraseModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

@@ -20,6 +20,8 @@ interface VideoEditorModalOverlaysProps {
     onOpenVideoEditor?: () => void;
     scale: number;
     position: { x: number; y: number };
+    isChatOpen?: boolean;
+    selectedIds?: string[];
 }
 
 export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> = ({
@@ -36,6 +38,8 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
     onOpenVideoEditor,
     scale,
     position,
+    isChatOpen = false,
+    selectedIds = [],
 }) => {
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -83,6 +87,20 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     scale={scale}
                     position={position}
                     isSelected={selectedVideoEditorModalId === modalState.id || (selectedVideoEditorModalIds || []).includes(modalState.id)}
+                    isAttachedToChat={isChatOpen && (selectedVideoEditorModalId === modalState.id || (selectedVideoEditorModalIds || []).includes(modalState.id))}
+                    selectionOrder={
+                      isChatOpen
+                        ? (() => {
+                            if (selectedIds && selectedIds.includes(modalState.id)) {
+                              return selectedIds.indexOf(modalState.id) + 1;
+                            }
+                            if (selectedVideoEditorModalIds && selectedVideoEditorModalIds.includes(modalState.id)) {
+                              return selectedVideoEditorModalIds.indexOf(modalState.id) + 1;
+                            }
+                            return undefined;
+                          })()
+                        : undefined
+                    }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

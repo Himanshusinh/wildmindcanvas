@@ -50,6 +50,8 @@ interface StoryboardPluginModalProps {
     specialRequest?: string;
   }) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
@@ -86,6 +88,8 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
   images = [],
   onGenerate,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -255,6 +259,22 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       onContextMenu={onContextMenu}
       style={{ touchAction: 'none' }}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div 
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}

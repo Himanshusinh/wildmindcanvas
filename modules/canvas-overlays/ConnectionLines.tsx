@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { Connection, ActiveDrag } from './types';
 import { computeNodeCenter, computeStrokeForScale, computeCircleRadiusForScale } from './utils';
 import Konva from 'konva';
@@ -91,9 +91,31 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
     ensureConnectionAnimationStyles();
   }, []);
 
-  // Track last values to prevent unnecessary recalculations
-  const lastValuesRef = useRef({ x: 0, y: 0, scale: 1, viewportUpdateKey: 0 });
-  const lastUpdateTimeRef = useRef(0);
+  // Force recalculation during interaction using RAF loop
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isInteracting) {
+      // During interaction, force recalculation every frame for smooth movement
+      const update = () => {
+        setForceUpdate(prev => prev + 1);
+        rafRef.current = requestAnimationFrame(update);
+      };
+      rafRef.current = requestAnimationFrame(update);
+      return () => {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+        }
+      };
+    } else {
+      // Stop RAF loop when not interacting
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    }
+  }, [isInteracting]);
 
   const generatingNodeIds = useMemo(() => {
     const ids = new Set<string>();
@@ -137,73 +159,65 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
     return ids;
   }, [imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, scriptFrameModalStates]);
 
-  // Memoize connection lines to recalculate when viewport changes
-  // Use requestAnimationFrame during interaction to ensure DOM is updated before reading
-  const [connectionLines, setConnectionLines] = useState<Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>>([]);
+  // Use useMemo for instant, synchronous recalculation - no RAF delay
+  // This ensures lines update immediately when components move
+  const connectionLines = useMemo(() => {
+    // Filter out duplicates and compute connection lines
+    const seen = new Set<string>();
+    // Don't cache during interaction - always get fresh DOM positions for accurate attachment
+    // During interaction, components are moving so we need real-time positions
+    const domCache = isInteracting ? undefined : new Map<string, Element | null>();
 
-  useEffect(() => {
-    // Check if values actually changed to prevent unnecessary recalculations
-    const hasChanged = 
-      lastValuesRef.current.x !== position.x ||
-      lastValuesRef.current.y !== position.y ||
-      lastValuesRef.current.scale !== scale ||
-      lastValuesRef.current.viewportUpdateKey !== viewportUpdateKey;
+    const lines = connections
+      .map(conn => {
+        // Create a unique key for deduplication
+        const uniqueKey = `${conn.from}-${conn.to}`;
 
-    if (!hasChanged && !isInteracting) {
-      // Skip if nothing changed and not interacting
-      return;
-    }
+        // Skip if we've already seen this connection
+        if (seen.has(uniqueKey)) {
+          return null;
+        }
+        seen.add(uniqueKey);
 
-    // Update refs
-    lastValuesRef.current = { x: position.x, y: position.y, scale, viewportUpdateKey };
-
-    const computeLines = () => {
-      // Filter out duplicates and compute connection lines
-      const seen = new Set<string>();
-      const domCache = new Map<string, Element | null>();
-
-      const lines = connections
-        .map(conn => {
-          // Create a unique key for deduplication
-          const uniqueKey = `${conn.from}-${conn.to}`;
-
-          // Skip if we've already seen this connection
-          if (seen.has(uniqueKey)) {
-            return null;
-          }
-          seen.add(uniqueKey);
-
-          // During interaction, prefer state-based calculation for smoother updates
-          const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache, isInteracting);
-          const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache, isInteracting);
-          if (!fromCenter || !toCenter) {
-            return null;
-          }
-          return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
-        })
-        .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-      
-      setConnectionLines(lines);
-    };
-
-    if (isInteracting) {
-      // During interaction, throttle updates to every 100ms
-      const now = Date.now();
-      if (now - lastUpdateTimeRef.current < 100) {
-        return;
-      }
-      lastUpdateTimeRef.current = now;
-      
-      // Use requestAnimationFrame to ensure DOM is updated
-      const rafId = requestAnimationFrame(() => {
-        requestAnimationFrame(computeLines); // Double RAF to ensure layout is complete
-      });
-      return () => cancelAnimationFrame(rafId);
-    } else {
-      // When not interacting, compute immediately
-      computeLines();
-    }
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, isInteracting, stageRef]);
+        // Always try DOM reads first for precise node positions
+        // This ensures lines connect exactly to the circular connection nodes
+        // The computeNodeCenter function will fall back to state-based if DOM not available
+        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache, false);
+        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache, false);
+        if (!fromCenter || !toCenter) {
+          return null;
+        }
+        return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
+      })
+      .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
+    
+    return lines;
+  }, [
+    connections,
+    position.x,
+    position.y,
+    scale,
+    // Include all modal state arrays - useMemo will recalculate when any x/y changes
+    // during drag because React will detect the array reference change
+    textInputStates,
+    imageModalStates,
+    videoModalStates,
+    musicModalStates,
+    upscaleModalStates,
+    multiangleCameraModalStates,
+    removeBgModalStates,
+    eraseModalStates,
+    expandModalStates,
+    vectorizeModalStates,
+    nextSceneModalStates,
+    storyboardModalStates,
+    scriptFrameModalStates,
+    sceneFrameModalStates,
+    viewportUpdateKey, // Force recalculation when viewport updates
+    isInteracting, // Force recalculation during interaction
+    forceUpdate, // Force recalculation every frame during interaction
+    stageRef
+  ]);
 
   return (
     <svg

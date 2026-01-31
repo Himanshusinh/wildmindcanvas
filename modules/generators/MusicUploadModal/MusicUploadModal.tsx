@@ -98,6 +98,8 @@ interface MusicUploadModalProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   onPersistMusicModalCreate?: (modal: any) => void | Promise<void>;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
@@ -119,6 +121,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   onDownload,
   onDuplicate,
   isSelected,
+  isAttachedToChat,
+  selectionOrder,
   initialModel,
   initialFrame,
   initialAspectRatio,
@@ -911,6 +915,22 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         opacity: isDimmed ? 0.4 : 1,
       }}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div 
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       <MusicModalTooltip
         isHovered={isHovered}
         scale={scale}

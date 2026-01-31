@@ -28,6 +28,8 @@ interface RemoveBgModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
@@ -51,6 +53,8 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -95,6 +99,20 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedRemoveBgModalId === modalState.id || (selectedRemoveBgModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (selectedRemoveBgModalIds && selectedRemoveBgModalIds.includes(modalState.id)) {
+                    return selectedRemoveBgModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

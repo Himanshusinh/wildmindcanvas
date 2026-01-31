@@ -67,6 +67,8 @@ interface MusicModalOverlaysProps {
   connections?: any[];
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
   projectId?: string;
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
@@ -88,6 +90,8 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
   connections = [],
   textInputStates = [],
   projectId,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -167,6 +171,22 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           }}
           onMusicSelect={onMusicSelect}
           isPinned={modalState.isPinned}
+          isAttachedToChat={isChatOpen && (selectedMusicModalId === modalState.id || selectedMusicModalIds.includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                  // 1. Try global selectedIds first (if valid and contains id)
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  // 2. Fallback to specific type list
+                  if (selectedMusicModalIds && selectedMusicModalIds.includes(modalState.id)) {
+                    return selectedMusicModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
+              : undefined
+          }
           onTogglePin={() => {
             if (onPersistMusicModalMove) {
               onPersistMusicModalMove(modalState.id, { isPinned: !modalState.isPinned });

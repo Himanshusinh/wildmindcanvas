@@ -19,6 +19,8 @@ interface ImageEditorModalOverlaysProps {
     onOpenImageEditor?: () => void;
     scale: number;
     position: { x: number; y: number };
+    isChatOpen?: boolean;
+    selectedIds?: string[];
 }
 
 export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> = ({
@@ -35,6 +37,8 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
     onOpenImageEditor,
     scale,
     position,
+    isChatOpen = false,
+    selectedIds = [],
 }) => {
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
@@ -83,6 +87,20 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     scale={scale}
                     position={position}
                     isSelected={selectedImageEditorModalId === modalState.id || (selectedImageEditorModalIds || []).includes(modalState.id)}
+                    isAttachedToChat={isChatOpen && (selectedImageEditorModalId === modalState.id || (selectedImageEditorModalIds || []).includes(modalState.id))}
+                    selectionOrder={
+                      isChatOpen
+                        ? (() => {
+                            if (selectedIds && selectedIds.includes(modalState.id)) {
+                              return selectedIds.indexOf(modalState.id) + 1;
+                            }
+                            if (selectedImageEditorModalIds && selectedImageEditorModalIds.includes(modalState.id)) {
+                              return selectedImageEditorModalIds.indexOf(modalState.id) + 1;
+                            }
+                            return undefined;
+                          })()
+                        : undefined
+                    }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();

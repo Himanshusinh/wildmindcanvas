@@ -36,6 +36,8 @@ interface ComparePluginModalProps {
     initialModel?: string;
     projectId?: string | null;
     onContextMenu?: (e: React.MouseEvent) => void;
+    isAttachedToChat?: boolean;
+    selectionOrder?: number;
 }
 
 export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
@@ -60,6 +62,8 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
     initialModel,
     projectId,
     onContextMenu,
+    isAttachedToChat,
+    selectionOrder,
 }) => {
     const isDark = useIsDarkTheme();
     const [isHovered, setIsHovered] = useState(false);
@@ -306,6 +310,22 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
                 pointerEvents: 'none',
             }}
         >
+            {isAttachedToChat && selectionOrder && (
+                <div 
+                    className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+                    style={{
+                        left: `${-40 * (scale || 1)}px`,
+                        top: `${-8 * (scale || 1)}px`,
+                        width: `${32 * (scale || 1)}px`,
+                        height: `${32 * (scale || 1)}px`,
+                        fontSize: `${20 * (scale || 1)}px`,
+                        minWidth: `${32 * (scale || 1)}px`,
+                        minHeight: `${32 * (scale || 1)}px`,
+                    }}
+                >
+                    {selectionOrder}
+                </div>
+            )}
             {/* Plugin Node (Clickable) */}
             <div
                 onMouseDown={handleMouseDown}

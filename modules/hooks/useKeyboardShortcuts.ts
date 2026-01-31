@@ -85,6 +85,15 @@ interface UseKeyboardShortcutsProps {
   setSelectedVideoEditorModalIds: (ids: string[]) => void;
   onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
 
+  // Image Editor deletion
+  selectedImageEditorModalIds: string[];
+  selectedImageEditorModalId: string | null;
+  imageEditorModalStates: any[];
+  setImageEditorModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedImageEditorModalId: (id: string | null) => void;
+  setSelectedImageEditorModalIds: (ids: string[]) => void;
+  onPersistImageEditorModalDelete?: (id: string) => void | Promise<void>;
+
   // Music deletion
   selectedMusicModalId: string | null;
   setSelectedMusicModalId: (id: string | null) => void;
@@ -296,6 +305,13 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedVideoEditorModalId,
     setSelectedVideoEditorModalIds,
     onPersistVideoEditorModalDelete,
+    selectedImageEditorModalIds = [],
+    selectedImageEditorModalId,
+    imageEditorModalStates = [],
+    setImageEditorModalStates,
+    setSelectedImageEditorModalId,
+    setSelectedImageEditorModalIds,
+    onPersistImageEditorModalDelete,
     selectedMusicModalId,
     setSelectedMusicModalId,
     setSelectedMusicModalIds,
@@ -620,14 +636,16 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           if (selectedVideoModalIds) allIds.push(...selectedVideoModalIds);
           if (selectedVideoEditorModalId) allIds.push(selectedVideoEditorModalId);
           if (selectedVideoEditorModalIds) allIds.push(...selectedVideoEditorModalIds);
+          if (selectedImageEditorModalId) allIds.push(selectedImageEditorModalId);
+          if (selectedImageEditorModalIds && selectedImageEditorModalIds.length > 0) allIds.push(...selectedImageEditorModalIds);
           if (selectedMusicModalId) allIds.push(selectedMusicModalId);
-          if (selectedMusicModalIds) allIds.push(...selectedMusicModalIds);
+          if (selectedMusicModalIds && selectedMusicModalIds.length > 0) allIds.push(...selectedMusicModalIds);
           if (selectedTextInputId) allIds.push(selectedTextInputId);
-          if (selectedTextInputIds) allIds.push(...selectedTextInputIds);
+          if (selectedTextInputIds && selectedTextInputIds.length > 0) allIds.push(...selectedTextInputIds);
           if (selectedUpscaleModalId) allIds.push(selectedUpscaleModalId);
-          if (selectedUpscaleModalIds) allIds.push(...selectedUpscaleModalIds);
+          if (selectedUpscaleModalIds && selectedUpscaleModalIds.length > 0) allIds.push(...selectedUpscaleModalIds);
           if (selectedMultiangleCameraModalId) allIds.push(selectedMultiangleCameraModalId);
-          if (selectedMultiangleCameraModalIds) allIds.push(...selectedMultiangleCameraModalIds);
+          if (selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.length > 0) allIds.push(...selectedMultiangleCameraModalIds);
           if (selectedRemoveBgModalId) allIds.push(selectedRemoveBgModalId);
           if (selectedRemoveBgModalIds) allIds.push(...selectedRemoveBgModalIds);
           if (selectedEraseModalId) allIds.push(selectedEraseModalId);
@@ -650,6 +668,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           if (selectedRichTextIds) allIds.push(...selectedRichTextIds);
 
           const uniqueIds = Array.from(new Set(allIds)).filter(id => !!id);
+          
+          console.log('[Keyboard Delete] All collected IDs:', allIds);
+          console.log('[Keyboard Delete] Unique IDs:', uniqueIds);
+          console.log('[Keyboard Delete] MultiangleCamera selection:', { 
+            selectedMultiangleCameraModalId, 
+            selectedMultiangleCameraModalIds,
+            hasId: !!selectedMultiangleCameraModalId,
+            hasIds: selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.length > 0
+          });
 
           if (uniqueIds.length > 0 && onBulkDelete) {
             console.log('[Keyboard] Triggering Bulk Delete for:', uniqueIds);
@@ -690,6 +717,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             setSelectedCompareModalId(null);
             setSelectedVideoEditorModalIds([]);
             setSelectedVideoEditorModalId(null);
+            setSelectedImageEditorModalIds([]);
+            setSelectedImageEditorModalId(null);
 
             if (setSelectedCanvasTextIds) setSelectedCanvasTextIds([]);
             if (effectiveSetSelectedCanvasTextId) effectiveSetSelectedCanvasTextId(null);
@@ -737,6 +766,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         const allScriptFrameModalIds = scriptFrameModalStates.map(m => m.id);
         const allSceneFrameModalIds = sceneFrameModalStates.map(m => m.id);
         const allVideoEditorModalIds = videoEditorModalStates.map(m => m.id);
+        const allImageEditorModalIds = imageEditorModalStates.map(m => m.id);
         const allRichTextIds = richTextStates ? richTextStates.map((s: any) => s.id) : [];
 
         setSelectedImageIndices(allImageIndices);
@@ -774,6 +804,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         setSelectedSceneFrameModalId(allSceneFrameModalIds[0] || null);
         setSelectedVideoEditorModalIds(allVideoEditorModalIds);
         setSelectedVideoEditorModalId(allVideoEditorModalIds[0] || null);
+        setSelectedImageEditorModalIds(allImageEditorModalIds);
+        setSelectedImageEditorModalId(allImageEditorModalIds[0] || null);
 
         if (setSelectedRichTextIds) setSelectedRichTextIds(allRichTextIds);
         if (setSelectedRichTextId) setSelectedRichTextId(allRichTextIds[0] || null);
@@ -833,6 +865,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         updateBoundsFromModal(scriptFrameModalStates, 360, 260);
         updateBoundsFromModal(sceneFrameModalStates, 350, 300);
         updateBoundsFromModal(videoEditorModalStates, 600, 400);
+        updateBoundsFromModal(imageEditorModalStates, 600, 400);
 
         if (richTextStates) {
           richTextStates.forEach((t: any) => {

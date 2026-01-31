@@ -106,39 +106,12 @@ export const computeNodeCenter = (
     return null;
   };
 
-  // During interaction, prefer state-based calculation for smoother updates
-  if (preferStateCalculation) {
-    try {
-      const stage = stageRef?.current as any;
-      if (stage && typeof stage.container === 'function') {
-        const containerRect = stage.container().getBoundingClientRect();
-        const modal = findModal();
-        if (modal) {
-          const screenX = containerRect.left + (modal.x * scale) + position.x;
-          const screenY = containerRect.top + (modal.y * scale) + position.y;
-          const screenWidth = modal.width * scale;
-          const screenHeight = modal.height * scale;
-          
-          const centerX = Math.round(screenX + screenWidth / 2);
-          const centerY = Math.round(screenY + screenHeight / 2);
-          
-          if (side === 'send') {
-            return { x: Math.round(centerX + screenWidth / 2), y: centerY };
-          } else {
-            return { x: Math.round(centerX - screenWidth / 2), y: centerY };
-          }
-        }
-      }
-    } catch (err) {
-      // Fall through to DOM reads
-    }
-  }
-
-  // First, try to use the actual node element position (most accurate for plugins with circular nodes)
+  // ALWAYS try to use the actual node element position first (most accurate)
+  // This ensures lines connect precisely to the circular connection nodes
   const el = cachedQuery(`[data-node-id="${id}"][data-node-side="${side}"]`);
   if (el) {
     const rect = el.getBoundingClientRect();
-    // Return exact center of the circular node
+    // Return exact center of the circular node - this is the most accurate position
     const centerX = Math.round(rect.left + rect.width / 2);
     const centerY = Math.round(rect.top + rect.height / 2);
     return { x: centerX, y: centerY };
