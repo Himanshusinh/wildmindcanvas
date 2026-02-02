@@ -855,29 +855,52 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     }
   };
 
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render so effect has access to latest values
+  useEffect(() => {
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDraggingContainer) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
 
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
-      onPositionChange(newCanvasX, newCanvasY);
+      state.onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDraggingContainer(false);
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      const state = dragStateRef.current;
+      if (state.onPositionCommit && lastCanvasPosRef.current) {
+        state.onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
     };
 
@@ -889,7 +912,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange]);
+  }, [isDraggingContainer]);
 
 
   if (!isOpen) return null;
@@ -916,7 +939,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       }}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,

@@ -174,29 +174,52 @@ export const TextInput: React.FC<TextInputProps> = ({
     lastPositionRef.current = { x, y };
   }, [x, y]);
 
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render
+  useEffect(() => {
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
 
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
-      onPositionChange(newCanvasX, newCanvasY);
+      state.onPositionChange(newCanvasX, newCanvasY);
       lastPositionRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      if (onPositionCommit) {
-        onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
+      const state = dragStateRef.current;
+      if (state.onPositionCommit) {
+        state.onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
       }
     };
 
@@ -208,7 +231,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  }, [isDragging]);
 
   const handleConfirm = () => {
     if (text.trim()) {

@@ -227,6 +227,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         const rectW = viewW + padding * 2;
                         const rectH = viewH + padding * 2;
 
+                        // Adaptive Grid Scale Logic
+                        // As we zoom out (scale < 1), we want the dots to effectively "get larger" in world space
+                        // so they stay visible on screen, but "further apart" (reduced density).
+                        // We scale by powers of 2: 1x, 2x, 4x...
+                        const zoomLevel = scale;
+                        const exponent = Math.floor(Math.log2(1 / zoomLevel));
+                        const gridScale = Math.pow(2, Math.max(0, exponent));
+
                         return (
                             <>
                                 {/* Solid background color */}
@@ -248,13 +256,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                         height={rectH}
                                         fillPatternImage={patternImage}
                                         fillPatternRepeat="repeat"
-                                        fillPatternScaleX={1 / Math.pow(scale, 0.9)}
-                                        fillPatternScaleY={1 / Math.pow(scale, 0.9)}
+                                        fillPatternScaleX={gridScale}
+                                        fillPatternScaleY={gridScale}
                                         fillPatternOffset={{
-                                            // Keep the dot pattern anchored in world space so it pans in the
-                                            // same direction as the canvas (no inverted/parallax drift).
-                                            x: rectX,
-                                            y: rectY
+                                            // Keep the dot pattern anchored in world space
+                                            // Must divide by gridScale because offset is in unscaled pattern space
+                                            x: rectX / gridScale,
+                                            y: rectY / gridScale
                                         }}
                                         name="background-rect"
                                         listening={false}

@@ -26,14 +26,14 @@ export function getComponentDimensions(
     };
 
     const {
-        images,
-        canvasTextStates,
-        textInputStates,
-        imageModalStates,
-        videoModalStates,
-        musicModalStates,
-        upscaleModalStates,
-        multiangleCameraModalStates,
+        images = [],
+        canvasTextStates = [],
+        textInputStates = [],
+        imageModalStates = [],
+        videoModalStates = [],
+        musicModalStates = [],
+        upscaleModalStates = [],
+        multiangleCameraModalStates = [],
         // REMOVED: removeBgModalStates
         // REMOVED: eraseModalStates
         // REMOVED: expandModalStates
@@ -41,11 +41,11 @@ export function getComponentDimensions(
         // nextSceneModalStates,
         // compareModalStates,
         // storyboardModalStates,
-        scriptFrameModalStates,
-        sceneFrameModalStates,
+        scriptFrameModalStates = [],
+        sceneFrameModalStates = [],
         // videoEditorModalStates,
         // compareModalStates,
-        richTextStates,
+        richTextStates = [],
         // The imageEditorModalStates from `data` is no longer destructured here
     } = data;
 

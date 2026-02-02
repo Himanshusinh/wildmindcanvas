@@ -730,6 +730,27 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     }
   };
 
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render so effect has access to latest values
+  useEffect(() => {
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
+
   // Handle drag move - use RAF for smooth updates
   useEffect(() => {
     if (!isDraggingContainer) return;
@@ -742,26 +763,27 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       const e = pendingEvent;
       pendingEvent = null;
 
-      if (!containerRef.current || !onPositionChange) return;
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
 
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
       // Update local position immediately for smooth visual feedback
       setDragPosition({ x: newCanvasX, y: newCanvasY });
 
-      onPositionChange(newCanvasX, newCanvasY);
+      state.onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
       rafId = null;
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      if (!containerRef.current) return;
 
       // Store the event and schedule RAF if not already scheduled
       pendingEvent = e;
@@ -778,8 +800,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       setIsDraggingContainer(false);
       // Don't clear dragPosition immediately - wait for props to update
       // This prevents the flicker when dropping the frame
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      const state = dragStateRef.current;
+      if (state.onPositionCommit && lastCanvasPosRef.current) {
+        state.onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
     };
 
@@ -792,7 +815,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       window.removeEventListener('mouseup', handleMouseUp, true);
       if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  }, [isDraggingContainer]);
 
   if (!isOpen) return null;
 

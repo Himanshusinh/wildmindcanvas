@@ -648,6 +648,7 @@ export const ImageModalOverlays = React.memo<ImageModalOverlaysProps>(({
             generatedImageUrl={modalState.generatedImageUrl}
             generatedImageUrls={modalState.generatedImageUrls}
             isGenerating={modalState.isGenerating}
+            isProcessing={modalState.isProcessing}
             initialModel={modalState.model}
             initialFrame={modalState.frame}
             initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}

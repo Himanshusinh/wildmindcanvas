@@ -27,6 +27,7 @@ export interface ImageModalState {
   imageCount?: number;
   resolution?: string;
   isGenerating?: boolean;
+  isProcessing?: boolean;
   isPinned?: boolean;
 }
 

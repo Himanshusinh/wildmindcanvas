@@ -620,6 +620,21 @@ export function useCanvasEvents(
                 const newSelectedRichTextIds = isMultiSelect ? [...selectedRichTextIds] : [];
                 // (Shortened for brevity, implement logic similarly for all)
 
+                // Create a consolidated data object that includes both canvasState and the local store states
+                // This ensures getComponentDimensions can find all items
+                const canvasItemsData = {
+                    ...canvasState,
+                    canvasTextStates: effectiveCanvasTextStates,
+                    imageModalStates,
+                    videoModalStates,
+                    musicModalStates,
+                    upscaleModalStates,
+                    multiangleCameraModalStates,
+                    removeBgModalStates,
+                    eraseModalStates,
+                    expandModalStates,
+                };
+
                 // Helper to check intersection
                 const checkIntersection = (itemRect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
                     const componentRect = getClientRect(itemRect);
@@ -630,7 +645,7 @@ export function useCanvasEvents(
                 // Images
                 images.forEach((img, idx) => {
                     if (img.type === 'image' || img.type === 'video') {
-                        const dims = getComponentDimensions('image', idx, canvasState as any);
+                        const dims = getComponentDimensions('image', idx, canvasItemsData);
                         if (checkIntersection({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height, rotation: img.rotation || 0 })) {
                             if (!newSelectedIndices.includes(idx)) newSelectedIndices.push(idx);
                         }
@@ -639,7 +654,7 @@ export function useCanvasEvents(
 
                 // Image Modals 
                 imageModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('imageModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('imageModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedImageModalIds.includes(modal.id)) newSelectedImageModalIds.push(modal.id);
                     }
@@ -647,7 +662,7 @@ export function useCanvasEvents(
 
                 const newSelectedVideoModalIds = isMultiSelect ? [...selectedVideoModalIds] : [];
                 videoModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('videoModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('videoModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVideoModalIds.includes(modal.id)) newSelectedVideoModalIds.push(modal.id);
                     }
@@ -655,7 +670,7 @@ export function useCanvasEvents(
 
                 const newSelectedVideoEditorModalIds = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
                 videoEditorModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('videoEditorModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('videoEditorModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVideoEditorModalIds.includes(modal.id)) newSelectedVideoEditorModalIds.push(modal.id);
                     }
@@ -663,7 +678,7 @@ export function useCanvasEvents(
 
                 const newSelectedImageEditorModalIds = isMultiSelect ? [...selectedImageEditorModalIds] : [];
                 imageEditorModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('imageEditorModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('imageEditorModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedImageEditorModalIds.includes(modal.id)) newSelectedImageEditorModalIds.push(modal.id);
                     }
@@ -671,14 +686,14 @@ export function useCanvasEvents(
 
                 const newSelectedMusicModalIds = isMultiSelect ? [...selectedMusicModalIds] : [];
                 musicModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('musicModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('musicModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
                     }
                 });
 
                 textInputStates.forEach((input: any) => {
-                    const dims = getComponentDimensions('input', input.id, canvasState as any);
+                    const dims = getComponentDimensions('input', input.id, canvasItemsData);
                     if (checkIntersection({ x: input.x, y: input.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedTextInputIds.includes(input.id)) newSelectedTextInputIds.push(input.id);
                     }
@@ -686,7 +701,7 @@ export function useCanvasEvents(
 
                 const newSelectedNextSceneModalIds = isMultiSelect ? [...selectedNextSceneModalIds] : [];
                 nextSceneModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('nextSceneModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('nextSceneModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedNextSceneModalIds.includes(modal.id)) newSelectedNextSceneModalIds.push(modal.id);
                     }
@@ -694,7 +709,7 @@ export function useCanvasEvents(
 
                 const newSelectedMultiangleCameraModalIds = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
                 multiangleCameraModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('multiangleCameraModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('multiangleCameraModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedMultiangleCameraModalIds.includes(modal.id)) newSelectedMultiangleCameraModalIds.push(modal.id);
                     }
@@ -702,7 +717,7 @@ export function useCanvasEvents(
 
                 const newSelectedVectorizeModalIds = isMultiSelect ? [...selectedVectorizeModalIds] : [];
                 vectorizeModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('vectorizeModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('vectorizeModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
                     }
@@ -710,7 +725,7 @@ export function useCanvasEvents(
 
                 const newSelectedRemoveBgModalIds = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
                 removeBgModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('removeBgModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('removeBgModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
                     }
@@ -718,7 +733,7 @@ export function useCanvasEvents(
 
                 const newSelectedUpscaleModalIds = isMultiSelect ? [...selectedUpscaleModalIds] : [];
                 upscaleModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('upscaleModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('upscaleModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
                     }
@@ -726,7 +741,7 @@ export function useCanvasEvents(
 
                 const newSelectedEraseModalIds = isMultiSelect ? [...selectedEraseModalIds] : [];
                 eraseModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('eraseModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('eraseModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
                     }
@@ -734,7 +749,7 @@ export function useCanvasEvents(
 
                 const newSelectedExpandModalIds = isMultiSelect ? [...selectedExpandModalIds] : [];
                 expandModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('expandModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('expandModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
                     }
@@ -742,7 +757,7 @@ export function useCanvasEvents(
 
                 const newSelectedCompareModalIds = isMultiSelect ? [...selectedCompareModalIds] : [];
                 compareModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('compareModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('compareModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedCompareModalIds.includes(modal.id)) newSelectedCompareModalIds.push(modal.id);
                     }
@@ -750,7 +765,7 @@ export function useCanvasEvents(
 
                 const newSelectedStoryboardModalIds = isMultiSelect ? [...selectedStoryboardModalIds] : [];
                 storyboardModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('storyboardModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('storyboardModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
                     }
@@ -758,7 +773,7 @@ export function useCanvasEvents(
 
                 const newSelectedScriptFrameModalIds = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
                 scriptFrameModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('scriptFrameModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('scriptFrameModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
                     }
@@ -766,7 +781,7 @@ export function useCanvasEvents(
 
                 const newSelectedSceneFrameModalIds = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
                 sceneFrameModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('sceneFrameModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('sceneFrameModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
                     }
@@ -782,7 +797,7 @@ export function useCanvasEvents(
                 const newSelectedCanvasTextIds = isMultiSelect ? [...selectedCanvasTextIds] : [];
 
                 richTextStates.forEach((text: any) => {
-                    const dims = getComponentDimensions('rich-text', text.id, canvasState as any);
+                    const dims = getComponentDimensions('rich-text', text.id, canvasItemsData);
                     // Robust AABB Check (Manual) to fail-safe against rotation/clientRect issues
                     const textRect = { x: text.x, y: text.y, width: dims.width, height: dims.height };
                     const intersects = !(
@@ -798,7 +813,7 @@ export function useCanvasEvents(
                 });
 
                 effectiveCanvasTextStates.forEach((text: any) => {
-                    const dims = getComponentDimensions('text', text.id, canvasState as any);
+                    const dims = getComponentDimensions('text', text.id, canvasItemsData);
                     if (checkIntersection({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 })) {
                         if (!newSelectedCanvasTextIds.includes(text.id)) newSelectedCanvasTextIds.push(text.id);
                     }
