@@ -14,7 +14,8 @@ import {
   useMultiangleCameraModalStates, useMultiangleCameraSelection,
   useRemoveBgStore, useRemoveBgModalStates, useRemoveBgSelection,
   useEraseStore, useEraseModalStates, useEraseSelection,
-  useExpandStore, useExpandModalStates, useExpandSelection
+  useExpandStore, useExpandModalStates, useExpandSelection,
+  useTextStore, useTextModalStates
 } from '@/modules/stores';
 
 interface UseKeyboardShortcutsProps {
@@ -45,7 +46,8 @@ interface UseKeyboardShortcutsProps {
   position: { x: number; y: number };
   scale: number;
   findAvailablePositionNearWrapper: (x: number, y: number) => { x: number; y: number };
-  setTextInputStates: React.Dispatch<React.SetStateAction<any[]>>;
+  // setTextInputStates: React.Dispatch<React.SetStateAction<any[]>>; // REMOVED: Managed by store
+
 
   onPersistTextModalCreate?: (modal: any) => void | Promise<void>;
   onPersistImageModalCreate?: (modal: any) => void | Promise<void>;
@@ -236,7 +238,7 @@ interface UseKeyboardShortcutsProps {
 
   // Select All
   images: ImageUpload[];
-  textInputStates: any[];
+  // textInputStates: any[]; // REMOVED: Managed by store
   // REMOVED: imageModalStates, videoModalStates (now using Zustand store)
   // imageModalStates: any[];
   // videoModalStates: any[];
@@ -277,7 +279,6 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     position,
     scale,
     findAvailablePositionNearWrapper,
-    setTextInputStates,
 
     onPersistTextModalCreate,
     onPersistImageModalCreate,
@@ -405,7 +406,6 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     onPersistGroupDelete,
     richTextStates,
     images,
-    textInputStates,
 
     setScale,
     setPosition,
@@ -452,6 +452,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
   const expandModalStates = useExpandModalStates();
   const { addExpandModal, setSelectedExpandModalId, setSelectedExpandModalIds, setExpandModalStates } = useExpandStore();
   const { selectedId: selectedExpandModalId, selectedIds: selectedExpandModalIds } = useExpandSelection();
+
+  // Text Store
+  const textInputStates = useTextModalStates();
+  const setTextInputStates = useTextStore(state => state.setTextModalStates);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Undo/Redo

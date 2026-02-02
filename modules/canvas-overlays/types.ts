@@ -323,7 +323,7 @@ export interface ComponentMenu {
 }
 
 export interface ModalOverlaysProps {
-  textInputStates: TextModalState[];
+  // textInputStates: TextModalState[]; // REMOVED: Managed by Zustand store
   // REMOVED: imageModalStates (now managed by Zustand store - useImageStore)
   // imageModalStates: ImageModalState[];
   // REMOVED: videoModalStates (now managed by Zustand store - useVideoStore)
@@ -374,9 +374,8 @@ export interface ModalOverlaysProps {
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
   onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onQwenMultipleAngles?: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
-
-  selectedTextInputId: string | null;
-  selectedTextInputIds: string[];
+  // selectedTextInputId: string | null; // REMOVED: Managed by Zustand store
+  // selectedTextInputIds: string[]; // REMOVED: Managed by Zustand store
   // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
   // selectedImageModalId: string | null;
   // selectedImageModalIds: string[];
@@ -406,9 +405,9 @@ export interface ModalOverlaysProps {
   selectedStoryboardModalId?: string | null;
   selectedStoryboardModalIds?: string[];
   clearAllSelections: () => void;
-  setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
-  setSelectedTextInputId: (id: string | null) => void;
-  setSelectedTextInputIds: (ids: string[]) => void;
+  // setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>; // REMOVED: Managed by store
+  // setSelectedTextInputId: (id: string | null) => void; // REMOVED: Managed by store
+  // setSelectedTextInputIds: (ids: string[]) => void; // REMOVED: Managed by store
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
   // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand store)
   // setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;

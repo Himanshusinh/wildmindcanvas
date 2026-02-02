@@ -680,7 +680,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     ]),
 
     // State setters
-    setTextInputStates: canvasState.setTextInputStates,
+    // REMOVED: setTextInputStates (now managed by store directly in shortcuts where possible, or kept if canvasState provides it for other reasons)
+    // setTextInputStates: canvasState.setTextInputStates, 
 
 
     // Persist Create
@@ -860,7 +861,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
 
     images,
-    textInputStates: canvasState.textInputStates,
+    // textInputStates: canvasState.textInputStates, // REMOVED: Managed by store
     // REMOVED: imageModalStates (now using Zustand store)
     // imageModalStates,
     // REMOVED: videoModalStates (now using Zustand store)

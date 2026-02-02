@@ -1,9 +1,20 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { CanvasItemsData, CanvasProps } from '../types';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
 // Zustand Store - Image & Video State Management
 import { useImageStore, useImageSelection, useVideoStore, useVideoSelection, useMusicStore, useMusicSelection, useUpscaleStore, useUpscaleSelection, useMultiangleCameraStore, useMultiangleCameraSelection, useRemoveBgStore, useRemoveBgSelection, useEraseStore, useEraseSelection, useRemoveBgModalStates, useEraseModalStates, useExpandStore, useExpandSelection, useExpandModalStates, useVectorizeStore, useVectorizeSelection, useVectorizeModalStates, useImageEditorStore, useImageEditorSelection, useImageEditorModalStates, useNextSceneStore, useNextSceneSelection, useNextSceneModalStates, useStoryboardStore, useStoryboardSelection, useStoryboardModalStates, useVideoEditorStore, useVideoEditorSelection, useVideoEditorModalStates, useCompareStore, useCompareSelection, useCompareModalStates, useTextStore } from '@/modules/stores';
+
+// Helper function to wrap Zustand setters to match React.Dispatch<React.SetStateAction<T>> signature
+function wrapSetterForDispatch<T>(setter: (value: T) => void, getCurrentValue: () => T): React.Dispatch<React.SetStateAction<T>> {
+    return (value: React.SetStateAction<T>) => {
+        if (typeof value === 'function') {
+            setter((value as (prev: T) => T)(getCurrentValue()));
+        } else {
+            setter(value);
+        }
+    };
+}
 
 export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasItemsData) {
     const {
@@ -32,27 +43,51 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const selectedImageModalId = useImageStore(state => state.selectedImageModalId);
     const selectedImageModalIds = useImageStore(state => state.selectedImageModalIds);
     const setSelectedImageModalId = useImageStore(state => state.setSelectedImageModalId);
-    const setSelectedImageModalIds = useImageStore(state => state.setSelectedImageModalIds);
+    const rawSetSelectedImageModalIds = useImageStore(state => state.setSelectedImageModalIds);
+    const setSelectedImageModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedImageModalIds, () => selectedImageModalIds),
+        [rawSetSelectedImageModalIds, selectedImageModalIds]
+    );
 
     // Zustand Store - Get video selection state
     const selectedVideoModalId = useVideoStore(state => state.selectedVideoModalId);
     const selectedVideoModalIds = useVideoStore(state => state.selectedVideoModalIds);
     const setSelectedVideoModalId = useVideoStore(state => state.setSelectedVideoModalId);
-    const setSelectedVideoModalIds = useVideoStore(state => state.setSelectedVideoModalIds);
+    const rawSetSelectedVideoModalIds = useVideoStore(state => state.setSelectedVideoModalIds);
+    const setSelectedVideoModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedVideoModalIds, () => selectedVideoModalIds),
+        [rawSetSelectedVideoModalIds, selectedVideoModalIds]
+    );
 
     // Zustand Store - Get video editor selection state
     const clearVideoEditorSelection = useVideoEditorStore(state => state.clearVideoEditorSelection);
     const selectedVideoEditorModalId = useVideoEditorStore(state => state.selectedId);
     const selectedVideoEditorModalIds = useVideoEditorStore(state => state.selectedIds);
-    const setSelectedVideoEditorModalId = useVideoEditorStore(state => state.setSelectedId);
-    const setSelectedVideoEditorModalIds = useVideoEditorStore(state => state.setSelectedIds);
+    const rawSetSelectedVideoEditorModalId = useVideoEditorStore(state => state.setSelectedId);
+    const setSelectedVideoEditorModalId = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedVideoEditorModalId, () => selectedVideoEditorModalId),
+        [rawSetSelectedVideoEditorModalId, selectedVideoEditorModalId]
+    );
+    const rawSetSelectedVideoEditorModalIds = useVideoEditorStore(state => state.setSelectedIds);
+    const setSelectedVideoEditorModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedVideoEditorModalIds, () => selectedVideoEditorModalIds),
+        [rawSetSelectedVideoEditorModalIds, selectedVideoEditorModalIds]
+    );
 
     // Zustand Store - Get image editor selection state
     const clearImageEditorSelection = useImageEditorStore(state => state.clearImageEditorSelection);
     const selectedImageEditorModalId = useImageEditorStore(state => state.selectedImageEditorModalId);
     const selectedImageEditorModalIds = useImageEditorStore(state => state.selectedImageEditorModalIds);
-    const setSelectedImageEditorModalId = useImageEditorStore(state => state.setSelectedImageEditorModalId);
-    const setSelectedImageEditorModalIds = useImageEditorStore(state => state.setSelectedImageEditorModalIds);
+    const rawSetSelectedImageEditorModalId = useImageEditorStore(state => state.setSelectedImageEditorModalId);
+    const setSelectedImageEditorModalId = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedImageEditorModalId, () => selectedImageEditorModalId),
+        [rawSetSelectedImageEditorModalId, selectedImageEditorModalId]
+    );
+    const rawSetSelectedImageEditorModalIds = useImageEditorStore(state => state.setSelectedImageEditorModalIds);
+    const setSelectedImageEditorModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedImageEditorModalIds, () => selectedImageEditorModalIds),
+        [rawSetSelectedImageEditorModalIds, selectedImageEditorModalIds]
+    );
 
 
 
@@ -60,21 +95,33 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const selectedMusicModalId = useMusicStore(state => state.selectedMusicModalId);
     const selectedMusicModalIds = useMusicStore(state => state.selectedMusicModalIds);
     const setSelectedMusicModalId = useMusicStore(state => state.setSelectedMusicModalId);
-    const setSelectedMusicModalIds = useMusicStore(state => state.setSelectedMusicModalIds);
+    const rawSetSelectedMusicModalIds = useMusicStore(state => state.setSelectedMusicModalIds);
+    const setSelectedMusicModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedMusicModalIds, () => selectedMusicModalIds),
+        [rawSetSelectedMusicModalIds, selectedMusicModalIds]
+    );
 
     // Zustand Store - Get upscale selection state
     const clearUpscaleSelection = useUpscaleStore(state => state.clearUpscaleSelection);
     const selectedUpscaleModalId = useUpscaleStore(state => state.selectedUpscaleModalId);
     const selectedUpscaleModalIds = useUpscaleStore(state => state.selectedUpscaleModalIds);
     const setSelectedUpscaleModalId = useUpscaleStore(state => state.setSelectedUpscaleModalId);
-    const setSelectedUpscaleModalIds = useUpscaleStore(state => state.setSelectedUpscaleModalIds);
+    const rawSetSelectedUpscaleModalIds = useUpscaleStore(state => state.setSelectedUpscaleModalIds);
+    const setSelectedUpscaleModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedUpscaleModalIds, () => selectedUpscaleModalIds),
+        [rawSetSelectedUpscaleModalIds, selectedUpscaleModalIds]
+    );
 
     // Zustand Store - Get multiangle camera selection state
     const clearMultiangleCameraSelection = useMultiangleCameraStore(state => state.clearMultiangleCameraSelection);
     const selectedMultiangleCameraModalId = useMultiangleCameraStore(state => state.selectedMultiangleCameraModalId);
     const selectedMultiangleCameraModalIds = useMultiangleCameraStore(state => state.selectedMultiangleCameraModalIds);
     const setSelectedMultiangleCameraModalId = useMultiangleCameraStore(state => state.setSelectedMultiangleCameraModalId);
-    const setSelectedMultiangleCameraModalIds = useMultiangleCameraStore(state => state.setSelectedMultiangleCameraModalIds);
+    const rawSetSelectedMultiangleCameraModalIds = useMultiangleCameraStore(state => state.setSelectedMultiangleCameraModalIds);
+    const setSelectedMultiangleCameraModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedMultiangleCameraModalIds, () => selectedMultiangleCameraModalIds),
+        [rawSetSelectedMultiangleCameraModalIds, selectedMultiangleCameraModalIds]
+    );
 
 
 
@@ -104,7 +151,11 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const selectedVectorizeModalId = useVectorizeStore(state => state.selectedVectorizeModalId);
     const selectedVectorizeModalIds = useVectorizeStore(state => state.selectedVectorizeModalIds);
     const setSelectedVectorizeModalId = useVectorizeStore(state => state.setSelectedVectorizeModalId);
-    const setSelectedVectorizeModalIds = useVectorizeStore(state => state.setSelectedVectorizeModalIds);
+    const rawSetSelectedVectorizeModalIds = useVectorizeStore(state => state.setSelectedVectorizeModalIds);
+    const setSelectedVectorizeModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedVectorizeModalIds, () => selectedVectorizeModalIds),
+        [rawSetSelectedVectorizeModalIds, selectedVectorizeModalIds]
+    );
 
     // REMOVED: legacy local state
     // const [selectedRemoveBgModalId, setSelectedRemoveBgModalId] = useState<string | null>(null);
@@ -126,28 +177,44 @@ export function useCanvasSelection(props: CanvasProps, canvasItemsData: CanvasIt
     const selectedNextSceneModalId = useNextSceneStore(state => state.selectedNextSceneModalId);
     const selectedNextSceneModalIds = useNextSceneStore(state => state.selectedNextSceneModalIds);
     const setSelectedNextSceneModalId = useNextSceneStore(state => state.setSelectedNextSceneModalId);
-    const setSelectedNextSceneModalIds = useNextSceneStore(state => state.setSelectedNextSceneModalIds);
+    const rawSetSelectedNextSceneModalIds = useNextSceneStore(state => state.setSelectedNextSceneModalIds);
+    const setSelectedNextSceneModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedNextSceneModalIds, () => selectedNextSceneModalIds),
+        [rawSetSelectedNextSceneModalIds, selectedNextSceneModalIds]
+    );
 
     // Zustand Store - Get compare selection state
     const clearCompareSelection = useCompareStore(state => state.clearCompareSelection);
     const selectedCompareModalId = useCompareStore(state => state.selectedId);
     const selectedCompareModalIds = useCompareStore(state => state.selectedIds);
     const setSelectedCompareModalId = useCompareStore(state => state.setSelectedId);
-    const setSelectedCompareModalIds = useCompareStore(state => state.setSelectedIds);
+    const rawSetSelectedCompareModalIds = useCompareStore(state => state.setSelectedIds);
+    const setSelectedCompareModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedCompareModalIds, () => selectedCompareModalIds),
+        [rawSetSelectedCompareModalIds, selectedCompareModalIds]
+    );
 
     // Zustand Store - Get storyboard selection state
     const clearStoryboardSelection = useStoryboardStore(state => state.clearStoryboardSelection);
     const selectedStoryboardModalId = useStoryboardStore(state => state.selectedStoryboardModalId);
     const selectedStoryboardModalIds = useStoryboardStore(state => state.selectedStoryboardModalIds);
     const setSelectedStoryboardModalId = useStoryboardStore(state => state.setSelectedStoryboardModalId);
-    const setSelectedStoryboardModalIds = useStoryboardStore(state => state.setSelectedStoryboardModalIds);
+    const rawSetSelectedStoryboardModalIds = useStoryboardStore(state => state.setSelectedStoryboardModalIds);
+    const setSelectedStoryboardModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedStoryboardModalIds, () => selectedStoryboardModalIds),
+        [rawSetSelectedStoryboardModalIds, selectedStoryboardModalIds]
+    );
 
     // Zustand Store - Get text selection state
     const clearTextSelection = useTextStore(state => state.clearTextSelection);
     const selectedTextModalId = useTextStore(state => state.selectedTextModalId);
     const selectedTextModalIds = useTextStore(state => state.selectedTextModalIds);
     const setSelectedTextModalId = useTextStore(state => state.setSelectedTextModalId);
-    const setSelectedTextModalIds = useTextStore(state => state.setSelectedTextModalIds);
+    const rawSetSelectedTextModalIds = useTextStore(state => state.setSelectedTextModalIds);
+    const setSelectedTextModalIds = useMemo(
+        () => wrapSetterForDispatch(rawSetSelectedTextModalIds, () => selectedTextModalIds),
+        [rawSetSelectedTextModalIds, selectedTextModalIds]
+    );
 
 
     const [selectedScriptFrameModalId, setSelectedScriptFrameModalId] = useState<string | null>(null);

@@ -224,7 +224,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 isZoomedOut={scale < 0.4}
                 isInteracting={isInteracting}
                 setIsComponentDragging={setIsComponentDragging}
-                textInputStates={textInputStates}
+                // textInputStates={textInputStates} // REMOVED: Managed by store
                 // REMOVED: imageModalStates, videoModalStates props (now managed by Zustand store)
                 // imageModalStates={virtualizedImageModalStates}
                 // videoModalStates={virtualizedVideoModalStates}
@@ -273,9 +273,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
                 onMultiangleCamera={props.onMultiangleCamera}
                 onQwenMultipleAngles={props.onQwenMultipleAngles}
-
-                selectedTextInputId={selectedTextInputId}
-                selectedTextInputIds={selectedTextInputIds}
+                // selectedTextInputId={selectedTextInputId} // REMOVED: Managed by store
+                // selectedTextInputIds={selectedTextInputIds} // REMOVED: Managed by store
                 // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
                 // selectedImageModalId={selectedImageModalId}
                 // selectedImageModalIds={selectedImageModalIds}
@@ -307,11 +306,10 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 selectedStoryboardModalIds={selectedStoryboardModalIds}
                 selectedIds={selectedIds}
                 setSelectionOrder={setSelectionOrder}
-
                 clearAllSelections={clearAllSelections}
-                setTextInputStates={setTextInputStates}
-                setSelectedTextInputId={setSelectedTextInputId}
-                setSelectedTextInputIds={setSelectedTextInputIds}
+                // setTextInputStates={setTextInputStates} // REMOVED: Managed by store
+                // setSelectedTextInputId={setSelectedTextInputId} // REMOVED: Managed by store
+                // setSelectedTextInputIds={setSelectedTextInputIds} // REMOVED: Managed by store
                 setSelectedImageIndices={setSelectedImageIndices}
                 // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand)
                 // setImageModalStates={setImageModalStates}

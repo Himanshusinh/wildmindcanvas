@@ -23,6 +23,7 @@ import {
   useRemoveBgModalStates,
   useRemoveBgStore,
   useRemoveBgSelection,
+  useTextModalStates,
 } from '@/modules/stores';
 import { useConnectionManager } from './useConnectionManager';
 import { ConnectionLines } from './ConnectionLines';
@@ -49,7 +50,7 @@ import { ComponentCreationMenu } from './ComponentCreationMenu';
 import { CanvasTextOverlays } from './CanvasTextOverlays';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
-  textInputStates,
+  // textInputStates, // REMOVED: Managed by Zustand store locally
   // REMOVED: imageModalStates, videoModalStates (now managed by Zustand store)
   // imageModalStates,
   // videoModalStates,
@@ -85,8 +86,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistMultiangleCameraModalCreate, // Multiangle Camera Plugin
   onPersistMultiangleCameraModalMove, // Multiangle Camera Plugin
   onPersistMultiangleCameraModalDelete, // Multiangle Camera Plugin
-  selectedTextInputId,
-  selectedTextInputIds,
+
+  // selectedTextInputId, // REMOVED: Managed by Zustand store
+  // selectedTextInputIds, // REMOVED: Managed by Zustand store
   // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
   // selectedImageModalId,
   // selectedImageModalIds,
@@ -139,9 +141,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   isComponentDraggable, // New prop
 
   clearAllSelections,
-  setTextInputStates,
-  setSelectedTextInputId,
-  setSelectedTextInputIds,
+
+  // setTextInputStates, // REMOVED: Managed by Zustand store
+  // setSelectedTextInputId, // REMOVED: Managed by Zustand store
+  // setSelectedTextInputIds, // REMOVED: Managed by Zustand store
   setSelectedImageIndices,
   // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand store)
   // setImageModalStates,
@@ -272,8 +275,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   isInteracting = false,
   setIsComponentDragging,
 }) => {
+
   // Zustand Store - Get image and video modal states (replaces props)
   const imageModalStates = useImageModalStates();
+  const textInputStates = useTextModalStates(); // Added: Get text states from store for ConnectionLines
   const videoModalStates = useVideoModalStates();
   const { selectedId: selectedVideoModalId, selectedIds: selectedVideoModalIds } = useVideoSelection();
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
@@ -413,13 +418,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       {/* TextInputOverlays restored for AI Text functionality */}
+      {/* TextInputOverlays restored for AI Text functionality */}
       <TextInputOverlays
-        textInputStates={textInputStates}
-        selectedTextInputId={selectedTextInputId}
-        selectedTextInputIds={selectedTextInputIds}
+        // textInputStates={textInputStates} // Removed: managed by store
+        // selectedTextInputId={selectedTextInputId} // Removed: managed by store
+        // selectedTextInputIds={selectedTextInputIds} // Removed: managed by store
         clearAllSelections={clearAllSelections}
-        setTextInputStates={setTextInputStates}
-        setSelectedTextInputId={setSelectedTextInputId}
+        // setTextInputStates={setTextInputStates} // Removed: managed by store
+        // setSelectedTextInputId={setSelectedTextInputId} // Removed: managed by store
         onTextCreate={onTextCreate}
         onPersistTextModalDelete={onPersistTextModalDelete}
         onPersistTextModalMove={onPersistTextModalMove}
