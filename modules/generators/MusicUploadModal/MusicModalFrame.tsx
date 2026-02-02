@@ -194,7 +194,7 @@ export const MusicModalFrame: React.FC<MusicModalFrameProps> = ({
         height: `${240 * scale}px`,
         minHeight: `${200 * scale}px`,
         backgroundColor: frameBg,
-        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
+        borderRadius: ((isHovered || isPinned) && effectiveCategory) ? '0px' : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
