@@ -7,6 +7,7 @@ import { MusicModalState } from './types';
 import { downloadAudio, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { generateMusicForCanvas } from '@/core/api/api';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useMusicStore, useMusicModalStates, useMusicSelection } from '@/modules/stores';
 
 /**
  * Calculate aspect ratio string (e.g., "9:16") from width and height
@@ -49,13 +50,6 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
 }
 
 interface MusicModalOverlaysProps {
-  musicModalStates: MusicModalState[];
-  selectedMusicModalId: string | null;
-  selectedMusicModalIds: string[];
-  clearAllSelections: () => void;
-  setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
-  setSelectedMusicModalId: (id: string | null) => void;
-  setSelectedMusicModalIds: (ids: string[]) => void;
   onMusicSelect?: (file: File) => void;
   onMusicGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string) => Promise<string | null>;
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; filename?: string; duration?: number; promptInfluence?: number; loop?: boolean }) => void | Promise<void>;
@@ -72,13 +66,6 @@ interface MusicModalOverlaysProps {
 }
 
 export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
-  musicModalStates,
-  selectedMusicModalId,
-  selectedMusicModalIds,
-  clearAllSelections,
-  setMusicModalStates,
-  setSelectedMusicModalId,
-  setSelectedMusicModalIds,
   onMusicSelect,
   onMusicGenerate,
   onPersistMusicModalCreate,
@@ -94,6 +81,16 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
   selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Zustand Store Hooks
+  const musicModalStates = useMusicModalStates();
+  const { selectedId: selectedMusicModalId, selectedIds: selectedMusicModalIds } = useMusicSelection();
+  const {
+    setMusicModalStates,
+    setSelectedMusicModalId,
+    setSelectedMusicModalIds,
+    clearMusicSelection
+  } = useMusicStore();
 
   return (
     <>
@@ -137,7 +134,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
                 useSpeakerBoost: modalState.useSpeakerBoost,
                 isGenerating: false,
               };
-              setMusicModalStates(prev => [...prev, duplicated]);
+              setMusicModalStates((prev: MusicModalState[]) => [...prev, duplicated]);
               if (onPersistMusicModalCreate) {
                 Promise.resolve(onPersistMusicModalCreate(duplicated)).catch(console.error);
               }
@@ -163,7 +160,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           isOpen={true}
           id={modalState.id}
           onClose={() => {
-            setMusicModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setMusicModalStates((prev: MusicModalState[]) => prev.filter(m => m.id !== modalState.id));
             setSelectedMusicModalId(null);
             if (onPersistMusicModalDelete) {
               Promise.resolve(onPersistMusicModalDelete(modalState.id)).catch(console.error);
@@ -175,16 +172,16 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           selectionOrder={
             isChatOpen
               ? (() => {
-                  // 1. Try global selectedIds first (if valid and contains id)
-                  if (selectedIds && selectedIds.includes(modalState.id)) {
-                    return selectedIds.indexOf(modalState.id) + 1;
-                  }
-                  // 2. Fallback to specific type list
-                  if (selectedMusicModalIds && selectedMusicModalIds.includes(modalState.id)) {
-                    return selectedMusicModalIds.indexOf(modalState.id) + 1;
-                  }
-                  return undefined;
-                })()
+                // 1. Try global selectedIds first (if valid and contains id)
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                // 2. Fallback to specific type list
+                if (selectedMusicModalIds && selectedMusicModalIds.includes(modalState.id)) {
+                  return selectedMusicModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
               : undefined
           }
           onTogglePin={() => {
@@ -206,7 +203,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             }
 
             try {
-              setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: true } : m));
+              setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: true } : m));
 
               const backendModel = model === 'MiniMax Music 2' ? 'music-2.0' : model;
 
@@ -244,7 +241,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
               const url = result.url || (result as any).audio?.url;
 
               if (url) {
-                setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url, isGenerating: false } : m));
+                setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, generatedMusicUrl: url, isGenerating: false } : m));
                 if (onPersistMusicModalMove) {
                   const frameWidth = 600;
                   const frameHeight = 300;
@@ -282,11 +279,11 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
                   })).catch(console.error);
                 }
               } else {
-                setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: false } : m));
+                setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: false } : m));
               }
             } catch (err) {
               console.error('[ModalOverlays] music generation failed', err);
-              setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: false } : m));
+              setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, isGenerating: false } : m));
               alert('Music generation failed. Please try again.');
             }
             return Promise.resolve();
@@ -320,7 +317,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           initialPromptInfluence={modalState.promptInfluence}
           initialLoop={modalState.loop}
           onOptionsChange={(opts) => {
-            setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
+            setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m));
             // Trigger persistence for options changes (category, prompt, etc)
             if (onPersistMusicModalMove) {
               // Debouncing/throttling might be ideal for text inputs but for category/dropdowns it's fine.
@@ -360,7 +357,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
             }
           }}
           onSelect={() => {
-            clearAllSelections();
+            clearMusicSelection();
             setSelectedMusicModalId(modalState.id);
             setSelectedMusicModalIds([modalState.id]);
           }}
@@ -409,7 +406,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
               audioFormat: modalState.audioFormat,
               isGenerating: false,
             };
-            setMusicModalStates(prev => [...prev, duplicated]);
+            setMusicModalStates((prev: MusicModalState[]) => [...prev, duplicated]);
             if (onPersistMusicModalCreate) {
               Promise.resolve(onPersistMusicModalCreate(duplicated)).catch(console.error);
             }
@@ -419,7 +416,7 @@ export const MusicModalOverlays: React.FC<MusicModalOverlaysProps> = ({
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
-            setMusicModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+            setMusicModalStates((prev: MusicModalState[]) => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
           }}
           onPositionCommit={(finalX, finalY) => {
             if (onPersistMusicModalMove) {

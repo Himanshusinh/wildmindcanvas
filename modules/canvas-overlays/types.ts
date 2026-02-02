@@ -324,12 +324,14 @@ export interface ComponentMenu {
 
 export interface ModalOverlaysProps {
   textInputStates: TextModalState[];
-  imageModalStates: ImageModalState[];
-  videoModalStates: VideoModalState[];
+  // REMOVED: imageModalStates (now managed by Zustand store - useImageStore)
+  // imageModalStates: ImageModalState[];
+  // REMOVED: videoModalStates (now managed by Zustand store - useVideoStore)
+  // videoModalStates: VideoModalState[];
   videoEditorModalStates?: VideoEditorModalState[];
   imageEditorModalStates?: ImageEditorModalState[];
-  musicModalStates: MusicModalState[];
-  upscaleModalStates?: UpscaleModalState[];
+  // REMOVED: musicModalStates (now managed by store)
+  // REMOVED: upscaleModalStates (now managed by store)
   removeBgModalStates?: RemoveBgModalState[];
   eraseModalStates?: EraseModalState[];
   expandModalStates?: ExpandModalState[];
@@ -360,13 +362,13 @@ export interface ModalOverlaysProps {
   isInteracting?: boolean;
   setIsComponentDragging?: React.Dispatch<React.SetStateAction<boolean>>;
 
-  // Multiangle Camera Plugin
-  multiangleCameraModalStates?: MultiangleCameraModalState[];
-  selectedMultiangleCameraModalId?: string | null;
-  selectedMultiangleCameraModalIds?: string[];
-  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
-  setSelectedMultiangleCameraModalId?: (id: string | null) => void;
-  setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
+  // REMOVED: Multiangle Camera props (now managed by store)
+  // multiangleCameraModalStates?: MultiangleCameraModalState[];
+  // selectedMultiangleCameraModalId?: string | null;
+  // selectedMultiangleCameraModalIds?: string[];
+  // setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
+  // setSelectedMultiangleCameraModalId?: (id: string | null) => void;
+  // setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
   onPersistMultiangleCameraModalCreate?: (modal: MultiangleCameraModalState) => void | Promise<void>;
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
@@ -375,18 +377,22 @@ export interface ModalOverlaysProps {
 
   selectedTextInputId: string | null;
   selectedTextInputIds: string[];
-  selectedImageModalId: string | null;
-  selectedImageModalIds: string[];
-  selectedVideoModalId: string | null;
-  selectedVideoModalIds: string[];
+  // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
+  // selectedImageModalId: string | null;
+  // selectedImageModalIds: string[];
+  // REMOVED: selectedVideoModalId, selectedVideoModalIds (now managed by Zustand store)
+  // selectedVideoModalId: string | null;
+  // selectedVideoModalIds: string[];
   selectedVideoEditorModalId?: string | null;
   selectedVideoEditorModalIds?: string[];
   selectedImageEditorModalId?: string | null;
   selectedImageEditorModalIds?: string[];
-  selectedMusicModalId: string | null;
-  selectedMusicModalIds: string[];
-  selectedUpscaleModalId?: string | null;
-  selectedUpscaleModalIds?: string[];
+  // REMOVED: selectedMusicModalId, selectedMusicModalIds (now managed by Zustand store)
+  // selectedMusicModalId: string | null;
+  // selectedMusicModalIds: string[];
+  // REMOVED: selectedUpscaleModalId, selectedUpscaleModalIds (now managed by Zustand store)
+  // selectedUpscaleModalId?: string | null;
+  // selectedUpscaleModalIds?: string[];
   selectedRemoveBgModalId?: string | null;
   selectedRemoveBgModalIds?: string[];
   selectedEraseModalId?: string | null;
@@ -404,24 +410,28 @@ export interface ModalOverlaysProps {
   setSelectedTextInputId: (id: string | null) => void;
   setSelectedTextInputIds: (ids: string[]) => void;
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
-  setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
-  setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
-  setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand store)
+  // setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
+  // setSelectedImageModalId: (id: string | null) => void;
+  // setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds (now managed by Zustand store)
+  // setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
+  // setSelectedVideoModalId: (id: string | null) => void;
+  // setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
   setSelectedVideoEditorModalId?: (id: string | null) => void;
   setSelectedVideoEditorModalIds?: (ids: string[]) => void;
   setImageEditorModalStates?: React.Dispatch<React.SetStateAction<ImageEditorModalState[]>>;
   setSelectedImageEditorModalId?: (id: string | null) => void;
   setSelectedImageEditorModalIds?: (ids: string[]) => void;
-  setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
-  setSelectedMusicModalId: (id: string | null) => void;
-  setSelectedMusicModalIds: (ids: string[]) => void;
-  setUpscaleModalStates?: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
-  setSelectedUpscaleModalId?: (id: string | null) => void;
-  setSelectedUpscaleModalIds?: (ids: string[]) => void;
+  // REMOVED: setMusicModalStates, setSelectedMusicModalId, setSelectedMusicModalIds (now managed by Zustand store)
+  // setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
+  // setSelectedMusicModalId: (id: string | null) => void;
+  // setSelectedMusicModalIds: (ids: string[]) => void;
+  // REMOVED: setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
+  // setUpscaleModalStates?: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
+  // setSelectedUpscaleModalId?: (id: string | null) => void;
+  // setSelectedUpscaleModalIds?: (ids: string[]) => void;
   setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
   setSelectedRemoveBgModalId?: (id: string | null) => void;
   setSelectedRemoveBgModalIds?: (ids: string[]) => void;

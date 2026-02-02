@@ -4,6 +4,7 @@ import React from 'react';
 import { ImageEditorTrigger } from '@/modules/plugins/ImageEditorPluginModal/ImageEditorTrigger';
 import { ImageEditorModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useImageEditorStore, useImageEditorSelection, useImageEditorModalStates } from '@/modules/stores';
 
 interface ImageEditorModalOverlaysProps {
     imageEditorModalStates: ImageEditorModalState[] | undefined;
@@ -23,7 +24,7 @@ interface ImageEditorModalOverlaysProps {
     selectedIds?: string[];
 }
 
-export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> = ({
+export const ImageEditorModalOverlays = React.memo<ImageEditorModalOverlaysProps>(({
     imageEditorModalStates,
     selectedImageEditorModalId,
     selectedImageEditorModalIds,
@@ -40,6 +41,23 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
     isChatOpen = false,
     selectedIds = [],
 }) => {
+    const storeImageEditorModalStates = useImageEditorModalStates();
+    const {
+        selectedId: storeSelectedImageEditorModalId,
+        selectedIds: storeSelectedImageEditorModalIds,
+        setSelectedId: storeSetSelectedImageEditorModalId,
+        setSelectedIds: storeSetSelectedImageEditorModalIds
+    } = useImageEditorSelection();
+    const storeSetImageEditorModalStates = useImageEditorStore(state => state.setImageEditorModalStates);
+
+    const finalImageEditorModalStates = imageEditorModalStates || storeImageEditorModalStates;
+    const finalSelectedImageEditorModalId = selectedImageEditorModalId !== undefined ? selectedImageEditorModalId : storeSelectedImageEditorModalId;
+    const finalSelectedImageEditorModalIds = selectedImageEditorModalIds !== undefined ? selectedImageEditorModalIds : storeSelectedImageEditorModalIds;
+
+    const finalSetImageEditorModalStates = setImageEditorModalStates || storeSetImageEditorModalStates;
+    const finalSetSelectedImageEditorModalId = setSelectedImageEditorModalId || storeSetSelectedImageEditorModalId;
+    const finalSetSelectedImageEditorModalIds = setSelectedImageEditorModalIds || storeSetSelectedImageEditorModalIds;
+
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
     return (
@@ -50,7 +68,7 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
                     onDuplicate={() => {
-                        const modalState = imageEditorModalStates?.find(m => m.id === contextMenu.modalId);
+                        const modalState = finalImageEditorModalStates?.find((m: ImageEditorModalState) => m.id === contextMenu.modalId);
                         if (modalState) {
                             const duplicated = {
                                 ...modalState,
@@ -58,7 +76,10 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                                 x: modalState.x + 50,
                                 y: modalState.y + 50,
                             };
-                            setImageEditorModalStates(prev => [...prev, duplicated]);
+                            finalSetImageEditorModalStates((prev: ImageEditorModalState[]) => {
+                                const prevArr = typeof prev === 'function' ? (prev as any)(finalImageEditorModalStates) : prev;
+                                return [...(prevArr || []), duplicated];
+                            });
                             if (onPersistImageEditorModalCreate) {
                                 Promise.resolve(onPersistImageEditorModalCreate(duplicated)).catch(console.error);
                             }
@@ -67,8 +88,8 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     onDelete={() => {
                         if (onPersistImageEditorModalDelete) {
                             const modalId = contextMenu.modalId;
-                            setSelectedImageEditorModalId(null);
-                            setSelectedImageEditorModalIds([]);
+                            finalSetSelectedImageEditorModalId(null);
+                            finalSetSelectedImageEditorModalIds([]);
                             const result = onPersistImageEditorModalDelete(modalId);
                             if (result && typeof (result as any).then === 'function') {
                                 Promise.resolve(result as any).catch(console.error);
@@ -78,7 +99,7 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                 />
             )}
 
-            {(imageEditorModalStates || []).map((modalState) => (
+            {(finalImageEditorModalStates || []).map((modalState) => (
                 <ImageEditorTrigger
                     key={modalState.id}
                     id={modalState.id}
@@ -86,20 +107,20 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     y={modalState.y}
                     scale={scale}
                     position={position}
-                    isSelected={selectedImageEditorModalId === modalState.id || (selectedImageEditorModalIds || []).includes(modalState.id)}
-                    isAttachedToChat={isChatOpen && (selectedImageEditorModalId === modalState.id || (selectedImageEditorModalIds || []).includes(modalState.id))}
+                    isSelected={finalSelectedImageEditorModalId === modalState.id || (finalSelectedImageEditorModalIds || []).includes(modalState.id)}
+                    isAttachedToChat={isChatOpen && (finalSelectedImageEditorModalId === modalState.id || (finalSelectedImageEditorModalIds || []).includes(modalState.id))}
                     selectionOrder={
-                      isChatOpen
-                        ? (() => {
-                            if (selectedIds && selectedIds.includes(modalState.id)) {
-                              return selectedIds.indexOf(modalState.id) + 1;
-                            }
-                            if (selectedImageEditorModalIds && selectedImageEditorModalIds.includes(modalState.id)) {
-                              return selectedImageEditorModalIds.indexOf(modalState.id) + 1;
-                            }
-                            return undefined;
-                          })()
-                        : undefined
+                        isChatOpen
+                            ? (() => {
+                                if (selectedIds && selectedIds.includes(modalState.id)) {
+                                    return selectedIds.indexOf(modalState.id) + 1;
+                                }
+                                if (finalSelectedImageEditorModalIds && finalSelectedImageEditorModalIds.includes(modalState.id)) {
+                                    return finalSelectedImageEditorModalIds.indexOf(modalState.id) + 1;
+                                }
+                                return undefined;
+                            })()
+                            : undefined
                     }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
@@ -108,8 +129,8 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                     }}
                     onSelect={() => {
                         clearAllSelections();
-                        setSelectedImageEditorModalId(modalState.id);
-                        setSelectedImageEditorModalIds([modalState.id]);
+                        finalSetSelectedImageEditorModalId(modalState.id);
+                        finalSetSelectedImageEditorModalIds([modalState.id]);
                     }}
                     onOpenEditor={() => {
                         if (onOpenImageEditor) {
@@ -117,7 +138,10 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                         }
                     }}
                     onPositionChange={(newX, newY) => {
-                        setImageEditorModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+                        finalSetImageEditorModalStates((prev: ImageEditorModalState[]) => {
+                            const prevArr = typeof prev === 'function' ? (prev as any)(finalImageEditorModalStates) : prev;
+                            return (prevArr || []).map((m: ImageEditorModalState) => m.id === modalState.id ? { ...m, x: newX, y: newY } : m);
+                        });
                     }}
                     onPositionCommit={(finalX, finalY) => {
                         if (onPersistImageEditorModalMove) {
@@ -125,8 +149,8 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
                         }
                     }}
                     onDelete={() => {
-                        setSelectedImageEditorModalId(null);
-                        setSelectedImageEditorModalIds([]);
+                        finalSetSelectedImageEditorModalId(null);
+                        finalSetSelectedImageEditorModalIds([]);
                         if (onPersistImageEditorModalDelete) {
                             const result = onPersistImageEditorModalDelete(modalState.id);
                             if (result && typeof (result as any).then === 'function') {
@@ -140,4 +164,6 @@ export const ImageEditorModalOverlays: React.FC<ImageEditorModalOverlaysProps> =
             ))}
         </>
     );
-};
+});
+
+ImageEditorModalOverlays.displayName = 'ImageEditorModalOverlays';

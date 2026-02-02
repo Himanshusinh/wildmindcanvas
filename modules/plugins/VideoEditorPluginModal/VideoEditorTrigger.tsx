@@ -22,7 +22,7 @@ interface VideoEditorTriggerProps {
     selectionOrder?: number;
 }
 
-export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
+export const VideoEditorTrigger = React.memo<VideoEditorTriggerProps>(({
     id,
     x,
     y,
@@ -79,7 +79,7 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
             onContextMenu={onContextMenu}
         >
             {isAttachedToChat && selectionOrder && (
-                <div 
+                <div
                     className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
                     style={{
                         left: `${-40 * scale}px`,
@@ -182,4 +182,6 @@ export const VideoEditorTrigger: React.FC<VideoEditorTriggerProps> = ({
             </div>
         </PluginNodeShell>
     );
-};
+});
+
+VideoEditorTrigger.displayName = 'VideoEditorTrigger';

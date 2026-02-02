@@ -4,14 +4,18 @@ import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from './useCanvasState';
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/core/api/api';
 import { StoryWorld, StorySceneOutline } from '@/core/types/storyWorld';
+import { useImageModalStates, useImageStore } from '@/modules/stores';
 
 export function useStoryboardLogic(
     canvasState: ReturnType<typeof useCanvasState>,
     props: CanvasProps
 ) {
+    const imageModalStates = useImageModalStates();
+    const { setImageModalStates } = useImageStore();
+
     const {
         images,
-        imageModalStates,
+        // REMOVED: imageModalStates (via store)
         storyboardModalStates,
         setStoryboardModalStates,
         sceneFrameModalStates,
@@ -551,7 +555,7 @@ export function useStoryboardLogic(
                     // "const associatedImages = imageModalStates.filter(...)".
                     // Since imageModalStates is in dependency array, we are fine.
 
-                    const associatedImages = canvasState.imageModalStates.filter((img: any) => img.id.includes(sceneToDelete.id));
+                    const associatedImages = imageModalStates.filter((img: any) => img.id.includes(sceneToDelete.id));
                     for (const img of associatedImages) {
                         // Call setter from canvasState (need to import it)
                         // We destructured setImageModalStates? No, we didn't destructure it at the top!
@@ -580,7 +584,7 @@ export function useStoryboardLogic(
         } catch (error) {
             console.error('[Canvas] Error in smart scene update:', error);
         }
-    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalMove, onPersistSceneFrameModalCreate, onPersistConnectorCreate, onPersistSceneFrameModalDelete, onPersistConnectorDelete, canvasState.imageModalStates, connections]); // Missing dependencies like setImageModalStates
+    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalMove, onPersistSceneFrameModalCreate, onPersistConnectorCreate, onPersistSceneFrameModalDelete, onPersistConnectorDelete, imageModalStates, connections, setImageModalStates]);
 
 
     const handleGenerateScenesFromStoryboard = useCallback(async (

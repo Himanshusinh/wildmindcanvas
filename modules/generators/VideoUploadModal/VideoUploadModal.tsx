@@ -22,6 +22,8 @@ import { ImageUpload } from '@/core/types/canvas';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { buildProxyMediaUrl } from '@/core/api/proxyUtils';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+// Zustand Store - Image State Management
+import { useImageModalStates } from '@/modules/stores';
 
 const VIDEO_MODEL_OPTIONS = [
   'Sora 2 Pro',
@@ -67,7 +69,8 @@ interface VideoUploadModalProps {
   initialResolution?: string;
   onOptionsChange?: (opts: { model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
-  imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  // REMOVED: imageModalStates (now managed by Zustand store)
+  // imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: ImageUpload[];
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
   draggable?: boolean;
@@ -109,7 +112,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   onOptionsChange,
   onVideoSelect,
   connections = [],
-  imageModalStates = [],
+  // REMOVED: imageModalStates (now managed by Zustand store)
+  // imageModalStates = [],
   images = [],
   textInputStates = [],
   draggable = true,
@@ -118,6 +122,9 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   onTogglePin,
   onPersistVideoModalCreate,
 }) => {
+  // Zustand Store - Get image states for connections
+  const imageModalStates = useImageModalStates();
+
   const [isDraggingContainer, setIsDraggingContainer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   // Removed local isPinned state
@@ -326,8 +333,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const defaultResolution = getModelDefaultResolution(targetModel);
 
     // Respect initialDuration if provided (from chat instructions)
-    const durationToUse = (initialDuration && isValidDurationForModel(targetModel, initialDuration)) 
-      ? initialDuration 
+    const durationToUse = (initialDuration && isValidDurationForModel(targetModel, initialDuration))
+      ? initialDuration
       : defaultDuration;
 
     // Respect initialResolution if provided (from chat instructions)
@@ -515,12 +522,12 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous'; // Allow CORS for external videos
     video.preload = 'metadata'; // Only load metadata, not the full video
-    
+
     let isCancelled = false;
-    
+
     video.onloadedmetadata = () => {
       if (isCancelled) return;
-      
+
       if (video.videoWidth > 0 && video.videoHeight > 0) {
         setVideoResolution({ width: video.videoWidth, height: video.videoHeight });
         lastProcessedUrlRef.current = proxiedVideoUrl;
@@ -550,13 +557,13 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         }
       }
     };
-    
+
     video.onerror = () => {
       if (isCancelled) return;
       setVideoResolution(null);
       lastProcessedUrlRef.current = null;
     };
-    
+
     video.src = proxiedVideoUrl;
 
     return () => {
@@ -656,7 +663,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         // Only handle as click if mouse didn't move much (was a click, not a drag)
         wasClick = dx <= 5 && dy <= 5;
       }
-      
+
       if (wasClick) {
         console.log('[VideoUploadModal] handleClick triggering onSelect for shift-click', {
           id,
@@ -668,7 +675,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         e.preventDefault();
       }
     }
-    
+
     // Clear the mouseDownPosRef after click event has been processed
     mouseDownPosRef.current = null;
   };
@@ -680,7 +687,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const isButton = target.tagName === 'BUTTON' || target.closest('button');
     const isControls = target.closest('.controls-overlay');
     const isShiftClick = e.shiftKey || e.ctrlKey || e.metaKey;
-    
+
     // Allow drag even when clicking video/image content so user can still reposition after generation.
     if (draggable === false && !isInput && !isButton && !isControls) {
       return;
@@ -734,7 +741,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       if (!pendingEvent) return;
       const e = pendingEvent;
       pendingEvent = null;
-      
+
       if (!containerRef.current || !onPositionChange) return;
 
       // Calculate new screen position
@@ -755,7 +762,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current || !onPositionChange) return;
-      
+
       // Store the event and schedule RAF if not already scheduled
       pendingEvent = e;
       if (rafId == null) {
@@ -814,7 +821,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       }}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,

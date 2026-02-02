@@ -1,5 +1,3 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
@@ -35,7 +33,7 @@ interface StoryboardControlsProps {
 }
 
 
-export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
+export const StoryboardControls = React.memo<StoryboardControlsProps>(({
     id,
     scale,
     characterInput,
@@ -585,4 +583,6 @@ export const StoryboardControls: React.FC<StoryboardControlsProps> = ({
             </button>
         </div>
     );
-};
+});
+
+StoryboardControls.displayName = 'StoryboardControls';

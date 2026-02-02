@@ -9,6 +9,8 @@ import { ImageModalNodes } from './ImageModalNodes';
 import { ImageModalControls } from './ImageModalControls';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
+// Zustand Store - Image State Management
+import { useImageModalStates, useImageStore } from '@/modules/stores';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -46,9 +48,11 @@ interface ImageUploadModalProps {
   frameHeight?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number, options?: Record<string, any>) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
-  onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
+  // REMOVED: onUpdateModalState (now using Zustand store)
+  // onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
-  imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  // REMOVED: imageModalStates (now using Zustand store - useImageModalStates)
+  // imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
@@ -97,9 +101,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onOptionsChange,
   onPersistImageModalCreate,
   onImageGenerate,
-  onUpdateModalState,
+  // REMOVED: onUpdateModalState (now using Zustand store)
+  // onUpdateModalState,
   connections = [],
-  imageModalStates = [],
+  // REMOVED: imageModalStates (now using Zustand store)
+  // imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
   textInputStates = [],
@@ -114,6 +120,10 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isPinned = false,
   onTogglePin,
 }) => {
+  // Zustand Store - Get image modal states and actions
+  const imageModalStates = useImageModalStates();
+  const { updateImageModal } = useImageStore();
+
   // Fix 3: Strict Guard - Prevent rendering invalid modals
   if (!id) return null;
 
@@ -1105,7 +1115,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // Update all frames with their respective images
         // Only show images when all are ready
         for (let i = 0; i < modalIds.length && i < imageUrls.length; i++) {
-          if (onUpdateModalState) {
             // Recalculate frame dimensions based on selected aspect ratio to ensure correct frame size
             // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
             const [w, h] = selectedAspectRatio.split(':').map(Number);
@@ -1114,7 +1123,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             const rawHeight = ar ? Math.round(calculatedFrameWidth / ar) : 600;
             const calculatedFrameHeight = Math.max(400, rawHeight);
 
-            onUpdateModalState(modalIds[i], {
+          // Update Zustand store instead of callback
+          updateImageModal(modalIds[i], {
               generatedImageUrl: imageUrls[i],
               isGenerating: false, // Mark as completed
               model: selectedModel,
@@ -1124,7 +1134,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
               frameWidth: calculatedFrameWidth, // Use calculated dimensions based on aspect ratio
               frameHeight: calculatedFrameHeight, // Use calculated dimensions based on aspect ratio
             } as any);
-          }
         }
       } catch (error) {
         console.error('Error generating images:', error);
@@ -1661,7 +1670,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       }
       // Only prevent default for left mouse button (allow right-click context menu, etc.)
       if (e.button === 0) {
-        e.preventDefault();
+      e.preventDefault();
       }
       e.stopPropagation();
     }
@@ -1692,7 +1701,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       // Update local position immediately for smooth visual feedback
       setDragPosition({ x: newCanvasX, y: newCanvasY });
       
+      // Update Zustand store for position
+      if (id) {
+        updateImageModal(id, { x: newCanvasX, y: newCanvasY });
+      }
+      // Also call callback for persistence if provided
+      if (onPositionChange) {
       onPositionChange(newCanvasX, newCanvasY);
+      }
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
       rafId = null;
     };

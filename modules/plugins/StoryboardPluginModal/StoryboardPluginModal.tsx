@@ -1,6 +1,4 @@
-'use client';
-
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
@@ -54,7 +52,7 @@ interface StoryboardPluginModalProps {
   selectionOrder?: number;
 }
 
-export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
+export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
   isOpen,
   id,
   onClose,
@@ -260,7 +258,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       style={{ touchAction: 'none' }}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -446,5 +444,7 @@ export const StoryboardPluginModal: React.FC<StoryboardPluginModalProps> = ({
       </div>
     </PluginNodeShell>
   );
-};
+});
+
+StoryboardPluginModal.displayName = 'StoryboardPluginModal';
 

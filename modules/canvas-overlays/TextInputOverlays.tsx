@@ -6,14 +6,15 @@ import Konva from 'konva';
 import { TextModalState, StoryboardModalState, Connection } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { generateDownloadFilename } from '@/core/api/downloadUtils';
+import { useTextStore, useTextModalStates, useTextSelection } from '@/modules/stores';
 
 interface TextInputOverlaysProps {
-  textInputStates: TextModalState[];
-  selectedTextInputId: string | null;
-  selectedTextInputIds: string[];
+  // textInputStates: TextModalState[]; // Removed - used from store
+  // selectedTextInputId: string | null; // Removed - used from store
+  // selectedTextInputIds: string[]; // Removed - used from store
   clearAllSelections: () => void;
-  setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
-  setSelectedTextInputId: (id: string | null) => void;
+  // setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>; // Removed - used from store
+  // setSelectedTextInputId: (id: string | null) => void; // Removed - used from store
   onTextCreate?: (text: string, x: number, y: number) => void;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean }>) => void | Promise<void>;
@@ -24,15 +25,17 @@ interface TextInputOverlaysProps {
   onScriptGenerationStart?: (textModalId: string) => void;
   connections?: Connection[];
   storyboardModalStates?: StoryboardModalState[];
+  selectedIds?: string[]; // Added for consistency with other overlays
+  isChatOpen?: boolean; // Added for consistency
 }
 
-export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
-  textInputStates,
-  selectedTextInputId,
-  selectedTextInputIds,
+export const TextInputOverlays = React.memo<TextInputOverlaysProps>(({
+  // textInputStates,
+  // selectedTextInputId,
+  // selectedTextInputIds,
   clearAllSelections,
-  setTextInputStates,
-  setSelectedTextInputId,
+  // setTextInputStates,
+  // setSelectedTextInputId,
   onTextCreate,
   onPersistTextModalDelete,
   onPersistTextModalMove,
@@ -43,8 +46,40 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
   onScriptGenerationStart,
   connections = [],
   storyboardModalStates = [],
+  selectedIds = [],
+  isChatOpen = false,
 }) => {
+  // Zustand Store
+  const textInputStates = useTextModalStates();
+  const {
+    selectedId: selectedTextInputId,
+    selectedIds: selectedTextInputIds
+  } = useTextSelection();
+
+  const setTextModalStates = useTextStore(state => state.setTextModalStates);
+  const setSelectedTextInputId = useTextStore(state => state.setSelectedTextModalId);
+  const setSelectedTextInputIds = useTextStore(state => state.setSelectedTextModalIds);
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Track Shift key locally for robust multi-selection
+  const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setIsShiftPressed(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const handleDownload = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'text/plain' });
@@ -92,18 +127,18 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             if (onPersistTextModalDelete) {
               Promise.resolve(onPersistTextModalDelete(textState.id)).catch(console.error);
             }
-            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
+            setTextModalStates(prev => prev.filter(t => t.id !== textState.id));
             setSelectedTextInputId(null);
           }}
           onCancel={() => {
             if (onPersistTextModalDelete) {
               Promise.resolve(onPersistTextModalDelete(textState.id)).catch(console.error);
             }
-            setTextInputStates(prev => prev.filter(t => t.id !== textState.id));
+            setTextModalStates(prev => prev.filter(t => t.id !== textState.id));
             setSelectedTextInputId(null);
           }}
           onPositionChange={(newX, newY) => {
-            setTextInputStates(prev => prev.map(t =>
+            setTextModalStates(prev => prev.map(t =>
               t.id === textState.id ? { ...t, x: newX, y: newY } : t
             ));
           }}
@@ -113,10 +148,19 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             }
           }}
           onSelect={() => {
-            // Clear all other selections first
-            clearAllSelections();
-            // Then set this text input as selected
-            setSelectedTextInputId(textState.id);
+            if (isShiftPressed) {
+              const isAlreadySelected = (selectedTextInputIds || []).includes(textState.id);
+              if (isAlreadySelected) {
+                setSelectedTextInputIds((selectedTextInputIds || []).filter(id => id !== textState.id));
+              } else {
+                setSelectedTextInputIds([...(selectedTextInputIds || []), textState.id]);
+              }
+              setSelectedTextInputId(textState.id);
+            } else {
+              clearAllSelections();
+              setSelectedTextInputId(textState.id);
+              setSelectedTextInputIds([textState.id]);
+            }
           }}
           onDelete={() => {
             console.log('[TextInputOverlays] onDelete called', {
@@ -136,7 +180,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
               }
             }
             // Then update local state (this should match what parent state will be)
-            setTextInputStates(prev => {
+            setTextModalStates(prev => {
               const filtered = prev.filter(t => t.id !== textState.id);
               console.log('[TextInputOverlays] Local state updated, remaining modals:', filtered.length);
               return filtered;
@@ -151,17 +195,17 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
               y: textState.y, // Same Y position
               value: textState.value || ''
             };
-            setTextInputStates(prev => [...prev, duplicated]);
+            setTextModalStates(prev => [...prev, duplicated]);
           }}
           onValueChange={(val) => {
-            setTextInputStates(prev => prev.map(t => t.id === textState.id ? { ...t, value: val } : t));
+            setTextModalStates(prev => prev.map(t => t.id === textState.id ? { ...t, value: val } : t));
             if (onPersistTextModalMove) {
               Promise.resolve(onPersistTextModalMove(textState.id, { value: val })).catch(console.error);
             }
           }}
           onSendPrompt={(sentText) => {
             // Update sentValue when arrow is clicked - this triggers sync in connected components
-            setTextInputStates(prev => prev.map(t => t.id === textState.id ? { ...t, sentValue: sentText } : t));
+            setTextModalStates(prev => prev.map(t => t.id === textState.id ? { ...t, sentValue: sentText } : t));
             if (onPersistTextModalMove) {
               Promise.resolve(onPersistTextModalMove(textState.id, { sentValue: sentText })).catch(console.error);
             }
@@ -203,7 +247,7 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
                 y: modal.y,
                 value: modal.value || ''
               };
-              setTextInputStates(prev => [...prev, duplicated]);
+              setTextModalStates(prev => [...prev, duplicated]);
               // Trigger creation persistence if needed? The original code didn't have persisted create for logic in onDuplicate,
               // but usually there should be onPersistTextModalCreate.
               // It is prop 15: onTextCreate. But onTextCreate signature is (text, x, y) => void.
@@ -220,12 +264,14 @@ export const TextInputOverlays: React.FC<TextInputOverlaysProps> = ({
             setSelectedTextInputId(null);
             if (onPersistTextModalDelete) {
               Promise.resolve(onPersistTextModalDelete(modalId)).catch(console.error);
-              setTextInputStates(prev => prev.filter(m => m.id !== modalId));
+              setTextModalStates(prev => prev.filter(m => m.id !== modalId));
             }
           }}
         />
       )}
     </>
   );
-};
+});
+
+TextInputOverlays.displayName = 'TextInputOverlays';
 

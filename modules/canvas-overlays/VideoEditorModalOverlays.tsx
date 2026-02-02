@@ -1,10 +1,9 @@
-'use client';
-
 import React from 'react';
 import { VideoEditorTrigger } from '@/modules/plugins/VideoEditorPluginModal/VideoEditorTrigger';
 import { VideoEditorModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import Konva from 'konva';
+import { useVideoEditorStore, useVideoEditorSelection, useVideoEditorModalStates } from '@/modules/stores';
 
 interface VideoEditorModalOverlaysProps {
     videoEditorModalStates: VideoEditorModalState[] | undefined;
@@ -24,7 +23,7 @@ interface VideoEditorModalOverlaysProps {
     selectedIds?: string[];
 }
 
-export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> = ({
+export const VideoEditorModalOverlays = React.memo<VideoEditorModalOverlaysProps>(({
     videoEditorModalStates,
     selectedVideoEditorModalId,
     selectedVideoEditorModalIds,
@@ -41,6 +40,23 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
     isChatOpen = false,
     selectedIds = [],
 }) => {
+    const storeVideoEditorModalStates = useVideoEditorModalStates();
+    const {
+        selectedId: storeSelectedVideoEditorModalId,
+        selectedIds: storeSelectedVideoEditorModalIds,
+        setSelectedId: storeSetSelectedVideoEditorModalId,
+        setSelectedIds: storeSetSelectedVideoEditorModalIds
+    } = useVideoEditorSelection();
+    const storeSetVideoEditorModalStates = useVideoEditorStore(state => state.setVideoEditorModalStates);
+
+    const finalVideoEditorModalStates = videoEditorModalStates || storeVideoEditorModalStates;
+    const finalSelectedVideoEditorModalId = selectedVideoEditorModalId !== undefined ? selectedVideoEditorModalId : storeSelectedVideoEditorModalId;
+    const finalSelectedVideoEditorModalIds = selectedVideoEditorModalIds !== undefined ? selectedVideoEditorModalIds : storeSelectedVideoEditorModalIds;
+
+    const finalSetVideoEditorModalStates = setVideoEditorModalStates || storeSetVideoEditorModalStates;
+    const finalSetSelectedVideoEditorModalId = setSelectedVideoEditorModalId || storeSetSelectedVideoEditorModalId;
+    const finalSetSelectedVideoEditorModalIds = setSelectedVideoEditorModalIds || storeSetSelectedVideoEditorModalIds;
+
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
     return (
@@ -51,7 +67,7 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
                     onDuplicate={() => {
-                        const modalState = videoEditorModalStates?.find(m => m.id === contextMenu.modalId);
+                        const modalState = finalVideoEditorModalStates?.find((m: VideoEditorModalState) => m.id === contextMenu.modalId);
                         if (modalState) {
                             const duplicated = {
                                 ...modalState,
@@ -59,7 +75,10 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                                 x: modalState.x + 50,
                                 y: modalState.y + 50,
                             };
-                            setVideoEditorModalStates(prev => [...prev, duplicated]);
+                            finalSetVideoEditorModalStates(prev => {
+                                const prevArr = typeof prev === 'function' ? (prev as any)(finalVideoEditorModalStates) : prev;
+                                return [...(prevArr || []), duplicated];
+                            });
                             if (onPersistVideoEditorModalCreate) {
                                 Promise.resolve(onPersistVideoEditorModalCreate(duplicated)).catch(console.error);
                             }
@@ -68,8 +87,8 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     onDelete={() => {
                         if (onPersistVideoEditorModalDelete) {
                             const modalId = contextMenu.modalId;
-                            setSelectedVideoEditorModalId(null);
-                            setSelectedVideoEditorModalIds([]);
+                            finalSetSelectedVideoEditorModalId(null);
+                            finalSetSelectedVideoEditorModalIds([]);
                             const result = onPersistVideoEditorModalDelete(modalId);
                             if (result && typeof result.then === 'function') {
                                 Promise.resolve(result).catch(console.error);
@@ -78,7 +97,7 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     }}
                 />
             )}
-            {(videoEditorModalStates || []).map((modalState) => (
+            {(finalVideoEditorModalStates || []).map((modalState) => (
                 <VideoEditorTrigger
                     key={modalState.id}
                     id={modalState.id}
@@ -86,20 +105,20 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     y={modalState.y}
                     scale={scale}
                     position={position}
-                    isSelected={selectedVideoEditorModalId === modalState.id || (selectedVideoEditorModalIds || []).includes(modalState.id)}
-                    isAttachedToChat={isChatOpen && (selectedVideoEditorModalId === modalState.id || (selectedVideoEditorModalIds || []).includes(modalState.id))}
+                    isSelected={finalSelectedVideoEditorModalId === modalState.id || (finalSelectedVideoEditorModalIds || []).includes(modalState.id)}
+                    isAttachedToChat={isChatOpen && (finalSelectedVideoEditorModalId === modalState.id || (finalSelectedVideoEditorModalIds || []).includes(modalState.id))}
                     selectionOrder={
-                      isChatOpen
-                        ? (() => {
-                            if (selectedIds && selectedIds.includes(modalState.id)) {
-                              return selectedIds.indexOf(modalState.id) + 1;
-                            }
-                            if (selectedVideoEditorModalIds && selectedVideoEditorModalIds.includes(modalState.id)) {
-                              return selectedVideoEditorModalIds.indexOf(modalState.id) + 1;
-                            }
-                            return undefined;
-                          })()
-                        : undefined
+                        isChatOpen
+                            ? (() => {
+                                if (selectedIds && selectedIds.includes(modalState.id)) {
+                                    return selectedIds.indexOf(modalState.id) + 1;
+                                }
+                                if (finalSelectedVideoEditorModalIds && finalSelectedVideoEditorModalIds.includes(modalState.id)) {
+                                    return finalSelectedVideoEditorModalIds.indexOf(modalState.id) + 1;
+                                }
+                                return undefined;
+                            })()
+                            : undefined
                     }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
@@ -108,8 +127,8 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                     }}
                     onSelect={() => {
                         clearAllSelections();
-                        setSelectedVideoEditorModalId(modalState.id);
-                        setSelectedVideoEditorModalIds([modalState.id]);
+                        finalSetSelectedVideoEditorModalId(modalState.id);
+                        finalSetSelectedVideoEditorModalIds([modalState.id]);
                     }}
                     onOpenEditor={() => {
                         if (onOpenVideoEditor) {
@@ -117,7 +136,10 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                         }
                     }}
                     onPositionChange={(newX, newY) => {
-                        setVideoEditorModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+                        finalSetVideoEditorModalStates(prev => {
+                            const prevArr = typeof prev === 'function' ? (prev as any)(finalVideoEditorModalStates) : prev;
+                            return (prevArr || []).map((m: VideoEditorModalState) => m.id === modalState.id ? { ...m, x: newX, y: newY } : m);
+                        });
                     }}
                     onPositionCommit={(finalX, finalY) => {
                         if (onPersistVideoEditorModalMove) {
@@ -130,8 +152,8 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
                             modalId: modalState.id,
                         });
                         // Clear selection immediately
-                        setSelectedVideoEditorModalId(null);
-                        setSelectedVideoEditorModalIds([]);
+                        finalSetSelectedVideoEditorModalId(null);
+                        finalSetSelectedVideoEditorModalIds([]);
                         // Call persist delete - it updates parent state (videoEditorGenerators) which flows down as externalVideoEditorModals
                         // Canvas will sync videoEditorModalStates with externalVideoEditorModals via useEffect
                         if (onPersistVideoEditorModalDelete) {
@@ -151,4 +173,6 @@ export const VideoEditorModalOverlays: React.FC<VideoEditorModalOverlaysProps> =
             ))}
         </>
     );
-};
+});
+
+VideoEditorModalOverlays.displayName = 'VideoEditorModalOverlays';

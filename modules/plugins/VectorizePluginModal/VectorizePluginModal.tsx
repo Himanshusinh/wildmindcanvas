@@ -7,9 +7,7 @@ import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
-import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
-import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState, PluginNodeShell, PluginConnectionNodes } from '../PluginComponents';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -50,7 +48,9 @@ interface VectorizePluginModalProps {
   selectionOrder?: number;
 }
 
-export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
+import { memo } from 'react';
+
+export const VectorizePluginModal = memo<VectorizePluginModalProps>(({
   isOpen,
   isExpanded,
   id,
@@ -357,7 +357,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       onContextMenu={onContextMenu}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -452,7 +452,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             id={id}
             scale={scale}
             isHovered={isHovered}
-            isSelected={isSelected || false}
+            isSelected={Boolean(isSelected)}
           />
         </div>
 
@@ -490,7 +490,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
                 onModeChange={(newMode) => {
                   setMode(newMode);
                   if (onOptionsChange) {
-                    onOptionsChange({ mode: newMode } as any);
+                    onOptionsChange({ mode: newMode });
                   }
                 }}
                 onVectorize={handleVectorize}
@@ -504,7 +504,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
                 isVectorizedImage={isVectorizedImage}
                 isDraggingContainer={isDraggingContainer}
                 isHovered={isHovered}
-                isSelected={isSelected || false}
+                isSelected={Boolean(isSelected)}
                 sourceImageUrl={sourceImageUrl}
                 onMouseDown={handleMouseDown}
                 onSelect={onSelect}
@@ -516,5 +516,6 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
 
     </PluginNodeShell>
   );
-};
+});
 
+VectorizePluginModal.displayName = 'VectorizePluginModal';

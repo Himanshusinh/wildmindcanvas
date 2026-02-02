@@ -7,6 +7,7 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import Konva from 'konva';
 import { ImageModalState } from './types';
 import { ImageUpload } from '@/core/types/canvas';
+import { useStoryboardStore, useStoryboardSelection, useStoryboardModalStates } from '@/modules/stores';
 
 interface StoryboardModalState {
   id: string;
@@ -56,7 +57,7 @@ interface StoryboardModalOverlaysProps {
   selectedIds?: string[];
 }
 
-export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = ({
+export const StoryboardModalOverlays = React.memo<StoryboardModalOverlaysProps>(({
   storyboardModalStates,
   selectedStoryboardModalId,
   selectedStoryboardModalIds,
@@ -79,6 +80,23 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
   isChatOpen = false,
   selectedIds = [],
 }) => {
+  const storeStoryboardModalStates = useStoryboardModalStates();
+  const {
+    selectedId: storeSelectedStoryboardModalId,
+    selectedIds: storeSelectedStoryboardModalIds,
+    setSelectedId: storeSetSelectedStoryboardModalId,
+    setSelectedIds: storeSetSelectedStoryboardModalIds
+  } = useStoryboardSelection();
+  const storeSetStoryboardModalStates = useStoryboardStore((state) => state.setStoryboardModalStates);
+
+  const finalStoryboardModalStates = storyboardModalStates || storeStoryboardModalStates;
+  const finalSelectedStoryboardModalId = selectedStoryboardModalId !== undefined ? selectedStoryboardModalId : storeSelectedStoryboardModalId;
+  const finalSelectedStoryboardModalIds = selectedStoryboardModalIds !== undefined ? selectedStoryboardModalIds : storeSelectedStoryboardModalIds;
+
+  const finalSetStoryboardModalStates = setStoryboardModalStates || storeSetStoryboardModalStates;
+  const finalSetSelectedStoryboardModalId = setSelectedStoryboardModalId || storeSetSelectedStoryboardModalId;
+  const finalSetSelectedStoryboardModalIds = setSelectedStoryboardModalIds || storeSetSelectedStoryboardModalIds;
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   // Helper to get connected images for a storyboard
@@ -112,7 +130,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           onDuplicate={() => {
-            const modalState = storyboardModalStates?.find(m => m.id === contextMenu.modalId);
+            const modalState = finalStoryboardModalStates?.find(m => m.id === contextMenu.modalId);
             if (modalState) {
               const duplicated = {
                 ...modalState,
@@ -120,7 +138,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
                 x: modalState.x + 50,
                 y: modalState.y + 50,
               };
-              setStoryboardModalStates(prev => [...prev, duplicated]);
+              finalSetStoryboardModalStates(prev => [...prev, duplicated]);
               if (onPersistStoryboardModalCreate) {
                 Promise.resolve(onPersistStoryboardModalCreate(duplicated)).catch(console.error);
               }
@@ -129,8 +147,8 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
           onDelete={() => {
             if (onPersistStoryboardModalDelete) {
               const modalId = contextMenu.modalId;
-              setSelectedStoryboardModalId(null);
-              setSelectedStoryboardModalIds([]);
+              finalSetSelectedStoryboardModalId(null);
+              finalSetSelectedStoryboardModalIds([]);
               const result = onPersistStoryboardModalDelete(modalId);
               if (result && typeof result.then === 'function') {
                 Promise.resolve(result).catch(console.error);
@@ -139,7 +157,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
           }}
         />
       )}
-      {(storyboardModalStates || []).map((modalState) => {
+      {(finalStoryboardModalStates || []).map((modalState) => {
         // Get connected images for this storyboard
         const connectedCharacterImages = getConnectedImages(modalState.id, 'receive-character');
         const connectedBackgroundImages = getConnectedImages(modalState.id, 'receive-background');
@@ -150,18 +168,18 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
             key={modalState.id}
             isOpen={true}
             id={modalState.id}
-            isAttachedToChat={isChatOpen && (selectedStoryboardModalId === modalState.id || (selectedStoryboardModalIds || []).includes(modalState.id))}
+            isAttachedToChat={isChatOpen && (finalSelectedStoryboardModalId === modalState.id || (finalSelectedStoryboardModalIds || []).includes(modalState.id))}
             selectionOrder={
               isChatOpen
                 ? (() => {
-                    if (selectedIds && selectedIds.includes(modalState.id)) {
-                      return selectedIds.indexOf(modalState.id) + 1;
-                    }
-                    if (selectedStoryboardModalIds && selectedStoryboardModalIds.includes(modalState.id)) {
-                      return selectedStoryboardModalIds.indexOf(modalState.id) + 1;
-                    }
-                    return undefined;
-                  })()
+                  if (selectedIds && selectedIds.includes(modalState.id)) {
+                    return selectedIds.indexOf(modalState.id) + 1;
+                  }
+                  if (finalSelectedStoryboardModalIds && finalSelectedStoryboardModalIds.includes(modalState.id)) {
+                    return finalSelectedStoryboardModalIds.indexOf(modalState.id) + 1;
+                  }
+                  return undefined;
+                })()
                 : undefined
             }
             onContextMenu={(e: React.MouseEvent) => {
@@ -170,19 +188,20 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
               setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
             }}
             onClose={() => {
-              setStoryboardModalStates(prev => prev.filter(m => m.id !== modalState.id));
-              setSelectedStoryboardModalId(null);
+              finalSetStoryboardModalStates(prev => prev.filter(m => m.id !== modalState.id));
+              finalSetSelectedStoryboardModalId(null);
               if (onPersistStoryboardModalDelete) {
                 Promise.resolve(onPersistStoryboardModalDelete(modalState.id)).catch(console.error);
               }
             }}
             onSelect={() => {
               clearAllSelections();
-              setSelectedStoryboardModalId(modalState.id);
-              setSelectedStoryboardModalIds([modalState.id]);
+              finalSetSelectedStoryboardModalId(modalState.id);
+              finalSetSelectedStoryboardModalIds([modalState.id]);
             }}
             onDelete={() => {
-              setSelectedStoryboardModalId(null);
+              finalSetSelectedStoryboardModalId(null);
+              finalSetSelectedStoryboardModalIds([]);
               if (onPersistStoryboardModalDelete) {
                 const result = onPersistStoryboardModalDelete(modalState.id);
                 if (result && typeof result.then === 'function') {
@@ -198,7 +217,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
               // Placeholder for duplicate functionality
               console.log('[StoryboardModalOverlays] Duplicate not implemented');
             }}
-            isSelected={selectedStoryboardModalId === modalState.id || (selectedStoryboardModalIds || []).includes(modalState.id)}
+            isSelected={finalSelectedStoryboardModalId === modalState.id || (finalSelectedStoryboardModalIds || []).includes(modalState.id)}
             frameWidth={modalState.frameWidth}
             frameHeight={modalState.frameHeight}
             scriptText={modalState.scriptText}
@@ -254,7 +273,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
             }}
             onPositionChange={(newX, newY) => {
               // Update local state immediately for smooth dragging
-              setStoryboardModalStates(prev =>
+              finalSetStoryboardModalStates((prev: any[]) =>
                 prev.map(m =>
                   m.id === modalState.id ? { ...m, x: newX, y: newY } : m
                 )
@@ -289,5 +308,7 @@ export const StoryboardModalOverlays: React.FC<StoryboardModalOverlaysProps> = (
       })}
     </>
   );
-};
+});
+
+StoryboardModalOverlays.displayName = 'StoryboardModalOverlays';
 

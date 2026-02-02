@@ -2,6 +2,7 @@ import React from 'react';
 import { ComparePluginModal } from '@/modules/plugins/ComparePluginModal/ComparePluginModal';
 import { CompareModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useCompareStore, useCompareSelection, useCompareModalStates } from '@/modules/stores';
 
 interface CompareModalOverlaysProps {
     compareModalStates: CompareModalState[];
@@ -25,7 +26,7 @@ interface CompareModalOverlaysProps {
     selectedIds?: string[];
 }
 
-export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
+export const CompareModalOverlays = React.memo<CompareModalOverlaysProps>(({
     compareModalStates,
     selectedCompareModalId,
     selectedCompareModalIds,
@@ -46,7 +47,42 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
     isChatOpen = false,
     selectedIds = [],
 }) => {
+    // Zustand Store
+    const storeCompareModalStates = useCompareModalStates();
+    const storeSelectedCompareModalId = useCompareStore(state => state.selectedId);
+    const storeSelectedCompareModalIds = useCompareStore(state => state.selectedIds);
+    const storeSetSelectedCompareModalId = useCompareStore(state => state.setSelectedId);
+    const storeSetSelectedCompareModalIds = useCompareStore(state => state.setSelectedIds);
+    const storeSetCompareModalStates = useCompareStore(state => state.setCompareModalStates);
+
+    const finalCompareModalStates = compareModalStates || storeCompareModalStates;
+    const finalSelectedCompareModalId = selectedCompareModalId !== undefined ? selectedCompareModalId : storeSelectedCompareModalId;
+    const finalSelectedCompareModalIds = selectedCompareModalIds !== undefined ? selectedCompareModalIds : storeSelectedCompareModalIds;
+
+    const finalSetCompareModalStates = setCompareModalStates || storeSetCompareModalStates;
+    const finalSetSelectedCompareModalId = setSelectedCompareModalId || storeSetSelectedCompareModalId;
+    const finalSetSelectedCompareModalIds = setSelectedCompareModalIds || storeSetSelectedCompareModalIds;
+
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
+    // Track Shift key locally for robust multi-selection
+    const [isShiftPressed, setIsShiftPressed] = React.useState(false);
+
+    React.useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') setIsShiftPressed(true);
+        };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') setIsShiftPressed(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, []);
 
     return (
         <>
@@ -56,7 +92,7 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
                     onDuplicate={() => {
-                        const modalState = compareModalStates.find(m => m.id === contextMenu.modalId);
+                        const modalState = finalCompareModalStates.find((m: CompareModalState) => m.id === contextMenu.modalId);
                         if (modalState) {
                             const duplicated = {
                                 ...modalState,
@@ -64,7 +100,10 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                                 x: modalState.x + 50,
                                 y: modalState.y + 50,
                             };
-                            setCompareModalStates(prev => [...prev, duplicated]);
+                            finalSetCompareModalStates((prev: CompareModalState[]) => {
+                                const prevArr = typeof prev === 'function' ? (prev as any)(finalCompareModalStates) : prev;
+                                return [...(prevArr || []), duplicated];
+                            });
                             if (onPersistCompareModalCreate) {
                                 Promise.resolve(onPersistCompareModalCreate(duplicated)).catch(console.error);
                             }
@@ -73,8 +112,8 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     onDelete={() => {
                         if (onPersistCompareModalDelete) {
                             const modalId = contextMenu.modalId;
-                            setSelectedCompareModalId(null);
-                            setSelectedCompareModalIds([]);
+                            finalSetSelectedCompareModalId(null);
+                            finalSetSelectedCompareModalIds([]);
                             const result = onPersistCompareModalDelete(modalId);
                             if (result && typeof result.then === 'function') {
                                 Promise.resolve(result).catch(console.error);
@@ -83,7 +122,7 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     }}
                 />
             )}
-            {compareModalStates.map((modalState) => (
+            {(finalCompareModalStates || []).map((modalState) => (
                 <ComparePluginModal
                     key={modalState.id}
                     id={modalState.id}
@@ -93,23 +132,23 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     height={modalState.height}
                     isOpen={true}
                     isExpanded={modalState.isExpanded}
-                    isSelected={selectedCompareModalId === modalState.id || selectedCompareModalIds.includes(modalState.id)}
+                    isSelected={finalSelectedCompareModalId === modalState.id || (finalSelectedCompareModalIds || []).includes(modalState.id)}
                     stageRef={stageRef}
                     scale={scale}
                     position={position}
-                    isAttachedToChat={isChatOpen && (selectedCompareModalId === modalState.id || selectedCompareModalIds.includes(modalState.id))}
+                    isAttachedToChat={isChatOpen && (finalSelectedCompareModalId === modalState.id || (finalSelectedCompareModalIds || []).includes(modalState.id))}
                     selectionOrder={
-                      isChatOpen
-                        ? (() => {
-                            if (selectedIds && selectedIds.includes(modalState.id)) {
-                              return selectedIds.indexOf(modalState.id) + 1;
-                            }
-                            if (selectedCompareModalIds && selectedCompareModalIds.includes(modalState.id)) {
-                              return selectedCompareModalIds.indexOf(modalState.id) + 1;
-                            }
-                            return undefined;
-                          })()
-                        : undefined
+                        isChatOpen
+                            ? (() => {
+                                if (selectedIds && selectedIds.includes(modalState.id)) {
+                                    return selectedIds.indexOf(modalState.id) + 1;
+                                }
+                                if (finalSelectedCompareModalIds && finalSelectedCompareModalIds.includes(modalState.id)) {
+                                    return finalSelectedCompareModalIds.indexOf(modalState.id) + 1;
+                                }
+                                return undefined;
+                            })()
+                            : undefined
                     }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
@@ -117,15 +156,28 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                         setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
                     }}
                     onClose={() => {
-                        setCompareModalStates(prev => prev.filter(m => m.id !== modalState.id));
+                        finalSetCompareModalStates((prev: CompareModalState[]) => {
+                            const prevArr = typeof prev === 'function' ? (prev as any)(finalCompareModalStates) : prev;
+                            return (prevArr || []).filter((m: CompareModalState) => m.id !== modalState.id);
+                        });
                         if (onPersistCompareModalDelete) {
                             onPersistCompareModalDelete(modalState.id);
                         }
                     }}
                     onSelect={() => {
-                        clearAllSelections();
-                        setSelectedCompareModalId(modalState.id);
-                        setSelectedCompareModalIds([modalState.id]);
+                        if (isShiftPressed) {
+                            const isAlreadySelected = (finalSelectedCompareModalIds || []).includes(modalState.id);
+                            if (isAlreadySelected) {
+                                finalSetSelectedCompareModalIds((finalSelectedCompareModalIds || []).filter(id => id !== modalState.id));
+                            } else {
+                                finalSetSelectedCompareModalIds([...(finalSelectedCompareModalIds || []), modalState.id]);
+                            }
+                            finalSetSelectedCompareModalId(modalState.id);
+                        } else {
+                            clearAllSelections();
+                            finalSetSelectedCompareModalId(modalState.id);
+                            finalSetSelectedCompareModalIds([modalState.id]);
+                        }
                     }}
                     onDelete={() => {
                         console.log('[CompareModalOverlays] onDelete called', {
@@ -133,8 +185,8 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                             modalId: modalState.id,
                         });
                         // Clear selection immediately
-                        setSelectedCompareModalId(null);
-                        setSelectedCompareModalIds([]);
+                        finalSetSelectedCompareModalId(null);
+                        finalSetSelectedCompareModalIds([]);
                         // Call persist delete - it updates parent state (compareGenerators) which flows down as externalCompareModals
                         // Canvas will sync compareModalStates with externalCompareModals via useEffect
                         if (onPersistCompareModalDelete) {
@@ -153,11 +205,17 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
                     initialPrompt={modalState.prompt}
                     initialModel={modalState.model}
                     onUpdateModalState={(id, updates) => {
-                        setCompareModalStates(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+                        finalSetCompareModalStates((prev: CompareModalState[]) => {
+                            const prevArr = typeof prev === 'function' ? (prev as any)(finalCompareModalStates) : prev;
+                            return (prevArr || []).map((m: CompareModalState) => m.id === id ? { ...m, ...updates } : m);
+                        });
                         // TODO: Add persistence callback for updates if needed
                     }}
                     onPositionChange={(newX, newY) => {
-                        setCompareModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m));
+                        finalSetCompareModalStates((prev: CompareModalState[]) => {
+                            const prevArr = typeof prev === 'function' ? (prev as any)(finalCompareModalStates) : prev;
+                            return (prevArr || []).map((m: CompareModalState) => m.id === modalState.id ? { ...m, x: newX, y: newY } : m);
+                        });
                     }}
                     onPositionCommit={(newX, newY) => {
                         if (onPersistCompareModalMove) {
@@ -172,4 +230,6 @@ export const CompareModalOverlays: React.FC<CompareModalOverlaysProps> = ({
             ))}
         </>
     );
-};
+});
+
+CompareModalOverlays.displayName = 'CompareModalOverlays';

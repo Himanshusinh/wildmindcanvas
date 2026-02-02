@@ -22,7 +22,7 @@ interface ImageEditorTriggerProps {
     selectionOrder?: number;
 }
 
-export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
+export const ImageEditorTrigger = React.memo<ImageEditorTriggerProps>(({
     id,
     x,
     y,
@@ -79,7 +79,7 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
             onContextMenu={onContextMenu}
         >
             {isAttachedToChat && selectionOrder && (
-                <div 
+                <div
                     className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
                     style={{
                         left: `${-40 * scale}px`,
@@ -168,4 +168,6 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
             </div>
         </PluginNodeShell>
     );
-};
+});
+
+ImageEditorTrigger.displayName = 'ImageEditorTrigger';

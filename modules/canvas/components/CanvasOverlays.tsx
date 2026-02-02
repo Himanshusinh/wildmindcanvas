@@ -8,10 +8,13 @@ import { CanvasImageConnectionNodes } from '../CanvasImageConnectionNodes';
 import { ContextMenu } from '@/modules/ui-global/ContextMenu';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { SettingsPopup } from '@/modules/ui-global/Settings';
-// import { ComponentCreationMenu } from '../../canvas-overlays/components/ComponentCreationMenu';
-// import { UnifiedCanvasOverlay } from '@/modules/canvas-overlays/UnifiedCanvasOverlay';
-// import { LoadingOverlay } from '@/modules/ui-global/LoadingOverlay';
 import Konva from 'konva';
+// Zustand Store - Image & Video State Management
+import {
+    useImageModalStates, useVideoModalStates, useRemoveBgModalStates, useRemoveBgSelection, useRemoveBgStore,
+    useEraseModalStates, useEraseSelection, useEraseStore,
+    useExpandModalStates, useExpandSelection, useExpandStore,
+} from '@/modules/stores';
 
 interface CanvasOverlaysProps {
     canvasState: ReturnType<typeof useCanvasState>;
@@ -54,16 +57,21 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     isInteracting = false,
     setIsComponentDragging
 }) => {
+    // Zustand Store - Get image and video modal states (replaces from canvasState)
+    const imageModalStates = useImageModalStates();
+    const videoModalStates = useVideoModalStates();
+
     const {
         images,
         textInputStates, setTextInputStates,
-        imageModalStates, setImageModalStates,
-        videoModalStates, setVideoModalStates,
+        // REMOVED: imageModalStates, setImageModalStates (now managed by Zustand)
+        // REMOVED: videoModalStates, setVideoModalStates (now managed by Zustand store)
+        // videoModalStates, setVideoModalStates,
         videoEditorModalStates, setVideoEditorModalStates,
         imageEditorModalStates, setImageEditorModalStates,
-        musicModalStates, setMusicModalStates,
-        upscaleModalStates, setUpscaleModalStates,
-        multiangleCameraModalStates, setMultiangleCameraModalStates,
+        // REMOVED: musicModalStates, setMusicModalStates (now managed by store)
+        // REMOVED: upscaleModalStates, setUpscaleModalStates (now managed by Zustand)
+        // REMOVED: multiangleCameraModalStates, setMultiangleCameraModalStates (now managed by store)
         removeBgModalStates, setRemoveBgModalStates,
         eraseModalStates, setEraseModalStates,
         expandModalStates, setExpandModalStates,
@@ -81,15 +89,16 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedImageIndices, setSelectedImageIndices,
         selectedTextInputIds, setSelectedTextInputIds, setSelectedTextInputId, selectedTextInputId,
         selectedImageModalIds, setSelectedImageModalIds, setSelectedImageModalId, selectedImageModalId,
-        selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId,
+        // REMOVED: selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId (now managed by Zustand store)
+        // selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds, setSelectedVideoEditorModalId, selectedVideoEditorModalId,
         selectedImageEditorModalIds, setSelectedImageEditorModalIds, setSelectedImageEditorModalId, selectedImageEditorModalId,
-        selectedMusicModalIds, setSelectedMusicModalIds, setSelectedMusicModalId, selectedMusicModalId,
-        selectedUpscaleModalIds, setSelectedUpscaleModalIds, setSelectedUpscaleModalId, selectedUpscaleModalId,
-        selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalId, selectedMultiangleCameraModalId,
-        selectedRemoveBgModalIds, setSelectedRemoveBgModalIds, setSelectedRemoveBgModalId, selectedRemoveBgModalId,
-        selectedEraseModalIds, setSelectedEraseModalIds, setSelectedEraseModalId, selectedEraseModalId,
-        selectedExpandModalIds, setSelectedExpandModalIds, setSelectedExpandModalId, selectedExpandModalId,
+        // REMOVED: selectedMusicModalIds, setSelectedMusicModalIds, setSelectedMusicModalId, selectedMusicModalId (now managed by store)
+        // REMOVED: selectedUpscaleModalIds, setSelectedUpscaleModalIds (now managed by Zustand)
+        // REMOVED: selectedMultiangleCameraModalIds (now managed by store)
+        selectedRemoveBgModalId, selectedRemoveBgModalIds, setSelectedRemoveBgModalId, setSelectedRemoveBgModalIds,
+        selectedEraseModalId, selectedEraseModalIds, setSelectedEraseModalId, setSelectedEraseModalIds,
+        selectedExpandModalId, selectedExpandModalIds, setSelectedExpandModalId, setSelectedExpandModalIds,
         selectedVectorizeModalIds, setSelectedVectorizeModalIds, setSelectedVectorizeModalId, selectedVectorizeModalId,
         selectedNextSceneModalIds, setSelectedNextSceneModalIds, setSelectedNextSceneModalId, selectedNextSceneModalId,
         selectedCompareModalIds, setSelectedCompareModalIds, setSelectedCompareModalId, selectedCompareModalId,
@@ -130,7 +139,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     // Skip recalculation during interaction to prevent lag
     const prevVirtualizedImageRef = useRef<typeof imageModalStates>([]);
     const prevVirtualizedVideoRef = useRef<typeof videoModalStates>([]);
-    
+
     const virtualizedImageModalStates = useMemo(() => {
         if (isInteracting) {
             // During interaction, use previous state to avoid lag
@@ -216,14 +225,17 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 isInteracting={isInteracting}
                 setIsComponentDragging={setIsComponentDragging}
                 textInputStates={textInputStates}
-                imageModalStates={virtualizedImageModalStates}
-                videoModalStates={virtualizedVideoModalStates}
+                // REMOVED: imageModalStates, videoModalStates props (now managed by Zustand store)
+                // imageModalStates={virtualizedImageModalStates}
+                // videoModalStates={virtualizedVideoModalStates}
                 videoEditorModalStates={videoEditorModalStates}
                 imageEditorModalStates={imageEditorModalStates}
-                musicModalStates={musicModalStates}
-                upscaleModalStates={upscaleModalStates}
+                // REMOVED: musicModalStates (now managed by store)
+                // REMOVED: upscaleModalStates (now managed by Zustand store)
+                // upscaleModalStates={upscaleModalStates}
                 isComponentDraggable={isComponentDraggable}
-                multiangleCameraModalStates={multiangleCameraModalStates}
+                // REMOVED: multiangleCameraModalStates (now managed by store)
+                // multiangleCameraModalStates={multiangleCameraModalStates}
                 removeBgModalStates={removeBgModalStates}
                 eraseModalStates={eraseModalStates}
                 expandModalStates={expandModalStates}
@@ -251,11 +263,11 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onPersistCompareModalMove={onPersistCompareModalMove}
                 onPersistCompareModalDelete={onPersistCompareModalDelete}
 
-                selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
-                selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
-                setMultiangleCameraModalStates={setMultiangleCameraModalStates}
-                setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
-                setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
+                // REMOVED: Multiangle Camera props (now managed by store)
+                // selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
+                // selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
+                // setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
+                // setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
                 onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
                 onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
                 onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
@@ -264,18 +276,23 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
 
                 selectedTextInputId={selectedTextInputId}
                 selectedTextInputIds={selectedTextInputIds}
-                selectedImageModalId={selectedImageModalId}
-                selectedImageModalIds={selectedImageModalIds}
-                selectedVideoModalId={selectedVideoModalId}
-                selectedVideoModalIds={selectedVideoModalIds}
+                // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
+                // selectedImageModalId={selectedImageModalId}
+                // selectedImageModalIds={selectedImageModalIds}
+                // REMOVED: selectedVideoModalId, selectedVideoModalIds (now managed by Zustand store)
+                // selectedVideoModalId={selectedVideoModalId}
+                // selectedVideoModalIds={selectedVideoModalIds}
                 selectedVideoEditorModalId={selectedVideoEditorModalId}
                 selectedVideoEditorModalIds={selectedVideoEditorModalIds}
                 selectedImageEditorModalId={selectedImageEditorModalId}
                 selectedImageEditorModalIds={selectedImageEditorModalIds}
-                selectedMusicModalId={selectedMusicModalId}
-                selectedMusicModalIds={selectedMusicModalIds}
-                selectedUpscaleModalId={selectedUpscaleModalId}
-                selectedUpscaleModalIds={selectedUpscaleModalIds}
+
+                // REMOVED: selectedMusicModalId, selectedMusicModalIds (now managed by store)
+                // selectedMusicModalId={selectedMusicModalId}
+                // selectedMusicModalIds={selectedMusicModalIds}
+                // REMOVED: selectedUpscaleModalId, selectedUpscaleModalIds (now managed by store)
+                // selectedUpscaleModalId={selectedUpscaleModalId}
+                // selectedUpscaleModalIds={selectedUpscaleModalIds}
                 selectedRemoveBgModalId={selectedRemoveBgModalId}
                 selectedRemoveBgModalIds={selectedRemoveBgModalIds}
                 selectedEraseModalId={selectedEraseModalId}
@@ -296,24 +313,29 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 setSelectedTextInputId={setSelectedTextInputId}
                 setSelectedTextInputIds={setSelectedTextInputIds}
                 setSelectedImageIndices={setSelectedImageIndices}
-                setImageModalStates={setImageModalStates}
-                setSelectedImageModalId={setSelectedImageModalId}
-                setSelectedImageModalIds={setSelectedImageModalIds}
-                setVideoModalStates={setVideoModalStates}
-                setSelectedVideoModalId={setSelectedVideoModalId}
-                setSelectedVideoModalIds={setSelectedVideoModalIds}
+                // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand)
+                // setImageModalStates={setImageModalStates}
+                // setSelectedImageModalId={setSelectedImageModalId}
+                // setSelectedImageModalIds={setSelectedImageModalIds}
+                // REMOVED: setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds (now managed by Zustand store)
+                // setVideoModalStates={setVideoModalStates}
+                // setSelectedVideoModalId={setSelectedVideoModalId}
+                // setSelectedVideoModalIds={setSelectedVideoModalIds}
                 setVideoEditorModalStates={setVideoEditorModalStates}
                 setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
                 setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
                 setImageEditorModalStates={setImageEditorModalStates}
                 setSelectedImageEditorModalId={setSelectedImageEditorModalId}
                 setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
-                setMusicModalStates={setMusicModalStates}
-                setSelectedMusicModalId={setSelectedMusicModalId}
-                setSelectedMusicModalIds={setSelectedMusicModalIds}
-                setUpscaleModalStates={setUpscaleModalStates}
-                setSelectedUpscaleModalId={setSelectedUpscaleModalId}
-                setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+
+                // REMOVED: setMusicModalStates, setSelectedMusicModalId, setSelectedMusicModalIds (now managed by store)
+                // setMusicModalStates={setMusicModalStates}
+                // setSelectedMusicModalId={setSelectedMusicModalId}
+                // setSelectedMusicModalIds={setSelectedMusicModalIds}
+                // REMOVED: setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand)
+                // setUpscaleModalStates={setUpscaleModalStates}
+                // setSelectedUpscaleModalId={setSelectedUpscaleModalId}
+                // setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
                 setRemoveBgModalStates={setRemoveBgModalStates}
                 setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
                 setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
@@ -442,7 +464,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 showDuplicate={true}
             />
 
-            {/* Clear Studio Context Menu (Right Click on Empty Canvas) */}
             {contextMenuOpen && contextMenuModalType === 'canvas' && (
                 <PluginContextMenu
                     x={contextMenuPosition.x}
@@ -458,9 +479,10 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             )}
 
             {/* <UnifiedCanvasOverlay
-                imageModalStates={imageModalStates}
+                // REMOVED: imageModalStates, setImageModalStates (now managed by Zustand)
+                // imageModalStates={imageModalStates}
                 setTextInputStates={setTextInputStates}
-                setImageModalStates={setImageModalStates}
+                // setImageModalStates={setImageModalStates}
                 setVideoModalStates={setVideoModalStates}
                 setMusicModalStates={setMusicModalStates}
                 onPersistTextModalCreate={props.onPersistTextModalCreate}

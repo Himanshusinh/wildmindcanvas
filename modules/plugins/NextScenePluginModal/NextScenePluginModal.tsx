@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { NextSceneLabel } from './NextSceneLabel';
 // import { ModalActionIcons } from '../../common/ModalActionIcons'; // Not used in Vectorize either
@@ -77,7 +77,7 @@ interface NextScenePluginModalProps {
   selectionOrder?: number;
 }
 
-export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
+export const NextScenePluginModal = React.memo<NextScenePluginModalProps>(({
   isOpen,
   isExpanded,
   id,
@@ -393,7 +393,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       onContextMenu={onContextMenu}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -438,8 +438,6 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           }}
         >
           Next Scene
-
-          {/* Delete button removed in favor of context menu */}
         </div>
 
         {/* Main plugin container - Circular */}
@@ -568,7 +566,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           </div>
         )}
       </div>
-
     </PluginNodeShell>
   );
-};
+});
+
+NextScenePluginModal.displayName = 'NextScenePluginModal';

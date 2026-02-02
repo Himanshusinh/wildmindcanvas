@@ -40,7 +40,7 @@ interface ComparePluginModalProps {
     selectionOrder?: number;
 }
 
-export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
+export const ComparePluginModal = React.memo<ComparePluginModalProps>(({
     id,
     x,
     y,
@@ -311,7 +311,7 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
             }}
         >
             {isAttachedToChat && selectionOrder && (
-                <div 
+                <div
                     className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
                     style={{
                         left: `${-40 * (scale || 1)}px`,
@@ -516,4 +516,6 @@ export const ComparePluginModal: React.FC<ComparePluginModalProps> = ({
             )}
         </PluginNodeShell>
     );
-};
+});
+
+ComparePluginModal.displayName = 'ComparePluginModal';

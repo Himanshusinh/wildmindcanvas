@@ -7,14 +7,20 @@ import { Connection, ImageModalState, VectorizeModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 
+import {
+  useVectorizeModalStates,
+  useVectorizeStore,
+  useVectorizeSelection
+} from '@/modules/stores';
+
 interface VectorizeModalOverlaysProps {
-  vectorizeModalStates: VectorizeModalState[] | undefined;
-  selectedVectorizeModalId: string | null | undefined;
-  selectedVectorizeModalIds: string[] | undefined;
+  vectorizeModalStates?: VectorizeModalState[];
+  selectedVectorizeModalId?: string | null;
+  selectedVectorizeModalIds?: string[];
   clearAllSelections: () => void;
-  setVectorizeModalStates: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
-  setSelectedVectorizeModalId: (id: string | null) => void;
-  setSelectedVectorizeModalIds: (ids: string[]) => void;
+  setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>> | ((states: any) => void);
+  setSelectedVectorizeModalId?: (id: string | null) => void;
+  setSelectedVectorizeModalIds?: (ids: string[]) => void;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
@@ -32,14 +38,14 @@ interface VectorizeModalOverlaysProps {
   selectedIds?: string[];
 }
 
-export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
-  vectorizeModalStates,
-  selectedVectorizeModalId,
-  selectedVectorizeModalIds,
+export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
+  vectorizeModalStates: propsVectorizeModalStates,
+  selectedVectorizeModalId: propsSelectedVectorizeModalId,
+  selectedVectorizeModalIds: propsSelectedVectorizeModalIds,
   clearAllSelections,
-  setVectorizeModalStates,
-  setSelectedVectorizeModalId,
-  setSelectedVectorizeModalIds,
+  setVectorizeModalStates: propsSetVectorizeModalStates,
+  setSelectedVectorizeModalId: propsSetSelectedVectorizeModalId,
+  setSelectedVectorizeModalIds: propsSetSelectedVectorizeModalIds,
   onVectorize,
   onPersistVectorizeModalCreate,
   onPersistVectorizeModalMove,
@@ -57,6 +63,27 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
   selectedIds = [],
 }) => {
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
+
+  // Zustand Store
+  const storeVectorizeModalStates = useVectorizeModalStates();
+  const storeSetVectorizeModalStates = useVectorizeStore(state => state.setVectorizeModalStates);
+  const {
+    selectedId: storeSelectedVectorizeModalId,
+    selectedIds: storeSelectedVectorizeModalIds,
+    setSelectedId: storeSetSelectedVectorizeModalId,
+    setSelectedIds: storeSetSelectedVectorizeModalIds
+  } = useVectorizeSelection();
+
+  // effective state
+  const vectorizeModalStates = propsVectorizeModalStates || storeVectorizeModalStates;
+  const setVectorizeModalStates = propsSetVectorizeModalStates || storeSetVectorizeModalStates;
+
+  // Final selection
+  const selectedVectorizeModalId = propsSelectedVectorizeModalId !== undefined ? propsSelectedVectorizeModalId : storeSelectedVectorizeModalId;
+  const selectedVectorizeModalIds = propsSelectedVectorizeModalIds || storeSelectedVectorizeModalIds;
+
+  const setSelectedVectorizeModalId = propsSetSelectedVectorizeModalId || storeSetSelectedVectorizeModalId;
+  const setSelectedVectorizeModalIds = propsSetSelectedVectorizeModalIds || storeSetSelectedVectorizeModalIds;
 
   return (
     <>
@@ -103,14 +130,14 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
           selectionOrder={
             isChatOpen
               ? (() => {
-                  if (selectedIds && selectedIds.includes(modalState.id)) {
-                    return selectedIds.indexOf(modalState.id) + 1;
-                  }
-                  if (selectedVectorizeModalIds && selectedVectorizeModalIds.includes(modalState.id)) {
-                    return selectedVectorizeModalIds.indexOf(modalState.id) + 1;
-                  }
-                  return undefined;
-                })()
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedVectorizeModalIds && selectedVectorizeModalIds.includes(modalState.id)) {
+                  return selectedVectorizeModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
               : undefined
           }
           onContextMenu={(e: React.MouseEvent) => {
@@ -239,5 +266,7 @@ export const VectorizeModalOverlays: React.FC<VectorizeModalOverlaysProps> = ({
       ))}
     </>
   );
-};
+});
+
+VectorizeModalOverlays.displayName = 'VectorizeModalOverlays';
 

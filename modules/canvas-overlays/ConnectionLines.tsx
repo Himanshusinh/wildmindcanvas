@@ -91,6 +91,13 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
     ensureConnectionAnimationStyles();
   }, []);
 
+  // Track which line is being hovered for delete icon display
+  const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+  // Track mouse position along the hovered line for icon positioning
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+  // Track if we're hovering over the delete icon to prevent flickering
+  const hoverIconRef = useRef<string | null>(null);
+
   // Force recalculation during interaction using RAF loop
   const [forceUpdate, setForceUpdate] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -164,9 +171,8 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
   const connectionLines = useMemo(() => {
     // Filter out duplicates and compute connection lines
     const seen = new Set<string>();
-    // Don't cache during interaction - always get fresh DOM positions for accurate attachment
-    // During interaction, components are moving so we need real-time positions
-    const domCache = isInteracting ? undefined : new Map<string, Element | null>();
+    // Always use a DOM cache map for lookups within this specific calculation
+    const domCache = new Map<string, Element | null>();
 
     const lines = connections
       .map(conn => {
@@ -190,7 +196,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
         return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
       })
       .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-    
+
     return lines;
   }, [
     connections,
@@ -281,8 +287,126 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
 
         const pathData = `M ${line.fromX} ${line.fromY} C ${cp1x} ${line.fromY}, ${cp2x} ${line.toY}, ${line.toX} ${line.toY}`;
 
+        const isHovered = hoveredConnectionId === connectionId;
+
+        // Helper function to calculate point on bezier curve at parameter t
+        const bezierPoint = (t: number) => {
+          const mt = 1 - t;
+          const x = mt * mt * mt * line.fromX + 3 * mt * mt * t * cp1x + 3 * mt * t * t * cp2x + t * t * t * line.toX;
+          const y = mt * mt * mt * line.fromY + 3 * mt * mt * t * line.fromY + 3 * mt * t * t * line.toY + t * t * t * line.toY;
+          return { x, y };
+        };
+
+        // Helper function to find closest point on bezier curve to mouse position
+        const findClosestPointOnCurve = (mouseX: number, mouseY: number) => {
+          let closestT = 0.5;
+          let minDist = Infinity;
+
+          // Sample the curve at multiple points to find the closest
+          for (let t = 0; t <= 1; t += 0.01) {
+            const point = bezierPoint(t);
+            const dist = Math.hypot(point.x - mouseX, point.y - mouseY);
+            if (dist < minDist) {
+              minDist = dist;
+              closestT = t;
+            }
+          }
+
+          // Refine with binary search around the closest point
+          let low = Math.max(0, closestT - 0.05);
+          let high = Math.min(1, closestT + 0.05);
+          for (let i = 0; i < 10; i++) {
+            const mid1 = (low + closestT) / 2;
+            const mid2 = (closestT + high) / 2;
+            const p1 = bezierPoint(mid1);
+            const p2 = bezierPoint(mid2);
+            const d1 = Math.hypot(p1.x - mouseX, p1.y - mouseY);
+            const d2 = Math.hypot(p2.x - mouseX, p2.y - mouseY);
+
+            if (d1 < d2) {
+              high = closestT;
+              closestT = mid1;
+            } else {
+              low = closestT;
+              closestT = mid2;
+            }
+          }
+
+          return bezierPoint(closestT);
+        };
+
+        // Only show icon when hovering and we have a valid hover position
+        // Don't show fallback midpoint to prevent double icons
+        const shouldShowIcon = isHovered && hoverPosition !== null;
+        const iconX = hoverPosition?.x ?? 0;
+        const iconY = hoverPosition?.y ?? 0;
+
         return (
           <g key={connectionId}>
+            {/* Invisible wider path for easier hover detection */}
+            <path
+              d={pathData}
+              stroke="transparent"
+              strokeWidth={Math.max(40 * scale, 50)} // Much wider hit area (40-50px) for easier hover
+              fill="none"
+              strokeLinecap="round"
+              style={{
+                pointerEvents: 'auto', // Make this the hover target
+                cursor: 'pointer',
+                transition: 'none',
+              }}
+              onMouseEnter={(e) => {
+                // Clear icon hover ref when entering path
+                hoverIconRef.current = null;
+                setHoveredConnectionId(connectionId);
+                // Calculate initial hover position - get mouse position relative to SVG
+                const svgElement = e.currentTarget.ownerSVGElement;
+                if (svgElement) {
+                  const svgPoint = svgElement.createSVGPoint();
+                  svgPoint.x = e.clientX;
+                  svgPoint.y = e.clientY;
+                  const ctm = svgElement.getScreenCTM();
+                  if (ctm) {
+                    const invertedCTM = ctm.inverse();
+                    const transformedPoint = svgPoint.matrixTransform(invertedCTM);
+                    const closestPoint = findClosestPointOnCurve(transformedPoint.x, transformedPoint.y);
+                    setHoverPosition(closestPoint);
+                  }
+                }
+              }}
+              onMouseLeave={() => {
+                // Only clear if we're not moving to the delete icon
+                if (hoverIconRef.current !== connectionId) {
+                  setHoveredConnectionId(null);
+                  setHoverPosition(null);
+                }
+              }}
+              onMouseMove={(e) => {
+                // Always update hover position as mouse moves along the line
+                const svgElement = e.currentTarget.ownerSVGElement;
+                if (svgElement) {
+                  const svgPoint = svgElement.createSVGPoint();
+                  svgPoint.x = e.clientX;
+                  svgPoint.y = e.clientY;
+                  const ctm = svgElement.getScreenCTM();
+                  if (ctm) {
+                    const invertedCTM = ctm.inverse();
+                    const transformedPoint = svgPoint.matrixTransform(invertedCTM);
+                    const closestPoint = findClosestPointOnCurve(transformedPoint.x, transformedPoint.y);
+                    setHoverPosition(closestPoint);
+                  }
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Toggle selection: if already selected, deselect; otherwise select
+                if (isSelected) {
+                  onSelectConnection(null);
+                } else {
+                  onSelectConnection(connectionId);
+                }
+              }}
+            />
             {/* Dashed helper line showing connection path (like in demo) */}
             <path
               d={pathData}
@@ -307,33 +431,15 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
               strokeDasharray={isSelected ? `${6 * scale} ${4 * scale}` : 'none'}
               style={{
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
-                pointerEvents: 'auto', // Make path clickable
+                pointerEvents: 'none', // Disable pointer events on visible line to prevent conflicts
                 cursor: 'pointer',
                 transition: 'none', // Disable transitions to prevent animation
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                // Toggle selection: if already selected, deselect; otherwise select
-                if (isSelected) {
-                  onSelectConnection(null);
-                } else {
-                  onSelectConnection(connectionId);
-                }
-              }}
-              onMouseEnter={(e) => {
+              onMouseMove={(e) => {
+                // Update visual hover effect on the visible line
                 if (!isSelected) {
-                  e.currentTarget.style.stroke = '#2a4d73';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2.2, scale));
-                } else {
-                  // Keep selected state (same as active drag)
-                  e.currentTarget.style.stroke = '#4C83FF';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(1.6, scale));
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.stroke = '#4C83FF';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2, scale));
+                  e.currentTarget.style.stroke = isHovered ? '#2a4d73' : strokeColor;
+                  e.currentTarget.style.strokeWidth = isHovered ? String(computeStrokeForScale(2.2, scale)) : String(strokeWidth);
                 } else {
                   // Keep selected state (same as active drag)
                   e.currentTarget.style.stroke = '#4C83FF';
@@ -408,6 +514,82 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
                 }
               }}
             />
+            {/* Delete icon (scissors) that appears on hover */}
+            {shouldShowIcon && onDeleteConnection && hoverPosition && (
+              <g
+                data-delete-icon={connectionId}
+                onMouseEnter={() => {
+                  // Keep hover state when mouse enters the icon
+                  hoverIconRef.current = connectionId;
+                  setHoveredConnectionId(connectionId);
+                }}
+                onMouseLeave={() => {
+                  // Clear icon hover ref and check if we should clear hover state
+                  hoverIconRef.current = null;
+                  // Small delay to allow path to detect mouse enter if moving back
+                  setTimeout(() => {
+                    if (hoverIconRef.current !== connectionId && hoveredConnectionId === connectionId) {
+                      setHoveredConnectionId(null);
+                      setHoverPosition(null);
+                    }
+                  }, 10);
+                }}
+              >
+                {/* Background circle for better visibility */}
+                <circle
+                  cx={iconX}
+                  cy={iconY}
+                  r={14 * scale}
+                  fill="rgba(0, 0, 0, 0.8)"
+                  stroke="rgba(255, 255, 255, 0.95)"
+                  strokeWidth={2 * scale}
+                  style={{
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (onDeleteConnection) {
+                      onDeleteConnection(connectionId);
+                      setHoveredConnectionId(null);
+                      setHoverPosition(null);
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    // Prevent event from bubbling to path click handler
+                    e.stopPropagation();
+                  }}
+                />
+                {/* Scissors icon (X shape) */}
+                <g
+                  transform={`translate(${iconX}, ${iconY})`}
+                  style={{
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <line
+                    x1={-7 * scale}
+                    y1={-7 * scale}
+                    x2={7 * scale}
+                    y2={7 * scale}
+                    stroke="rgba(255, 255, 255, 1)"
+                    strokeWidth={2.5 * scale}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={7 * scale}
+                    y1={-7 * scale}
+                    x2={-7 * scale}
+                    y2={7 * scale}
+                    stroke="rgba(255, 255, 255, 1)"
+                    strokeWidth={2.5 * scale}
+                    strokeLinecap="round"
+                  />
+                </g>
+              </g>
+            )}
           </g>
         );
       })}

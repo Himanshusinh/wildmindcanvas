@@ -8,6 +8,7 @@ import { useCanvasSelection } from './useCanvasSelection';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
 import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE, findBlankSpace } from '@/core/canvas/canvasHelpers';
 import { useGroupLogic } from './useGroupLogic';
+import { useImageModalStates, useVideoModalStates, useMusicModalStates, useUpscaleModalStates, useMultiangleCameraModalStates, useRemoveBgModalStates, useEraseModalStates, useExpandModalStates, useImageStore, useVideoStore, useMusicStore, useRemoveBgStore, useEraseStore, useExpandStore } from '@/modules/stores';
 
 // Module-level variable to debounce creation across Strict Mode remounts
 let globalLastTextCreateTime = 0;
@@ -54,6 +55,23 @@ export function useCanvasEvents(
         navigationMode = 'trackpad'
     } = canvasLocalState;
 
+    // Zustand Store Hooks
+    const imageModalStates = useImageModalStates();
+    const videoModalStates = useVideoModalStates();
+    const musicModalStates = useMusicModalStates();
+    const upscaleModalStates = useUpscaleModalStates();
+    const multiangleCameraModalStates = useMultiangleCameraModalStates();
+
+    const { setImageModalStates } = useImageStore();
+    const { setVideoModalStates } = useVideoStore();
+    const { setMusicModalStates } = useMusicStore();
+    const removeBgModalStates = useRemoveBgModalStates();
+    const { setRemoveBgModalStates } = useRemoveBgStore();
+    const eraseModalStates = useEraseModalStates();
+    const { setEraseModalStates } = useEraseStore();
+    const expandModalStates = useExpandModalStates();
+    const { setExpandModalStates } = useExpandStore();
+
     const {
         // setCanvasTextStates, // REMOVED: use effectiveSetCanvasTextStates
         effectiveCanvasTextStates,
@@ -62,17 +80,16 @@ export function useCanvasEvents(
         images,
         textInputStates,
         setTextInputStates,
-        imageModalStates,
-        setImageModalStates,
-        videoModalStates,
-        setVideoModalStates,
-        musicModalStates,
-        setMusicModalStates,
-        upscaleModalStates,
-        multiangleCameraModalStates,
-        removeBgModalStates,
-        eraseModalStates,
-        expandModalStates,
+        // REMOVED: imageModalStates, setImageModalStates (now using store hooks)
+        // REMOVED: videoModalStates, setVideoModalStates (now using store hooks)
+        // REMOVED: musicModalStates, setMusicModalStates (now using store hooks)
+        // REMOVED: upscaleModalStates, multiangleCameraModalStates (now using store hooks)
+        // REMOVED: removeBgModalStates (now using store hooks)
+        // removeBgModalStates,
+        // REMOVED: eraseModalStates (via store)
+        // eraseModalStates,
+        // REMOVED: expandModalStates (via store)
+        // expandModalStates,
         vectorizeModalStates,
         nextSceneModalStates,
         compareModalStates,

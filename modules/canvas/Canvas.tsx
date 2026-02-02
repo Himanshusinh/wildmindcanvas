@@ -14,6 +14,16 @@ import { CanvasOverlays } from './components/CanvasOverlays';
 import { CanvasProps } from './types';
 import AvatarButton from './AvatarButton';
 import { ChatPanel } from '../chat/ChatPanel';
+// Zustand Store - Image & Video State Management
+import {
+  useImageModalStates, useVideoModalStates,
+  useMusicModalStates, useUpscaleModalStates, useUpscaleSelection, useUpscaleStore,
+  useMultiangleCameraModalStates, useMultiangleCameraSelection, useMultiangleCameraStore,
+  useRemoveBgModalStates, useRemoveBgSelection, useRemoveBgStore,
+  useEraseModalStates, useEraseSelection, useEraseStore,
+  useExpandModalStates, useExpandSelection, useExpandStore,
+  useVectorizeModalStates, useVectorizeSelection, useVectorizeStore,
+} from '@/modules/stores';
 
 export const Canvas: React.FC<CanvasProps> = (props) => {
   const {
@@ -151,18 +161,45 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     }
   }, [props.initialCenter, props.initialScale]);
 
+  // Zustand Store - Get image modal states (replaces imageModalStates from canvasState)
+  const imageModalStates = useImageModalStates();
+  const removeBgModalStatesFromStore = useRemoveBgModalStates();
+  const eraseModalStatesFromStore = useEraseModalStates();
+  const { setEraseModalStates } = useEraseStore();
+  const { selectedId: selectedEraseModalId, selectedIds: selectedEraseModalIds, setSelectedId: setSelectedEraseModalId, setSelectedIds: setSelectedEraseModalIds } = useEraseSelection();
+  const expandModalStatesFromStore = useExpandModalStates();
+  const vectorizeModalStatesFromStore = useVectorizeModalStates();
+  const { setExpandModalStates } = useExpandStore();
+  const { selectedId: selectedExpandModalId, selectedIds: selectedExpandModalIds, setSelectedId: setSelectedExpandModalId, setSelectedIds: setSelectedExpandModalIds } = useExpandSelection();
+  // Zustand Store - Get video modal states (replaces videoModalStates from canvasState)
+  const videoModalStates = useVideoModalStates();
+  // Zustand Store - Get music modal states
+  const musicModalStates = useMusicModalStates();
+  // Zustand Store - Get upscale modal states
+  const upscaleModalStates = useUpscaleModalStates();
+  // Zustand Store - Get multiangle camera modal states
+  const multiangleCameraModalStates = useMultiangleCameraModalStates();
+
   const {
     patternImage,
-    imageModalStates,
-    videoModalStates,
+    // REMOVED: imageModalStates (now managed by Zustand store)
+    // imageModalStates,
+    // REMOVED: videoModalStates (now managed by Zustand store)
+    // videoModalStates,
     videoEditorModalStates,
     imageEditorModalStates,
-    musicModalStates,
-    upscaleModalStates,
-    multiangleCameraModalStates,
-    removeBgModalStates,
-    eraseModalStates,
-    expandModalStates,
+    // REMOVED: musicModalStates (now managed by store)
+    // musicModalStates,
+    // REMOVED: upscaleModalStates (now managed by Zustand store)
+    // upscaleModalStates,
+    // REMOVED: multiangleCameraModalStates (now managed by Zustand store)
+    // multiangleCameraModalStates,
+    // REMOVED: removeBgModalStates (via store)
+    // removeBgModalStates,
+    // REMOVED: eraseModalStates (now managed by Zustand store)
+    // eraseModalStates,
+    // REMOVED: expandModalStates (now managed by store)
+    // expandModalStates,
     vectorizeModalStates,
     nextSceneModalStates,
     storyboardModalStates,
@@ -205,25 +242,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   }, []);
 
   // --- DATA AGGREGATION ---
-  const canvasItemsData = {
-    images,
-    imageModalStates,
-    videoModalStates,
-    videoEditorModalStates,
-    imageEditorModalStates,
-    musicModalStates,
-    upscaleModalStates,
-    multiangleCameraModalStates,
-    removeBgModalStates,
-    eraseModalStates,
-    expandModalStates,
-    vectorizeModalStates,
-    nextSceneModalStates,
-    storyboardModalStates,
-    scriptFrameModalStates,
-    sceneFrameModalStates,
-    compareModalStates,
-  };
+  // Placeholder for canvasItemsData - will be defined after effective states
 
   // --- HELPERS ---
   const isComponentDraggable = useCallback((id: string) => {
@@ -265,11 +284,6 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   const showLabelsOnly = scale >= 0.4 && scale < 0.8;
   const isZoomedOut = scale < 0.4;
 
-  // --- HOOKS ---
-  const canvasSelection = useCanvasSelection(props, canvasItemsData as any);
-
-  const groupLogic = useGroupLogic(canvasState, canvasSelection, props);
-
   const updateViewportCenter = useCallback((pos: { x: number; y: number }, s: number) => {
     // Don't set state here - it's already set by the wheel handler
     // Just call the callback to notify parent components
@@ -280,6 +294,154 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     props.onViewportChange?.(worldCenter, s);
   }, [props.onViewportChange, viewportSize]);
 
+  // Placeholder for events - will be moved down
+
+  // Track component dragging state
+  // Placeholder for interaction state - moved after events
+
+  // Detect component dragging via global mouse events
+  const [isComponentDragging, setIsComponentDragging] = React.useState(false);
+
+  React.useEffect(() => {
+    let isDragging = false;
+    let dragStartTime = 0;
+    let isDraggingValueSet = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Check if clicking on a modal component
+      const target = e.target as HTMLElement;
+      const modalElement = target.closest('[data-overlay-id], [data-frame-id]');
+      if (modalElement) {
+        isDragging = true;
+        dragStartTime = Date.now();
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && !isDraggingValueSet && (Date.now() - dragStartTime > 50)) {
+        // Only set dragging if mouse moved after initial click (prevents false positives)
+        setIsComponentDragging(true);
+        isDraggingValueSet = true;
+      }
+    };
+
+    const endDrag = (e: MouseEvent) => {
+      isDragging = false;
+      isDraggingValueSet = false;
+      setIsComponentDragging(false);
+    };
+
+    window.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', endDrag, true);
+    // Safety: if pointer is cancelled or window loses focus, ensure we end drag
+    window.addEventListener('pointercancel', endDrag as any, true);
+    window.addEventListener('blur', endDrag as any);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', endDrag as any, true);
+      window.removeEventListener('pointercancel', endDrag as any, true);
+      window.removeEventListener('blur', endDrag as any);
+    };
+  }, [setIsComponentDragging]);
+
+  // --- EFFECTIVE DATA (Group Displacements) ---
+  const getEffectiveStatesForCanvas = (states: any[], type: string) => {
+    const overrides = new Map<string, { x: number, y: number }>();
+    groupContainerStates.forEach(group => {
+      if (group.children) {
+        group.children.forEach((child: any) => {
+          if (child.type === type) {
+            overrides.set(child.id, {
+              x: group.x + child.relativeTransform.x,
+              y: group.y + child.relativeTransform.y
+            });
+          }
+        });
+      }
+    });
+    if (overrides.size === 0) return states;
+    return states.map(state => {
+      const id = state.id || state.elementId;
+      if (!id) return state;
+      const override = overrides.get(id);
+      if (override) return { ...state, x: override.x, y: override.y };
+      return state;
+    });
+  };
+
+  const effectiveImages = getEffectiveStatesForCanvas(images, 'image');
+  const effectiveImageModalStates = getEffectiveStatesForCanvas(imageModalStates, 'image-modal');
+  const effectiveVideoModalStates = getEffectiveStatesForCanvas(videoModalStates, 'video-modal');
+  const effectiveMusicModalStates = getEffectiveStatesForCanvas(musicModalStates, 'music-modal');
+  const effectiveTextInputStates = getEffectiveStatesForCanvas(textInputStates, 'text-input');
+  const effectiveUpscaleModalStates = getEffectiveStatesForCanvas(upscaleModalStates, 'upscale');
+  const effectiveMultiangleCameraModalStates = getEffectiveStatesForCanvas(multiangleCameraModalStates, 'multiangle-camera');
+  const effectiveRemoveBgModalStates = getEffectiveStatesForCanvas(removeBgModalStatesFromStore, 'removebg');
+  const effectiveEraseModalStates = getEffectiveStatesForCanvas(eraseModalStatesFromStore, 'erase');
+  const effectiveExpandModalStates = getEffectiveStatesForCanvas(expandModalStatesFromStore, 'expand');
+  const effectiveVectorizeModalStates = getEffectiveStatesForCanvas(vectorizeModalStatesFromStore, 'vectorize');
+  const effectiveNextSceneModalStates = getEffectiveStatesForCanvas(nextSceneModalStates, 'next-scene');
+  const effectiveStoryboardModalStates = getEffectiveStatesForCanvas(storyboardModalStates, 'storyboard');
+  const effectiveScriptFrameModalStates = getEffectiveStatesForCanvas(scriptFrameModalStates, 'script-frame');
+  const effectiveSceneFrameModalStates = getEffectiveStatesForCanvas(sceneFrameModalStates, 'scene-frame');
+  const effectiveVideoEditorModalStates = getEffectiveStatesForCanvas(videoEditorModalStates, 'video-editor-modal');
+  const effectiveImageEditorModalStates = getEffectiveStatesForCanvas(imageEditorModalStates, 'image-editor-modal');
+  const effectiveCompareModalStates = getEffectiveStatesForCanvas(compareModalStates, 'compare-modal');
+  const effectiveCanvasTextStates = getEffectiveStatesForCanvas(canvasState.effectiveCanvasTextStates, 'canvas-text');
+  const effectiveRichTextStates = getEffectiveStatesForCanvas(richTextStates || [], 'rich-text');
+
+  const effectiveCanvasState = {
+    ...canvasState,
+    images: effectiveImages,
+    imageModalStates: effectiveImageModalStates,
+    // REMOVED: videoModalStates (now managed by Zustand store)
+    // videoModalStates: effectiveVideoModalStates,
+    musicModalStates: effectiveMusicModalStates,
+    textInputStates: effectiveTextInputStates,
+    upscaleModalStates: effectiveUpscaleModalStates,
+    // REMOVED: multiangleCameraModalStates (now managed by store)
+    // multiangleCameraModalStates,
+    // setMultiangleCameraModalStates,
+    removeBgModalStates: effectiveRemoveBgModalStates,
+    eraseModalStates: effectiveEraseModalStates,
+    expandModalStates: effectiveExpandModalStates,
+    vectorizeModalStates: effectiveVectorizeModalStates,
+    nextSceneModalStates: effectiveNextSceneModalStates,
+    storyboardModalStates: effectiveStoryboardModalStates,
+    scriptFrameModalStates: effectiveScriptFrameModalStates,
+    sceneFrameModalStates: effectiveSceneFrameModalStates,
+    videoEditorModalStates: effectiveVideoEditorModalStates,
+    imageEditorModalStates: effectiveImageEditorModalStates,
+    compareModalStates: effectiveCompareModalStates,
+    effectiveCanvasTextStates,
+    effectiveRichTextStates,
+  };
+
+  const canvasItemsData = {
+    images,
+    imageModalStates,
+    videoModalStates,
+    videoEditorModalStates,
+    imageEditorModalStates,
+    musicModalStates,
+    multiangleCameraModalStates,
+    removeBgModalStates: effectiveRemoveBgModalStates,
+    eraseModalStates: effectiveEraseModalStates,
+    expandModalStates: effectiveExpandModalStates,
+    vectorizeModalStates: effectiveVectorizeModalStates,
+    nextSceneModalStates,
+    storyboardModalStates,
+    scriptFrameModalStates,
+    sceneFrameModalStates,
+    compareModalStates,
+  };
+
+  // --- HOOKS RE-INIT WITH EFFECTIVE DATA ---
+  const canvasSelection = useCanvasSelection(props, canvasItemsData as any);
+  const groupLogic = useGroupLogic(canvasState, canvasSelection, props);
   const events = useCanvasEvents(
     canvasState,
     canvasSelection,
@@ -299,106 +461,8 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     }
   );
 
-  // Track component dragging state
-  const [isComponentDragging, setIsComponentDragging] = React.useState(false);
-  
   // Combined interaction state: panning OR component dragging
   const isInteracting = events.isPanning || isComponentDragging;
-
-  // Detect component dragging via global mouse events
-  React.useEffect(() => {
-    if (!setIsComponentDragging) return;
-    
-    let isDragging = false;
-    let dragStartTime = 0;
-    
-    const handleMouseDown = (e: MouseEvent) => {
-      // Check if clicking on a modal component
-      const target = e.target as HTMLElement;
-      const modalElement = target.closest('[data-overlay-id], [data-frame-id]');
-      if (modalElement && !target.closest('input, textarea, button, [role="button"]')) {
-        isDragging = true;
-        dragStartTime = Date.now();
-        setIsComponentDragging(true);
-      }
-    };
-    
-    const handleMouseMove = () => {
-      if (isDragging && Date.now() - dragStartTime > 50) {
-        // Only set dragging if mouse moved after initial click (prevents false positives)
-        setIsComponentDragging(true);
-      }
-    };
-    
-    const endDrag = () => {
-      if (isDragging) {
-        isDragging = false;
-        // Small delay to ensure smooth transition
-        setTimeout(() => setIsComponentDragging(false), 50);
-      }
-    };
-    
-    window.addEventListener('mousedown', handleMouseDown, true);
-    window.addEventListener('mousemove', handleMouseMove, true);
-    window.addEventListener('mouseup', endDrag, true);
-    // Safety: if pointer is cancelled or window loses focus, ensure we end drag
-    window.addEventListener('pointercancel', endDrag as any, true);
-    window.addEventListener('blur', endDrag as any);
-    
-    return () => {
-      window.removeEventListener('mousedown', handleMouseDown, true);
-      window.removeEventListener('mousemove', handleMouseMove, true);
-      window.removeEventListener('mouseup', endDrag as any, true);
-      window.removeEventListener('pointercancel', endDrag as any, true);
-      window.removeEventListener('blur', endDrag as any);
-    };
-  }, [setIsComponentDragging]);
-
-  // --- EFFECTIVE DATA (Group Displacements) ---
-  const effectiveImages = groupLogic.getEffectiveStates(images, 'image');
-  const effectiveImageModalStates = groupLogic.getEffectiveStates(imageModalStates, 'image-modal');
-  const effectiveVideoModalStates = groupLogic.getEffectiveStates(videoModalStates, 'video-modal');
-  const effectiveMusicModalStates = groupLogic.getEffectiveStates(musicModalStates, 'music-modal');
-  const effectiveTextInputStates = groupLogic.getEffectiveStates(textInputStates, 'text-input');
-  const effectiveUpscaleModalStates = groupLogic.getEffectiveStates(upscaleModalStates, 'upscale');
-  const effectiveMultiangleCameraModalStates = groupLogic.getEffectiveStates(multiangleCameraModalStates, 'multiangle-camera');
-  const effectiveRemoveBgModalStates = groupLogic.getEffectiveStates(removeBgModalStates, 'removebg');
-  const effectiveEraseModalStates = groupLogic.getEffectiveStates(eraseModalStates, 'erase');
-  const effectiveExpandModalStates = groupLogic.getEffectiveStates(expandModalStates, 'expand');
-  const effectiveVectorizeModalStates = groupLogic.getEffectiveStates(vectorizeModalStates, 'vectorize');
-  const effectiveNextSceneModalStates = groupLogic.getEffectiveStates(nextSceneModalStates, 'next-scene');
-  const effectiveStoryboardModalStates = groupLogic.getEffectiveStates(storyboardModalStates, 'storyboard');
-  const effectiveScriptFrameModalStates = groupLogic.getEffectiveStates(scriptFrameModalStates, 'script-frame');
-  const effectiveSceneFrameModalStates = groupLogic.getEffectiveStates(sceneFrameModalStates, 'scene-frame');
-  const effectiveVideoEditorModalStates = groupLogic.getEffectiveStates(videoEditorModalStates, 'video-editor-modal');
-  const effectiveImageEditorModalStates = groupLogic.getEffectiveStates(imageEditorModalStates, 'image-editor-modal');
-  const effectiveCompareModalStates = groupLogic.getEffectiveStates(compareModalStates, 'compare-modal');
-  const effectiveCanvasTextStates = groupLogic.getEffectiveStates(canvasState.effectiveCanvasTextStates, 'canvas-text');
-  const effectiveRichTextStates = groupLogic.getEffectiveStates(richTextStates || [], 'rich-text');
-
-  const effectiveCanvasState = {
-    ...canvasState,
-    images: effectiveImages,
-    imageModalStates: effectiveImageModalStates,
-    videoModalStates: effectiveVideoModalStates,
-    musicModalStates: effectiveMusicModalStates,
-    textInputStates: effectiveTextInputStates,
-    upscaleModalStates: effectiveUpscaleModalStates,
-    multiangleCameraModalStates: effectiveMultiangleCameraModalStates,
-    removeBgModalStates: effectiveRemoveBgModalStates,
-    eraseModalStates: effectiveEraseModalStates,
-    expandModalStates: effectiveExpandModalStates,
-    vectorizeModalStates: effectiveVectorizeModalStates,
-    nextSceneModalStates: effectiveNextSceneModalStates,
-    storyboardModalStates: effectiveStoryboardModalStates,
-    scriptFrameModalStates: effectiveScriptFrameModalStates,
-    sceneFrameModalStates: effectiveSceneFrameModalStates,
-    videoEditorModalStates: effectiveVideoEditorModalStates,
-    imageEditorModalStates: effectiveImageEditorModalStates,
-    compareModalStates: effectiveCompareModalStates,
-    effectiveCanvasTextStates,
-    effectiveRichTextStates,
-  };
 
   const handleFitView = useCallback(() => {
     // Helper: compute bounding rect from selection or all components
@@ -456,11 +520,13 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       checkSelectionModals(canvasSelection.selectedImageModalIds, imageModalStates);
       checkSelectionModals(canvasSelection.selectedVideoModalIds, videoModalStates);
       checkSelectionModals(canvasSelection.selectedMusicModalIds, musicModalStates, 600, 300);
-      checkSelectionModals(canvasSelection.selectedUpscaleModalIds, upscaleModalStates);
+      // REMOVED: upscaleModalStates selection check (managed by store or needs update)
+      // checkSelectionModals(canvasSelection.selectedUpscaleModalIds, upscaleModalStates);
       checkSelectionModals(canvasSelection.selectedMultiangleCameraModalIds, multiangleCameraModalStates);
-      checkSelectionModals(canvasSelection.selectedRemoveBgModalIds, removeBgModalStates);
-      checkSelectionModals(canvasSelection.selectedEraseModalIds, eraseModalStates);
-      checkSelectionModals(canvasSelection.selectedExpandModalIds, expandModalStates);
+      // REMOVED: removeBgModalStates check (via store)
+      // checkSelectionModals(canvasSelection.selectedRemoveBgModalIds, removeBgModalStates);
+      checkSelectionModals(canvasSelection.selectedEraseModalIds, effectiveEraseModalStates); // Use effective from store
+      checkSelectionModals(canvasSelection.selectedExpandModalIds, effectiveExpandModalStates); // Use effective from store
       checkSelectionModals(canvasSelection.selectedVectorizeModalIds, vectorizeModalStates);
       checkSelectionModals(canvasSelection.selectedNextSceneModalIds, nextSceneModalStates);
       checkSelectionModals(canvasSelection.selectedStoryboardModalIds, storyboardModalStates);
@@ -512,10 +578,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       checkModals(effectiveImageModalStates);
       checkModals(effectiveVideoModalStates);
       checkModals(effectiveMusicModalStates, 600, 300);
-      checkModals(effectiveUpscaleModalStates);
+      // REMOVED: effectiveUpscaleModalStates check (managed by store)
+      // checkModals(effectiveUpscaleModalStates);
       checkModals(effectiveMultiangleCameraModalStates);
-      checkModals(effectiveRemoveBgModalStates);
-      checkModals(effectiveEraseModalStates);
+      // checkModals(effectiveRemoveBgModalStates);
+      checkModals(effectiveEraseModalStates); // Use effective from store
       checkModals(effectiveExpandModalStates);
       checkModals(effectiveVectorizeModalStates);
       checkModals(effectiveNextSceneModalStates);
@@ -557,12 +624,13 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   }, [
     images, canvasSelection, updateViewportCenter, viewportSize,
     textInputStates, imageModalStates, videoModalStates, musicModalStates,
-    upscaleModalStates, multiangleCameraModalStates, removeBgModalStates,
-    eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates,
+    // REMOVED: upscaleModalStates
+    multiangleCameraModalStates, // removeBgModalStates,
+    effectiveEraseModalStates, setEraseModalStates, vectorizeModalStates, nextSceneModalStates,
     storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates,
     videoEditorModalStates, compareModalStates,
     effectiveImageModalStates, effectiveVideoModalStates, effectiveMusicModalStates,
-    effectiveUpscaleModalStates, effectiveMultiangleCameraModalStates, effectiveRemoveBgModalStates,
+    effectiveUpscaleModalStates, effectiveMultiangleCameraModalStates, // effectiveRemoveBgModalStates,
     effectiveEraseModalStates, effectiveExpandModalStates, effectiveVectorizeModalStates,
     effectiveNextSceneModalStates, effectiveStoryboardModalStates, effectiveScriptFrameModalStates,
     effectiveSceneFrameModalStates, effectiveVideoEditorModalStates, effectiveCompareModalStates
@@ -589,7 +657,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     selectedImageIndices: canvasSelection.selectedImageIndices,
     selectedImageModalIds: canvasSelection.selectedImageModalIds,
     selectedVideoModalIds: canvasSelection.selectedVideoModalIds,
-    selectedMusicModalIds: canvasSelection.selectedMusicModalIds,
+
     selectedTextInputIds: canvasSelection.selectedTextInputIds,
     selectedCanvasTextIds: canvasSelection.effectiveSelectedCanvasTextIds,
 
@@ -613,9 +681,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
     // State setters
     setTextInputStates: canvasState.setTextInputStates,
-    setImageModalStates: canvasState.setImageModalStates,
-    setVideoModalStates: canvasState.setVideoModalStates,
-    setMusicModalStates: canvasState.setMusicModalStates,
+
 
     // Persist Create
     onPersistTextModalCreate: props.onPersistTextModalCreate,
@@ -682,21 +748,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistTextModalDelete: props.onPersistTextModalDelete,
 
     // Upscale Deletion
-    selectedUpscaleModalIds: canvasSelection.selectedUpscaleModalIds,
-    selectedUpscaleModalId: canvasSelection.selectedUpscaleModalId,
-    upscaleModalStates: canvasState.upscaleModalStates,
-    setUpscaleModalStates: canvasState.setUpscaleModalStates,
-    setSelectedUpscaleModalId: canvasSelection.setSelectedUpscaleModalId,
-    setSelectedUpscaleModalIds: canvasSelection.setSelectedUpscaleModalIds,
+
     onPersistUpscaleModalDelete: props.onPersistUpscaleModalDelete,
 
     // Multiangle Deletion
-    selectedMultiangleCameraModalIds: canvasSelection.selectedMultiangleCameraModalIds,
-    selectedMultiangleCameraModalId: canvasSelection.selectedMultiangleCameraModalId,
-    multiangleCameraModalStates: canvasState.multiangleCameraModalStates,
-    setMultiangleCameraModalStates: canvasState.setMultiangleCameraModalStates,
-    setSelectedMultiangleCameraModalId: canvasSelection.setSelectedMultiangleCameraModalId,
-    setSelectedMultiangleCameraModalIds: canvasSelection.setSelectedMultiangleCameraModalIds,
+    // Multiangle Deletion
     onPersistMultiangleCameraModalDelete: props.onPersistMultiangleCameraModalDelete,
 
     // Rich Text Deletion
@@ -708,31 +764,33 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistRichTextDelete: props.onPersistRichTextDelete,
 
     // RemoveBG Deletion
-    selectedRemoveBgModalIds: canvasSelection.selectedRemoveBgModalIds,
-    selectedRemoveBgModalId: canvasSelection.selectedRemoveBgModalId,
-    removeBgModalStates: canvasState.removeBgModalStates,
-    setRemoveBgModalStates: canvasState.setRemoveBgModalStates,
-    setSelectedRemoveBgModalId: canvasSelection.setSelectedRemoveBgModalId,
-    setSelectedRemoveBgModalIds: canvasSelection.setSelectedRemoveBgModalIds,
+    // REMOVED: passed props (now hooks)
+    // selectedRemoveBgModalIds: canvasSelection.selectedRemoveBgModalIds,
+    // selectedRemoveBgModalId: canvasSelection.selectedRemoveBgModalId,
+    // setRemoveBgModalStates: canvasState.setRemoveBgModalStates,
+    // setSelectedRemoveBgModalId: canvasSelection.setSelectedRemoveBgModalId,
+    // setSelectedRemoveBgModalIds: canvasSelection.setSelectedRemoveBgModalIds,
     onPersistRemoveBgModalDelete: props.onPersistRemoveBgModalDelete,
 
     // Erase Deletion
     // Erase Deletion
-    selectedEraseModalIds: canvasSelection.selectedEraseModalIds,
-    selectedEraseModalId: canvasSelection.selectedEraseModalId,
-    eraseModalStates: canvasState.eraseModalStates,
-    setEraseModalStates: canvasState.setEraseModalStates,
-    setSelectedEraseModalId: canvasSelection.setSelectedEraseModalId,
-    setSelectedEraseModalIds: canvasSelection.setSelectedEraseModalIds,
+    // REMOVED: eraseModalStates props (now managed by store)
+    // selectedEraseModalIds: canvasSelection.selectedEraseModalIds,
+    // selectedEraseModalId: canvasSelection.selectedEraseModalId,
+    // eraseModalStates: canvasState.eraseModalStates,
+    // setEraseModalStates: canvasState.setEraseModalStates,
+    // setSelectedEraseModalId: canvasSelection.setSelectedEraseModalId,
+    // setSelectedEraseModalIds: canvasSelection.setSelectedEraseModalIds,
     onPersistEraseModalDelete: props.onPersistEraseModalDelete,
 
     // Expand deletion
-    selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
-    selectedExpandModalId: canvasSelection.selectedExpandModalId,
-    expandModalStates: canvasState.expandModalStates,
-    setExpandModalStates: canvasState.setExpandModalStates,
-    setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
-    setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
+    // REMOVED: expandModalStates props (now managed by store)
+    // selectedExpandModalIds: canvasSelection.selectedExpandModalIds,
+    // selectedExpandModalId: canvasSelection.selectedExpandModalId,
+    // expandModalStates: canvasState.expandModalStates,
+    // setExpandModalStates: canvasState.setExpandModalStates,
+    // setSelectedExpandModalId: canvasSelection.setSelectedExpandModalId,
+    // setSelectedExpandModalIds: canvasSelection.setSelectedExpandModalIds,
     onPersistExpandModalDelete: props.onPersistExpandModalDelete,
 
     // Vectorize Deletion
@@ -803,8 +861,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
     images,
     textInputStates: canvasState.textInputStates,
-    imageModalStates,
-    videoModalStates,
+    // REMOVED: imageModalStates (now using Zustand store)
+    // imageModalStates,
+    // REMOVED: videoModalStates (now using Zustand store)
+    // videoModalStates,
     musicModalStates,
 
     setScale,

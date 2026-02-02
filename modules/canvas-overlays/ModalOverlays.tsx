@@ -3,6 +3,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Konva from 'konva';
 import { ModalOverlaysProps } from './types';
+// Zustand Store - Image & Video State Management
+import {
+  useImageModalStates,
+  useVideoModalStates,
+  useVideoSelection,
+  useUpscaleModalStates,
+  useMusicModalStates,
+  useMultiangleCameraModalStates,
+  useExpandModalStates,
+  useExpandStore,
+  useExpandSelection,
+  useEraseModalStates,
+  useEraseStore,
+  useEraseSelection,
+  useVectorizeModalStates,
+  useVectorizeStore,
+  useVectorizeSelection,
+  useRemoveBgModalStates,
+  useRemoveBgStore,
+  useRemoveBgSelection,
+} from '@/modules/stores';
 import { useConnectionManager } from './useConnectionManager';
 import { ConnectionLines } from './ConnectionLines';
 import { TextInputOverlays } from './TextInputOverlays';
@@ -29,12 +50,13 @@ import { CanvasTextOverlays } from './CanvasTextOverlays';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   textInputStates,
-  imageModalStates,
-  videoModalStates,
+  // REMOVED: imageModalStates, videoModalStates (now managed by Zustand store)
+  // imageModalStates,
+  // videoModalStates,
   videoEditorModalStates,
   imageEditorModalStates,
-  musicModalStates,
-  upscaleModalStates,
+  // REMOVED: musicModalStates (now managed by store)
+  // REMOVED: upscaleModalStates (now managed by Zustand store)
   removeBgModalStates,
   eraseModalStates,
   expandModalStates,
@@ -53,29 +75,30 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onPersistCompareModalCreate, // New
   onPersistCompareModalMove, // New
   onPersistCompareModalDelete, // New
-  multiangleCameraModalStates, // Multiangle Camera Plugin
-  selectedMultiangleCameraModalId, // Multiangle Camera Plugin
-  selectedMultiangleCameraModalIds, // Multiangle Camera Plugin
-  setMultiangleCameraModalStates = () => { }, // Multiangle Camera Plugin
-  setSelectedMultiangleCameraModalId = () => { }, // Multiangle Camera Plugin
-  setSelectedMultiangleCameraModalIds = () => { }, // Multiangle Camera Plugin
+  // REMOVED: multiangleCameraModalStates (now managed by store)
+  // multiangleCameraModalStates,
+  // selectedMultiangleCameraModalId,
+  // selectedMultiangleCameraModalIds,
+  // setMultiangleCameraModalStates,
+  // setSelectedMultiangleCameraModalId,
+  // setSelectedMultiangleCameraModalIds,
   onPersistMultiangleCameraModalCreate, // Multiangle Camera Plugin
   onPersistMultiangleCameraModalMove, // Multiangle Camera Plugin
   onPersistMultiangleCameraModalDelete, // Multiangle Camera Plugin
   selectedTextInputId,
   selectedTextInputIds,
-  selectedImageModalId,
-  selectedImageModalIds,
-  selectedVideoModalId,
-  selectedVideoModalIds,
+  // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
+  // selectedImageModalId,
+  // selectedImageModalIds,
+  // REMOVED: selectedVideoModalId, selectedVideoModalIds (now managed by Zustand store)
+  // selectedVideoModalId,
+  // selectedVideoModalIds,
   selectedVideoEditorModalId,
   selectedVideoEditorModalIds,
   selectedImageEditorModalId,
   selectedImageEditorModalIds,
-  selectedMusicModalId,
-  selectedMusicModalIds,
-  selectedUpscaleModalId,
-  selectedUpscaleModalIds,
+  // REMOVED: selectedMusicModalId, selectedMusicModalIds (now managed by store)
+  // REMOVED: selectedUpscaleModalId, selectedUpscaleModalIds (now managed by store)
   selectedRemoveBgModalId,
   selectedRemoveBgModalIds,
   selectedEraseModalId,
@@ -120,33 +143,32 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   setSelectedTextInputId,
   setSelectedTextInputIds,
   setSelectedImageIndices,
-  setImageModalStates,
-  setSelectedImageModalId,
-  setSelectedImageModalIds,
-  setVideoModalStates,
-  setSelectedVideoModalId,
-  setSelectedVideoModalIds,
+  // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand store)
+  // setImageModalStates,
+  // setSelectedImageModalId,
+  // setSelectedImageModalIds,
+  // REMOVED: setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds (now managed by Zustand store)
+  // setVideoModalStates,
+  // setSelectedVideoModalId,
+  // setSelectedVideoModalIds,
   setVideoEditorModalStates = () => { },
   setSelectedVideoEditorModalId = () => { },
   setSelectedVideoEditorModalIds = () => { },
   setImageEditorModalStates = () => { },
   setSelectedImageEditorModalId = () => { },
   setSelectedImageEditorModalIds = () => { },
-  setMusicModalStates,
-  setSelectedMusicModalId,
-  setSelectedMusicModalIds,
-  setUpscaleModalStates = () => { },
-  setSelectedUpscaleModalId = () => { },
-  setSelectedUpscaleModalIds = () => { },
+  // REMOVED: setMusicModalStates, setSelectedMusicModalId, setSelectedMusicModalIds (now managed by store)
+  // REMOVED: setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
   setRemoveBgModalStates = () => { },
   setSelectedRemoveBgModalId = () => { },
   setSelectedRemoveBgModalIds = () => { },
   setEraseModalStates = () => { },
   setSelectedEraseModalId = () => { },
   setSelectedEraseModalIds = () => { },
-  setExpandModalStates = () => { },
-  setSelectedExpandModalId = () => { },
-  setSelectedExpandModalIds = () => { },
+  // REMOVED: setExpandModalStates, setSelectedExpandModalId, setSelectedExpandModalIds (now managed by store)
+  // setExpandModalStates,
+  // setSelectedExpandModalId,
+  // setSelectedExpandModalIds,
   setVectorizeModalStates = () => { },
   setSelectedVectorizeModalId = () => { },
   setSelectedVectorizeModalIds = () => { },
@@ -250,6 +272,10 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   isInteracting = false,
   setIsComponentDragging,
 }) => {
+  // Zustand Store - Get image and video modal states (replaces props)
+  const imageModalStates = useImageModalStates();
+  const videoModalStates = useVideoModalStates();
+  const { selectedId: selectedVideoModalId, selectedIds: selectedVideoModalIds } = useVideoSelection();
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
   const lastUpdateRef = useRef({ x: 0, y: 0, scale: 1 });
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -260,36 +286,61 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       // During interaction, skip updates to prevent lag
       return;
     }
-    
+
     // Only update if position or scale actually changed
-    const hasChanged = 
+    const hasChanged =
       lastUpdateRef.current.x !== position.x ||
       lastUpdateRef.current.y !== position.y ||
       lastUpdateRef.current.scale !== scale;
-    
+
     if (!hasChanged) {
       return;
     }
-    
+
     // Clear any pending timeout
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
-    
+
     // Update ref immediately to prevent duplicate updates
     lastUpdateRef.current = { x: position.x, y: position.y, scale };
-    
+
     // Debounce the update to prevent rapid-fire updates
     updateTimeoutRef.current = setTimeout(() => {
       setViewportUpdateKey(prev => prev + 1);
     }, 16); // ~60fps
-    
+
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
       }
     };
   }, [position.x, position.y, scale, isInteracting]);
+
+  // Zustand Store
+  const upscaleModalStates = useUpscaleModalStates();
+  const musicModalStates = useMusicModalStates();
+  const multiangleCameraModalStates = useMultiangleCameraModalStates();
+
+  // Falling back to hooks if props are not provided (e.g. for components that don't pass them)
+  const storeExpandModalStates = useExpandModalStates();
+  const storeEraseModalStates = useEraseModalStates();
+  const effectiveExpandModalStates = expandModalStates || storeExpandModalStates;
+  const effectiveEraseModalStates = eraseModalStates || storeEraseModalStates;
+
+  const { setExpandModalStates } = useExpandStore();
+  const { selectedId: hookSelectedExpandModalId, selectedIds: hookSelectedExpandModalIds, setSelectedId: setSelectedExpandModalId, setSelectedIds: setSelectedExpandModalIds } = useExpandSelection();
+  const { setEraseModalStates: hookSetEraseModalStates } = useEraseStore();
+  const { selectedId: hookSelectedEraseModalId, selectedIds: hookSelectedEraseModalIds, setSelectedId: hookSetSelectedEraseModalId, setSelectedIds: hookSetSelectedEraseModalIds } = useEraseSelection();
+
+  // Prefer props if available, otherwise use hooks
+  const finalSelectedExpandModalId = selectedExpandModalId || hookSelectedExpandModalId;
+  const finalSelectedExpandModalIds = selectedExpandModalIds || hookSelectedExpandModalIds;
+  const finalSelectedEraseModalId = selectedEraseModalId || hookSelectedEraseModalId;
+  const finalSelectedEraseModalIds = selectedEraseModalIds || hookSelectedEraseModalIds;
+  const finalSetEraseModalStates = setEraseModalStates || hookSetEraseModalStates;
+  const finalSetSelectedEraseModalId = setSelectedEraseModalId || hookSetSelectedEraseModalId;
+  const finalSetSelectedEraseModalIds = setSelectedEraseModalIds || hookSetSelectedEraseModalIds;
 
   const connectionManager = useConnectionManager({
     connections: externalConnections ?? [],
@@ -314,6 +365,23 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
     scriptFrameModalStates: scriptFrameModalStates ?? [],
     sceneFrameModalStates: sceneFrameModalStates ?? [],
   });
+
+  // --- VECTORIZE SELECTION ---
+  const storeVectorizeModalStates = useVectorizeModalStates();
+  const finalVectorizeModalStates = vectorizeModalStates || storeVectorizeModalStates;
+
+  const {
+    selectedId: storeSelectedVectorizeModalId,
+    selectedIds: storeSelectedVectorizeModalIds,
+    setSelectedId: storeSetSelectedVectorizeModalId,
+    setSelectedIds: storeSetSelectedVectorizeModalIds,
+  } = useVectorizeSelection();
+
+  const finalSelectedVectorizeModalId = selectedVectorizeModalId !== undefined ? selectedVectorizeModalId : storeSelectedVectorizeModalId;
+  const finalSelectedVectorizeModalIds = selectedVectorizeModalIds !== undefined ? selectedVectorizeModalIds : storeSelectedVectorizeModalIds;
+
+  const finalSetSelectedVectorizeModalId = setSelectedVectorizeModalId || storeSetSelectedVectorizeModalId;
+  const finalSetSelectedVectorizeModalIds = setSelectedVectorizeModalIds || storeSetSelectedVectorizeModalIds;
 
   return (
     <>
@@ -365,13 +433,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <ImageModalOverlays
-        imageModalStates={imageModalStates}
-        selectedImageModalId={selectedImageModalId}
-        selectedImageModalIds={selectedImageModalIds}
+        // REMOVED: imageModalStates, selectedImageModalId, selectedImageModalIds, setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds
+        // These are now managed by Zustand store (useImageStore)
         clearAllSelections={clearAllSelections}
-        setImageModalStates={setImageModalStates}
-        setSelectedImageModalId={setSelectedImageModalId}
-        setSelectedImageModalIds={setSelectedImageModalIds}
         onImageGenerate={onImageGenerate}
         onAddImageToCanvas={onAddImageToCanvas}
         onPersistImageModalCreate={onPersistImageModalCreate}
@@ -398,13 +462,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <VideoModalOverlays
-        videoModalStates={videoModalStates}
-        selectedVideoModalId={selectedVideoModalId}
-        selectedVideoModalIds={selectedVideoModalIds}
+        // REMOVED: videoModalStates, selectedVideoModalId, selectedVideoModalIds, setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds
+        // These are now managed by Zustand store (useVideoStore)
         clearAllSelections={clearAllSelections}
-        setVideoModalStates={setVideoModalStates}
-        setSelectedVideoModalId={setSelectedVideoModalId}
-        setSelectedVideoModalIds={setSelectedVideoModalIds}
         onVideoGenerate={onVideoGenerate}
         onPersistVideoModalCreate={onPersistVideoModalCreate}
         onPersistVideoModalMove={onPersistVideoModalMove}
@@ -463,13 +523,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <MusicModalOverlays
-        musicModalStates={musicModalStates}
-        selectedMusicModalId={selectedMusicModalId}
-        selectedMusicModalIds={selectedMusicModalIds}
-        clearAllSelections={clearAllSelections}
-        setMusicModalStates={setMusicModalStates}
-        setSelectedMusicModalId={setSelectedMusicModalId}
-        setSelectedMusicModalIds={setSelectedMusicModalIds}
+        // REMOVED: props now managed by store
+        // musicModalStates={musicModalStates}
+        // selectedMusicModalId={selectedMusicModalId}
+        // selectedMusicModalIds={selectedMusicModalIds}
+        // clearAllSelections={clearAllSelections}
+        // setMusicModalStates={setMusicModalStates}
+        // setSelectedMusicModalId={setSelectedMusicModalId}
+        // setSelectedMusicModalIds={setSelectedMusicModalIds}
         onMusicSelect={onMusicSelect}
         onMusicGenerate={onMusicGenerate}
         onPersistMusicModalCreate={onPersistMusicModalCreate}
@@ -486,13 +547,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <UpscaleModalOverlays
-        upscaleModalStates={upscaleModalStates ?? []}
-        selectedUpscaleModalId={selectedUpscaleModalId ?? null}
-        selectedUpscaleModalIds={selectedUpscaleModalIds ?? []}
+        // REMOVED: upscaleModalStates, selectedUpscaleModalId, selectedUpscaleModalIds, setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
+        // upscaleModalStates={upscaleModalStates ?? []}
+        // selectedUpscaleModalId={selectedUpscaleModalId ?? null}
+        // selectedUpscaleModalIds={selectedUpscaleModalIds ?? []}
         clearAllSelections={clearAllSelections}
-        setUpscaleModalStates={setUpscaleModalStates}
-        setSelectedUpscaleModalId={setSelectedUpscaleModalId}
-        setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+        // setUpscaleModalStates={setUpscaleModalStates}
+        // setSelectedUpscaleModalId={setSelectedUpscaleModalId}
+        // setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
         onUpscale={onUpscale}
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
         onPersistUpscaleModalMove={onPersistUpscaleModalMove}
@@ -534,13 +596,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         selectedIds={selectedIds}
       />
       <EraseModalOverlays
-        eraseModalStates={eraseModalStates ?? []}
-        selectedEraseModalId={selectedEraseModalId ?? null}
-        selectedEraseModalIds={selectedEraseModalIds ?? []}
+        eraseModalStates={effectiveEraseModalStates ?? []}
+        selectedEraseModalId={finalSelectedEraseModalId ?? null}
+        selectedEraseModalIds={finalSelectedEraseModalIds ?? []}
         clearAllSelections={clearAllSelections}
-        setEraseModalStates={setEraseModalStates}
-        setSelectedEraseModalId={setSelectedEraseModalId}
-        setSelectedEraseModalIds={setSelectedEraseModalIds}
+        setEraseModalStates={finalSetEraseModalStates}
+        setSelectedEraseModalId={finalSetSelectedEraseModalId}
+        setSelectedEraseModalIds={finalSetSelectedEraseModalIds}
         onErase={onErase}
         onPersistEraseModalCreate={onPersistEraseModalCreate}
         onPersistEraseModalMove={onPersistEraseModalMove}
@@ -559,9 +621,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <ExpandModalOverlays
-        expandModalStates={expandModalStates ?? []}
-        selectedExpandModalId={selectedExpandModalId ?? null}
-        selectedExpandModalIds={selectedExpandModalIds ?? []}
+        expandModalStates={effectiveExpandModalStates ?? []}
+        selectedExpandModalId={finalSelectedExpandModalId ?? null}
+        selectedExpandModalIds={finalSelectedExpandModalIds ?? []}
         clearAllSelections={clearAllSelections}
         setExpandModalStates={setExpandModalStates}
         setSelectedExpandModalId={setSelectedExpandModalId}
@@ -584,13 +646,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <VectorizeModalOverlays
-        vectorizeModalStates={vectorizeModalStates ?? []}
-        selectedVectorizeModalId={selectedVectorizeModalId ?? null}
-        selectedVectorizeModalIds={selectedVectorizeModalIds ?? []}
+        vectorizeModalStates={finalVectorizeModalStates}
+        selectedVectorizeModalId={finalSelectedVectorizeModalId}
+        selectedVectorizeModalIds={finalSelectedVectorizeModalIds}
+        setVectorizeModalStates={setVectorizeModalStates || (() => { })}
+        setSelectedVectorizeModalId={finalSetSelectedVectorizeModalId}
+        setSelectedVectorizeModalIds={finalSetSelectedVectorizeModalIds}
         clearAllSelections={clearAllSelections}
-        setVectorizeModalStates={setVectorizeModalStates}
-        setSelectedVectorizeModalId={setSelectedVectorizeModalId}
-        setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
         onVectorize={onVectorize}
         onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
         onPersistVectorizeModalMove={onPersistVectorizeModalMove}
@@ -599,7 +661,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistImageModalMove={onPersistImageModalMove}
         connections={externalConnections ?? []}
         imageModalStates={imageModalStates}
-        images={images}
+        images={images as any}
         onPersistConnectorCreate={onPersistConnectorCreate}
         stageRef={stageRef}
         scale={scale}
@@ -609,13 +671,14 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <MultiangleCameraModalOverlays
-        multiangleCameraModalStates={multiangleCameraModalStates ?? []}
-        selectedMultiangleCameraModalId={selectedMultiangleCameraModalId ?? null}
-        selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds ?? []}
+        // REMOVED: multiangleCameraModalStates (now managed by store)
+        // multiangleCameraModalStates={multiangleCameraModalStates}
+        // selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
+        // selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
         clearAllSelections={clearAllSelections}
-        setMultiangleCameraModalStates={setMultiangleCameraModalStates}
-        setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
-        setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
+        // setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+        // setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
+        // setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
         onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
         onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
         onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
@@ -738,9 +801,9 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistVideoModalCreate={onPersistVideoModalCreate}
         onPersistMusicModalCreate={onPersistMusicModalCreate}
         onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
-        setUpscaleModalStates={setUpscaleModalStates}
+        // setUpscaleModalStates={setUpscaleModalStates}
         onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
-        setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+
         onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
         setRemoveBgModalStates={setRemoveBgModalStates}
         onPersistEraseModalCreate={onPersistEraseModalCreate}
