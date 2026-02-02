@@ -26,7 +26,7 @@ import {
   useTextModalStates,
 } from '@/modules/stores';
 import { useConnectionManager } from './useConnectionManager';
-import { ConnectionLines } from './ConnectionLines';
+import { ReactFlowConnectionLayer } from './ReactFlowConnectionLayer';
 import { TextInputOverlays } from './TextInputOverlays';
 import { ImageModalOverlays } from './ImageModalOverlays';
 import { VideoModalOverlays } from './VideoModalOverlays';
@@ -390,7 +390,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
 
   return (
     <>
-      <ConnectionLines
+      <ReactFlowConnectionLayer
         connections={externalConnections ?? []}
         activeDrag={connectionManager.activeDrag}
         selectedConnectionId={connectionManager.selectedConnectionId}
@@ -415,6 +415,20 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         scriptFrameModalStates={scriptFrameModalStates ?? []}
         sceneFrameModalStates={sceneFrameModalStates ?? []}
         viewportUpdateKey={viewportUpdateKey}
+
+        // --- Pass Down Props for React Flow Nodes (ImageNode) ---
+        onImageGenerate={onImageGenerate}
+        onAddImageToCanvas={onAddImageToCanvas}
+        onPersistImageModalCreate={onPersistImageModalCreate}
+        onPersistImageModalMove={onPersistImageModalMove}
+        onPersistImageModalDelete={onPersistImageModalDelete}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        clearAllSelections={clearAllSelections}
+        images={images}
+        isChatOpen={isChatOpen}
+        selectedIds={selectedIds}
+        selectionOrder={setSelectionOrder} // Pass setter if needed, or derived order
+        isComponentDraggable={isComponentDraggable}
       />
 
       {/* TextInputOverlays restored for AI Text functionality */}
@@ -438,34 +452,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         storyboardModalStates={storyboardModalStates}
       />
 
-      <ImageModalOverlays
-        // REMOVED: imageModalStates, selectedImageModalId, selectedImageModalIds, setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds
-        // These are now managed by Zustand store (useImageStore)
-        clearAllSelections={clearAllSelections}
-        onImageGenerate={onImageGenerate}
-        onAddImageToCanvas={onAddImageToCanvas}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        onPersistImageModalDelete={onPersistImageModalDelete}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        connections={externalConnections ?? []}
-        imageModalStatesForConnections={imageModalStates}
-        images={images}
-        textInputStates={textInputStates}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        sceneFrameModalStates={sceneFrameModalStates ?? []}
-        scriptFrameModalStates={scriptFrameModalStates ?? []}
-        storyboardModalStates={storyboardModalStates ?? []}
-        isComponentDraggable={isComponentDraggable}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-        setSelectionOrder={setSelectionOrder}
-        showFineDetails={showFineDetails}
-        showLabelsOnly={showLabelsOnly}
-        isZoomedOut={isZoomedOut}
-      />
+      {/* 
+        REMOVED: ImageModalOverlays 
+        MIGRATED: Image Modals are now rendered as custom 'image' nodes within 
+        the ReactFlowConnectionLayer above.
+      */}
+      {/* <ImageModalOverlays ... /> */}
+
 
       <VideoModalOverlays
         // REMOVED: videoModalStates, selectedVideoModalId, selectedVideoModalIds, setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds
