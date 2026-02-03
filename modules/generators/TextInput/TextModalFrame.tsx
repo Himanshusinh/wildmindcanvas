@@ -30,6 +30,7 @@ interface TextModalFrameProps {
   hasConnectedComponents?: boolean;
   smartTokens?: SmartToken[];
   onSmartTokensChange?: (tokens: SmartToken[]) => void;
+  isEnhancing?: boolean;
 }
 
 export const TextModalFrame: React.FC<TextModalFrameProps> = ({
@@ -60,6 +61,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   hasConnectedComponents = false,
   smartTokens: externalSmartTokens = [],
   onSmartTokensChange,
+  isEnhancing = false,
 }: TextModalFrameProps) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const isDark = useIsDarkTheme();
@@ -401,6 +403,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             padding: `${24 * scale}px ${16 * scale}px`,
             margin: 0,
           }}
+          className={isEnhancing ? 'animate-shine' : ''}
           onWheel={(e) => e.stopPropagation()}
           onClick={handleTextareaClick}
           onMouseMove={handleTextareaMouseMove}
@@ -431,6 +434,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
             boxSizing: 'border-box',
             margin: 0,
           }}
+          className={isEnhancing ? 'animate-shine' : ''}
         >
           {renderTextWithTokens(text, smartTokens, scale, isDark, activeTokenIndex)}
         </div>

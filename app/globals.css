@@ -173,3 +173,19 @@ main {
 .dark canvas {
   background-color: var(--bg-primary) !important;
 }
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+.animate-shine {
+  background: linear-gradient(to right, var(--text-primary) 20%, var(--accent-color) 40%, var(--accent-color) 60%, var(--text-primary) 80%);
+  background-size: 200% auto;
+  color: transparent !important;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 2s linear infinite;
+  display: inline;
+}

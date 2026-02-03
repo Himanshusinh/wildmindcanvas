@@ -501,6 +501,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           text={text}
           isTextFocused={isTextFocused}
           autoFocusInput={autoFocusInput}
+          isEnhancing={isEnhancing}
           onTextChange={(v) => {
             setText(v);
             if (onValueChange) onValueChange(v);
