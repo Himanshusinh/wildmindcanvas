@@ -17,7 +17,7 @@ interface TextInputOverlaysProps {
   // setSelectedTextInputId: (id: string | null) => void; // Removed - used from store
   onTextCreate?: (text: string, x: number, y: number) => void;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean; smartTokens?: any[] }>) => void | Promise<void>;
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
@@ -208,6 +208,14 @@ export const TextInputOverlays = React.memo<TextInputOverlaysProps>(({
             setTextModalStates(prev => prev.map(t => t.id === textState.id ? { ...t, sentValue: sentText } : t));
             if (onPersistTextModalMove) {
               Promise.resolve(onPersistTextModalMove(textState.id, { sentValue: sentText })).catch(console.error);
+            }
+          }}
+          value={textState.value}
+          smartTokens={textState.smartTokens}
+          onSmartTokensChange={(tokens) => {
+            setTextModalStates(prev => prev.map(t => t.id === textState.id ? { ...t, smartTokens: tokens } : t));
+            if (onPersistTextModalMove) {
+              Promise.resolve(onPersistTextModalMove(textState.id, { smartTokens: tokens })).catch(console.error);
             }
           }}
           stageRef={stageRef}

@@ -174,15 +174,34 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
     // Let's stick to pointer cursor on click/focus intent? 
     // No, let's use the click handler's logic but for mouse move.
 
-    const tokenUnderMouse = smartTokens.some(t => caretPos >= t.startIndex && caretPos <= t.endIndex);
+    const buffer = 2; // Matched with click detection buffer
+    const tokenUnderMouse = smartTokens.some(t =>
+      caretPos >= Math.max(0, t.startIndex - buffer) &&
+      caretPos <= Math.min(e.currentTarget.value.length, t.endIndex + buffer)
+    );
     setIsTokenHovered(tokenUnderMouse);
   };
 
   const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
-    const pos = e.currentTarget.selectionStart;
-    if (pos === null) return;
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
 
-    const tokenIndex = smartTokens.findIndex(t => pos >= t.startIndex && pos <= t.endIndex);
+    if (start === null) return;
+
+    // Check if the click/selection overlaps with any smart token
+    // Added a small 1-char buffer to make it easier to click small words
+    const tokenIndex = smartTokens.findIndex(t => {
+      const buffer = 2; // Increased buffer for better touch/click reliability
+      // If it's a simple click (start === end), check if the cursor is within or very near the token
+      if (start === end) {
+        return start >= Math.max(0, t.startIndex - buffer) && start <= Math.min(textarea.value.length, t.endIndex + buffer);
+      }
+      // If it's a range selection, check if the range overlaps with the token
+      return (start < t.endIndex && end > t.startIndex);
+    });
+
+    console.log(`[handleTextareaClick] pos=${start}-${end}, tokenFound=${tokenIndex !== -1}`);
 
     if (tokenIndex !== -1 && tokenContainerRef.current) {
       const span = tokenContainerRef.current.querySelector(`[data-token-index="${tokenIndex}"]`);
@@ -191,8 +210,8 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
         const containerRect = containerRef.current?.getBoundingClientRect() || { top: 0, left: 0 };
         setActiveTokenIndex(tokenIndex);
         setActiveTokenRect({
-          top: (rect.bottom - containerRect.top) / scale,
-          left: (rect.left - containerRect.left) / scale,
+          top: rect.bottom - containerRect.top,
+          left: rect.left - containerRect.left,
         });
       }
     } else {
@@ -422,7 +441,7 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
           className="smart-dropdown"
           style={{
             position: 'absolute',
-            top: `${activeTokenRect.top + 4 * scale}px`,
+            top: `${activeTokenRect.top + 6}px`, // Fixed offset in pixels
             left: `${activeTokenRect.left}px`,
             zIndex: 3001,
             backgroundColor: isDark ? '#1f2937' : '#ffffff',
@@ -598,7 +617,7 @@ function renderTextWithTokens(
         style={{
           color: activeIndex === index ? '#3B82F6' : '#60A5FA',
           fontWeight: 900,
-          transition: 'all 0.2s ease',
+          transition: 'color 0.2s ease',
           display: 'inline',
           position: 'relative',
           cursor: 'pointer',

@@ -101,7 +101,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         boxSizing: 'border-box',
         overflow: 'visible',
         zIndex: 1,
-        transition: 'background-color, border-color, opacity, max-height',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -164,7 +164,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              {['GPT-4o', 'Gemini Pro'].map((model) => (
+              {['GPT-5', 'Gemini Pro'].map((model) => (
                 <div
                   key={model}
                   onClick={(e) => {

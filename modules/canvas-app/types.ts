@@ -250,6 +250,7 @@ export interface TextGenerator {
   x: number;
   y: number;
   value?: string;
+  smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[];
 }
 
 export interface Connector {

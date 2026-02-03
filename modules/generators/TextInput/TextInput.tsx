@@ -25,8 +25,11 @@ interface TextInputProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onValueChange?: (value: string) => void;
+  value?: string;
+  onSmartTokensChange?: (tokens: SmartToken[]) => void;
   onSendPrompt?: (text: string) => void;
   stageRef: React.RefObject<any>;
+  smartTokens?: SmartToken[];
   scale: number;
   position: { x: number; y: number };
   isSelected?: boolean;
@@ -66,8 +69,11 @@ export const TextInput: React.FC<TextInputProps> = ({
   isPinned = false,
   onTogglePin,
   onDownload,
+  smartTokens: initialSmartTokens = [],
+  onSmartTokensChange,
+  value: initialText = '',
 }) => {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -80,7 +86,23 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStatus, setEnhanceStatus] = useState('');
-  const [smartTokens, setSmartTokens] = useState<SmartToken[]>([]);
+  const [smartTokens, setSmartTokens] = useState<SmartToken[]>(initialSmartTokens);
+
+  // Sync smartTokens state if prop changes (e.g. from backend load)
+  useEffect(() => {
+    if (initialSmartTokens && initialSmartTokens.length > 0) {
+      console.log('[TextInput] Syncing smartTokens from prop:', initialSmartTokens.length);
+      setSmartTokens(initialSmartTokens);
+    }
+  }, [initialSmartTokens]);
+
+  // Sync text state if prop changes (e.g. from backend load)
+  useEffect(() => {
+    if (initialText !== undefined) {
+      console.log('[TextInput] Syncing initialText from prop, len:', initialText.length);
+      setText(initialText);
+    }
+  }, [initialText]);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -285,6 +307,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           }
           if (result.smart_tokens) {
             setSmartTokens(result.smart_tokens);
+            if (onSmartTokensChange) onSmartTokensChange(result.smart_tokens);
           }
 
           // Send the generated story to connected storyboard (as scriptText)
@@ -336,6 +359,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         }
         if (result.smart_tokens) {
           setSmartTokens(result.smart_tokens);
+          if (onSmartTokensChange) onSmartTokensChange(result.smart_tokens);
         }
         // Also call onScriptGenerated for backwards compatibility
         if (onScriptGenerated) {
@@ -436,7 +460,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'border-radius 0.3s ease, border-bottom 0.3s ease, background-color 0.3s ease',
+        transition: 'background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
         minWidth: `${400 * scale}px`,
@@ -499,7 +523,10 @@ export const TextInput: React.FC<TextInputProps> = ({
           onSendPrompt={handleSendPrompt}
           hasConnectedComponents={hasConnectedComponents}
           smartTokens={smartTokens}
-          onSmartTokensChange={(tokens) => setSmartTokens(tokens)}
+          onSmartTokensChange={(tokens) => {
+            setSmartTokens(tokens);
+            if (onSmartTokensChange) onSmartTokensChange(tokens);
+          }}
         />
 
         <TextModalNodes

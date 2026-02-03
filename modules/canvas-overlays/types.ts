@@ -9,6 +9,7 @@ export interface TextModalState {
   sentValue?: string; // Value sent to connected components (only updated when arrow is clicked)
   autoFocusInput?: boolean;
   isPinned?: boolean;
+  smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[];
 }
 
 export interface ImageModalState {
@@ -546,7 +547,7 @@ export interface ModalOverlaysProps {
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean; smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[] }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   connections?: Connection[];
   onConnectionsChange?: (connections: Connection[]) => void;

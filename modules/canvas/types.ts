@@ -76,7 +76,7 @@ export interface CanvasProps {
     externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
     externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
     externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
-    externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
+    externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean; smartTokens?: any[] }>;
     onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
     onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>) => void | Promise<void>;
     onPersistImageModalDelete?: (id: string) => void | Promise<void>;
@@ -143,7 +143,7 @@ export interface CanvasProps {
     onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
     // Text generator (input overlay) persistence callbacks
     onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-    onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+    onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; smartTokens?: any[] }>) => void | Promise<void>;
     onPersistTextModalDelete?: (id: string) => void | Promise<void>;
     // Group persistence callbacks
     onPersistGroupCreate?: (group: GroupContainerState) => void | Promise<void>;
@@ -204,7 +204,7 @@ export interface CanvasItemsData {
     images: ImageUpload[];
     canvasTextStates: CanvasTextState[];
     richTextStates: CanvasTextState[];
-    textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
+    textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean; smartTokens?: any[] }>;
     imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>;
     videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     videoEditorModalStates: Array<{ id: string; x: number; y: number }>;

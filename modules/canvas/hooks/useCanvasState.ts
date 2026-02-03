@@ -179,7 +179,12 @@ export function useCanvasState(props: CanvasProps) {
 
   // Sync text modals
   const setTextModalStatesInStore = useTextStore(state => state.setTextModalStates);
-  useEffect(() => { if (externalTextModals) setTextModalStatesInStore(externalTextModals); }, [externalTextModals, setTextModalStatesInStore]);
+  useEffect(() => {
+    if (externalTextModals) {
+      console.log('[useCanvasState] Syncing externalTextModals to store:', externalTextModals.map(m => ({ id: m.id, hasTokens: !!m.smartTokens && m.smartTokens.length > 0, tokensCount: m.smartTokens?.length, textLen: m.value?.length })));
+      setTextModalStatesInStore(externalTextModals);
+    }
+  }, [externalTextModals, setTextModalStatesInStore]);
 
   // Get current states from stores for return
   const imageModalStatesInStore = useImageStore(state => state.imageModalStates);

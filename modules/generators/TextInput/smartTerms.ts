@@ -14,10 +14,10 @@ export function anchorSmartTokens(text: string, tokens: SmartToken[]): SmartToke
     if (!text || !tokens || tokens.length === 0) return [];
 
     const result: SmartToken[] = [];
-    // Sort tokens by length (descending) to match longest phrases first (prevents partial matches)
+    // Sort tokens by length (ascending) to match shortest phrases first (favors granularity)
     const sortedTokens = [...tokens]
         .filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0)
-        .sort((a, b) => b.text.length - a.text.length);
+        .sort((a, b) => a.text.length - b.text.length);
 
     console.log(`[anchorSmartTokens] Attempting to anchor ${sortedTokens.length} tokens into text of length ${text.length}`);
 
@@ -25,7 +25,13 @@ export function anchorSmartTokens(text: string, tokens: SmartToken[]): SmartToke
         const tokenText = token.text.trim();
         // Escape special regex characters in token text and replace spaces with \s+
         const escapedText = tokenText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = escapedText.replace(/\s+/g, '\\s+');
+        // Use word boundaries if token starts/ends with alphanumeric chars to avoid partial word matches
+        const useStartBoundary = /^\w/.test(tokenText);
+        const useEndBoundary = /\w$/.test(tokenText);
+
+        const pattern = (useStartBoundary ? '\\b' : '') +
+            escapedText.replace(/\s+/g, '\\s+') +
+            (useEndBoundary ? '\\b' : '');
         const regex = new RegExp(pattern, 'gi');
 
         let match;
@@ -48,7 +54,6 @@ export function anchorSmartTokens(text: string, tokens: SmartToken[]): SmartToke
                     endIndex: end
                 });
                 console.log(`[anchorSmartTokens] ✅ Anchored: "${match[0]}" at ${index}-${end}`);
-                break; // One match per unique token definition
             }
         }
     }

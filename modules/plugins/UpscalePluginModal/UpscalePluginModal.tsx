@@ -113,6 +113,14 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useLatestRef(onOptionsChange);
 
+  // Auto-close popup when zooming out past a threshold (60%)
+  useEffect(() => {
+    const zoomThreshold = 0.2;
+    if (scale < zoomThreshold && isPopupOpen) {
+      setIsPopupOpen(false);
+    }
+  }, [scale, isPopupOpen, setIsPopupOpen]);
+
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
   const screenY = y * scale + position.y;
@@ -381,7 +389,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       onContextMenu={onContextMenu}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -417,14 +425,16 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
-            marginBottom: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
+            marginBottom: `${10 * scale}px`,
+            fontSize: `${13 * scale}px`,
+            fontWeight: 600,
             color: isDark ? '#ffffff' : '#1a1a1a',
             textAlign: 'center',
             userSelect: 'none',
             transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
+            letterSpacing: '0.02em',
+            textTransform: 'uppercase',
+            opacity: 0.9
           }}
         >
           Upscale
@@ -434,20 +444,20 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         <div
           style={{
             position: 'relative',
-            width: `${100 * scale}px`,
-            height: `${100 * scale}px`,
-            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            width: `${110 * scale}px`,
+            height: `${110 * scale}px`,
+            backgroundColor: isDark ? '#1e1e1e' : '#f0f0f0',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
+            border: `${2 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#333' : '#ccc')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
             boxShadow: isDark
-              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
-              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
-            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
-            overflow: 'visible', // Allow nodes to extend beyond container
+              ? (isHovered || isSelected ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.6)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.4)`)
+              : (isHovered || isSelected ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.08)`),
+            transform: (isHovered || isSelected) ? `scale(1.05)` : 'scale(1)',
+            overflow: 'visible',
             zIndex: 20,
           }}
         >
