@@ -8,6 +8,7 @@ import { TextModalFrame } from './TextModalFrame';
 import { TextModalNodes } from './TextModalNodes';
 import { TextModalControls } from './TextModalControls';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SmartToken } from './smartTerms';
 
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -79,6 +80,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStatus, setEnhanceStatus] = useState('');
+  const [smartTokens, setSmartTokens] = useState<SmartToken[]>([]);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -281,6 +283,9 @@ export const TextInput: React.FC<TextInputProps> = ({
           if (onValueChange) {
             onValueChange(generatedStory);
           }
+          if (result.smart_tokens) {
+            setSmartTokens(result.smart_tokens);
+          }
 
           // Send the generated story to connected storyboard (as scriptText)
           window.dispatchEvent(new CustomEvent('text-script-generated', {
@@ -328,6 +333,9 @@ export const TextInput: React.FC<TextInputProps> = ({
         setText(enhancedText);
         if (onValueChange) {
           onValueChange(enhancedText);
+        }
+        if (result.smart_tokens) {
+          setSmartTokens(result.smart_tokens);
         }
         // Also call onScriptGenerated for backwards compatibility
         if (onScriptGenerated) {
@@ -410,6 +418,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => requestHoverState(true, true)}
       onMouseLeave={() => requestHoverState(false)}
+      onWheel={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
@@ -420,12 +429,14 @@ export const TextInput: React.FC<TextInputProps> = ({
         gap: `${0 * scale}px`, // Removed gap as header is merging
         padding: 0, // Remove padding, let internal components handle spacing
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`, // Increased radius slightly
+        borderRadius: (isHovered || isPinned)
+          ? '0px'
+          : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'border 0.3s ease, background-color 0.3s ease',
+        transition: 'border-radius 0.3s ease, border-bottom 0.3s ease, background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
         minWidth: `${400 * scale}px`,
@@ -440,8 +451,6 @@ export const TextInput: React.FC<TextInputProps> = ({
         isHovered={isHovered}
         scale={scale}
       />
-
-
 
       <div style={{ position: 'relative' }}>
         <ModalActionIcons
@@ -489,6 +498,8 @@ export const TextInput: React.FC<TextInputProps> = ({
           onHoverChange={requestHoverState}
           onSendPrompt={handleSendPrompt}
           hasConnectedComponents={hasConnectedComponents}
+          smartTokens={smartTokens}
+          onSmartTokensChange={(tokens) => setSmartTokens(tokens)}
         />
 
         <TextModalNodes

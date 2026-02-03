@@ -79,8 +79,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
       style={{
         position: 'absolute',
         top: '100%',
-        left: `${-frameBorderWidth * scale}px`,
-        right: `${-frameBorderWidth * scale}px`, // Span full width
+        left: 0,
+        right: 0, // Align exactly with parent width
         padding: `${12 * scale}px`,
         paddingTop: `${8 * scale}px`,
         paddingBottom: `${12 * scale}px`,
@@ -98,10 +98,10 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         flexDirection: 'column',
         gap: `${10 * scale}px`,
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+        boxSizing: 'border-box',
         overflow: 'visible',
         zIndex: 1,
         transition: 'background-color, border-color, opacity, max-height',
-        marginTop: `${-1 * scale}px`, // Pull up to overlap border
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
