@@ -6,5 +6,5 @@ export * from './hooks/useConnectedSourceImage';
 export * from './utils/mediaUrl';
 export * from './types';
 export * from './ui/PluginNodeShell';
-export * from './connections/PluginConnectionNodes';
+
 

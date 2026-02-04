@@ -103,6 +103,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: ((isHovered || isPinned) && !isUploadedVideo) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        boxSizing: 'border-box',
         transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',

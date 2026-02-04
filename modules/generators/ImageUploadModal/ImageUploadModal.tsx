@@ -5,7 +5,7 @@ import '@/modules/ui-global/common/canvasCaptureGuard';
 import { ImageModalTooltip } from './ImageModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { ImageModalFrame } from './ImageModalFrame';
-import { ImageModalNodes } from './ImageModalNodes';
+
 import { ImageModalControls } from './ImageModalControls';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
@@ -122,9 +122,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isPinned = false,
   onTogglePin,
 }) => {
-  // Zustand Store - Get image modal states and actions
-  const imageModalStates = useImageModalStates();
-  const { updateImageModal } = useImageStore();
 
   // Fix 3: Strict Guard - Prevent rendering invalid modals
   if (!id) return null;
@@ -141,6 +138,35 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const imageModalStates = useImageStore(s => s.imageModalStates);
+  const updateImageModal = useImageStore(s => s.updateImageModal);
+  const modalState = useMemo(() => imageModalStates.find(m => m.id === id), [imageModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
   // Track if resolution change was user-initiated to prevent useEffect from overriding it
   const userInitiatedResolutionChangeRef = useRef(false);
   // Debug Selection Props
@@ -264,6 +290,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     return null;
   }, [id, connections, textInputStates, sceneFrameModalStates]);
+
+  // Sync isHovered state with store
+  useEffect(() => {
+    updateImageModal(id, { isHovered });
+  }, [id, isHovered, updateImageModal]);
 
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
@@ -1782,8 +1813,8 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true)}
+      onMouseLeave={() => requestHoverState(false)}
       onKeyDown={(e) => {
         // Allow keyboard events to bubble up for shortcuts (like 'z' for zoom)
         // Don't stop propagation or prevent default for keyboard events
@@ -1792,7 +1823,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,
         transition: 'opacity 0.2s ease',
@@ -1971,7 +2002,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           width={(() => {
             // For uploaded images, let aspect ratio control the size
             if (isUploadedImage) {
-              return undefined;
+              return frameWidth || 600;
             }
             // If image exists, keep existing frame width; otherwise calculate from aspect ratio
             if (generatedImageUrl && frameWidth) {
@@ -1995,12 +2026,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             return Math.max(400, rawHeight); // Min 400px height
           })()}
         />
-        <ImageModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={Boolean(isSelected)}
-        />
+
       </div>
 
       {!isUploadedImage && (

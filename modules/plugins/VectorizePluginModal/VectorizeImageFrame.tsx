@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
 interface VectorizeImageFrameProps {
@@ -126,12 +126,7 @@ export const VectorizeImageFrame: React.FC<VectorizeImageFrameProps> = ({
         </div>
       )}
 
-      <PluginConnectionNodes
-        id={id}
-        scale={scale}
-        isHovered={isHovered}
-        isSelected={isSelected}
-      />
+
     </div>
   );
 };

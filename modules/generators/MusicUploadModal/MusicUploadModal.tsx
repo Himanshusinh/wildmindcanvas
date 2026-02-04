@@ -5,9 +5,10 @@ import '@/modules/ui-global/common/canvasCaptureGuard';
 import { MusicModalTooltip } from './MusicModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { MusicModalFrame } from './MusicModalFrame';
-import { MusicModalNodes } from './MusicModalNodes';
+
 import { MusicModalControls } from './MusicModalControls';
 import { MusicModalTabs, MusicCategory } from './MusicModalTabs';
+import { useMusicStore } from '@/modules/stores';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { DialogueInput } from '../../canvas-overlays/types';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
@@ -162,6 +163,9 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'MiniMax Music 2');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
+
+  if (!id) return null;
+
   const [lyricsPrompt, setLyricsPrompt] = useState(initialLyrics ?? '');
   const [sampleRate, setSampleRate] = useState(initialSampleRate ?? '44100');
   const [bitrate, setBitrate] = useState(initialBitrate ?? '256000');
@@ -196,6 +200,29 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
 
   // Refs to track initial props for cycle-free syncing
   const initialCategoryRef = useRef(initialCategory);
@@ -235,6 +262,17 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  const musicModalStates = useMusicStore(s => s.musicModalStates);
+  const updateMusicModal = useMusicStore(s => s.updateMusicModal);
+  const modalState = useMemo(() => musicModalStates.find(m => m.id === id), [musicModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
+  // Sync isHovered state with store
+  useEffect(() => {
+    updateMusicModal(id, { isHovered });
+  }, [id, isHovered, updateMusicModal]);
 
   // Listen for pin toggle keyboard shortcut (P key)
   useEffect(() => {
@@ -927,13 +965,13 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true)}
+      onMouseLeave={() => requestHoverState(false)}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,
       }}
@@ -955,7 +993,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
         </div>
       )}
       <MusicModalTooltip
-        isHovered={isHovered}
+        isHovered={effectiveIsHovered}
         scale={scale}
         activeCategory={effectiveCategory}
       />
@@ -989,14 +1027,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           onCategoryChange={setActiveCategory}
         />
 
-        <MusicModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={!!isSelected}
-          globalDragActive={globalDragActive}
-          activeCategory={effectiveCategory}
-        />
+
       </div>
 
       {effectiveCategory && (

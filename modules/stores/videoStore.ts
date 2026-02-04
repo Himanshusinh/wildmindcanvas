@@ -11,22 +11,22 @@ import { VideoModalState } from '@/modules/canvas-overlays/types';
 interface VideoStoreState {
   // Video Modal States
   videoModalStates: VideoModalState[];
-  
+
   // Selection State
   selectedVideoModalId: string | null;
   selectedVideoModalIds: string[];
-  
+
   // Actions
   setVideoModalStates: (states: VideoModalState[] | ((prev: VideoModalState[]) => VideoModalState[])) => void;
   addVideoModal: (modal: VideoModalState) => void;
   updateVideoModal: (id: string, updates: Partial<VideoModalState>) => void;
   removeVideoModal: (id: string) => void;
-  
+
   // Selection Actions
   setSelectedVideoModalId: (id: string | null) => void;
   setSelectedVideoModalIds: (ids: string[] | ((prev: string[]) => string[])) => void;
   clearVideoSelection: () => void;
-  
+
   // Bulk Operations
   removeVideoModals: (ids: string[]) => void;
 }
@@ -58,8 +58,15 @@ export const useVideoStore = create<VideoStoreState>()(
 
       // Add a new video modal
       addVideoModal: (modal) => {
+        // Enforce defaults if missing
+        const modalWithDefaults = {
+          frameWidth: 600,
+          frameHeight: 338, // Default 16:9
+          aspectRatio: '16:9',
+          ...modal,
+        };
         set((state) => ({
-          videoModalStates: [...state.videoModalStates, modal],
+          videoModalStates: [...state.videoModalStates, modalWithDefaults],
         }), false, 'addVideoModal');
       },
 

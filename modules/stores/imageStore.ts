@@ -11,22 +11,22 @@ import { ImageModalState } from '@/modules/canvas-overlays/types';
 interface ImageStoreState {
   // Image Modal States
   imageModalStates: ImageModalState[];
-  
+
   // Selection State
   selectedImageModalId: string | null;
   selectedImageModalIds: string[];
-  
+
   // Actions
   setImageModalStates: (states: ImageModalState[] | ((prev: ImageModalState[]) => ImageModalState[])) => void;
   addImageModal: (modal: ImageModalState) => void;
   updateImageModal: (id: string, updates: Partial<ImageModalState>) => void;
   removeImageModal: (id: string) => void;
-  
+
   // Selection Actions
   setSelectedImageModalId: (id: string | null) => void;
   setSelectedImageModalIds: (ids: string[] | ((prev: string[]) => string[])) => void;
   clearImageSelection: () => void;
-  
+
   // Bulk Operations
   removeImageModals: (ids: string[]) => void;
 }
@@ -58,8 +58,15 @@ export const useImageStore = create<ImageStoreState>()(
 
       // Add a new image modal
       addImageModal: (modal) => {
+        // Enforce defaults if missing
+        const modalWithDefaults = {
+          frameWidth: 600,
+          frameHeight: 600, // Default 1:1
+          aspectRatio: '1:1',
+          ...modal,
+        };
         set((state) => ({
-          imageModalStates: [...state.imageModalStates, modal],
+          imageModalStates: [...state.imageModalStates, modalWithDefaults],
         }), false, 'addImageModal');
       },
 

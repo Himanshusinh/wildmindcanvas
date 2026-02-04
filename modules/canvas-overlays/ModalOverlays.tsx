@@ -396,24 +396,12 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         selectedConnectionId={connectionManager.selectedConnectionId}
         onSelectConnection={connectionManager.setSelectedConnectionId}
         onDeleteConnection={connectionManager.handleDeleteConnection}
+        onPersistConnectorCreate={onPersistConnectorCreate}
+        onPersistConnectorDelete={onPersistConnectorDelete}
         stageRef={stageRef}
         position={position}
         scale={scale}
         isInteracting={isInteracting}
-        textInputStates={textInputStates}
-        imageModalStates={imageModalStates}
-        videoModalStates={videoModalStates}
-        musicModalStates={musicModalStates}
-        upscaleModalStates={upscaleModalStates}
-        multiangleCameraModalStates={multiangleCameraModalStates ?? []}
-        removeBgModalStates={removeBgModalStates ?? []}
-        eraseModalStates={eraseModalStates ?? []}
-        expandModalStates={expandModalStates ?? []}
-        vectorizeModalStates={vectorizeModalStates ?? []}
-        nextSceneModalStates={nextSceneModalStates ?? []}
-        storyboardModalStates={storyboardModalStates ?? []}
-        scriptFrameModalStates={scriptFrameModalStates ?? []}
-        sceneFrameModalStates={sceneFrameModalStates ?? []}
         viewportUpdateKey={viewportUpdateKey}
       />
 

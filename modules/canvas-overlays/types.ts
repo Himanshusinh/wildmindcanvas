@@ -10,6 +10,10 @@ export interface TextModalState {
   autoFocusInput?: boolean;
   isPinned?: boolean;
   smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[];
+  frameWidth?: number;
+  frameHeight?: number;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
 }
 
 export interface ImageModalState {
@@ -30,6 +34,8 @@ export interface ImageModalState {
   isGenerating?: boolean;
   isProcessing?: boolean;
   isPinned?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
 }
 
 export interface VideoModalState {
@@ -51,6 +57,8 @@ export interface VideoModalState {
   provider?: string;
   isExpanded?: boolean;
   isPinned?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
 }
 
 export interface VideoEditorModalState {
@@ -118,6 +126,8 @@ export interface MusicModalState {
   duration?: number;
   promptInfluence?: number;
   loop?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
 }
 
 export interface UpscaleModalState {

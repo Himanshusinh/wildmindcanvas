@@ -742,13 +742,14 @@ export function useConnectionManager({
 
         if (!isInputFocused) {
           e.preventDefault();
+          e.stopImmediatePropagation();
           handleDeleteConnection(selectedConnectionId);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [selectedConnectionId, handleDeleteConnection]);
 
   // Deselect connection when clicking on canvas or modals (but not on connection lines)

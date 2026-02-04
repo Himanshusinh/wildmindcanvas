@@ -18,6 +18,8 @@ export function PluginNodeShell(props: {
   onMouseLeave?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  scale?: number;
+  width?: number;
   children: React.ReactNode;
 }) {
   const {
@@ -36,6 +38,8 @@ export function PluginNodeShell(props: {
     onMouseLeave,
     className,
     style,
+    scale = 1,
+    width = 110,
     children,
   } = props;
 
@@ -54,6 +58,10 @@ export function PluginNodeShell(props: {
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
+        width: `${width * scale}px`, // Predictable width
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
         zIndex: isHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,

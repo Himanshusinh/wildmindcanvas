@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { TextModalTooltip } from './TextModalTooltip';
 import { TextModalFrame } from './TextModalFrame';
-import { TextModalNodes } from './TextModalNodes';
+
 import { TextModalControls } from './TextModalControls';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SmartToken } from './smartTerms';
+import { useTextStore } from '@/modules/stores';
 
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -402,6 +403,12 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const textModalStates = useTextStore(s => s.textModalStates);
+  const updateTextModal = useTextStore(s => s.updateTextModal);
+  const modalState = useMemo(() => textModalStates.find(m => m.id === id), [textModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
   const requestHoverState = (next: boolean, force = false) => {
     if (next) {
       if (hoverTimeoutRef.current) {
@@ -409,6 +416,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         hoverTimeoutRef.current = null;
       }
       setIsHovered(true);
+      updateTextModal(id, { isHovered: true });
       return;
     }
 
@@ -420,6 +428,7 @@ export const TextInput: React.FC<TextInputProps> = ({
 
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(false);
+      updateTextModal(id, { isHovered: false });
       hoverTimeoutRef.current = null;
     }, 150);
   };
@@ -447,32 +456,32 @@ export const TextInput: React.FC<TextInputProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         display: 'flex',
         flexDirection: 'column',
         gap: `${0 * scale}px`, // Removed gap as header is merging
         padding: 0, // Remove padding, let internal components handle spacing
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: (isHovered || isPinned)
+        borderRadius: (effectiveIsHovered || isPinned)
           ? '0px'
           : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (effectiveIsHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         transition: 'background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
         minWidth: `${400 * scale}px`,
         maxWidth: `${400 * scale}px`,
-        cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
+        cursor: isDragging ? 'grabbing' : (effectiveIsHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
         overflow: 'visible',
         boxSizing: 'border-box',
       }}
     >
       <TextModalTooltip
-        isHovered={isHovered}
+        isHovered={effectiveIsHovered}
         scale={scale}
       />
 
@@ -530,13 +539,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           }}
         />
 
-        <TextModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={!!isSelected}
-          globalDragActive={globalDragActive}
-        />
+
       </div>
 
       <TextModalControls

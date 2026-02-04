@@ -262,6 +262,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   y: canvasY,
                   value: '',
                   autoFocusInput: false,
+                  frameWidth: 400,
+                  frameHeight: 400,
                 };
                 Promise.resolve(onPersistTextModalCreate(newText)).catch(console.error);
               } else if (comp.type === 'image' && onPersistImageModalCreate) {
@@ -272,9 +274,9 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   y: canvasY,
                   generatedImageUrl: null,
                   frameWidth: 600,
-                  frameHeight: 400,
+                  frameHeight: 600, // Standardized 1:1
                   model: 'Google Nano Banana',
-                  frame: 'Frame',
+                  frame: 'Square',
                   aspectRatio: '1:1',
                   prompt: '',
                 };
@@ -287,7 +289,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   y: canvasY,
                   generatedVideoUrl: null,
                   frameWidth: 600,
-                  frameHeight: 400,
+                  frameHeight: 338, // Standardized 16:9
                   model: 'Seedance 1.0 Pro',
                   frame: 'Frame',
                   aspectRatio: '16:9',

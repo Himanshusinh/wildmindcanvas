@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
-import { StoryboardConnectionNodes } from './StoryboardConnectionNodes';
 import { StoryboardControls } from './StoryboardControls';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { PluginNodeShell } from '../PluginComponents';
@@ -171,7 +170,7 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
     if (!id || !connections) return [];
     const matchingConnections = connections.filter(c => c.to === id && c.toAnchor === anchor);
 
-    console.log(`[StoryboardPluginModal] getConnectedImages for anchor "${anchor}":`, {
+    console.log(`[StoryboardPluginModal] getConnectedImages for anchor "${anchor}": `, {
       storyboardId: id,
       totalConnections: connections.length,
       matchingConnections: matchingConnections.length,
@@ -185,18 +184,18 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
       if (imageNode) {
         if (imageNode.generatedImageUrl) {
           imageUrls.push(imageNode.generatedImageUrl);
-          console.log(`[StoryboardPluginModal] Found image from imageModalStates (generatedImageUrl):`, imageNode.generatedImageUrl.substring(0, 50) + '...');
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates(generatedImageUrl): `, imageNode.generatedImageUrl.substring(0, 50) + '...');
         } else if (imageNode.sourceImageUrl) {
           imageUrls.push(imageNode.sourceImageUrl);
-          console.log(`[StoryboardPluginModal] Found image from imageModalStates (sourceImageUrl):`, imageNode.sourceImageUrl.substring(0, 50) + '...');
+          console.log(`[StoryboardPluginModal] Found image from imageModalStates(sourceImageUrl): `, imageNode.sourceImageUrl.substring(0, 50) + '...');
         }
       } else {
         const mediaImage = images.find(img => img.elementId === connection.from);
         if (mediaImage && mediaImage.url) {
           imageUrls.push(mediaImage.url);
-          console.log(`[StoryboardPluginModal] Found image from media images:`, mediaImage.url.substring(0, 50) + '...');
+          console.log(`[StoryboardPluginModal] Found image from media images: `, mediaImage.url.substring(0, 50) + '...');
         } else {
-          console.warn(`[StoryboardPluginModal] Connection found but no image URL available:`, {
+          console.warn(`[StoryboardPluginModal] Connection found but no image URL available: `, {
             connectionFrom: connection.from,
             hasImageNode: !!imageNode,
             hasMediaImage: !!mediaImage
@@ -241,7 +240,6 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
 
   if (!isOpen) return null;
 
-
   return (
     <PluginNodeShell
       modalKey="storyboard"
@@ -249,6 +247,7 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       onPointerDown={handlePointerDown}
@@ -325,7 +324,6 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
             zIndex: 20,
           }}
         >
-          {/* Storyboard Icon - Using SVG */}
           {/* Storyboard Icon */}
           <img
             src="/icons/film-editing.svg"
@@ -338,24 +336,13 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
               userSelect: 'none',
               pointerEvents: 'none',
               filter: isDark ? 'brightness(0) invert(1)' : 'brightness(0)',
-
             }}
             onError={(e) => {
               console.error('[StoryboardPluginModal] Failed to load film-editing.svg icon');
               // Fallback to inline SVG if image fails
               e.currentTarget.style.display = 'none';
               e.currentTarget.insertAdjacentHTML('afterend', `
-                <svg
-                  width="${40 * scale}px"
-                  height="${40 * scale}px"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="${isDark ? '#ffffff' : '#1a1a1a'}"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  style="display: block; user-select: none; pointer-events: none;"
-                >
+                <svg width="${40 * scale}px" height="${40 * scale}px" viewBox="0 0 24 24" fill="none" stroke="${isDark ? '#ffffff' : '#1a1a1a'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; user-select: none; pointer-events: none;">
                   <rect x="2" y="3" width="20" height="14" rx="2" />
                   <line x1="8" y1="21" x2="16" y2="21" />
                   <line x1="12" y1="17" x2="12" y2="21" />
@@ -366,12 +353,7 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
             }}
           />
 
-          <StoryboardConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+          {/* Legacy handles removed to use React Flow handles */}
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}
@@ -438,7 +420,6 @@ export const StoryboardPluginModal = React.memo<StoryboardPluginModalProps>(({
                 updateOptions({ backgroundNamesMap: map });
               }}
             />
-
           </div>
         )}
       </div>

@@ -5,7 +5,7 @@ import '@/modules/ui-global/common/canvasCaptureGuard';
 import { VideoModalTooltip } from './VideoModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { VideoModalFrame } from './VideoModalFrame';
-import { VideoModalNodes } from './VideoModalNodes';
+
 import { VideoModalControls } from './VideoModalControls';
 import {
   getModelDurations,
@@ -19,6 +19,7 @@ import {
   isValidResolutionForModel,
 } from '@/core/api/videoModelConfig';
 import { ImageUpload } from '@/core/types/canvas';
+import { useVideoStore } from '@/modules/stores';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { buildProxyMediaUrl } from '@/core/api/proxyUtils';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
@@ -136,12 +137,38 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   // Track initial mouse position to distinguish clicks from drags
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'Seedance 1.0 Pro');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(
     initialAspectRatio ?? getModelDefaultAspectRatio(initialModel ?? 'Seedance 1.0 Pro')
   );
+
+  if (!id) return null;
+
   // Prioritize initialDuration if provided (from chat instructions), otherwise use model default
   const [selectedDuration, setSelectedDuration] = useState<number>(() => {
     const modelForDefault = initialModel ?? 'Seedance 1.0 Pro';
@@ -464,6 +491,17 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  const videoModalStates = useVideoStore(s => s.videoModalStates);
+  const updateVideoModal = useVideoStore(s => s.updateVideoModal);
+  const modalState = useMemo(() => videoModalStates.find(m => m.id === id), [videoModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
+  // Sync isHovered state with store
+  useEffect(() => {
+    updateVideoModal(id, { isHovered });
+  }, [id, isHovered, updateVideoModal]);
 
   // Listen for pin toggle keyboard shortcut (P key)
   useEffect(() => {
@@ -827,8 +865,8 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true)}
+      onMouseLeave={() => requestHoverState(false)}
       onKeyDown={(e) => {
         // Allow keyboard events to bubble up for shortcuts (like 'z' for zoom)
         // Don't stop propagation or prevent default for keyboard events
@@ -837,7 +875,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,
         transition: 'opacity 0.2s ease',
@@ -860,7 +898,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
         </div>
       )}
       <VideoModalTooltip
-        isHovered={isHovered}
+        isHovered={effectiveIsHovered}
         isUploadedVideo={!!isUploadedVideo}
         videoResolution={videoResolution}
         scale={scale}
@@ -895,13 +933,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           getAspectRatio={getAspectRatio}
         />
 
-        <VideoModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={!!isSelected}
-          globalDragActive={globalDragActive}
-        />
+
       </div>
 
       <VideoModalControls

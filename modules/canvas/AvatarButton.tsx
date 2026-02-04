@@ -64,6 +64,7 @@ const AvatarButton: React.FC<Props> = ({ scale = 1, onClick, isHidden = false })
           src={avatarUrl}
           alt="profile"
           referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
           onError={() => setAvatarFailed(true)}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />

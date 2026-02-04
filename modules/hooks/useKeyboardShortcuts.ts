@@ -567,7 +567,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             const canvasY = (viewportSize.height / 2 - position.y) / scale;
             const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
             const newId = `img-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: pos.x, y: pos.y };
+            const newModal = {
+              id: newId,
+              x: pos.x,
+              y: pos.y,
+              frameWidth: 600,
+              frameHeight: 600, // Default 1:1 aspect ratio
+              frame: 'Square',
+              aspectRatio: '1:1'
+            };
             // Use Zustand store instead
             const { addImageModal } = useImageStore.getState();
             addImageModal(newModal);
@@ -589,7 +597,14 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             const canvasY = (viewportSize.height / 2 - position.y) / scale;
             const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
             const newId = `video-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: pos.x, y: pos.y };
+            const newModal = {
+              id: newId,
+              x: pos.x,
+              y: pos.y,
+              frameWidth: 600,
+              frameHeight: 338, // Default 16:9 aspect ratio
+              aspectRatio: '16:9'
+            };
 
             // Use Zustand and persist
             const { addVideoModal } = useVideoStore.getState();

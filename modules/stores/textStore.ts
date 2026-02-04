@@ -49,8 +49,13 @@ export const useTextStore = create<TextStoreState>()(
 
             // Add a new text modal
             addTextModal: (modal) => {
+                const modalWithDefaults = {
+                    frameWidth: 400,
+                    frameHeight: 400,
+                    ...modal,
+                };
                 set((state) => ({
-                    textModalStates: [...state.textModalStates, modal],
+                    textModalStates: [...state.textModalStates, modalWithDefaults],
                 }), false, 'addTextModal');
             },
 

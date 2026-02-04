@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
 interface EraseImageFrameProps {
@@ -105,12 +105,7 @@ export const EraseImageFrame: React.FC<EraseImageFrameProps> = ({
         />
       )}
 
-      <PluginConnectionNodes
-        id={id}
-        scale={scale}
-        isHovered={isHovered}
-        isSelected={isSelected}
-      />
+
     </div>
   );
 };

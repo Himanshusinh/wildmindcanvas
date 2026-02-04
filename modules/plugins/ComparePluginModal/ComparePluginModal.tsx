@@ -7,7 +7,7 @@ import { generateImageForCanvas } from '@/core/api/api';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 
 interface ComparePluginModalProps {
     id: string;
@@ -297,6 +297,7 @@ export const ComparePluginModal = React.memo<ComparePluginModalProps>(({
             containerRef={containerRef as any}
             screenX={screenX}
             screenY={screenY}
+            scale={scale}
             isHovered={isHovered}
             isSelected={Boolean(isSelected)}
             onMouseDown={handleMouseDown}
@@ -384,12 +385,7 @@ export const ComparePluginModal = React.memo<ComparePluginModalProps>(({
                     />
 
                     {/* Add Connection Nodes for visual anchors */}
-                    <PluginConnectionNodes
-                        id={id}
-                        scale={scale}
-                        isHovered={isHovered}
-                        isSelected={isSelected || false}
-                    />
+
                 </div>
             </div>
 

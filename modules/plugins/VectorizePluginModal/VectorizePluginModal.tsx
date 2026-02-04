@@ -7,7 +7,7 @@ import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
-import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState, PluginNodeShell, PluginConnectionNodes } from '../PluginComponents';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState, PluginNodeShell } from '../PluginComponents';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -348,6 +348,7 @@ export const VectorizePluginModal = memo<VectorizePluginModalProps>(({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -448,12 +449,7 @@ export const VectorizePluginModal = memo<VectorizePluginModalProps>(({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={Boolean(isSelected)}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
-import { PluginConnectionNodes, PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
+import { PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface VideoEditorTriggerProps {
@@ -71,6 +71,7 @@ export const VideoEditorTrigger = React.memo<VideoEditorTriggerProps>(({
             containerRef={containerRef}
             screenX={screenX}
             screenY={screenY}
+            scale={scale}
             isHovered={isHovered}
             isSelected={Boolean(isSelected)}
             onMouseDown={handleMouseDown}
@@ -172,12 +173,7 @@ export const VideoEditorTrigger = React.memo<VideoEditorTriggerProps>(({
                         }}
                     />
 
-                    <PluginConnectionNodes
-                        id={id}
-                        scale={scale}
-                        isHovered={isHovered}
-                        isSelected={isSelected || false}
-                    />
+
                 </div>
             </div>
         </PluginNodeShell>

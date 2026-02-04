@@ -191,9 +191,11 @@ export const TextInputOverlays = React.memo<TextInputOverlaysProps>(({
             // Create a duplicate of the text input to the right
             const duplicated = {
               id: `text-${Date.now()}-${Math.random()}`,
-              x: textState.x + 300 + 50, // 300px width + 50px spacing
+              x: textState.x + (textState.frameWidth || 400) + 50, // width + 50px spacing
               y: textState.y, // Same Y position
-              value: textState.value || ''
+              value: textState.value || '',
+              frameWidth: textState.frameWidth || 400,
+              frameHeight: textState.frameHeight || 400,
             };
             setTextModalStates(prev => [...prev, duplicated]);
           }}
@@ -251,9 +253,11 @@ export const TextInputOverlays = React.memo<TextInputOverlaysProps>(({
             if (modal) {
               const duplicated = {
                 id: `text-${Date.now()}-${Math.random()}`,
-                x: modal.x + 300 + 50,
+                x: modal.x + (modal.frameWidth || 400) + 50,
                 y: modal.y,
-                value: modal.value || ''
+                value: modal.value || '',
+                frameWidth: modal.frameWidth || 400,
+                frameHeight: modal.frameHeight || 400,
               };
               setTextModalStates(prev => [...prev, duplicated]);
               // Trigger creation persistence if needed? The original code didn't have persisted create for logic in onDuplicate,

@@ -78,6 +78,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderBottom: ((isHovered || isPinned) && !isUploadedImage) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        boxSizing: 'border-box',
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',

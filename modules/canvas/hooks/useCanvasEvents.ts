@@ -267,18 +267,33 @@ export function useCanvasEvents(
         const id = `${selectedTool}-${Date.now()}`;
 
         if (selectedTool === 'image') {
-            const { x, y } = findSmartPosition(600, 400); // Default image modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 600); // Standardized to 600x600 (1:1)
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 600,
+                frame: 'Square',
+                aspectRatio: '1:1'
+            };
             setImageModalStates(prev => [...prev, newState]);
             onPersistImageModalCreate?.(newState);
         } else if (selectedTool === 'video') {
-            const { x, y } = findSmartPosition(600, 400); // Default video modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 338); // Standardized to 600x338 (16:9)
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 338,
+                aspectRatio: '16:9'
+            };
             setVideoModalStates(prev => [...prev, newState]);
             onPersistVideoModalCreate?.(newState);
         } else if (selectedTool === 'music') {
-            const { x, y } = findSmartPosition(600, 300); // Default music modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 300); // Logic for music remains same but using standardization
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 300
+            };
             setMusicModalStates(prev => [...prev, newState]);
             onPersistMusicModalCreate?.(newState);
         } else if (selectedTool === 'rich-text') {
@@ -323,8 +338,14 @@ export function useCanvasEvents(
 
                 console.log('[useCanvasEvents] Creating AI Text (TextInput)');
                 // Estimated size of new text input
-                const { x, y } = findSmartPosition(400, 140);
-                const newState = { id, x, y, value: '', autoFocusInput: false };
+                const { x, y } = findSmartPosition(400, 400); // Standardized to 400x400
+                const newState = {
+                    id, x, y,
+                    value: '',
+                    autoFocusInput: false,
+                    frameWidth: 400,
+                    frameHeight: 400
+                };
                 setTextInputStates(prev => [...prev, newState]);
                 onPersistTextModalCreate?.(newState);
             } else {

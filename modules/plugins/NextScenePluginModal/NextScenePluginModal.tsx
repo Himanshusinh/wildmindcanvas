@@ -9,7 +9,7 @@ import { NextSceneImageFrame } from './NextSceneImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImages, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { API_BASE_URL } from '@/core/api/api';
@@ -582,6 +582,7 @@ export const NextScenePluginModal = React.memo<NextScenePluginModalProps>(({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -678,12 +679,7 @@ export const NextScenePluginModal = React.memo<NextScenePluginModalProps>(({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}

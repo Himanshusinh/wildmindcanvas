@@ -9,7 +9,7 @@ import { RemoveBgImageFrame } from './RemoveBgImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -348,6 +348,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -357,7 +358,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
       onContextMenu={onContextMenu}
     >
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -448,12 +449,7 @@ export const RemoveBgPluginModal: React.FC<RemoveBgPluginModalProps> = ({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}

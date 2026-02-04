@@ -776,9 +776,15 @@ export const ImageModalOverlays = React.memo<ImageModalOverlaysProps>(({
               // Create a duplicate of the image modal to the right
               const duplicated = {
                 id: `image-modal-${Date.now()}`,
-                x: modalState.x + 600 + 50, // 600px width + 50px spacing
+                x: modalState.x + (modalState.frameWidth || 600) + 50, // width + 50px spacing
                 y: modalState.y, // Same Y position
                 generatedImageUrl: modalState.generatedImageUrl,
+                frameWidth: modalState.frameWidth || 600,
+                frameHeight: modalState.frameHeight || 600,
+                frame: modalState.frame || 'Square',
+                aspectRatio: modalState.aspectRatio || '1:1',
+                prompt: modalState.prompt || '',
+                model: modalState.model || 'Google Nano Banana',
               };
               setImageModalStates((prev) => [...prev, duplicated]);
               if (onPersistImageModalCreate) {
