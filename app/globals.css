@@ -173,6 +173,7 @@ main {
 .dark canvas {
   background-color: var(--bg-primary) !important;
 }
+
 @keyframes shine {
   to {
     background-position: 200% center;
@@ -218,8 +219,11 @@ main {
 .react-flow.dark {
   --xy-node-boxshadow-default:
     0px 3.54px 4.55px 0px rgba(255, 255, 255, 0.05),
-    /* light shadow */ 0px 3.54px 4.55px 0px rgba(255, 255, 255, 0.13),
-    /* medium shadow */ 0px 0.51px 1.01px 0px rgba(255, 255, 255, 0.2); /* smallest shadow */
+    /* light shadow */
+    0px 3.54px 4.55px 0px rgba(255, 255, 255, 0.13),
+    /* medium shadow */
+    0px 0.51px 1.01px 0px rgba(255, 255, 255, 0.2);
+  /* smallest shadow */
   --xy-theme-color-focus: #535353;
 }
 
@@ -364,12 +368,12 @@ main {
   border: 1px solid var(--color-disabled);
 }
 
-.xy-theme__button > span {
+.xy-theme__button>span {
   margin-right: 0.2rem;
 }
 
 /* Add gap between adjacent buttons */
-.xy-theme__button + .xy-theme__button {
+.xy-theme__button+.xy-theme__button {
   margin-left: 0.3rem;
 }
 

@@ -47,8 +47,8 @@ import { getComponentType } from './utils';
 
 // --- Configuration ---
 const handleStyle = {
-  width: 16,
-  height: 16,
+  width: 24,
+  height: 24,
   backgroundColor: '#fff',
   border: '2px solid #777',
   borderRadius: '50%',
@@ -111,7 +111,7 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
   return (
     <div style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'relative' }}>
       <div
-        style={{ position: 'absolute', right: -20, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        style={{ position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
         onMouseEnter={() => requestHoverState(true)}
         onMouseLeave={() => requestHoverState(false)}
         onMouseDown={(e) => e.stopPropagation()}
@@ -127,7 +127,7 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
         />
       </div>
       <div
-        style={{ position: 'absolute', left: -20, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        style={{ position: 'absolute', left: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
         onMouseEnter={() => requestHoverState(true)}
         onMouseLeave={() => requestHoverState(false)}
         onMouseDown={(e) => e.stopPropagation()}
@@ -238,6 +238,7 @@ interface ConnectionLinesProps {
   scale: number;
   viewportUpdateKey: number;
   isInteracting?: boolean;
+  scriptFrameModalStates?: any[];
 }
 
 const MIN_DISTANCE = 150;
@@ -253,6 +254,7 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   scale,
   viewportUpdateKey,
   isInteracting,
+  scriptFrameModalStates = [],
 }) => {
   const { setViewport } = useReactFlow();
   const [menu, setMenu] = useState<any>(null);
@@ -289,6 +291,28 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     ...selectedTextIds
   ]), [selectedImageIds, selectedVideoIds, selectedMusicIds, selectedTextIds]);
 
+  // Identify all nodes that are currently generating/processing to trigger edge animation
+  const generatingIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    imageModalStates.forEach(m => { if (m.isGenerating || m.isProcessing) ids.add(m.id); });
+    videoModalStates.forEach(m => { if (m.status === 'processing' || m.status === 'generating' || (m.taskId && !m.generatedVideoUrl)) ids.add(m.id); });
+    musicModalStates.forEach(m => { if (m.isGenerating) ids.add(m.id); });
+    upscaleModalStates.forEach(m => { if (m.isUpscaling) ids.add(m.id); });
+    removeBgModalStates.forEach(m => { if (m.isRemovingBg) ids.add(m.id); });
+    eraseModalStates.forEach(m => { if (m.isErasing) ids.add(m.id); });
+    expandModalStates.forEach(m => { if (m.isExpanding) ids.add(m.id); });
+    vectorizeModalStates.forEach(m => { if (m.isVectorizing) ids.add(m.id); });
+    nextSceneModalStates.forEach(m => { if (m.isProcessing) ids.add(m.id); });
+    scriptFrameModalStates.forEach(m => { if (m.isLoading) ids.add(m.id); });
+
+    return ids;
+  }, [
+    imageModalStates, videoModalStates, musicModalStates, upscaleModalStates,
+    removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, scriptFrameModalStates
+  ]);
+
   // Sync Viewport
   useEffect(() => {
     setViewport({ x: position.x, y: position.y, zoom: scale });
@@ -302,16 +326,16 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
 
     const allowedMap: Record<string, string[]> = {
       text: ['image', 'video', 'music', 'storyboard'],
-      image: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-      video: ['video'],
-      music: ['video'],
-      nextscene: ['image', 'video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
-      upscale: ['image', 'video'],
-      removebg: ['image', 'video'],
-      multianglecamera: ['image', 'video'],
-      erase: ['image', 'video'],
-      expand: ['image', 'video'],
-      vectorize: ['image', 'video'],
+      image: ['image', 'media-image', 'video', 'media-video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      video: ['video', 'media-video'],
+      music: ['video', 'media-video'],
+      nextscene: ['image', 'media-image', 'video', 'media-video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      upscale: ['image', 'media-image', 'video', 'media-video'],
+      removebg: ['image', 'media-image', 'video', 'media-video'],
+      multianglecamera: ['image', 'media-image', 'video', 'media-video'],
+      erase: ['image', 'media-image', 'video', 'media-video'],
+      expand: ['image', 'media-image', 'video', 'media-video'],
+      vectorize: ['image', 'media-image', 'video', 'media-video'],
       storyboard: ['sceneframe'],
     };
 
@@ -387,18 +411,28 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     connections // Added connections to dependencies
   ]);
 
-  const renderedEdges = useMemo(() => connections.map(conn => ({
-    id: conn.id || `conn-${conn.from}-${conn.to}`,
-    source: conn.from,
-    target: conn.to,
-    sourceHandle: 'send',
-    targetHandle: 'receive',
-    type: 'scissors',
-    animated: false,
-    selected: selectedConnectionId === (conn.id || `conn-${conn.from}-${conn.to}`),
-    style: { stroke: selectedConnectionId === (conn.id || `conn-${conn.from}-${conn.to}`) ? 'var(--xy-theme-selected)' : '#b1b1b7' },
-    data: { onDelete: onDeleteConnection }
-  })), [connections, selectedConnectionId, onDeleteConnection]);
+  const renderedEdges = useMemo(() => connections.map(conn => {
+    const isAnimating = generatingIds.has(conn.from) || generatingIds.has(conn.to);
+    const edgeId = conn.id || `conn-${conn.from}-${conn.to}`;
+    const isSelected = selectedConnectionId === edgeId;
+
+    return {
+      id: edgeId,
+      source: conn.from,
+      target: conn.to,
+      sourceHandle: 'send',
+      targetHandle: 'receive',
+      type: 'scissors',
+      animated: isAnimating,
+      selected: isSelected,
+      style: {
+        stroke: isSelected ? 'var(--xy-theme-selected)' : '#3b82f6',
+        strokeDasharray: isAnimating ? '6 4' : undefined,
+        strokeWidth: 3,
+      },
+      data: { onDelete: onDeleteConnection }
+    };
+  }), [connections, selectedConnectionId, onDeleteConnection, generatingIds]);
 
   const onConnect = useCallback((params: any) => {
     console.log('[ConnectionLines] onConnect triggered:', params);
@@ -406,7 +440,7 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
       onPersistConnectorCreate?.({
         from: params.source,
         to: params.target,
-        color: '#4C83FF',
+        color: '#3b82f6',
         fromAnchor: 'send',
         toAnchor: 'receive',
       });
@@ -485,6 +519,21 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           }} />}
         </ReactFlow>
       </div>
+      <style>{`
+        .react-flow__edge-path.animated {
+          stroke-dasharray: 6 4;
+          animation: marching-ants 1s linear infinite;
+        }
+
+        @keyframes marching-ants {
+          from {
+            stroke-dashoffset: 20;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 };

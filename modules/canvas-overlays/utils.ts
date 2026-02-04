@@ -29,10 +29,14 @@ export const getComponentType = (id?: string | null): string | null => {
     const canvasNodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
     if (canvasNodeEl) {
       const componentType = canvasNodeEl.getAttribute('data-component-type');
-      if (componentType) return componentType.toLowerCase();
+      if (componentType) {
+        const type = componentType.toLowerCase();
+        // Return specialized media type to distinguish from generation modals
+        return `media-${type}`;
+      }
     }
-    // Fallback: assume 'image' for canvas images
-    return 'image';
+    // Fallback: assume 'media-image' for canvas images
+    return 'media-image';
   }
   return null;
 };
@@ -151,10 +155,10 @@ export const computeNodeCenter = (
         const screenY = containerRect.top + (modal.y * scale) + position.y;
         const screenWidth = modal.width * scale;
         const screenHeight = modal.height * scale;
-        
+
         const centerX = Math.round(screenX + screenWidth / 2);
         const centerY = Math.round(screenY + screenHeight / 2);
-        
+
         if (side === 'send') {
           // Right side (send): center + half width
           return { x: Math.round(centerX + screenWidth / 2), y: centerY };
