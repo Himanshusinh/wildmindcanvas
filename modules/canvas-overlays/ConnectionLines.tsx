@@ -3,17 +3,23 @@
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
+  useReactFlow,
+  Background,
+  Controls,
+  Edge,
+  Node,
+  ReactFlowProvider,
   Handle,
   Position,
-  useReactFlow,
-  ReactFlowProvider,
-  Node,
-  Edge,
-  EdgeToolbar,
-  getBezierPath,
+  MarkerType,
   BaseEdge,
+  getBezierPath,
   EdgeProps,
-  EdgeTypes,
+  EdgeLabelRenderer,
+  Panel,
+  MiniMap,
+  EdgeToolbar,
+  EdgeTypes
 } from '@xyflow/react';
 import { Scissors } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -109,7 +115,11 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'relative' }}>
+    <div
+      data-node-id={id}
+      data-component-type={type}
+      style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'relative' }}
+    >
       <div
         style={{ position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
         onMouseEnter={() => requestHoverState(true)}
@@ -157,7 +167,14 @@ const ScissorsEdge = (props: EdgeProps) => {
 
   return (
     <>
-      <BaseEdge path={edgePath} {...props} style={{ ...props.style, strokeWidth: isHovered || selected ? 4 : 2 }} />
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{ ...props.style, strokeWidth: isHovered || selected ? 4 : 2 }}
+        markerStart={props.markerStart}
+        markerEnd={props.markerEnd}
+        interactionWidth={props.interactionWidth}
+      />
       <g
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -210,6 +227,10 @@ const ScissorsEdge = (props: EdgeProps) => {
 const nodeTypes = { ghost: GhostNode };
 const edgeTypes: EdgeTypes = { scissors: ScissorsEdge };
 
+const getMiniMapNodeColor = (node: any) => {
+  return '#3b82f6'; // Single consistent blue color for all nodes
+};
+
 // --- Context Menu ---
 const ConnectionContextMenu = ({ id, top, left, onDelete }: any) => (
   <div style={{ top, left, position: 'absolute', zIndex: 10000, background: 'white', border: '1px solid #ccc', padding: 5, borderRadius: 4, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
@@ -239,6 +260,7 @@ interface ConnectionLinesProps {
   viewportUpdateKey: number;
   isInteracting?: boolean;
   scriptFrameModalStates?: any[];
+  sceneFrameModalStates?: any[];
 }
 
 const MIN_DISTANCE = 150;
@@ -255,12 +277,45 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   viewportUpdateKey,
   isInteracting,
   scriptFrameModalStates = [],
+  sceneFrameModalStates = [],
 }) => {
-  const { setViewport } = useReactFlow();
+  const [isMiniMapVisible, setIsMiniMapVisible] = useState(false);
   const [menu, setMenu] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  const miniMapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  // UseReactFlow must be used inside ReactFlowProvider
+  const { setViewport } = useReactFlow();
+
+  // Dynamic MiniMap Visibility: Show on move/zoom, hide after inactivity
+  useEffect(() => {
+    // Show MiniMap
+    setIsMiniMapVisible(true);
+
+    // Clear existing timeout
+    if (miniMapTimeoutRef.current) {
+      clearTimeout(miniMapTimeoutRef.current);
+    }
+
+    // Set hide timeout
+    miniMapTimeoutRef.current = setTimeout(() => {
+      setIsMiniMapVisible(false);
+      miniMapTimeoutRef.current = null;
+    }, 2000); // Hide after 2 seconds of inactivity
+
+    return () => {
+      if (miniMapTimeoutRef.current) {
+        clearTimeout(miniMapTimeoutRef.current);
+      }
+    };
+  }, [position.x, position.y, scale, viewportUpdateKey]);
+
+  // Sync Konva viewport to React Flow
+  useEffect(() => {
+    setViewport({ x: position.x, y: position.y, zoom: scale });
+  }, [position.x, position.y, scale, setViewport, viewportUpdateKey]);
 
   // Store Selectors
   const imageModalStates = useImageModalStates();
@@ -358,6 +413,8 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           id: state.id,
           type: 'ghost',
           position: { x: state.x, y: state.y + yOffset },
+          width: state.frameWidth || width,
+          height: state.frameHeight || height,
           style: {
             width: state.frameWidth || width,
             height: state.frameHeight || height,
@@ -399,6 +456,8 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     add(compareModalStates, 110, 110, 'compare', 25);
     add(imageEditorModalStates, 110, 110, 'image-editor', 25);
     add(videoEditorModalStates, 110, 110, 'video-editor', 25);
+    add(scriptFrameModalStates, 600, 400, 'scriptframe');
+    add(sceneFrameModalStates, 600, 400, 'sceneframe');
 
     return allNodes;
   }, [
@@ -406,33 +465,40 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     upscaleModalStates, removeBgModalStates, multiangleCameraModalStates,
     eraseModalStates, expandModalStates, vectorizeModalStates,
     nextSceneModalStates, storyboardModalStates, compareModalStates,
-    imageEditorModalStates, videoEditorModalStates,
+    imageEditorModalStates, videoEditorModalStates, scriptFrameModalStates,
+    sceneFrameModalStates, viewportUpdateKey,
     allSelectedIdsSet, isConnecting, connectingSourceId, checkConnectionValidity,
     connections // Added connections to dependencies
   ]);
 
-  const renderedEdges = useMemo(() => connections.map(conn => {
-    const isAnimating = generatingIds.has(conn.from) || generatingIds.has(conn.to);
-    const edgeId = conn.id || `conn-${conn.from}-${conn.to}`;
-    const isSelected = selectedConnectionId === edgeId;
+  const renderedEdges = useMemo(() => {
+    return connections.map((conn, index) => {
+      const edgeId = conn.id || `edge-${index}`;
+      const isSelected = selectedConnectionId === edgeId;
+      const isGenerating = generatingIds.has(conn.from) || generatingIds.has(conn.to);
 
-    return {
-      id: edgeId,
-      source: conn.from,
-      target: conn.to,
-      sourceHandle: 'send',
-      targetHandle: 'receive',
-      type: 'scissors',
-      animated: isAnimating,
-      selected: isSelected,
-      style: {
-        stroke: isSelected ? 'var(--xy-theme-selected)' : '#3b82f6',
-        strokeDasharray: isAnimating ? '6 4' : undefined,
-        strokeWidth: 3,
-      },
-      data: { onDelete: onDeleteConnection }
-    };
-  }), [connections, selectedConnectionId, onDeleteConnection, generatingIds]);
+      return {
+        id: edgeId,
+        source: conn.from,
+        target: conn.to,
+        sourceHandle: 'send',
+        targetHandle: 'receive',
+        type: 'scissors',
+        animated: isGenerating,
+        selected: isSelected,
+        style: {
+          stroke: isGenerating ? '#437eb5' : (isSelected ? '#94a3b8' : (conn.color || '#437eb5')),
+          strokeWidth: isSelected ? 4 : 2,
+          strokeDasharray: (isGenerating || isSelected) ? '6 4' : undefined,
+          animation: isGenerating
+            ? 'marching-ants 0.5s linear infinite'
+            : (isSelected ? 'marching-ants 1s linear infinite' : undefined),
+          transition: 'stroke 0.2s ease, stroke-width 0.2s ease',
+        },
+        data: { onDelete: onDeleteConnection }
+      };
+    });
+  }, [connections, selectedConnectionId, onDeleteConnection, generatingIds]);
 
   const onConnect = useCallback((params: any) => {
     console.log('[ConnectionLines] onConnect triggered:', params);
@@ -459,6 +525,7 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     setConnectingSourceId(null);
   }, []);
 
+
   return (
     <div
       ref={ref}
@@ -469,7 +536,7 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
         top: 0,
         left: 0,
         pointerEvents: 'none',
-        zIndex: 2100
+        zIndex: 9999
       }}
     >
       <div style={{ width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -503,10 +570,38 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           onConnectEnd={onConnectEnd}
           style={{ width: '100%', height: '100%', background: 'transparent' }}
         >
+          <MiniMap
+            position="bottom-right"
+            nodeColor={getMiniMapNodeColor}
+            nodeStrokeColor="#4C83FF"
+            nodeStrokeWidth={2}
+            nodeBorderRadius={8}
+            maskColor="rgba(255, 255, 255, 0.25)"
+            bgColor="#0f0f14"
+            style={{
+              backgroundColor: '#0f0f14',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '16px',
+              margin: '24px',
+              padding: 0,
+              boxShadow: '0 12px 48px -12px rgba(0, 0, 0, 0.5)',
+              width: 250,
+              height: 150,
+              overflow: 'hidden',
+              opacity: isMiniMapVisible ? 1 : 0,
+              pointerEvents: isMiniMapVisible ? 'all' : 'none',
+              transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: isMiniMapVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
+            }}
+            pannable
+            zoomable
+          />
           <style>{`
             .react-flow { background: transparent !important; }
             .react-flow__panel { background: transparent !important; }
-            .react-flow__node { background: transparent !important; border: none !important; box-shadow: none !important; pointer-events: ${isConnecting ? 'auto' : 'none'} !important; }
+            .react-flow__viewport .react-flow__node { background: transparent !important; border: none !important; box-shadow: none !important; pointer-events: ${isConnecting ? 'auto' : 'none'} !important; }
+            .react-flow__minimap { pointer-events: all !important; }
+            .react-flow__minimap-mask { pointer-events: none !important; }
             .react-flow__edge { pointer-events: all !important; cursor: pointer; }
             .react-flow__edge-path { cursor: pointer; }
             .react-flow__handle { pointer-events: all !important; cursor: crosshair; }

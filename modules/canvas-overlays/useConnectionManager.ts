@@ -103,11 +103,11 @@ export function useConnectionManager({
     // Additional validation for media connections:
     // Check if source is media (Library Image or Uploaded Image)
     // Use the same logic as ImageUploadModal to determine if it's media
-    const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
+    const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle Camera'];
     const GENERATION_MODELS = [
       'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
       'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
-      'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
+      'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K', 'ChatGPT 1.5', 'Z Image Turbo', 'P-Image'
     ];
 
     const fromModal = imageModalStates.find(m => m.id === fromId);
@@ -234,11 +234,11 @@ export function useConnectionManager({
       console.log('[useConnectionManager] handleComplete: connection allowed', { fromType, toType });
 
       // Use the same logic as ImageUploadModal to determine if it's media
-      const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase'];
+      const PLUGIN_MODELS = ['Upscale', 'Remove BG', 'Vectorize', 'Expand', 'Erase', 'Multiangle Camera'];
       const GENERATION_MODELS = [
         'Google Nano Banana', 'Google nano banana pro', 'Flux 2 pro', 'Seedream v4',
         'Imagen 4 Ultra', 'Imagen 4', 'Imagen 4 Fast', 'Flux Kontext Max', 'Flux Kontext Pro',
-        'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K'
+        'Flux Pro 1.1 Ultra', 'Flux Pro 1.1', 'Seedream v4 4K', 'ChatGPT 1.5', 'Z Image Turbo', 'P-Image'
       ];
 
       const fromModal = imageModalStates.find(m => m.id === activeDrag.from);
@@ -271,6 +271,14 @@ export function useConnectionManager({
       // BUT: Allow image-to-image connections when both are image generation (not media)
       // AND: Always allow connections to plugins (they can accept any image)
       if (isFromMedia && isToImageGeneration && toModal && toModal.generatedImageUrl && !isToPlugin) {
+        setActiveDrag(null);
+        try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
+        return;
+      }
+
+      // Block: ChatGPT 1.5 does not support image-to-image
+      if (toModal && toModal.model === 'ChatGPT 1.5' && fromType === 'image') {
+        console.warn('[useConnectionManager] handleComplete: ChatGPT 1.5 does not support image-to-image');
         setActiveDrag(null);
         try { window.dispatchEvent(new CustomEvent('canvas-node-active', { detail: { active: false } })); } catch (err) { }
         return;

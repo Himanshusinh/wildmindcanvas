@@ -404,6 +404,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         isInteracting={isInteracting}
         viewportUpdateKey={viewportUpdateKey}
         scriptFrameModalStates={scriptFrameModalStates}
+        sceneFrameModalStates={sceneFrameModalStates}
       />
 
       {/* TextInputOverlays restored for AI Text functionality */}

@@ -972,7 +972,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
       // Handle 'z' to zoom to selection or to all components
       // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
-      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
         // Avoid when typing in inputs
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();

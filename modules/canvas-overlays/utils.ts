@@ -3,41 +3,54 @@ import { TextModalState, ImageModalState, VideoModalState, MusicModalState, Upsc
 
 export const getComponentType = (id?: string | null): string | null => {
   if (!id) return null;
+
+  // 1. Try finding by overlay ID (standard for generation modals)
   const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement | null;
   if (overlay) {
     const attr = overlay.getAttribute('data-modal-component') || (overlay.dataset as any).modalComponent;
     if (attr) return String(attr).toLowerCase();
   }
+
+  // 2. Try finding by frame ID (some script frames use this)
   const frameEl = document.querySelector(`[data-frame-id="${id}-frame"]`) as HTMLElement | null;
   if (frameEl) {
     const comp = frameEl.closest('[data-modal-component]') as HTMLElement | null;
     if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
   }
+
+  // 3. Try finding by node ID (connection nodes/handles)
   const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
   if (nodeEl) {
-    // First check if the node itself has data-component-type (for canvas images)
+    // Check for explicit component type first (used by canvas images and now ghost nodes)
     const componentType = nodeEl.getAttribute('data-component-type');
     if (componentType) return componentType.toLowerCase();
+
     // Otherwise check for modal component in ancestor
     const comp = nodeEl.closest('[data-modal-component]') as HTMLElement | null;
     if (comp) return (comp.getAttribute('data-modal-component') || (comp.dataset as any).modalComponent || '').toLowerCase() || null;
   }
-  // Check if this is a canvas image (uploaded image) by looking for the node element
-  // Canvas images have IDs like "canvas-image-{index}" or "element-{timestamp}-{random}"
+
+  // 4. Fallback based on ID prefix if DOM elements are missing (e.g., during re-renders)
+  if (id.startsWith('image-modal-') || id.startsWith('image-')) return 'image';
+  if (id.startsWith('video-modal-') || id.startsWith('video-')) return 'video';
+  if (id.startsWith('music-modal-') || id.startsWith('music-')) return 'music';
+  if (id.startsWith('text-input-') || id.startsWith('text-modal-') || id.startsWith('text-')) return 'text';
+  if (id.startsWith('rich-text-')) return 'text';
+  if (id.startsWith('upscale-')) return 'upscale';
+  if (id.startsWith('remove-bg-') || id.startsWith('removebg-')) return 'removebg';
+  if (id.startsWith('erase-')) return 'erase';
+  if (id.startsWith('expand-')) return 'expand';
+  if (id.startsWith('vectorize-')) return 'vectorize';
+  if (id.startsWith('next-scene-')) return 'nextscene';
+  if (id.startsWith('storyboard-')) return 'storyboard';
+  if (id.startsWith('compare-')) return 'compare';
+
+  // 5. Final fallback for media elements
   if (id.startsWith('canvas-image-') || id.startsWith('element-')) {
-    // Try to find the node element to get its component type
-    const canvasNodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement | null;
-    if (canvasNodeEl) {
-      const componentType = canvasNodeEl.getAttribute('data-component-type');
-      if (componentType) {
-        const type = componentType.toLowerCase();
-        // Return specialized media type to distinguish from generation modals
-        return `media-${type}`;
-      }
-    }
-    // Fallback: assume 'media-image' for canvas images
     return 'media-image';
   }
+  if (id.startsWith('canvas-video-')) return 'media-video';
+
   return null;
 };
 

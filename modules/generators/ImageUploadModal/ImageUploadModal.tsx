@@ -362,7 +362,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
     'Upscale',
-    'Remove BG'
+    'Remove BG',
+    'ChatGPT 1.5',
+    'Z Image Turbo',
+    'P-Image',
+    'Seedream v4 4K'
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -424,7 +428,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Seedream v4 4K',
     'Seedream 4.5',
-    'ChatGPT 1.5',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo'
   ];

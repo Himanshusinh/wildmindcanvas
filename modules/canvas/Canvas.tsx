@@ -520,20 +520,18 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       checkSelectionModals(canvasSelection.selectedImageModalIds, imageModalStates);
       checkSelectionModals(canvasSelection.selectedVideoModalIds, videoModalStates);
       checkSelectionModals(canvasSelection.selectedMusicModalIds, musicModalStates, 600, 300);
-      // REMOVED: upscaleModalStates selection check (managed by store or needs update)
-      // checkSelectionModals(canvasSelection.selectedUpscaleModalIds, upscaleModalStates);
-      checkSelectionModals(canvasSelection.selectedMultiangleCameraModalIds, multiangleCameraModalStates);
-      // REMOVED: removeBgModalStates check (via store)
-      // checkSelectionModals(canvasSelection.selectedRemoveBgModalIds, removeBgModalStates);
-      checkSelectionModals(canvasSelection.selectedEraseModalIds, effectiveEraseModalStates); // Use effective from store
-      checkSelectionModals(canvasSelection.selectedExpandModalIds, effectiveExpandModalStates); // Use effective from store
-      checkSelectionModals(canvasSelection.selectedVectorizeModalIds, vectorizeModalStates);
-      checkSelectionModals(canvasSelection.selectedNextSceneModalIds, nextSceneModalStates);
-      checkSelectionModals(canvasSelection.selectedStoryboardModalIds, storyboardModalStates);
-      checkSelectionModals(canvasSelection.selectedScriptFrameModalIds, scriptFrameModalStates);
-      checkSelectionModals(canvasSelection.selectedSceneFrameModalIds, sceneFrameModalStates);
-      checkSelectionModals(canvasSelection.selectedVideoEditorModalIds, videoEditorModalStates);
-      checkSelectionModals(canvasSelection.selectedCompareModalIds, compareModalStates);
+      checkSelectionModals(canvasSelection.selectedUpscaleModalIds, effectiveUpscaleModalStates, 600, 400);
+      checkSelectionModals(canvasSelection.selectedMultiangleCameraModalIds, effectiveMultiangleCameraModalStates);
+      checkSelectionModals(canvasSelection.selectedRemoveBgModalIds, effectiveRemoveBgModalStates, 600, 400);
+      checkSelectionModals(canvasSelection.selectedEraseModalIds, effectiveEraseModalStates);
+      checkSelectionModals(canvasSelection.selectedExpandModalIds, effectiveExpandModalStates);
+      checkSelectionModals(canvasSelection.selectedVectorizeModalIds, effectiveVectorizeModalStates);
+      checkSelectionModals(canvasSelection.selectedNextSceneModalIds, effectiveNextSceneModalStates);
+      checkSelectionModals(canvasSelection.selectedStoryboardModalIds, effectiveStoryboardModalStates);
+      checkSelectionModals(canvasSelection.selectedScriptFrameModalIds, effectiveScriptFrameModalStates);
+      checkSelectionModals(canvasSelection.selectedSceneFrameModalIds, effectiveSceneFrameModalStates);
+      checkSelectionModals(canvasSelection.selectedVideoEditorModalIds, effectiveVideoEditorModalStates);
+      checkSelectionModals(canvasSelection.selectedCompareModalIds, effectiveCompareModalStates);
 
       // If selection found, return logic
       if (found) {
@@ -578,11 +576,10 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       checkModals(effectiveImageModalStates);
       checkModals(effectiveVideoModalStates);
       checkModals(effectiveMusicModalStates, 600, 300);
-      // REMOVED: effectiveUpscaleModalStates check (managed by store)
-      // checkModals(effectiveUpscaleModalStates);
+      checkModals(effectiveUpscaleModalStates);
+      checkModals(effectiveRemoveBgModalStates);
       checkModals(effectiveMultiangleCameraModalStates);
-      // checkModals(effectiveRemoveBgModalStates);
-      checkModals(effectiveEraseModalStates); // Use effective from store
+      checkModals(effectiveEraseModalStates);
       checkModals(effectiveExpandModalStates);
       checkModals(effectiveVectorizeModalStates);
       checkModals(effectiveNextSceneModalStates);
@@ -591,6 +588,24 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       checkModals(effectiveSceneFrameModalStates);
       checkModals(effectiveVideoEditorModalStates);
       checkModals(effectiveCompareModalStates);
+
+      // Canvas Text
+      effectiveCanvasTextStates.forEach((t: any) => {
+        minX = Math.min(minX, t.x);
+        minY = Math.min(minY, t.y);
+        maxX = Math.max(maxX, t.x + (t.width || 300));
+        maxY = Math.max(maxY, t.y + (t.height || 100));
+        found = true;
+      });
+
+      // Rich Text
+      effectiveRichTextStates.forEach((t: any) => {
+        minX = Math.min(minX, t.x);
+        minY = Math.min(minY, t.y);
+        maxX = Math.max(maxX, t.x + (t.width || 400));
+        maxY = Math.max(maxY, t.y + (t.height || 200));
+        found = true;
+      });
 
       if (found) {
         return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
@@ -601,10 +616,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     const rect = computeSelectionBounds();
     if (!rect) return;
 
-    // Add small padding around rect
-    const padding = Math.max(50, Math.min(rect.width, rect.height) * 0.1);
-    const targetWidth = rect.width + padding * 2;
-    const targetHeight = rect.height + padding * 2;
+    // Add padding around rect (percentage based for better framing)
+    const paddingX = rect.width * 0.1;
+    const paddingY = rect.height * 0.1;
+    const targetWidth = rect.width + paddingX * 2;
+    const targetHeight = rect.height + paddingY * 2;
 
     // Compute scale to fit target into viewport
     const scaleX = viewportSize.width / targetWidth;
@@ -620,20 +636,22 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       y: viewportSize.height / 2 - rectCenterY * newScale,
     };
 
+    setPosition(newPos);
+    setScale(newScale);
     updateViewportCenter(newPos, newScale);
   }, [
     images, canvasSelection, updateViewportCenter, viewportSize,
     textInputStates, imageModalStates, videoModalStates, musicModalStates,
-    // REMOVED: upscaleModalStates
-    multiangleCameraModalStates, // removeBgModalStates,
+    multiangleCameraModalStates,
     effectiveEraseModalStates, setEraseModalStates, vectorizeModalStates, nextSceneModalStates,
     storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates,
     videoEditorModalStates, compareModalStates,
     effectiveImageModalStates, effectiveVideoModalStates, effectiveMusicModalStates,
-    effectiveUpscaleModalStates, effectiveMultiangleCameraModalStates, // effectiveRemoveBgModalStates,
+    effectiveUpscaleModalStates, effectiveMultiangleCameraModalStates, effectiveRemoveBgModalStates,
     effectiveEraseModalStates, effectiveExpandModalStates, effectiveVectorizeModalStates,
     effectiveNextSceneModalStates, effectiveStoryboardModalStates, effectiveScriptFrameModalStates,
-    effectiveSceneFrameModalStates, effectiveVideoEditorModalStates, effectiveCompareModalStates
+    effectiveSceneFrameModalStates, effectiveVideoEditorModalStates, effectiveCompareModalStates,
+    effectiveCanvasTextStates, effectiveRichTextStates
   ]);
 
   // --- SHORTCUTS ---

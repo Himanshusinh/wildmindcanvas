@@ -311,7 +311,7 @@ export const CAPABILITY_REGISTRY: Record<CapabilityType, CapabilityDefinition> =
                 name: 'ChatGPT 1.5',
                 inputType: 'text',
                 outputType: 'image',
-                supports: { textToContent: true, contentToContent: true },
+                supports: { textToContent: true, contentToContent: false },
                 resolutions: ['1024'],
                 aspectRatios: ['1:1', '3:2', '2:3'],
                 maxBatch: 1,
