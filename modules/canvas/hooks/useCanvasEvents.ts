@@ -404,6 +404,19 @@ export function useCanvasEvents(
         const isResizeHandle = target.name() === 'resize-handle';
         const isStartingSelection = (isCursorTool || isShiftSelection) && !isPanKey && e.evt.button === 0;
 
+        // Middle mouse button (button 1) unconditionally triggers panning
+        if (e.evt.button === 1) {
+            const stage = e.target.getStage();
+            if (stage) {
+                e.evt.preventDefault();
+                setIsMiddleButtonPressed(true);
+                setIsPanning(true);
+                stage.draggable(true);
+                applyStageCursorWrapper('grabbing', true);
+            }
+            return;
+        }
+
         let isInsideSelection = false;
         if (stage) {
             const pointerPos = stage.getPointerPosition();
@@ -518,12 +531,6 @@ export function useCanvasEvents(
         if (shouldPan) {
             const stage = e.target.getStage();
             if (stage) {
-                if (e.evt.button === 1) {
-                    e.evt.preventDefault();
-                    e.evt.stopPropagation();
-                    setIsMiddleButtonPressed(true);
-                    return;
-                }
                 setIsPanning(true);
                 stage.draggable(true);
                 applyStageCursorWrapper('grabbing', true);
@@ -603,6 +610,7 @@ export function useCanvasEvents(
             setIsPanning(false);
             const stage = e.target.getStage();
             if (stage) stage.draggable(false);
+            applyStageCursorWrapper('grab');
             e.evt.preventDefault();
             e.evt.stopPropagation();
             return;
