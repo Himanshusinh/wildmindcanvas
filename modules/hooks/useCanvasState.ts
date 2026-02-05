@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ImageUpload } from '@/core/types/canvas';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 import { ImageGenerator, VideoGenerator, MusicGenerator, UpscaleGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, TextGenerator, VideoEditorGenerator, ImageEditorGenerator, NextSceneGenerator, CompareGenerator, MultiangleCameraGenerator, Connector, CanvasAppState, CanvasAppSetters } from '@/modules/canvas-app/types';
 
 export function useCanvasState() {
@@ -22,7 +22,7 @@ export function useCanvasState() {
   const [sceneFrameGenerators, setSceneFrameGenerators] = useState<SceneFrameGenerator[]>([]);
   const [textGenerators, setTextGenerators] = useState<TextGenerator[]>([]);
   const [connectors, setConnectors] = useState<Connector[]>([]);
-  const [generationQueue, setGenerationQueue] = useState<GenerationQueueItem[]>([]);
+
   const [compareGenerators, setCompareGenerators] = useState<CompareGenerator[]>([]);
   const [canvasTextStates, setCanvasTextStates] = useState<import('@/modules/canvas-overlays/types').CanvasTextState[]>([]);
   const [richTextStates, setRichTextStates] = useState<import('@/modules/canvas-overlays/types').CanvasTextState[]>([]);
@@ -52,7 +52,7 @@ export function useCanvasState() {
     richTextStates,
     groupContainerStates,
     connectors,
-    generationQueue,
+
     showImageGenerationModal,
   };
 
@@ -79,7 +79,7 @@ export function useCanvasState() {
     setRichTextStates,
     setGroupContainerStates,
     setConnectors,
-    setGenerationQueue,
+
     setShowImageGenerationModal,
   };
 

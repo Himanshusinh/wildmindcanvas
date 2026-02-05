@@ -71,7 +71,7 @@ interface VideoModalOverlaysProps {
   position: { x: number; y: number };
   textInputStates?: TextModalState[];
   isComponentDraggable?: (id: string) => boolean;
-  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+
   isChatOpen?: boolean;
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
@@ -102,7 +102,7 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
   position,
   textInputStates,
   isComponentDraggable,
-  setGenerationQueue,
+
   isChatOpen,
   selectedIds,
   setSelectionOrder,
@@ -299,10 +299,7 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
                       // Update video modal with generated URL (using Zustand store)
                       updateVideoModal(modalState.id, { generatedVideoUrl: videoUrl, status: 'completed' });
 
-                      // Remove from generation queue
-                      if (setGenerationQueue) {
-                        setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                      }
+
 
                       if (onPersistVideoModalMove) {
                         Promise.resolve(onPersistVideoModalMove(modalState.id, {
@@ -316,10 +313,7 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
                   } else if (statusVal === 'failed' || statusVal === 'error') {
                     console.error('[Canvas Video Poll] generation failed', { taskId, status: statusVal, provider });
 
-                    // Remove from generation queue
-                    if (setGenerationQueue) {
-                      setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                    }
+
 
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'failed' } as any)).catch(console.error);
@@ -333,10 +327,7 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
                   if (pollErr?.status === 404 || pollErr?.isNotFound) {
                     console.error('[Canvas Video Poll] Prediction not found (404)', { taskId, provider, error: pollErr?.message });
 
-                    // Remove from generation queue
-                    if (setGenerationQueue) {
-                      setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                    }
+
 
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, {

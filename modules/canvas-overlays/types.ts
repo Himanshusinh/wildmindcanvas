@@ -586,7 +586,7 @@ export interface ModalOverlaysProps {
   onPersistRichTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
-  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+
   isUIHidden?: boolean;
   isChatOpen?: boolean;
 }

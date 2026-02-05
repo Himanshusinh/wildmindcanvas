@@ -1,6 +1,6 @@
 import { Dispatch, SetStateAction } from 'react';
 import { generateImageForCanvas } from '@/core/api/api';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 import { CanvasAppSetters } from '@/modules/canvas-app/types';
 import { ImageUpload } from '@/core/types/canvas';
 
@@ -20,7 +20,7 @@ export const handleImageGenerate = async (
   setters: CanvasAppSetters,
   options?: Record<string, any>
 ) => {
-  const { setGenerationQueue, setShowImageGenerationModal, setImageGenerators } = setters;
+  const { setShowImageGenerationModal, setImageGenerators } = setters;
 
   try {
     let effectiveSourceImageUrl = sourceImageUrl;
@@ -32,23 +32,7 @@ export const handleImageGenerate = async (
     if (isNaN(parsedImageCount) || parsedImageCount < 1) parsedImageCount = 1;
 
     const queuedCount = parsedImageCount;
-    const baseId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const jobEntries: GenerationQueueItem[] = [];
-    for (let i = 0; i < queuedCount; i++) {
-      jobEntries.push({
-        id: `${baseId}-${i}`,
-        type: 'image',
-        operationName: 'Generating Image',
-        prompt: prompt,
-        model: model,
-        total: queuedCount,
-        index: i + 1,
-        startedAt: Date.now()
-      });
-    }
-
-    setGenerationQueue((prev) => [...prev, ...jobEntries]);
     setShowImageGenerationModal(false);
 
     let genWidth = width;
@@ -84,8 +68,7 @@ export const handleImageGenerate = async (
       );
     }
 
-    const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
-    setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+
 
     // IMPORTANT: Update state if targetFrameId is provided (Canvas Generation Flow)
     if (targetFrameId && result && result.url) {
@@ -114,7 +97,7 @@ export const handleImageGenerate = async (
 
   } catch (error: any) {
     console.error('Generation failed:', error);
-    setGenerationQueue((prev) => prev.filter((job) => !job.model?.includes(model))); // simpler error cleanup
+
     throw error;
   }
 };

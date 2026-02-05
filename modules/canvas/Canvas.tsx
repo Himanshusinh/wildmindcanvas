@@ -69,7 +69,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     onPersistVectorizeModalMove,
     onPersistNextSceneModalMove,
     onPersistStoryboardModalMove,
-    setGenerationQueue,
+
     onPersistScriptFrameModalMove,
     onPersistSceneFrameModalMove,
     onPersistCompareModalMove,
@@ -1010,7 +1010,6 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
         setIsSettingsOpen={setIsSettingsOpen}
         activeGenerationCount={0}
         onFitView={handleFitView}
-        setGenerationQueue={setGenerationQueue}
         isChatOpen={isChatOpen}
         isInteracting={isInteracting}
         setIsComponentDragging={setIsComponentDragging}

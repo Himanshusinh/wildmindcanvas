@@ -1,5 +1,5 @@
 import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator, ImageEditorGenerator } from '@/modules/canvas-app/types';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 
 export interface PluginHandlers {
   onPersistUpscaleModalCreate: (modal: UpscaleGenerator) => Promise<void>;
@@ -77,17 +77,7 @@ export function createPluginHandlers(
       console.error('[onUpscale] Missing sourceImageUrl or projectId');
       return null;
     }
-    const queueId = `upscale-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const queueItem: GenerationQueueItem = {
-      id: queueId,
-      type: 'upscale',
-      operationName: 'Upscaling',
-      model: model || 'Crystal Upscaler',
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setters.setGenerationQueue((prev) => [...prev, queueItem]);
+
 
     try {
       const { upscaleImageForCanvas } = await import('@/core/api/api');
@@ -101,11 +91,11 @@ export function createPluginHandlers(
         topazModel,
         faceEnhanceCreativity
       );
-      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+
       return result?.url || (typeof result === 'string' ? result : null);
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
-      setters.setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+
       throw error;
     }
   };
@@ -126,24 +116,22 @@ export function createPluginHandlers(
     if (!sourceImageUrl || !projectId) return null;
     // logic similar to onUpscale...
     // Simplified for brevity in this rewrite, but functionality kept
-    const queueId = `multiangle-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'image', operationName: 'Multiangle', model: 'Qwen', total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { multiangleImageForCanvas } = await import('@/core/api/api');
       const result = await multiangleImageForCanvas(sourceImageUrl, projectId, prompt, loraScale, aspectRatio, moveForward, verticalTilt, rotateDegrees, useWideAngle);
-      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+
       // extract url
       return (result as any)?.url || result;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+
       throw e;
     }
   };
 
   const onQwenMultipleAngles = async (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => {
     if (!imageUrls || imageUrls.length === 0 || !projectId) return null;
-    const queueId = `qwen-multiple-angles-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'image', operationName: 'View Morph', model: 'Qwen Multiple Angles', total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { qwenMultipleAnglesForCanvas } = await import('@/core/api/api');
       const result = await qwenMultipleAnglesForCanvas(
@@ -155,10 +143,10 @@ export function createPluginHandlers(
         additionalPrompt,
         loraScale
       );
-      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+
       return result?.url || null;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(item => item.id !== queueId));
+
       throw e;
     }
   };
@@ -176,15 +164,14 @@ export function createPluginHandlers(
   };
   const onRemoveBg = async (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => {
     if (!sourceImageUrl || !projectId) return null;
-    const queueId = `removebg-${Date.now()}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'removebg', operationName: 'Remove BG', model, total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { removeBgImageForCanvas } = await import('@/core/api/api');
       const result = await removeBgImageForCanvas(sourceImageUrl, projectId, model, backgroundType, scaleValue);
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       return result.url;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       throw e;
     }
   };
@@ -203,15 +190,14 @@ export function createPluginHandlers(
   const onErase = async (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => {
     // similar logic
     if (!sourceImageUrl || !projectId) return null;
-    const queueId = `erase-${Date.now()}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'erase', operationName: 'Erasing', model, total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { eraseImageForCanvas } = await import('@/core/api/api');
       const result = await eraseImageForCanvas(sourceImageUrl, projectId, model, mask, prompt || '');
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       return result.url;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       throw e;
     }
   };
@@ -229,15 +215,14 @@ export function createPluginHandlers(
   };
   const onExpand = async (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => {
     if (!sourceImageUrl || !projectId) return null;
-    const queueId = `expand-${Date.now()}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'image', operationName: 'Expanding', model, total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { expandImageForCanvas } = await import('@/core/api/api');
       const result = await expandImageForCanvas(sourceImageUrl, projectId, canvasSize!, originalImageSize!, originalImageLocation!, prompt, aspectRatio);
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       return result.url;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       throw e;
     }
   };
@@ -255,15 +240,14 @@ export function createPluginHandlers(
   };
   const onVectorize = async (sourceImageUrl?: string, mode?: string) => {
     if (!sourceImageUrl || !projectId) return null;
-    const queueId = `vectorize-${Date.now()}`;
-    setters.setGenerationQueue(prev => [...prev, { id: queueId, type: 'vectorize', operationName: 'Vectorizing', model: 'Vectorize', total: 1, index: 1, startedAt: Date.now() }]);
+
     try {
       const { vectorizeImageForCanvas } = await import('@/core/api/api');
       const result = await vectorizeImageForCanvas(sourceImageUrl, projectId, mode);
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       return result.url;
     } catch (e) {
-      setters.setGenerationQueue(prev => prev.filter(i => i.id !== queueId));
+
       throw e;
     }
   };

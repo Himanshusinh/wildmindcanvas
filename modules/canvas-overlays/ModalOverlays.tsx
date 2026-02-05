@@ -270,7 +270,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   onScriptGenerationStart,
   onGenerateStoryboard,
   projectId,
-  setGenerationQueue,
+
   isChatOpen,
   viewportSize,
   showFineDetails,
@@ -483,7 +483,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         position={position}
         textInputStates={textInputStates}
         isComponentDraggable={isComponentDraggable}
-        setGenerationQueue={setGenerationQueue}
+
         isChatOpen={isChatOpen}
         selectedIds={selectedIds}
         setSelectionOrder={setSelectionOrder}

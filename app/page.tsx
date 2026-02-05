@@ -3,8 +3,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { CompareGenerator } from '@/modules/canvas-app/types';
-import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
 import { ToolbarPanel } from '@/modules/ui-global/ToolbarPanel';
+
 import { AuthGuard } from '@/modules/ui-global/AuthGuard';
 
 // Lazy load heavy components
@@ -108,7 +108,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
     richTextStates, setRichTextStates,
     groupContainerStates, setGroupContainerStates,
     connectors, setConnectors,
-    generationQueue, setGenerationQueue,
     execute, undo, redo, canUndo, canRedo,
     doc
   } = canvasStore;
@@ -196,7 +195,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     richTextStates,
     groupContainerStates,
     connectors,
-    generationQueue,
+
     showImageGenerationModal: false,
   };
 
@@ -1155,18 +1154,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
 
     // Add to generation queue
-    const queueId = `video - ${modalId || 'video'} -${Date.now()} -${Math.random().toString(36).slice(2)} `;
-    const queueItem: GenerationQueueItem = {
-      id: queueId,
-      type: 'video',
-      operationName: 'Generating Video',
-      prompt: prompt.trim(),
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
+
 
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
@@ -1197,7 +1185,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     } catch (error: any) {
       console.error('Error generating video:', error);
       // Remove from queue on error
-      setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
+
       alert(error.message || 'Failed to generate video. Please try again.');
       return { generationId: undefined, taskId: undefined };
     }
@@ -1529,7 +1517,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
 
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
-              setGenerationQueue={setGenerationQueue}
+
 
               onPersistCanvasTextCreate={(text) => {
                 setCanvasTextStates(prev => [...prev, text]);
@@ -1566,7 +1554,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
           </div>
         )}
       </div>
-      <GenerationQueue items={generationQueue} />
+
       <LibrarySidebar
         isOpen={isLibraryOpen}
         onClose={() => setIsLibraryOpen(false)}

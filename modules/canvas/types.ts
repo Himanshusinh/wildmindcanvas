@@ -3,7 +3,7 @@ import React from 'react';
 import { ImageUpload } from '@/core/types/canvas';
 import { CanvasTextState, CompareModalState, ScriptFrameModalState } from '@/modules/canvas-overlays/types';
 import { GroupContainerState } from '@/core/types/groupContainer';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 import { StoryWorld } from '@/core/types/storyWorld';
 import { MusicGenerator } from '@/modules/canvas-app/types';
 export type { MusicGenerator };
@@ -187,7 +187,7 @@ export interface CanvasProps {
     onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
     onPluginSidebarOpen?: () => void;
     isUIHidden?: boolean;
-    setGenerationQueue?: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
+
     stageRef?: React.RefObject<any>;
     onGenerateStoryboard?: (storyboardId: string, inputs: {
         characterInput?: string;

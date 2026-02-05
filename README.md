@@ -46,7 +46,7 @@ wildmindcanvas/
 │   │   │   ├── CanvasBackground.tsx        # Canvas background pattern (dot grid)
 │   │   │   ├── CanvasImage.tsx             # Individual image/video/text element rendering
 │   │   │   ├── CanvasImageConnectionNodes.tsx  # Connection nodes for linking elements
-│   │   │   ├── GenerationQueue.tsx         # Display generation queue status
+
 │   │   │   ├── index.ts                    # Barrel export file
 │   │   │   ├── LibrarySidebar.tsx          # Media library sidebar
 │   │   │   ├── MediaActionIcons.tsx        # Action icons (delete, download, duplicate)
@@ -498,25 +498,7 @@ wildmindcanvas/
   - Manages connection state
   - Updates on element move
 
-##### `GenerationQueue.tsx` - Generation Queue Display
-**Purpose**: Shows the status of AI generation jobs
-**What's Inside**:
-- **Queue Display**:
-  - Lists pending generation jobs
-  - Shows job progress
-  - Displays model and prompt info
-- **Job Status**:
-  - Queued status
-  - In progress indicator
-  - Completion notification
-- **Queue Management**:
-  - Adds jobs to queue
-  - Removes completed jobs
-  - Updates job status
-- **UI Components**:
-  - Queue list component
-  - Job item component
-  - Progress indicators
+
 
 ##### `LibrarySidebar.tsx` - Media Library Sidebar
 **Purpose**: Sidebar for browsing and adding media from library
@@ -684,15 +666,7 @@ wildmindcanvas/
 - **`handleImageSelect`**:
   - Handles file selection
   - Processes selected file
-- **`handleImageGenerate`**:
-  - Generates AI images
-  - Manages generation queue
-  - Calls API for image generation
-  - Handles multiple image generation
-  - Parses aspect ratio
-  - Calculates dimensions
-  - Returns generated URLs
-  - Updates generation queue
+
 - **`handleTextCreate`**:
   - Creates text element
   - Generates unique elementId
@@ -797,7 +771,7 @@ wildmindcanvas/
   - `upscaleGenerators`: Array of UpscaleGenerator
   - `textGenerators`: Array of TextGenerator
   - `connectors`: Array of Connector
-  - `generationQueue`: Array of GenerationQueueItem
+  
 - **State Object**:
   - Combines all state into CanvasAppState
   - Provides typed state access
@@ -937,7 +911,7 @@ wildmindcanvas/
 - **State Interface**:
   - `CanvasAppState`: Complete canvas state
   - All state arrays
-  - Generation queue
+  
 - **Setters Interface**:
   - `CanvasAppSetters`: All setState functions
   - Typed dispatchers
@@ -1375,7 +1349,7 @@ Server API (Persistence)
 - **Context Menu**: Right-click actions
 - **Toolbar**: Quick access to tools
 - **Settings Panel**: Customization options
-- **Generation Queue**: Track AI jobs
+
 
 ## 🔐 Security
 
