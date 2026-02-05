@@ -23,6 +23,7 @@ import {
 } from '@xyflow/react';
 import { Scissors } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
+import './ConnectionLines.css';
 import { Connection, ActiveDrag } from './types';
 import {
   useImageModalStates,

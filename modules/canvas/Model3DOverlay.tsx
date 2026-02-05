@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import Konva from 'konva';
 import { ImageUpload } from '@/core/types/canvas';
-import { Model3D } from '@/modules/generators/Model3D';
+const Model3D = lazy(() => import('@/modules/generators/Model3D').then(m => ({ default: m.Model3D })));
 
 interface Model3DOverlayProps {
   images: ImageUpload[];
@@ -47,7 +47,7 @@ export const Model3DOverlay: React.FC<Model3DOverlayProps> = ({
   }, [stageRef]);
 
   return (
-    <>
+    <Suspense fallback={null}>
       {images.map((imageData, index) => {
         // Convert canvas coordinates to screen coordinates
         const canvasX = imageData.x || 0;
@@ -80,7 +80,7 @@ export const Model3DOverlay: React.FC<Model3DOverlayProps> = ({
           />
         );
       })}
-    </>
+    </Suspense>
   );
 };
 

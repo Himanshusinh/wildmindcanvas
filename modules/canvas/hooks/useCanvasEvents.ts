@@ -163,6 +163,30 @@ export function useCanvasEvents(
     useEffect(() => { scaleRef.current = scale; }, [scale]);
     useEffect(() => { isPanningRef.current = isPanning; }, [isPanning]);
 
+    // Ref to cache stage bounding box to avoid forced reflow during mousemove
+    const stageRectRef = useRef<DOMRect | null>(null);
+
+    const updateStageRect = useCallback(() => {
+        if (stageRef.current) {
+            const container = stageRef.current.container();
+            if (container) {
+                stageRectRef.current = container.getBoundingClientRect();
+            }
+        }
+    }, [stageRef]);
+
+    useEffect(() => {
+        if (isSelecting) {
+            updateStageRect();
+            window.addEventListener('resize', updateStageRect);
+            window.addEventListener('scroll', updateStageRect, true);
+        }
+        return () => {
+            window.removeEventListener('resize', updateStageRect);
+            window.removeEventListener('scroll', updateStageRect, true);
+        };
+    }, [isSelecting, updateStageRect]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -576,16 +600,19 @@ export function useCanvasEvents(
         if (!isSelecting || !selectionBox) return;
 
         const handleWindowMouseMove = (e: MouseEvent) => {
-            if (!stageRef.current) return;
+            // Use cached rect if available, fallback only if necessary
+            let rectSize = stageRectRef.current;
+            if (!rectSize && stageRef.current) {
+                const stageContainer = stageRef.current.container();
+                if (stageContainer) {
+                    rectSize = stageContainer.getBoundingClientRect();
+                    stageRectRef.current = rectSize;
+                }
+            }
+            if (!rectSize) return;
 
-            // Get pointer position relative to stage
-            const stage = stageRef.current;
-            const stageContainer = stage.container();
-            if (!stageContainer) return;
-
-            const rect = stageContainer.getBoundingClientRect();
-            const pointerX = e.clientX - rect.left;
-            const pointerY = e.clientY - rect.top;
+            const pointerX = e.clientX - rectSize.left;
+            const pointerY = e.clientY - rectSize.top;
 
             // Convert to canvas coordinates
             const currentX = (pointerX - position.x) / scale;
@@ -597,6 +624,7 @@ export function useCanvasEvents(
                 currentY
             });
         };
+
 
         window.addEventListener('mousemove', handleWindowMouseMove, { passive: true });
         return () => {

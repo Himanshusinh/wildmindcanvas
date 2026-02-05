@@ -55,8 +55,10 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const fetchMediaLibrary = useCallback(async (pageNum: number, isRefresh = false) => {
+
     if (loading && !isRefresh) return;
 
     setLoading(true);
@@ -113,7 +115,38 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeCategory, loading, page]);
+
+  // Use IntersectionObserver for infinite scroll instead of scroll events
+  useEffect(() => {
+    if (!isOpen || !hasMore[activeCategory]) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const first = entries[0];
+      if (first.isIntersecting && !loading) {
+        console.log('[LibrarySidebar] Sentinel intersected, loading more...');
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchMediaLibrary(nextPage);
+      }
+    }, {
+      root: scrollContainerRef.current,
+      rootMargin: '200px', // Trigger before reaching the very bottom
+      threshold: 0.1
+    });
+
+    const currentSentinel = loadMoreRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [isOpen, activeCategory, hasMore, loading, page, fetchMediaLibrary]);
+
 
   // Initial load
   useEffect(() => {
@@ -162,17 +195,8 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
     };
   }, [isOpen, onClose]);
 
-  const handleScroll = () => {
-    if (scrollContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      // Load more when user is 300px from bottom (earlier fetch)
-      if (scrollTop + clientHeight >= scrollHeight - 300 && !loading && hasMore[activeCategory]) {
-        const nextPage = page + 1;
-        setPage(nextPage);
-        fetchMediaLibrary(nextPage);
-      }
-    }
-  };
+  // handleScroll replaced by IntersectionObserver for better performance
+
 
   const handleMediaClick = (media: MediaItem) => {
     // Don't trigger click if we just finished dragging
@@ -468,14 +492,17 @@ const LibrarySidebar: React.FC<LibrarySidebarProps> = ({ isOpen, onClose, onSele
       {/* Media Grid */}
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
         style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
       >
         {activeCategory === 'images' && renderMediaGrid(mediaLibrary.images)}
         {activeCategory === 'videos' && renderMediaGrid(mediaLibrary.videos)}
         {activeCategory === 'music' && renderMediaGrid(mediaLibrary.music)}
         {activeCategory === 'uploaded' && renderMediaGrid(mediaLibrary.uploaded)}
+
+        {/* Sentinel element for infinite scroll */}
+        <div ref={loadMoreRef} style={{ height: '20px', width: '100%' }} />
       </div>
+
     </div>
   );
 };

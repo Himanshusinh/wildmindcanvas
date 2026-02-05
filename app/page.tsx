@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { CompareGenerator } from '@/modules/canvas-app/types';
-import { Canvas } from '@/modules/canvas';
 import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
 import { ToolbarPanel } from '@/modules/ui-global/ToolbarPanel';
-import { Header } from '@/modules/ui-global/Header';
 import { AuthGuard } from '@/modules/ui-global/AuthGuard';
-import { Profile } from '@/modules/ui-global/Profile/Profile';
-import LibrarySidebar from '@/modules/canvas/LibrarySidebar';
-import PluginSidebar from '@/modules/canvas/PluginSidebar';
+
+// Lazy load heavy components
+const Canvas = dynamic(() => import('@/modules/canvas').then(m => m.Canvas), { ssr: false });
+const Header = dynamic(() => import('@/modules/ui-global/Header').then(m => m.Header), { ssr: false });
+const Profile = dynamic(() => import('@/modules/ui-global/Profile/Profile').then(m => m.Profile), { ssr: false });
+const LibrarySidebar = dynamic(() => import('@/modules/canvas/LibrarySidebar'), { ssr: false });
+const PluginSidebar = dynamic(() => import('@/modules/canvas/PluginSidebar'), { ssr: false });
 import { ImageUpload } from '@/core/types/canvas';
 import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/core/api/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/core/api/canvasApi';
@@ -211,10 +214,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         from: prevProjectIdRef.current,
         to: projectId,
       });
-      
+
       // CRITICAL: Reset snapshot loaded flag so new project can load
       snapshotLoadedRef.current = false;
-      
+
       // Reset viewport to center
       viewportCenterRef.current = {
         x: 25000,
@@ -392,7 +395,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         });
         return;
       }
-      
+
       if (docRef.current.version === 0) return;
 
       const nodeCount = Object.keys(docRef.current.nodes).length;
@@ -1374,41 +1377,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // ✅ VALIDATION: Limit image-to-video connections to maximum 2
                 const targetVideoId = connector.to;
                 const sourceImageId = connector.from;
-                
+
                 // Helper function to check if a node ID is an image node
                 const isImageNode = (nodeId: string): boolean => {
                   return imageGenerators.some(ig => ig.id === nodeId) ||
-                         images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
+                    images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
                 };
-                
+
                 // Helper function to check if a node ID is a video node
                 const isVideoNode = (nodeId: string): boolean => {
                   return videoGenerators.some(vg => vg.id === nodeId);
                 };
-                
+
                 // Check if this is an image-to-video connection
                 const isTargetVideo = isVideoNode(targetVideoId);
                 const isSourceImage = isImageNode(sourceImageId);
-                
+
                 if (isTargetVideo && isSourceImage) {
                   // Count existing connections from images to this video
-                  const existingImageToVideoConnections = connectors.filter(c => 
+                  const existingImageToVideoConnections = connectors.filter(c =>
                     c.to === targetVideoId && isImageNode(c.from)
                   );
-                  
+
                   if (existingImageToVideoConnections.length >= 2) {
                     console.warn(`[Connection Validation] ❌ BLOCKED: Video ${targetVideoId} already has ${existingImageToVideoConnections.length} image connections (maximum 2 allowed)`);
                     console.warn(`[Connection Validation] Existing connections:`, existingImageToVideoConnections.map(c => c.from));
                     console.warn(`[Connection Validation] Attempted connection from: ${sourceImageId}`);
-                    
+
                     // Show user-friendly error message
                     alert(`⚠️ Connection Limit Reached\n\nThis video generation frame already has 2 image connections (maximum allowed).\n\nPlease disconnect an existing image connection first if you want to connect a different image.`);
                     return; // Reject the connection
                   }
-                  
+
                   console.log(`[Connection Validation] ✅ ALLOWED: Video ${targetVideoId} will have ${existingImageToVideoConnections.length + 1} image connection(s) (limit: 2)`);
                 }
-                
+
                 // ✅ Connection is valid - proceed with creation
                 const cid = connector.id || `connector-${Date.now()}`;
                 setConnectors(prev => [...prev, {

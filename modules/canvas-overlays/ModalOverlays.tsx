@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
+
 import Konva from 'konva';
 import { ModalOverlaysProps } from './types';
 // Zustand Store - Image & Video State Management
@@ -11,6 +12,7 @@ import {
   useUpscaleModalStates,
   useMusicModalStates,
   useMultiangleCameraModalStates,
+  useMultiangleCameraSelection,
   useExpandModalStates,
   useExpandStore,
   useExpandSelection,
@@ -26,34 +28,36 @@ import {
   useTextModalStates,
 } from '@/modules/stores';
 import { useConnectionManager } from './useConnectionManager';
-import { ConnectionLines } from './ConnectionLines';
-import { TextInputOverlays } from './TextInputOverlays';
-import { ImageModalOverlays } from './ImageModalOverlays';
-import { VideoModalOverlays } from './VideoModalOverlays';
-import { VideoEditorModalOverlays } from './VideoEditorModalOverlays';
-import { ImageEditorModalOverlays } from './ImageEditorModalOverlays';
-import { MusicModalOverlays } from './MusicModalOverlays';
-import { UpscaleModalOverlays } from './UpscaleModalOverlays';
-import { RemoveBgModalOverlays } from './RemoveBgModalOverlays';
-import { EraseModalOverlays } from './EraseModalOverlays';
-import { ExpandModalOverlays } from './ExpandModalOverlays';
-import { VectorizeModalOverlays } from './VectorizeModalOverlays';
-import { NextSceneModalOverlays } from './NextSceneModalOverlays';
-import { StoryboardModalOverlays } from './StoryboardModalOverlays';
-import { CompareModalOverlays } from './CompareModalOverlays';
-import { MultiangleCameraModalOverlays } from './MultiangleCameraModalOverlays';
-import { CompareModalState } from './types';
+// Lazy load ConnectionLines which depends on @xyflow/react
+const ConnectionLines = lazy(() => import('./ConnectionLines').then(m => ({ default: m.ConnectionLines })));
 
-import { ScriptFrameModalOverlays } from './ScriptFrameModalOverlays';
-import { SceneFrameModalOverlays } from './SceneFrameModalOverlays';
+// Lazy load modal overlays
+const TextInputOverlays = lazy(() => import('./TextInputOverlays').then(m => ({ default: m.TextInputOverlays })));
+const ImageModalOverlays = lazy(() => import('./ImageModalOverlays').then(m => ({ default: m.ImageModalOverlays })));
+const VideoModalOverlays = lazy(() => import('./VideoModalOverlays').then(m => ({ default: m.VideoModalOverlays })));
+const VideoEditorModalOverlays = lazy(() => import('./VideoEditorModalOverlays').then(m => ({ default: m.VideoEditorModalOverlays })));
+const ImageEditorModalOverlays = lazy(() => import('./ImageEditorModalOverlays').then(m => ({ default: m.ImageEditorModalOverlays })));
+const MusicModalOverlays = lazy(() => import('./MusicModalOverlays').then(m => ({ default: m.MusicModalOverlays })));
+const UpscaleModalOverlays = lazy(() => import('./UpscaleModalOverlays').then(m => ({ default: m.UpscaleModalOverlays })));
+const RemoveBgModalOverlays = lazy(() => import('./RemoveBgModalOverlays').then(m => ({ default: m.RemoveBgModalOverlays })));
+const EraseModalOverlays = lazy(() => import('./EraseModalOverlays').then(m => ({ default: m.EraseModalOverlays })));
+const ExpandModalOverlays = lazy(() => import('./ExpandModalOverlays').then(m => ({ default: m.ExpandModalOverlays })));
+const VectorizeModalOverlays = lazy(() => import('./VectorizeModalOverlays').then(m => ({ default: m.VectorizeModalOverlays })));
+const NextSceneModalOverlays = lazy(() => import('./NextSceneModalOverlays').then(m => ({ default: m.NextSceneModalOverlays })));
+const StoryboardModalOverlays = lazy(() => import('./StoryboardModalOverlays').then(m => ({ default: m.StoryboardModalOverlays })));
+const CompareModalOverlays = lazy(() => import('./CompareModalOverlays').then(m => ({ default: m.CompareModalOverlays })));
+const MultiangleCameraModalOverlays = lazy(() => import('./MultiangleCameraModalOverlays').then(m => ({ default: m.MultiangleCameraModalOverlays })));
+const ScriptFrameModalOverlays = lazy(() => import('./ScriptFrameModalOverlays').then(m => ({ default: m.ScriptFrameModalOverlays })));
+const SceneFrameModalOverlays = lazy(() => import('./SceneFrameModalOverlays').then(m => ({ default: m.SceneFrameModalOverlays })));
+const CanvasTextOverlays = lazy(() => import('./CanvasTextOverlays').then(m => ({ default: m.CanvasTextOverlays })));
+
+import { CompareModalState } from './types';
 import { ComponentCreationMenu } from './ComponentCreationMenu';
-import { CanvasTextOverlays } from './CanvasTextOverlays';
 
 export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   // textInputStates, // REMOVED: Managed by Zustand store locally
-  // REMOVED: imageModalStates, videoModalStates (now managed by Zustand store)
-  // imageModalStates,
-  // videoModalStates,
+  imageModalStates: propImageModalStates,
+  videoModalStates: propVideoModalStates,
   videoEditorModalStates,
   imageEditorModalStates,
   // REMOVED: musicModalStates (now managed by store)
@@ -277,9 +281,13 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
 }) => {
 
   // Zustand Store - Get image and video modal states (replaces props)
-  const imageModalStates = useImageModalStates();
+  const storeImageModalStates = useImageModalStates();
   const textInputStates = useTextModalStates(); // Added: Get text states from store for ConnectionLines
-  const videoModalStates = useVideoModalStates();
+  const storeVideoModalStates = useVideoModalStates();
+
+  // Prefer props if available (for virtualization), otherwise use store
+  const imageModalStates = propImageModalStates || storeImageModalStates;
+  const videoModalStates = propVideoModalStates || storeVideoModalStates;
   const { selectedId: selectedVideoModalId, selectedIds: selectedVideoModalIds } = useVideoSelection();
   const [viewportUpdateKey, setViewportUpdateKey] = useState(0);
   const lastUpdateRef = useRef({ x: 0, y: 0, scale: 1 });
@@ -326,6 +334,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   const upscaleModalStates = useUpscaleModalStates();
   const musicModalStates = useMusicModalStates();
   const multiangleCameraModalStates = useMultiangleCameraModalStates();
+  const { selectedIds: selectedMultiangleCameraModalIds } = useMultiangleCameraSelection();
 
   // Falling back to hooks if props are not provided (e.g. for components that don't pass them)
   const storeExpandModalStates = useExpandModalStates();
@@ -390,22 +399,25 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
 
   return (
     <>
-      <ConnectionLines
-        connections={externalConnections ?? []}
-        activeDrag={connectionManager.activeDrag}
-        selectedConnectionId={connectionManager.selectedConnectionId}
-        onSelectConnection={connectionManager.setSelectedConnectionId}
-        onDeleteConnection={connectionManager.handleDeleteConnection}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        onPersistConnectorDelete={onPersistConnectorDelete}
-        stageRef={stageRef}
-        position={position}
-        scale={scale}
-        isInteracting={isInteracting}
-        viewportUpdateKey={viewportUpdateKey}
-        scriptFrameModalStates={scriptFrameModalStates}
-        sceneFrameModalStates={sceneFrameModalStates}
-      />
+      <Suspense fallback={null}>
+        <ConnectionLines
+          connections={externalConnections ?? []}
+          activeDrag={connectionManager.activeDrag}
+          selectedConnectionId={connectionManager.selectedConnectionId}
+          onSelectConnection={connectionManager.setSelectedConnectionId}
+          onDeleteConnection={connectionManager.handleDeleteConnection}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          onPersistConnectorDelete={onPersistConnectorDelete}
+          stageRef={stageRef}
+          position={position}
+          scale={scale}
+          isInteracting={isInteracting}
+          viewportUpdateKey={viewportUpdateKey}
+          scriptFrameModalStates={scriptFrameModalStates}
+          sceneFrameModalStates={sceneFrameModalStates}
+        />
+      </Suspense>
+
 
       {/* TextInputOverlays restored for AI Text functionality */}
       {/* TextInputOverlays restored for AI Text functionality */}
@@ -429,8 +441,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <ImageModalOverlays
-        // REMOVED: imageModalStates, selectedImageModalId, selectedImageModalIds, setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds
-        // These are now managed by Zustand store (useImageStore)
+        imageModalStates={imageModalStates}
         clearAllSelections={clearAllSelections}
         onImageGenerate={onImageGenerate}
         onAddImageToCanvas={onAddImageToCanvas}
@@ -458,8 +469,7 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
       />
 
       <VideoModalOverlays
-        // REMOVED: videoModalStates, selectedVideoModalId, selectedVideoModalIds, setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds
-        // These are now managed by Zustand store (useVideoStore)
+        videoModalStates={videoModalStates}
         clearAllSelections={clearAllSelections}
         onVideoGenerate={onVideoGenerate}
         onPersistVideoModalCreate={onPersistVideoModalCreate}
@@ -482,41 +492,45 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         isZoomedOut={isZoomedOut}
       />
 
-      <VideoEditorModalOverlays
-        videoEditorModalStates={videoEditorModalStates}
-        selectedVideoEditorModalId={selectedVideoEditorModalId}
-        selectedVideoEditorModalIds={selectedVideoEditorModalIds}
-        clearAllSelections={clearAllSelections}
-        setVideoEditorModalStates={setVideoEditorModalStates}
-        setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
-        setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
-        onPersistVideoEditorModalCreate={onPersistVideoEditorModalCreate}
-        onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
-        onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
-        onOpenVideoEditor={onOpenVideoEditor}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {((videoEditorModalStates && videoEditorModalStates.length > 0) || (selectedVideoEditorModalIds && selectedVideoEditorModalIds.length > 0)) && (
+        <VideoEditorModalOverlays
+          videoEditorModalStates={videoEditorModalStates}
+          selectedVideoEditorModalId={selectedVideoEditorModalId}
+          selectedVideoEditorModalIds={selectedVideoEditorModalIds}
+          clearAllSelections={clearAllSelections}
+          setVideoEditorModalStates={setVideoEditorModalStates}
+          setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
+          setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
+          onPersistVideoEditorModalCreate={onPersistVideoEditorModalCreate}
+          onPersistVideoEditorModalMove={onPersistVideoEditorModalMove}
+          onPersistVideoEditorModalDelete={onPersistVideoEditorModalDelete}
+          onOpenVideoEditor={onOpenVideoEditor}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
-      <ImageEditorModalOverlays
-        imageEditorModalStates={imageEditorModalStates}
-        selectedImageEditorModalId={selectedImageEditorModalId}
-        selectedImageEditorModalIds={selectedImageEditorModalIds}
-        clearAllSelections={clearAllSelections}
-        setImageEditorModalStates={setImageEditorModalStates}
-        setSelectedImageEditorModalId={setSelectedImageEditorModalId}
-        setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
-        onPersistImageEditorModalCreate={onPersistImageEditorModalCreate}
-        onPersistImageEditorModalMove={onPersistImageEditorModalMove}
-        onPersistImageEditorModalDelete={onPersistImageEditorModalDelete}
-        onOpenImageEditor={onOpenImageEditor}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {((imageEditorModalStates && imageEditorModalStates.length > 0) || (selectedImageEditorModalIds && selectedImageEditorModalIds.length > 0)) && (
+        <ImageEditorModalOverlays
+          imageEditorModalStates={imageEditorModalStates}
+          selectedImageEditorModalId={selectedImageEditorModalId}
+          selectedImageEditorModalIds={selectedImageEditorModalIds}
+          clearAllSelections={clearAllSelections}
+          setImageEditorModalStates={setImageEditorModalStates}
+          setSelectedImageEditorModalId={setSelectedImageEditorModalId}
+          setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
+          onPersistImageEditorModalCreate={onPersistImageEditorModalCreate}
+          onPersistImageEditorModalMove={onPersistImageEditorModalMove}
+          onPersistImageEditorModalDelete={onPersistImageEditorModalDelete}
+          onOpenImageEditor={onOpenImageEditor}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
       <MusicModalOverlays
         // REMOVED: props now managed by store
@@ -542,156 +556,168 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         selectedIds={selectedIds}
       />
 
-      <UpscaleModalOverlays
-        // REMOVED: upscaleModalStates, selectedUpscaleModalId, selectedUpscaleModalIds, setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
-        // upscaleModalStates={upscaleModalStates ?? []}
-        // selectedUpscaleModalId={selectedUpscaleModalId ?? null}
-        // selectedUpscaleModalIds={selectedUpscaleModalIds ?? []}
-        clearAllSelections={clearAllSelections}
-        // setUpscaleModalStates={setUpscaleModalStates}
-        // setSelectedUpscaleModalId={setSelectedUpscaleModalId}
-        // setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
-        onUpscale={onUpscale}
-        onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
-        onPersistUpscaleModalMove={onPersistUpscaleModalMove}
-        onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-      />
-      <RemoveBgModalOverlays
-        removeBgModalStates={removeBgModalStates ?? []}
-        selectedRemoveBgModalId={selectedRemoveBgModalId ?? null}
-        selectedRemoveBgModalIds={selectedRemoveBgModalIds ?? []}
-        clearAllSelections={clearAllSelections}
-        setRemoveBgModalStates={setRemoveBgModalStates}
-        setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
-        setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
-        onRemoveBg={onRemoveBg}
-        onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
-        onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
-        onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
-      <EraseModalOverlays
-        eraseModalStates={effectiveEraseModalStates ?? []}
-        selectedEraseModalId={finalSelectedEraseModalId ?? null}
-        selectedEraseModalIds={finalSelectedEraseModalIds ?? []}
-        clearAllSelections={clearAllSelections}
-        setEraseModalStates={finalSetEraseModalStates}
-        setSelectedEraseModalId={finalSetSelectedEraseModalId}
-        setSelectedEraseModalIds={finalSetSelectedEraseModalIds}
-        onErase={onErase}
-        onPersistEraseModalCreate={onPersistEraseModalCreate}
-        onPersistEraseModalMove={onPersistEraseModalMove}
-        onPersistEraseModalDelete={onPersistEraseModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {(upscaleModalStates && upscaleModalStates.length > 0) && (
+        <UpscaleModalOverlays
+          // REMOVED: upscaleModalStates, selectedUpscaleModalId, selectedUpscaleModalIds, setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
+          // upscaleModalStates={upscaleModalStates ?? []}
+          // selectedUpscaleModalId={selectedUpscaleModalId ?? null}
+          // selectedUpscaleModalIds={selectedUpscaleModalIds ?? []}
+          clearAllSelections={clearAllSelections}
+          // setUpscaleModalStates={setUpscaleModalStates}
+          // setSelectedUpscaleModalId={setSelectedUpscaleModalId}
+          // setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
+          onUpscale={onUpscale}
+          onPersistUpscaleModalCreate={onPersistUpscaleModalCreate}
+          onPersistUpscaleModalMove={onPersistUpscaleModalMove}
+          onPersistUpscaleModalDelete={onPersistUpscaleModalDelete}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+          images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+        />
+      )}
+      {((removeBgModalStates && removeBgModalStates.length > 0) || (selectedRemoveBgModalIds && selectedRemoveBgModalIds.length > 0)) && (
+        <RemoveBgModalOverlays
+          removeBgModalStates={removeBgModalStates ?? []}
+          selectedRemoveBgModalId={selectedRemoveBgModalId ?? null}
+          selectedRemoveBgModalIds={selectedRemoveBgModalIds ?? []}
+          clearAllSelections={clearAllSelections}
+          setRemoveBgModalStates={setRemoveBgModalStates}
+          setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
+          setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
+          onRemoveBg={onRemoveBg}
+          onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
+          onPersistRemoveBgModalMove={onPersistRemoveBgModalMove}
+          onPersistRemoveBgModalDelete={onPersistRemoveBgModalDelete}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
+      {((effectiveEraseModalStates && effectiveEraseModalStates.length > 0) || (finalSelectedEraseModalIds && finalSelectedEraseModalIds.length > 0)) && (
+        <EraseModalOverlays
+          eraseModalStates={effectiveEraseModalStates ?? []}
+          selectedEraseModalId={finalSelectedEraseModalId ?? null}
+          selectedEraseModalIds={finalSelectedEraseModalIds ?? []}
+          clearAllSelections={clearAllSelections}
+          setEraseModalStates={finalSetEraseModalStates}
+          setSelectedEraseModalId={finalSetSelectedEraseModalId}
+          setSelectedEraseModalIds={finalSetSelectedEraseModalIds}
+          onErase={onErase}
+          onPersistEraseModalCreate={onPersistEraseModalCreate}
+          onPersistEraseModalMove={onPersistEraseModalMove}
+          onPersistEraseModalDelete={onPersistEraseModalDelete}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
-      <ExpandModalOverlays
-        expandModalStates={effectiveExpandModalStates ?? []}
-        selectedExpandModalId={finalSelectedExpandModalId ?? null}
-        selectedExpandModalIds={finalSelectedExpandModalIds ?? []}
-        clearAllSelections={clearAllSelections}
-        setExpandModalStates={setExpandModalStates}
-        setSelectedExpandModalId={setSelectedExpandModalId}
-        setSelectedExpandModalIds={setSelectedExpandModalIds}
-        onExpand={onExpand}
-        onPersistExpandModalCreate={onPersistExpandModalCreate}
-        onPersistExpandModalMove={onPersistExpandModalMove}
-        onPersistExpandModalDelete={onPersistExpandModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {((effectiveExpandModalStates && effectiveExpandModalStates.length > 0) || (finalSelectedExpandModalIds && finalSelectedExpandModalIds.length > 0)) && (
+        <ExpandModalOverlays
+          expandModalStates={effectiveExpandModalStates ?? []}
+          selectedExpandModalId={finalSelectedExpandModalId ?? null}
+          selectedExpandModalIds={finalSelectedExpandModalIds ?? []}
+          clearAllSelections={clearAllSelections}
+          setExpandModalStates={setExpandModalStates}
+          setSelectedExpandModalId={setSelectedExpandModalId}
+          setSelectedExpandModalIds={setSelectedExpandModalIds}
+          onExpand={onExpand}
+          onPersistExpandModalCreate={onPersistExpandModalCreate}
+          onPersistExpandModalMove={onPersistExpandModalMove}
+          onPersistExpandModalDelete={onPersistExpandModalDelete}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
-      <VectorizeModalOverlays
-        vectorizeModalStates={finalVectorizeModalStates}
-        selectedVectorizeModalId={finalSelectedVectorizeModalId}
-        selectedVectorizeModalIds={finalSelectedVectorizeModalIds}
-        setVectorizeModalStates={setVectorizeModalStates || (() => { })}
-        setSelectedVectorizeModalId={finalSetSelectedVectorizeModalId}
-        setSelectedVectorizeModalIds={finalSetSelectedVectorizeModalIds}
-        clearAllSelections={clearAllSelections}
-        onVectorize={onVectorize}
-        onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
-        onPersistVectorizeModalMove={onPersistVectorizeModalMove}
-        onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images as any}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {((finalVectorizeModalStates && finalVectorizeModalStates.length > 0) || (finalSelectedVectorizeModalIds && finalSelectedVectorizeModalIds.length > 0)) && (
+        <VectorizeModalOverlays
+          vectorizeModalStates={finalVectorizeModalStates}
+          selectedVectorizeModalId={finalSelectedVectorizeModalId}
+          selectedVectorizeModalIds={finalSelectedVectorizeModalIds}
+          setVectorizeModalStates={setVectorizeModalStates || (() => { })}
+          setSelectedVectorizeModalId={finalSetSelectedVectorizeModalId}
+          setSelectedVectorizeModalIds={finalSetSelectedVectorizeModalIds}
+          clearAllSelections={clearAllSelections}
+          onVectorize={onVectorize}
+          onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
+          onPersistVectorizeModalMove={onPersistVectorizeModalMove}
+          onPersistVectorizeModalDelete={onPersistVectorizeModalDelete}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          images={images as any}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
-      <MultiangleCameraModalOverlays
-        // REMOVED: multiangleCameraModalStates (now managed by store)
-        // multiangleCameraModalStates={multiangleCameraModalStates}
-        // selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
-        // selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
-        clearAllSelections={clearAllSelections}
-        // setMultiangleCameraModalStates={setMultiangleCameraModalStates}
-        // setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
-        // setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
-        onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
-        onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
-        onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
-        onMultiangleCamera={onMultiangleCamera}
-        onQwenMultipleAngles={onQwenMultipleAngles}
-        onPersistImageModalCreate={onPersistImageModalCreate}
-        onPersistImageModalMove={onPersistImageModalMove}
-        connections={externalConnections ?? []}
-        imageModalStates={imageModalStates}
-        images={images}
-        onPersistConnectorCreate={onPersistConnectorCreate}
-        stageRef={stageRef}
-        scale={scale}
-        position={position}
-        isChatOpen={isChatOpen}
-        selectedIds={selectedIds}
-      />
+      {((multiangleCameraModalStates && multiangleCameraModalStates.length > 0) || (selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.length > 0)) && (
+        <MultiangleCameraModalOverlays
+          // REMOVED: multiangleCameraModalStates (now managed by store)
+          // multiangleCameraModalStates={multiangleCameraModalStates}
+          // selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
+          // selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
+          clearAllSelections={clearAllSelections}
+          // setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+          // setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
+          // setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
+          onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
+          onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
+          onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
+          onMultiangleCamera={onMultiangleCamera}
+          onQwenMultipleAngles={onQwenMultipleAngles}
+          onPersistImageModalCreate={onPersistImageModalCreate}
+          onPersistImageModalMove={onPersistImageModalMove}
+          connections={externalConnections ?? []}
+          imageModalStates={imageModalStates}
+          images={images}
+          onPersistConnectorCreate={onPersistConnectorCreate}
+          stageRef={stageRef}
+          scale={scale}
+          position={position}
+          isChatOpen={isChatOpen}
+          selectedIds={selectedIds}
+        />
+      )}
 
       <NextSceneModalOverlays
         nextSceneModalStates={nextSceneModalStates ?? []}

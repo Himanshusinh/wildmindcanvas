@@ -28,5 +28,7 @@ export interface ImageUpload {
   fill?: string;
   // For op tracking and persistence
   elementId?: string;
+  // For LCP optimization
+  priority?: 'high' | 'low' | 'auto';
 }
 

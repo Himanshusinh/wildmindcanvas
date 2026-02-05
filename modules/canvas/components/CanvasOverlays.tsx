@@ -222,6 +222,8 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 storyboardModalStates={storyboardModalStates}
                 scriptFrameModalStates={scriptFrameModalStates}
                 sceneFrameModalStates={sceneFrameModalStates}
+                imageModalStates={virtualizedImageModalStates}
+                videoModalStates={virtualizedVideoModalStates}
 
                 // Connections
                 connections={canvasState.connections}

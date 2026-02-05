@@ -3,6 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/modules/ui-global/common/FrameSpinner';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { buildProxyThumbnailUrl, buildProxyResourceUrl } from '@/core/api/proxyUtils';
 
 interface ImageModalFrameProps {
   id?: string;
@@ -95,8 +96,6 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
       {generatedImageUrl ? (
         <img
           src={(() => {
-            // Use proxy to ensure CORS success for all external images
-            const { buildProxyThumbnailUrl, buildProxyResourceUrl } = require('@/core/api/proxyUtils');
             if (generatedImageUrl.startsWith('blob:') || generatedImageUrl.startsWith('data:') || generatedImageUrl.includes('/api/proxy/')) {
               return generatedImageUrl;
             }
@@ -108,6 +107,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             return buildProxyResourceUrl(generatedImageUrl);
           })()}
           alt="Generated"
+          fetchPriority="high"
           style={{
             width: '100%',
             height: '100%',

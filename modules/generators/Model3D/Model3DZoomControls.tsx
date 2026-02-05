@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import * as THREE from 'three';
+// import * as THREE from 'three'; // Unused
 import { Model3DRefs } from './types';
 
 interface Model3DZoomControlsProps {
@@ -12,7 +12,7 @@ interface Model3DZoomControlsProps {
 export const Model3DZoomControls: React.FC<Model3DZoomControlsProps> = ({ refs, onUpdate }) => {
   const handleZoomIn = () => {
     if (!refs.cameraRef.current || !onUpdate) return;
-    
+
     const zoomSpeed = 0.2;
     refs.sphericalRef.current.radius *= (1 - zoomSpeed);
     refs.sphericalRef.current.radius = Math.max(1, Math.min(20, refs.sphericalRef.current.radius));
@@ -33,7 +33,7 @@ export const Model3DZoomControls: React.FC<Model3DZoomControlsProps> = ({ refs, 
 
   const handleZoomOut = () => {
     if (!refs.cameraRef.current || !onUpdate) return;
-    
+
     const zoomSpeed = 0.2;
     refs.sphericalRef.current.radius *= (1 + zoomSpeed);
     refs.sphericalRef.current.radius = Math.max(1, Math.min(20, refs.sphericalRef.current.radius));
@@ -109,7 +109,7 @@ export const Model3DZoomControls: React.FC<Model3DZoomControlsProps> = ({ refs, 
           <line x1="8" y1="11" x2="14" y2="11" />
         </svg>
       </button>
-      
+
       <button
         onClick={(e) => {
           e.stopPropagation();

@@ -10,7 +10,7 @@ class ImageCache {
      * Returns a promise that resolves to the HTMLImageElement.
      * If the image is already loading or loaded, returns the existing promise.
      */
-    load(url: string): Promise<HTMLImageElement> {
+    load(url: string, priority: 'high' | 'low' | 'auto' = 'auto'): Promise<HTMLImageElement> {
         if (!url) return Promise.reject(new Error('No URL provided'));
 
         if (this.cache.has(url)) {
@@ -20,6 +20,10 @@ class ImageCache {
         const promise = new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
+            // Set fetchPriority if supported (Chrome 101+)
+            if ('fetchPriority' in img || (img as any).fetchPriority) {
+                (img as any).fetchPriority = priority;
+            }
             img.src = url;
 
             img.onload = () => {

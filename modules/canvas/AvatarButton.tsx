@@ -33,47 +33,56 @@ const AvatarButton: React.FC<Props> = ({ scale = 1, onClick, isHidden = false })
   const textColor = isDark ? '#e5e7eb' : '#374151';
 
   return (
-    <button
-      onClick={onClick}
-      aria-label="Open profile"
-      style={{
-        position: 'fixed',
-        left: `${16 * s}px`,
-        bottom: `${16 * s}px`,
-        zIndex: 9999,
-        width: `${size}px`,
-        height: `${size}px`,
-        borderRadius: '50%',
-        overflow: 'hidden',
-        border: `${2 * s}px solid ${borderColor}`,
-        padding: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: avatarUrl ? 'transparent' : bgColor,
-        cursor: 'pointer',
-        pointerEvents: isHidden ? 'none' : 'auto',
-        opacity: isHidden ? 0 : 1,
-        transform: isHidden ? 'translateY(100%)' : 'translateY(0)',
-        transition: 'opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
-        boxShadow: `0 6px 20px ${shadowColor}`,
-      }}
-    >
-      {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt="profile"
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          onError={() => setAvatarFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : (
-        <span style={{ color: textColor, fontWeight: 700, fontSize: `${16 * s}px` }}>
-          {loading ? '…' : ((userData?.username || userData?.email || 'U').charAt(0).toUpperCase())}
-        </span>
-      )}
-    </button>
+    <div style={{ position: 'fixed', left: `${16 * s}px`, bottom: `${16 * s}px`, zIndex: 9999 }}>
+      {/* Optimization: Use opacity transition for hover state instead of expensive properties */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .avatar-btn { position: relative; overflow: hidden; }
+        .avatar-btn .hover-overlay { opacity: 0; transition: opacity 0.2s; pointer-events: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .avatar-btn:hover .hover-overlay { opacity: 1; }
+      `}} />
+      <button
+        onClick={onClick}
+        aria-label="Open profile"
+        className="avatar-btn"
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          border: `${2 * s}px solid ${borderColor}`,
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: avatarUrl ? 'transparent' : bgColor,
+          cursor: 'pointer',
+          pointerEvents: isHidden ? 'none' : 'auto',
+          opacity: isHidden ? 0 : 1,
+          transform: isHidden ? 'translateY(100%)' : 'translateY(0)',
+          transition: 'opacity 0.3s ease, transform 0.3s ease', // Removed expensive properties
+          boxShadow: `0 6px 20px ${shadowColor}`,
+        }}
+      >
+        {/* Overlay for hover effect */}
+        <div className="hover-overlay" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }} />
+
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt="profile"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            onError={() => setAvatarFailed(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'relative', zIndex: 1 }}
+          />
+        ) : (
+          <span style={{ color: textColor, fontWeight: 700, fontSize: `${16 * s}px`, position: 'relative', zIndex: 1 }}>
+            {loading ? '…' : ((userData?.username || userData?.email || 'U').charAt(0).toUpperCase())}
+          </span>
+        )}
+      </button>
+    </div>
   );
 };
 

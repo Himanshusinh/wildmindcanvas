@@ -275,7 +275,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       };
     } else {
       // Use global cache for images
-      imageCache.load(url)
+      imageCache.load(url, imageData.priority === 'high' ? 'high' : 'auto')
         .then((image) => {
           if (mounted) {
             setImg(image);

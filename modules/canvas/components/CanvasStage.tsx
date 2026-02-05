@@ -243,7 +243,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                     y={rectY}
                                     width={rectW}
                                     height={rectH}
-                                    fill={document.documentElement.classList.contains('dark') ? '#121212' : '#ffffff'}
+                                    fill={isDarkTheme ? '#121212' : '#ffffff'}
                                     listening={true}
                                     name="background-rect"
                                 />

@@ -52,9 +52,9 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
 
 interface VideoModalOverlaysProps {
   // REMOVED: These props are now managed by Zustand store
-  // videoModalStates: VideoModalState[];
-  // selectedVideoModalId: string | null;
-  // selectedVideoModalIds: string[];
+  videoModalStates?: VideoModalState[];
+  selectedVideoModalId?: string | null;
+  selectedVideoModalIds?: string[];
   clearAllSelections: () => void;
   // setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
   // setSelectedVideoModalId: (id: string | null) => void;
@@ -109,10 +109,17 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
   showFineDetails,
   showLabelsOnly,
   isZoomedOut,
+  videoModalStates: propVideoModalStates,
+  selectedVideoModalId: propSelectedVideoModalId,
+  selectedVideoModalIds: propSelectedVideoModalIds,
 }) => {
   // Zustand Store - Get video state and actions
-  const videoModalStates = useVideoModalStates();
-  const { selectedId: selectedVideoModalId, selectedIds: selectedVideoModalIds } = useVideoSelection();
+  const storeVideoModalStates = useVideoModalStates();
+  const { selectedId: storeSelectedVideoModalId, selectedIds: storeSelectedVideoModalIds } = useVideoSelection();
+
+  const videoModalStates = propVideoModalStates || storeVideoModalStates;
+  const selectedVideoModalId = propSelectedVideoModalId !== undefined ? propSelectedVideoModalId : storeSelectedVideoModalId;
+  const selectedVideoModalIds = propSelectedVideoModalIds !== undefined ? propSelectedVideoModalIds : storeSelectedVideoModalIds;
 
   const setVideoModalStates = useVideoStore(state => state.setVideoModalStates);
   const setSelectedVideoModalId = useVideoStore(state => state.setSelectedVideoModalId);

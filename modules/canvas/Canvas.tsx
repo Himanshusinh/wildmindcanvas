@@ -915,11 +915,16 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
 
     // Initial check (fallback)
     if (containerRef.current) {
-      const { offsetWidth, offsetHeight } = containerRef.current;
-      if (offsetWidth > 0 && offsetHeight > 0) {
-        setViewportSize({ width: offsetWidth, height: offsetHeight });
-      }
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          const { offsetWidth, offsetHeight } = containerRef.current;
+          if (offsetWidth > 0 && offsetHeight > 0) {
+            setViewportSize({ width: offsetWidth, height: offsetHeight });
+          }
+        }
+      });
     }
+
 
     return () => {
       resizeObserver.disconnect();

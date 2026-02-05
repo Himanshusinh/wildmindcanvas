@@ -336,10 +336,8 @@ export interface ComponentMenu {
 
 export interface ModalOverlaysProps {
   // textInputStates: TextModalState[]; // REMOVED: Managed by Zustand store
-  // REMOVED: imageModalStates (now managed by Zustand store - useImageStore)
-  // imageModalStates: ImageModalState[];
-  // REMOVED: videoModalStates (now managed by Zustand store - useVideoStore)
-  // videoModalStates: VideoModalState[];
+  imageModalStates: ImageModalState[];
+  videoModalStates: VideoModalState[];
   videoEditorModalStates?: VideoEditorModalState[];
   imageEditorModalStates?: ImageEditorModalState[];
   // REMOVED: musicModalStates (now managed by store)

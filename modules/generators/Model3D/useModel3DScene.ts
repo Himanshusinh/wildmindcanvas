@@ -1,17 +1,17 @@
 import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import { Scene, Color, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, Vector3, Mesh, Group } from 'three';
 import { Model3DRefs, SphericalCoords } from './types';
 
 interface UseModel3DSceneProps {
   refs: Model3DRefs;
   width: number;
   height: number;
-  model: THREE.Group | null;
+  model: Group | null;
   rotationX: number;
   rotationY: number;
   zoom: number;
   sphericalRef: React.RefObject<SphericalCoords>;
-  targetRef: React.RefObject<THREE.Vector3>;
+  targetRef: React.RefObject<Vector3>;
   currentRotationRef: React.RefObject<{ x: number; y: number }>;
   currentZoomRef: React.RefObject<number>;
 }
@@ -37,17 +37,18 @@ export function useModel3DScene({
     const canvas = refs.canvasRef.current;
 
     // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
+    // Scene setup
+    const scene = new Scene();
+    scene.background = new Color(0xf0f0f0);
     refs.sceneRef.current = scene;
 
     // Camera setup
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    const camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.z = 5;
     refs.cameraRef.current = camera;
 
     // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ 
+    const renderer = new WebGLRenderer({
       canvas,
       antialias: true,
       alpha: true,
@@ -58,14 +59,14 @@ export function useModel3DScene({
     refs.rendererRef.current = renderer;
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+
+    const directionalLight1 = new DirectionalLight(0xffffff, 0.8);
     directionalLight1.position.set(5, 5, 5);
     scene.add(directionalLight1);
-    
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+
+    const directionalLight2 = new DirectionalLight(0xffffff, 0.4);
     directionalLight2.position.set(-5, -5, -5);
     scene.add(directionalLight2);
 
@@ -78,12 +79,12 @@ export function useModel3DScene({
       sphericalRef.current.theta = currentRotationRef.current.y;
       sphericalRef.current.phi = Math.PI / 2 + currentRotationRef.current.x;
       sphericalRef.current.radius = 5 / currentZoomRef.current;
-      
+
       // Set camera position using spherical coordinates
       const x = targetRef.current.x + sphericalRef.current.radius * Math.sin(sphericalRef.current.phi) * Math.cos(sphericalRef.current.theta);
       const y = targetRef.current.y + sphericalRef.current.radius * Math.cos(sphericalRef.current.phi);
       const z = targetRef.current.z + sphericalRef.current.radius * Math.sin(sphericalRef.current.phi) * Math.sin(sphericalRef.current.theta);
-      
+
       camera.position.set(x, y, z);
       camera.lookAt(targetRef.current);
     } else {
@@ -112,7 +113,7 @@ export function useModel3DScene({
       if (refs.modelRef.current && refs.sceneRef.current) {
         refs.sceneRef.current.remove(refs.modelRef.current);
         refs.modelRef.current.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
+          if (child instanceof Mesh) {
             child.geometry.dispose();
             if (Array.isArray(child.material)) {
               child.material.forEach((mat) => mat.dispose());
@@ -132,15 +133,15 @@ export function useModel3DScene({
       sphericalRef.current.theta = rotationY;
       sphericalRef.current.phi = Math.PI / 2 + rotationX;
       sphericalRef.current.radius = 5 / zoom;
-      
+
       // Update camera position
       const x = targetRef.current.x + sphericalRef.current.radius * Math.sin(sphericalRef.current.phi) * Math.cos(sphericalRef.current.theta);
       const y = targetRef.current.y + sphericalRef.current.radius * Math.cos(sphericalRef.current.phi);
       const z = targetRef.current.z + sphericalRef.current.radius * Math.sin(sphericalRef.current.phi) * Math.sin(sphericalRef.current.theta);
-      
+
       refs.cameraRef.current.position.set(x, y, z);
       refs.cameraRef.current.lookAt(targetRef.current);
-      
+
       // Update refs
       currentRotationRef.current.x = rotationX;
       currentRotationRef.current.y = rotationY;

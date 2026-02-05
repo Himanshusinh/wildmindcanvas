@@ -53,9 +53,9 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
 
 interface ImageModalOverlaysProps {
   // REMOVED: These props are now managed by Zustand store
-  // imageModalStates: ImageModalState[];
-  // selectedImageModalId: string | null;
-  // selectedImageModalIds: string[];
+  imageModalStates?: ImageModalState[];
+  selectedImageModalId?: string | null;
+  selectedImageModalIds?: string[];
   // setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
   // setSelectedImageModalId: (id: string | null) => void;
   // setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -127,10 +127,17 @@ export const ImageModalOverlays = React.memo<ImageModalOverlaysProps>(({
   showFineDetails,
   showLabelsOnly,
   isZoomedOut,
+  imageModalStates: propImageModalStates,
+  selectedImageModalId: propSelectedImageModalId,
+  selectedImageModalIds: propSelectedImageModalIds,
 }) => {
   // Zustand Store - Get image state and actions
-  const imageModalStates = useImageModalStates();
-  const { selectedId: selectedImageModalId, selectedIds: selectedImageModalIds } = useImageSelection();
+  const storeImageModalStates = useImageModalStates();
+  const { selectedId: storeSelectedImageModalId, selectedIds: storeSelectedImageModalIds } = useImageSelection();
+
+  const imageModalStates = propImageModalStates || storeImageModalStates;
+  const selectedImageModalId = propSelectedImageModalId !== undefined ? propSelectedImageModalId : storeSelectedImageModalId;
+  const selectedImageModalIds = propSelectedImageModalIds !== undefined ? propSelectedImageModalIds : storeSelectedImageModalIds;
 
   const setImageModalStates = useImageStore(state => state.setImageModalStates);
   const setSelectedImageModalId = useImageStore(state => state.setSelectedImageModalId);

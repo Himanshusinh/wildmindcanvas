@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import * as THREE from 'three';
+import { Vector3 } from 'three';
 import { Model3DRefs, SphericalCoords } from './types';
 
 interface UseModel3DControlsProps {
@@ -72,9 +72,9 @@ export function useModel3DControls({
         const deltaY = (e.clientY - refs.panStartRef.current.y) * 0.01;
 
         // Calculate pan direction in camera space
-        const right = new THREE.Vector3();
-        const up = new THREE.Vector3();
-        camera.getWorldDirection(new THREE.Vector3());
+        const right = new Vector3();
+        const up = new Vector3();
+        camera.getWorldDirection(new Vector3());
         right.setFromMatrixColumn(camera.matrixWorld, 0);
         up.setFromMatrixColumn(camera.matrixWorld, 1);
 
@@ -109,10 +109,10 @@ export function useModel3DControls({
       // Smooth zoom with better control
       const zoomSpeed = 0.1;
       const zoomDelta = e.deltaY > 0 ? 1 + zoomSpeed : 1 - zoomSpeed;
-      
+
       // Update radius (distance from target)
       refs.sphericalRef.current.radius *= zoomDelta;
-      
+
       // Clamp zoom limits
       const minRadius = 1;
       const maxRadius = 20;
@@ -188,7 +188,7 @@ export function useModel3DControls({
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (refs.touchStartDistanceRef.current > 0) {
           const scale = refs.touchStartDistanceRef.current / distance;
 
