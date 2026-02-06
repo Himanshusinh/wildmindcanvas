@@ -10,7 +10,6 @@ import { AuthGuard } from '@/modules/ui-global/AuthGuard';
 // Lazy load heavy components
 const Canvas = dynamic(() => import('@/modules/canvas').then(m => m.Canvas), { ssr: false });
 const Header = dynamic(() => import('@/modules/ui-global/Header').then(m => m.Header), { ssr: false });
-const Profile = dynamic(() => import('@/modules/ui-global/Profile/Profile').then(m => m.Profile), { ssr: false });
 const LibrarySidebar = dynamic(() => import('@/modules/canvas/LibrarySidebar'), { ssr: false });
 const PluginSidebar = dynamic(() => import('@/modules/canvas/PluginSidebar'), { ssr: false });
 import { ImageUpload } from '@/core/types/canvas';

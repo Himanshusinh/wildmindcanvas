@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ReactFlow,
   useReactFlow,
@@ -527,6 +528,37 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   }, []);
 
 
+  // --- Navigation Mode State ---
+  const [navigationMode, setNavigationMode] = useState<'trackpad' | 'mouse'>('trackpad');
+
+  // Load initial settings and listen for changes
+  useEffect(() => {
+    // Initial load
+    try {
+      const stored = localStorage.getItem('canvasSettings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.navigationMode) {
+          setNavigationMode(parsed.navigationMode);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse canvas settings:', e);
+    }
+
+    // Listener
+    const handleSettingsChange = (e: CustomEvent) => {
+      if (e.detail && e.detail.navigationMode) {
+        setNavigationMode(e.detail.navigationMode);
+      }
+    };
+
+    window.addEventListener('canvasSettingsChanged' as any, handleSettingsChange);
+    return () => {
+      window.removeEventListener('canvasSettingsChanged' as any, handleSettingsChange);
+    };
+  }, []);
+
   return (
     <div
       ref={ref}
@@ -546,11 +578,16 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           edges={renderedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          panOnDrag={false}
-          zoomOnScroll={false}
-          panOnScroll={false}
-          zoomOnPinch={false}
-          zoomOnDoubleClick={false}
+
+          // Dynamic Navigation Props
+          panOnScroll={navigationMode === 'trackpad'}
+          zoomOnScroll={navigationMode === 'mouse'}
+          panOnDrag={true} // Always allow dragging
+          zoomOnPinch={true}
+          zoomOnDoubleClick={true}
+          panOnScrollSpeed={1.2}
+
+
           nodesDraggable={false}
           nodesConnectable={true}
           elementsSelectable={true}
@@ -571,32 +608,36 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           onConnectEnd={onConnectEnd}
           style={{ width: '100%', height: '100%', background: 'transparent' }}
         >
-          <MiniMap
-            position="bottom-right"
-            nodeColor={getMiniMapNodeColor}
-            nodeStrokeColor="#4C83FF"
-            nodeStrokeWidth={2}
-            nodeBorderRadius={8}
-            maskColor="rgba(255, 255, 255, 0.25)"
-            bgColor="#0f0f14"
-            style={{
-              backgroundColor: '#0f0f14',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '16px',
-              margin: '24px',
-              padding: 0,
-              boxShadow: '0 12px 48px -12px rgba(0, 0, 0, 0.5)',
-              width: 250,
-              height: 150,
-              overflow: 'hidden',
-              opacity: isMiniMapVisible ? 1 : 0,
-              pointerEvents: isMiniMapVisible ? 'all' : 'none',
-              transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: isMiniMapVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
-            }}
-            pannable
-            zoomable
-          />
+          {typeof document !== 'undefined' && createPortal(
+            <MiniMap
+              position="bottom-right"
+              nodeColor={getMiniMapNodeColor}
+              nodeStrokeColor="#4C83FF"
+              nodeStrokeWidth={2}
+              nodeBorderRadius={8}
+              maskColor="rgba(255, 255, 255, 0.25)"
+              bgColor="#0f0f14"
+              style={{
+                backgroundColor: '#0f0f14',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                margin: '24px',
+                padding: 0,
+                boxShadow: '0 12px 48px -12px rgba(0, 0, 0, 0.5)',
+                width: 250,
+                height: 150,
+                overflow: 'hidden',
+                zIndex: 9999,
+                opacity: isMiniMapVisible ? 1 : 0,
+                pointerEvents: isMiniMapVisible ? 'all' : 'none',
+                transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isMiniMapVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
+              }}
+              pannable
+              zoomable
+            />,
+            document.body
+          )}
           <style>{`
             .react-flow { background: transparent !important; }
             .react-flow__panel { background: transparent !important; }
