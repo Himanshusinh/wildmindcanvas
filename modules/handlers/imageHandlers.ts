@@ -20,7 +20,32 @@ export const handleImageGenerate = async (
   setters: CanvasAppSetters,
   options?: Record<string, any>
 ) => {
-  const { setGenerationQueue, setShowImageGenerationModal, setImageGenerators } = setters;
+  const { setGenerationQueue, setShowImageGenerationModal, setImageGenerators, onShowStorageWarning } = setters;
+
+  // Storage Validation
+  try {
+    const { getCurrentUser, getStorageInfo } = await import('@/core/api/api');
+    const user = await getCurrentUser();
+    if (user?.uid) {
+        const info = await getStorageInfo(user.uid);
+        const quota = BigInt(info.quotaBytes);
+        const used = BigInt(info.usedBytes);
+
+        if (quota > 0 && used >= quota) {
+            console.warn('[ImageGenerate] Storage limit reached.');
+            if (onShowStorageWarning) {
+                onShowStorageWarning();
+            }
+            throw new Error('Storage limit reached. Please upgrade your plan.');
+        }
+    }
+  } catch (error: any) {
+    if (error.message === 'Storage limit reached. Please upgrade your plan.') {
+        throw error;
+    }
+    console.warn('[ImageGenerate] Storage check failed, proceeding cautiously:', error);
+  }
+
 
   try {
     let effectiveSourceImageUrl = sourceImageUrl;
@@ -113,7 +138,9 @@ export const handleImageGenerate = async (
     return { url: result.url, originalUrl: result.originalUrl, prompt: prompt };
 
   } catch (error: any) {
-    console.error('Generation failed:', error);
+    if (error.message !== 'Storage limit reached. Please upgrade your plan.') {
+        console.error('Generation failed:', error);
+    }
     setGenerationQueue((prev) => prev.filter((job) => !job.model?.includes(model))); // simpler error cleanup
     throw error;
   }

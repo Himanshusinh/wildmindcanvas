@@ -319,6 +319,7 @@ export interface CanvasAppSetters {
   setShowImageGenerationModal: React.Dispatch<React.SetStateAction<boolean>>;
   setGeneratedImage?: React.Dispatch<React.SetStateAction<string | null>>;
   setGeneratedImages?: Function;
+  onShowStorageWarning?: () => void;
 }
 
 export interface ViewportCenter {

@@ -175,7 +175,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
 
   // Use the store itself as the setters object (it matches the interface)
-  const canvasSetters = canvasStore as unknown as CanvasAppSetters;
+  const canvasSetters = {
+    ...canvasStore,
+    onShowStorageWarning: handleShowStorageWarning
+  } as unknown as CanvasAppSetters;
 
   // Compatibility stubs
   const loadSnapshot = useCallback((data: { elements: Record<string, any>; metadata?: any }) => {
@@ -588,7 +591,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               window.dispatchEvent(new CustomEvent('library-refresh'));
             }, 1000);
           }
-        }
+        }    
       } catch (err) {
         console.warn('[processMediaFile] Background upload failed, keeping local blob:', err);
       }
@@ -1137,6 +1140,20 @@ export function CanvasApp({ user }: CanvasAppProps) {
   };
 
   const handleVideoGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string): Promise<{ generationId?: string; taskId?: string; provider?: string } | null> => {
+    // Storage Validation
+    try {
+      if (currentUser?.uid) {
+        const info = await getStorageInfo(currentUser.uid);
+        const quota = BigInt(info.quotaBytes);
+        const used = BigInt(info.usedBytes);
+        if (quota > 0 && used >= quota) {
+          handleShowStorageWarning();
+          return null;
+        }
+      }
+    } catch (e) {
+      console.warn('Storage check failed during video generation request:', e);
+    }
     if (!projectId || !prompt.trim()) {
       console.error('Missing projectId or prompt');
       return { generationId: undefined, taskId: undefined };
@@ -1197,6 +1214,19 @@ export function CanvasApp({ user }: CanvasAppProps) {
   };
 
   const handleMusicGenerate = async (prompt: string, model: string, frame: string, aspectRatio: string): Promise<string | null> => {
+    // Storage Validation
+    try {
+      if (currentUser?.uid) {
+        const info = await getStorageInfo(currentUser.uid);
+        if (BigInt(info.usedBytes) >= BigInt(info.quotaBytes)) {
+          handleShowStorageWarning();
+          return null;
+        }
+      }
+    } catch (e) {
+      console.warn('Storage check failed:', e);
+    }
+
     console.log('Generate music:', { prompt, model, frame, aspectRatio });
     // TODO: Implement music generation API call here
     // For now, just close the modal
