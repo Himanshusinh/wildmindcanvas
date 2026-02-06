@@ -38,7 +38,7 @@ interface VectorizePluginModalProps {
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
@@ -325,9 +325,8 @@ export const VectorizePluginModal = memo<VectorizePluginModalProps>(({
       // Update frame to show error state or remove it
       if (onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
-          generatedImageUrl: null,
-          model: 'Vectorize',
-          isGenerating: false, // Clear loading state
+
+          error: (error as any)?.message || 'Vectorize failed',
         });
       }
     } finally {

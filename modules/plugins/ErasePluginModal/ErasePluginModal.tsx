@@ -37,7 +37,7 @@ interface ErasePluginModalProps {
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; isErasing?: boolean }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { erasedImageUrl?: string | null; isErasing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
@@ -520,6 +520,7 @@ export const ErasePluginModal: React.FC<ErasePluginModalProps> = ({
           generatedImageUrl: null,
           model: 'Erase',
           isGenerating: false, // Clear loading state
+          error: (error as any)?.message || 'Erase failed',
         });
       }
     }

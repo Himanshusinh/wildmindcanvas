@@ -662,6 +662,7 @@ export const ImageModalOverlays = React.memo<ImageModalOverlaysProps>(({
             initialPrompt={modalState.prompt}
             frameWidth={modalState.frameWidth}
             frameHeight={modalState.frameHeight}
+            error={modalState.error}
             onOptionsChange={(opts) => {
               // Update local state to keep UI in sync
               updateImageModal(modalState.id, {

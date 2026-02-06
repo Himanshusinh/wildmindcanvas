@@ -116,6 +116,10 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
     );
   }
 
+  const useOffset = ['image', 'video', 'music', 'text'].includes(type);
+  const rightHandleTop = useOffset ? '20%' : '50%';
+  const leftHandleTop = useOffset ? '80%' : '50%';
+
   return (
     <div
       data-node-id={id}
@@ -123,7 +127,7 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
       style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'relative' }}
     >
       <div
-        style={{ position: 'absolute', right: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        style={{ position: 'absolute', right: -24, top: rightHandleTop, transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
         onMouseEnter={() => requestHoverState(true)}
         onMouseLeave={() => requestHoverState(false)}
         onMouseDown={(e) => e.stopPropagation()}
@@ -132,14 +136,14 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
         <Handle
           type="source"
           position={Position.Right}
-          style={{ ...handleStyle, right: 12, zIndex: 9999 }}
+          style={{ ...handleStyle, right: 0, zIndex: 9999 }}
           id="send"
           isConnectable={isConnectable}
           isValidConnection={(connection) => checkConnectionValidity(connection.source, connection.target)}
         />
       </div>
       <div
-        style={{ position: 'absolute', left: -24, top: '50%', transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        style={{ position: 'absolute', left: -24, top: leftHandleTop, transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
         onMouseEnter={() => requestHoverState(true)}
         onMouseLeave={() => requestHoverState(false)}
         onMouseDown={(e) => e.stopPropagation()}
@@ -148,7 +152,7 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
         <Handle
           type="target"
           position={Position.Left}
-          style={{ ...handleStyle, left: 12, zIndex: 9999 }}
+          style={{ ...handleStyle, left: 0, zIndex: 9999 }}
           id="receive"
           isConnectable={isConnectable}
           isValidConnection={(connection) => checkConnectionValidity(connection.source, connection.target)}

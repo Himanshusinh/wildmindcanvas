@@ -1,5 +1,5 @@
-import { Dispatch, SetStateAction } from 'react';
 import { generateImageForCanvas } from '@/core/api/api';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
 
 import { CanvasAppSetters } from '@/modules/canvas-app/types';
 import { ImageUpload } from '@/core/types/canvas';
@@ -97,6 +97,16 @@ export const handleImageGenerate = async (
 
   } catch (error: any) {
     console.error('Generation failed:', error);
+
+    // Show persistent error in UI
+    const errorMessage = error?.message || 'Fine-tuning/Generation failed. Please try again.';
+    useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+
+    if (targetFrameId) {
+      setters.setImageGenerators(prev => prev.map(img =>
+        img.id === targetFrameId ? { ...img, error: errorMessage } : img
+      ));
+    }
 
     throw error;
   }

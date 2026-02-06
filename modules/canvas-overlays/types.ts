@@ -14,6 +14,7 @@ export interface TextModalState {
   frameHeight?: number;
   isHovered?: boolean;
   isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface ImageModalState {
@@ -36,6 +37,7 @@ export interface ImageModalState {
   isPinned?: boolean;
   isHovered?: boolean;
   isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface VideoModalState {
@@ -59,6 +61,7 @@ export interface VideoModalState {
   isPinned?: boolean;
   isHovered?: boolean;
   isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface VideoEditorModalState {
@@ -128,6 +131,7 @@ export interface MusicModalState {
   loop?: boolean;
   isHovered?: boolean;
   isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface UpscaleModalState {
@@ -147,6 +151,7 @@ export interface UpscaleModalState {
   faceEnhanceStrength?: number;
   topazModel?: string;
   faceEnhanceCreativity?: number;
+  error?: string | null;
 }
 
 export interface MultiangleCameraModalState {
@@ -171,6 +176,7 @@ export interface RemoveBgModalState {
   frameHeight?: number;
   isRemovingBg?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface CompareModalState {
@@ -184,6 +190,7 @@ export interface CompareModalState {
   prompt?: string;
   model?: string;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface EraseModalState {
@@ -198,6 +205,7 @@ export interface EraseModalState {
   frameHeight?: number;
   isErasing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface ExpandModalState {
@@ -212,6 +220,7 @@ export interface ExpandModalState {
   frameHeight?: number;
   isExpanding?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface VectorizeModalState {
@@ -226,6 +235,7 @@ export interface VectorizeModalState {
   frameHeight?: number;
   isVectorizing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface NextSceneModalState {
@@ -240,6 +250,7 @@ export interface NextSceneModalState {
   frameHeight?: number;
   isProcessing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 
@@ -254,6 +265,7 @@ export interface StoryboardModalState {
   characterNamesMap?: Record<number, string>;
   propsNamesMap?: Record<number, string>;
   backgroundNamesMap?: Record<number, string>;
+  error?: string | null;
 }
 
 export interface CanvasTextState {
@@ -274,6 +286,7 @@ export interface CanvasTextState {
   rotation?: number;
   textDecoration?: string; // 'none' | 'underline' | 'line-through'
   htmlContent?: string;
+  error?: string | null;
 }
 
 export interface ScriptFrameModalState {
@@ -285,6 +298,7 @@ export interface ScriptFrameModalState {
   frameHeight: number;
   text: string;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 export interface SceneFrameModalState {
@@ -300,6 +314,7 @@ export interface SceneFrameModalState {
   characterIds?: string[];       // IDs of characters present in this scene
   locationId?: string;           // ID of the location where scene takes place
   mood?: string;                 // Emotional tone of the scene
+  error?: string | null;
 }
 
 export interface Connection {

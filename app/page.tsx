@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { CompareGenerator } from '@/modules/canvas-app/types';
 import { ToolbarPanel } from '@/modules/ui-global/ToolbarPanel';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
 
 import { AuthGuard } from '@/modules/ui-global/AuthGuard';
 
@@ -1183,9 +1184,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
       };
     } catch (error: any) {
       console.error('Error generating video:', error);
-      // Remove from queue on error
+      const errorMessage = error.message || 'Failed to generate video. Please try again.';
 
-      alert(error.message || 'Failed to generate video. Please try again.');
+      // Use notification store instead of alert
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+
+      // Persist error state in the specific generator frame
+      if (modalId) {
+        setVideoGenerators(prev => prev.map(m =>
+          m.id === modalId ? { ...m, error: errorMessage } : m
+        ));
+      }
+
       return { generationId: undefined, taskId: undefined };
     }
   };

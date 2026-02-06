@@ -1,4 +1,5 @@
 import { CanvasAppState, CanvasAppSetters, UpscaleGenerator, MultiangleCameraGenerator, RemoveBgGenerator, EraseGenerator, ExpandGenerator, VectorizeGenerator, NextSceneGenerator, StoryboardGenerator, ScriptFrameGenerator, SceneFrameGenerator, VideoEditorGenerator, ImageEditorGenerator } from '@/modules/canvas-app/types';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
 
 
 export interface PluginHandlers {
@@ -74,7 +75,9 @@ export function createPluginHandlers(
 
   const onUpscale = async (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => {
     if (!sourceImageUrl || !projectId) {
-      console.error('[onUpscale] Missing sourceImageUrl or projectId');
+      const msg = '[onUpscale] Missing sourceImageUrl or projectId';
+      console.error(msg);
+      useNotificationStore.getState().addToast(msg, 'error');
       return null;
     }
 
@@ -95,7 +98,8 @@ export function createPluginHandlers(
       return result?.url || (typeof result === 'string' ? result : null);
     } catch (error: any) {
       console.error('[onUpscale] Error:', error);
-
+      const errorMessage = error?.message || 'Upscale failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
       throw error;
     }
   };
@@ -123,9 +127,11 @@ export function createPluginHandlers(
 
       // extract url
       return (result as any)?.url || result;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onMultiangleCamera] Error:', error);
+      const errorMessage = error?.message || 'Multiangle Camera failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 
@@ -145,9 +151,11 @@ export function createPluginHandlers(
       );
 
       return result?.url || null;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onQwenMultipleAngles] Error:', error);
+      const errorMessage = error?.message || 'Multiple angles generation failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 
@@ -170,9 +178,11 @@ export function createPluginHandlers(
       const result = await removeBgImageForCanvas(sourceImageUrl, projectId, model, backgroundType, scaleValue);
 
       return result.url;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onRemoveBg] Error:', error);
+      const errorMessage = error?.message || 'Background removal failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 
@@ -196,9 +206,11 @@ export function createPluginHandlers(
       const result = await eraseImageForCanvas(sourceImageUrl, projectId, model, mask, prompt || '');
 
       return result.url;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onErase] Error:', error);
+      const errorMessage = error?.message || 'Erase failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 
@@ -221,9 +233,11 @@ export function createPluginHandlers(
       const result = await expandImageForCanvas(sourceImageUrl, projectId, canvasSize!, originalImageSize!, originalImageLocation!, prompt, aspectRatio);
 
       return result.url;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onExpand] Error:', error);
+      const errorMessage = error?.message || 'Expand failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 
@@ -246,9 +260,11 @@ export function createPluginHandlers(
       const result = await vectorizeImageForCanvas(sourceImageUrl, projectId, mode);
 
       return result.url;
-    } catch (e) {
-
-      throw e;
+    } catch (error: any) {
+      console.error('[onVectorize] Error:', error);
+      const errorMessage = error?.message || 'Vectorize failed. Please try again.';
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+      throw error;
     }
   };
 

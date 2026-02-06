@@ -14,6 +14,7 @@ import { CanvasOverlays } from './components/CanvasOverlays';
 import { CanvasProps } from './types';
 import AvatarButton from './AvatarButton';
 import { ChatPanel } from '../chat/ChatPanel';
+import { Toaster } from '../ui-global/common/Toaster';
 // Zustand Store - Image & Video State Management
 import {
   useImageModalStates, useVideoModalStates,
@@ -1015,6 +1016,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <Toaster />
       <CanvasStage
         canvasState={effectiveCanvasState as any}
         canvasSelection={canvasSelection}

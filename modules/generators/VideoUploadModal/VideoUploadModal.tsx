@@ -81,6 +81,7 @@ interface VideoUploadModalProps {
   onPersistVideoModalCreate?: (modal: any) => void | Promise<void>;
   isAttachedToChat?: boolean;
   selectionOrder?: number;
+  error?: string | null;
 }
 
 export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
@@ -110,6 +111,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
   initialPrompt,
   initialDuration,
   initialResolution,
+  error,
   onOptionsChange,
   onVideoSelect,
   connections = [],
@@ -494,6 +496,14 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
   const videoModalStates = useVideoStore(s => s.videoModalStates);
   const updateVideoModal = useVideoStore(s => s.updateVideoModal);
+
+  // Clear error on selection
+  useEffect(() => {
+    if (isSelected && error) {
+      updateVideoModal(id, { error: null });
+    }
+  }, [isSelected, error, id, updateVideoModal]);
+
   const modalState = useMemo(() => videoModalStates.find(m => m.id === id), [videoModalStates, id]);
   const storeIsHandleHovered = modalState?.isHandleHovered || false;
   const effectiveIsHovered = isHovered || storeIsHandleHovered;
@@ -931,6 +941,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           frameBorderWidth={frameBorderWidth}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
+          error={error}
         />
 
 

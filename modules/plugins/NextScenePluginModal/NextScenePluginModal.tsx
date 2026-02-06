@@ -67,7 +67,7 @@ interface NextScenePluginModalProps {
   }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean; isProcessing?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; isProcessing?: boolean }) => void;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; isProcessing?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
@@ -563,6 +563,7 @@ export const NextScenePluginModal = React.memo<NextScenePluginModalProps>(({
       if (onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
           isProcessing: false,
+          error: (error as any)?.message || 'Generation failed',
         });
       }
     } finally {

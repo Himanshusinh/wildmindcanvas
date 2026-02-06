@@ -66,6 +66,7 @@ interface ImageUploadModalProps {
   onTogglePin?: () => void;
   isAttachedToChat?: boolean;
   selectionOrder?: number;
+  error?: string | null;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -110,6 +111,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  error,
   textInputStates = [],
   sceneFrameModalStates = [],
   scriptFrameModalStates = [],
@@ -142,6 +144,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
   const imageModalStates = useImageStore(s => s.imageModalStates);
   const updateImageModal = useImageStore(s => s.updateImageModal);
+
+  // Clear error on selection
+  useEffect(() => {
+    if (isSelected && error) {
+      updateImageModal(id, { error: null });
+    }
+  }, [isSelected, error, id, updateImageModal]);
+
   const modalState = useMemo(() => imageModalStates.find(m => m.id === id), [imageModalStates, id]);
   const storeIsHandleHovered = modalState?.isHandleHovered || false;
   const effectiveIsHovered = isHovered || storeIsHandleHovered;
@@ -1999,6 +2009,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           externalIsGenerating={Boolean(externalIsGenerating || externalIsProcessing)}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
+          error={error}
           // If an image already exists, use existing frame dimensions to prevent visual frame size change
           // If no image exists, calculate from selected aspect ratio
           // For uploaded images, don't pass width/height so aspect ratio is used

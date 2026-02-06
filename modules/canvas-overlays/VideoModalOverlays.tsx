@@ -360,6 +360,7 @@ export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
           initialDuration={modalState.duration || 5}
           initialResolution={modalState.resolution}
           initialPrompt={modalState.prompt}
+          error={modalState.error}
           onOptionsChange={(opts) => {
             // Update video modal options (using Zustand store)
             const modal = videoModalStates.find(m => m.id === modalState.id);

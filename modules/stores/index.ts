@@ -15,6 +15,7 @@
 
 export { useImageStore, useImageModalStates, useImageModal, useImageSelection, useSelectedImageModalIds, useSelectedImageModalId } from './imageStore';
 export * from './imageStore';
+export * from './notificationStore';
 export * from './videoStore';
 export * from './musicStore';
 export * from './upscaleStore';

@@ -22,6 +22,7 @@ interface ImageModalFrameProps {
   width?: number;
   height?: number;
   onContextMenu?: (e: React.MouseEvent) => void;
+  error?: string | null;
 }
 
 export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
@@ -41,6 +42,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   width,
   height,
   onContextMenu,
+  error,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -75,10 +77,10 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         backgroundColor: frameBg,
         borderRadius: ((isHovered || isPinned) && !isUploadedImage) ? '0px' : `${20 * scale}px`,
         // keep top/left/right borders, but remove bottom border when controls are hovered (only for generated images)
-        borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: ((isHovered || isPinned) && !isUploadedImage) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderTop: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRight: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (error && isSelected) ? `${2 * scale}px solid #ef4444` : ((isHovered || isPinned) && !isUploadedImage) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         boxSizing: 'border-box',
         boxShadow: 'none',
         display: 'flex',
