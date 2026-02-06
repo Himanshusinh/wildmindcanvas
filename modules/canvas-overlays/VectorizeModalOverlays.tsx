@@ -101,7 +101,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
                 x: modalState.x + 50,
                 y: modalState.y + 50,
               };
-              setVectorizeModalStates(prev => [...prev, duplicated]);
+              setVectorizeModalStates((prev: VectorizeModalState[]) => [...prev, duplicated]);
               if (onPersistVectorizeModalCreate) {
                 Promise.resolve(onPersistVectorizeModalCreate(duplicated)).catch(console.error);
               }
@@ -146,7 +146,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
             setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
           }}
           onClose={() => {
-            setVectorizeModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            setVectorizeModalStates((prev: VectorizeModalState[]) => prev.filter(m => m.id !== modalState.id));
             setSelectedVectorizeModalId(null);
             if (onPersistVectorizeModalDelete) {
               Promise.resolve(onPersistVectorizeModalDelete(modalState.id)).catch(console.error);
@@ -210,7 +210,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
               frameHeight: modalState.frameHeight || 500,
               isVectorizing: false,
             };
-            setVectorizeModalStates(prev => [...prev, newModal]);
+            setVectorizeModalStates((prev: VectorizeModalState[]) => [...prev, newModal]);
             if (onPersistVectorizeModalCreate) {
               Promise.resolve(onPersistVectorizeModalCreate(newModal)).catch(console.error);
             }
@@ -222,7 +222,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
-            setVectorizeModalStates(prev =>
+            setVectorizeModalStates((prev: VectorizeModalState[]) =>
               prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m)
             );
           }}
@@ -235,7 +235,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
           initialSourceImageUrl={modalState.sourceImageUrl}
           initialLocalVectorizedImageUrl={modalState.localVectorizedImageUrl}
           onOptionsChange={(opts) => {
-            setVectorizeModalStates(prev =>
+            setVectorizeModalStates((prev: VectorizeModalState[]) =>
               prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m)
             );
             if (onPersistVectorizeModalMove) {
@@ -244,7 +244,7 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
           }}
           onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
           onUpdateModalState={(modalId, updates) => {
-            setVectorizeModalStates(prev =>
+            setVectorizeModalStates((prev: VectorizeModalState[]) =>
               prev.map(m => m.id === modalId ? { ...m, ...updates } : m)
             );
             if (onPersistVectorizeModalMove) {
