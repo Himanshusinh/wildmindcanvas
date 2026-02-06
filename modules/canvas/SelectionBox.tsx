@@ -2354,6 +2354,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               divProps={{
                 style: {
                   pointerEvents: 'none',
+                  zIndex: 15000,
                 }
               }}
             >
@@ -2454,11 +2455,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               divProps={{
                 style: {
                   pointerEvents: 'none',
-                  zIndex: 2000,
+                  zIndex: 15000,
                 }
               }}
             >
-              <div style={{ pointerEvents: 'auto' }}>
+              <div
+                style={{
+                  pointerEvents: 'auto',
+                  position: 'absolute',
+                  left: Math.min(selectionTightRect.width / 2, selectionTightRect.width - 150),
+                  top: Math.max(-60, -selectionTightRect.height - 10) * uiScale,
+                  transform: `scale(${Math.min(uiScale, 1.2)}) translate(-50%, -100%)`,
+                  transformOrigin: 'bottom center',
+                }}
+              >
                 <RichTextToolbar
                   fontFamily={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.fontFamily) ||
                     (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.fontFamily) || 'Inter'}
@@ -2469,10 +2479,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   align={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.align) ||
                     (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.textAlign) || 'left'}
                   onChange={handleMultiTextChange}
-                  position={{
-                    x: Math.min(selectionTightRect.width / 2, selectionTightRect.width - 150),
-                    y: Math.max(-60, -selectionTightRect.height - 10) // Ensure it doesn't go too far up
-                  }}
+                  position={{ x: 0, y: 0 }}
                 />
               </div>
             </Html>
