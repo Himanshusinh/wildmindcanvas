@@ -99,7 +99,7 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
               }}
               title="Pad (Trackpad behavior)"
             >
-              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : textColor, fontWeight: 500 }}>Pad</span>
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : textColor, fontWeight: 500 }}>TrackPad</span>
             </button>
 
             {/* Standard (Mouse) */}
@@ -117,9 +117,9 @@ export const CanvasSection: React.FC<CanvasSectionProps> = ({ canvasSettings, se
                 transition: 'all 0.2s ease',
                 gap: '8px'
               }}
-              title="Standard (Mouse behavior)"
+              title="Mouse (Mouse behavior)"
             >
-              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : textColor, fontWeight: 500 }}>Standard</span>
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : textColor, fontWeight: 500 }}>Mouse</span>
             </button>
           </div>
         </div>

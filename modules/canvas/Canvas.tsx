@@ -108,6 +108,39 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const selectionDragOriginRef = useRef<{ x: number; y: number } | null>(null);
 
+  // --- NAVIGATION MODE STATE ---
+  const [navigationMode, setNavigationMode] = useState<'trackpad' | 'mouse'>('trackpad');
+
+  useEffect(() => {
+    // Initialize from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('canvasSettings');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.navigationMode) {
+            setNavigationMode(parsed.navigationMode);
+          }
+        } catch (e) {
+          console.error('Failed to parse canvasSettings', e);
+        }
+      }
+    }
+
+    // Listen for updates
+    const handleSettingsChange = (e: CustomEvent) => {
+      if (e.detail && e.detail.navigationMode) {
+        setNavigationMode(e.detail.navigationMode);
+        console.log('[Canvas] Navigation mode updated:', e.detail.navigationMode);
+      }
+    };
+
+    window.addEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
+    return () => {
+      window.removeEventListener('canvasSettingsChanged', handleSettingsChange as EventListener);
+    };
+  }, []);
+
   // --- STATE MANAGEMENT ---
   const canvasState = useCanvasState({
     images,
@@ -457,7 +490,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
       position,
       setPosition,
       updateViewportCenter,
-      navigationMode: 'trackpad'
+      navigationMode
     }
   );
 

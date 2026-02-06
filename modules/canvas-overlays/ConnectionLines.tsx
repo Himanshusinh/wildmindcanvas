@@ -528,37 +528,6 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   }, []);
 
 
-  // --- Navigation Mode State ---
-  const [navigationMode, setNavigationMode] = useState<'trackpad' | 'mouse'>('trackpad');
-
-  // Load initial settings and listen for changes
-  useEffect(() => {
-    // Initial load
-    try {
-      const stored = localStorage.getItem('canvasSettings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.navigationMode) {
-          setNavigationMode(parsed.navigationMode);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse canvas settings:', e);
-    }
-
-    // Listener
-    const handleSettingsChange = (e: CustomEvent) => {
-      if (e.detail && e.detail.navigationMode) {
-        setNavigationMode(e.detail.navigationMode);
-      }
-    };
-
-    window.addEventListener('canvasSettingsChanged' as any, handleSettingsChange);
-    return () => {
-      window.removeEventListener('canvasSettingsChanged' as any, handleSettingsChange);
-    };
-  }, []);
-
   return (
     <div
       ref={ref}
@@ -578,16 +547,11 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
           edges={renderedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-
-          // Dynamic Navigation Props
-          panOnScroll={navigationMode === 'trackpad'}
-          zoomOnScroll={navigationMode === 'mouse'}
-          panOnDrag={true} // Always allow dragging
-          zoomOnPinch={true}
-          zoomOnDoubleClick={true}
-          panOnScrollSpeed={1.2}
-
-
+          panOnDrag={false}
+          zoomOnScroll={false}
+          panOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
           nodesDraggable={false}
           nodesConnectable={true}
           elementsSelectable={true}
