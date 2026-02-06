@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
+import { CanvasSettings } from './types';
+
 interface ProfileSectionProps {
   userData: any;
   loading: boolean;
@@ -11,6 +13,8 @@ interface ProfileSectionProps {
   creditBalance: number | null;
   handleUpgradePlan: () => void;
   handleAccountSettings: () => void;
+  canvasSettings: CanvasSettings;
+  setCanvasSettings: React.Dispatch<React.SetStateAction<CanvasSettings>>;
 }
 
 export const ProfileSection: React.FC<ProfileSectionProps> = ({
@@ -21,6 +25,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   creditBalance,
   handleUpgradePlan,
   handleAccountSettings,
+  canvasSettings,
+  setCanvasSettings,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -32,6 +38,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
   const cardBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)';
   const buttonBg = isDark ? '#1a1a1a' : '#ffffff';
   const buttonHoverBg = isDark ? '#2a2a2a' : '#f8fafc';
+  const inputBg = isDark ? '#1a1a1a' : '#ffffff';
+
   return (
     <>
       {/* Top section: Avatar, Account Status, and Credits */}
@@ -128,18 +136,18 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
       </div>
 
       {/* About You Section */}
-      <section style={{ 
-        marginBottom: '24px', 
-        padding: '20px', 
-        background: containerBg, 
+      <section style={{
+        marginBottom: '24px',
+        padding: '20px',
+        background: containerBg,
         borderRadius: '12px',
         transition: 'background-color 0.3s ease'
       }}>
-        <h4 style={{ 
-          margin: '0 0 16px 0', 
-          fontSize: '16px', 
-          fontWeight: 600, 
-          color: textColor, 
+        <h4 style={{
+          margin: '0 0 16px 0',
+          fontSize: '16px',
+          fontWeight: 600,
+          color: textColor,
           paddingBottom: '8px',
           transition: 'color 0.3s ease'
         }}>
@@ -167,19 +175,20 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
           background: containerBg,
           borderRadius: '12px',
           transition: 'background-color 0.3s ease',
+          marginBottom: '24px',
         }}
       >
         <div>
-          <h4 style={{ 
-            margin: '0 0 12px 0', 
-            fontSize: '16px', 
-            fontWeight: 600, 
+          <h4 style={{
+            margin: '0 0 12px 0',
+            fontSize: '16px',
+            fontWeight: 600,
             color: textColor,
             transition: 'color 0.3s ease'
           }}>Active Plan</h4>
-          <div style={{ 
-            fontSize: '14px', 
-            fontWeight: 600, 
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 600,
             color: textColor,
             transition: 'color 0.3s ease'
           }}>
@@ -211,6 +220,61 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({
         >
           Purchase Plan
         </button>
+      </section>
+
+      {/* Input Type (Navigation Mode) Section */}
+      <section
+        style={{
+          padding: '20px',
+          background: containerBg,
+          borderRadius: '12px',
+          transition: 'background-color 0.3s ease',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '14px', color: textColor, fontWeight: 500, transition: 'color 0.3s ease' }}>Input Type</div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Pad (Trackpad) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, navigationMode: 'trackpad' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : borderColor}`,
+                background: canvasSettings.navigationMode === 'trackpad' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                gap: '8px'
+              }}
+              title="Pad (Trackpad behavior)"
+            >
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'trackpad' ? '#4C83FF' : textColor, fontWeight: 500 }}>TrackPad</span>
+            </button>
+
+            {/* Standard (Mouse) */}
+            <button
+              onClick={() => setCanvasSettings((prev) => ({ ...prev, navigationMode: 'mouse' }))}
+              style={{
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: `2px solid ${canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : borderColor}`,
+                background: canvasSettings.navigationMode === 'mouse' ? (isDark ? '#1a2332' : '#e8f2ff') : inputBg,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                gap: '8px'
+              }}
+              title="Mouse (Mouse behavior)"
+            >
+              <span style={{ fontSize: '13px', color: canvasSettings.navigationMode === 'mouse' ? '#4C83FF' : textColor, fontWeight: 500 }}>Mouse</span>
+            </button>
+          </div>
+        </div>
       </section>
     </>
   );

@@ -228,12 +228,14 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         const rectH = viewH + padding * 2;
 
                         // Adaptive Grid Scale Logic
-                        // As we zoom out (scale < 1), we want the dots to effectively "get larger" in world space
-                        // so they stay visible on screen, but "further apart" (reduced density).
-                        // We scale by powers of 2: 1x, 2x, 4x...
                         const zoomLevel = scale;
                         const exponent = Math.floor(Math.log2(1 / zoomLevel));
                         const gridScale = Math.pow(2, Math.max(0, exponent));
+
+                        // Debug: monitor background drift components
+                        if (Date.now() % 100 < 5) { // Sample logs at ~5% to avoid flooding
+                            // console.log('[Background Debug] scale:', scale, 'position:', position, 'rectX:', rectX, 'gridScale:', gridScale);
+                        }
 
                         return (
                             <>

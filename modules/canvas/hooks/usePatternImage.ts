@@ -8,6 +8,7 @@ export function usePatternImage() {
   useEffect(() => {
     const createPattern = () => {
       if (typeof window === 'undefined') return;
+      console.log('[usePatternImage] 🎨 Creating new pattern image');
 
       const isDark = document.documentElement.classList.contains('dark');
       const dotColor = isDark ? 'rgba(255, 255, 255, 0.15)' : `rgba(0, 0, 0, ${DOT_OPACITY})`;

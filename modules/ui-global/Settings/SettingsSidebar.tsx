@@ -19,9 +19,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
 
   const sections = [
     { id: 'profile' as ActiveSection, label: 'Profile' },
-    { id: 'canvas' as ActiveSection, label: 'Canvas' },
     { id: 'keyboard' as ActiveSection, label: 'Keyboard Shortcuts' },
-    { id: 'notification' as ActiveSection, label: 'Notification' },
   ];
 
   const bgColor = isDark ? 'var(--bg-secondary)' : '#ffffff';
@@ -47,10 +45,10 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
       }}
     >
       <div style={{ marginBottom: '16px' }}>
-        <h3 style={{ 
-          margin: '0 0 20px 0', 
-          fontSize: '18px', 
-          color: textColor, 
+        <h3 style={{
+          margin: '0 0 20px 0',
+          fontSize: '18px',
+          color: textColor,
           fontWeight: 600,
           transition: 'color 0.3s ease'
         }}>Settings</h3>
@@ -89,9 +87,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         </nav>
       </div>
 
-      <div style={{ 
-        marginTop: 'auto', 
-        paddingTop: '20px', 
+      <div style={{
+        marginTop: 'auto',
+        paddingTop: '20px',
         borderTop: `1px solid ${borderColor}`,
         transition: 'border-color 0.3s ease'
       }}>

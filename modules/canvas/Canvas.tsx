@@ -262,6 +262,11 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     }
     return { x: 0, y: 0 };
   });
+
+  // Debug position monitoring
+  useEffect(() => {
+    // console.log('[Canvas State] pos:', position, 'scale:', scale);
+  }, [position, scale]);
   // No local state for selectedGroupIds, it's in useCanvasSelection
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);

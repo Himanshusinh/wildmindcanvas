@@ -1,4 +1,4 @@
-export type ActiveSection = 'profile' | 'canvas' | 'keyboard' | 'notification';
+export type ActiveSection = 'profile' | 'keyboard';
 export type CursorType = 'default' | 'crosshair' | 'pointer' | 'grab' | 'text';
 export type BackgroundType = 'dots' | 'dots-vertical' | 'dots-horizontal' | 'lines-vertical' | 'lines-horizontal' | 'grid' | 'solid' | 'none';
 export type NavigationMode = 'trackpad' | 'mouse';
