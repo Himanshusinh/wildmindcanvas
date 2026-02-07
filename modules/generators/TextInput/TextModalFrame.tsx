@@ -258,10 +258,9 @@ export const TextModalFrame: React.FC<TextModalFrameProps> = ({
   }, [isResizing, scale, textareaHeight]);
 
   useEffect(() => {
-    // Only autofocus the inner textarea when allowed. Default is to autofocus
-    // for backwards compatibility; creating via toolbar/tool should pass
-    // `autoFocusInput: false` to prevent forcing text cursor on the stage.
-    if (autoFocusInput === false) return;
+    // Only autofocus if explicitly requested (true).
+    // Older nodes or undefined should NOT autofocus to prevent focus stealing on load.
+    if (autoFocusInput !== true) return;
     if (inputRef.current) {
       inputRef.current.focus();
     }

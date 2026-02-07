@@ -288,7 +288,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   x: canvasX,
                   y: canvasY,
                   value: '',
-                  autoFocusInput: false,
+                  autoFocusInput: true,
                   frameWidth: config.defaultWidth,
                   frameHeight: config.defaultHeight,
                 };
