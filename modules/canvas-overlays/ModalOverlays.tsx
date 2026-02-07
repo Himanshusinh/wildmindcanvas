@@ -28,8 +28,7 @@ import {
   useTextModalStates,
 } from '@/modules/stores';
 import { useConnectionManager } from './useConnectionManager';
-// Lazy load ConnectionLines which depends on @xyflow/react
-const ConnectionLines = lazy(() => import('./ConnectionLines').then(m => ({ default: m.ConnectionLines })));
+import { ConnectionLines } from './ConnectionLines';
 
 // Lazy load modal overlays
 const TextInputOverlays = lazy(() => import('./TextInputOverlays').then(m => ({ default: m.TextInputOverlays })));
@@ -397,26 +396,41 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
   const finalSetSelectedVectorizeModalId = setSelectedVectorizeModalId || storeSetSelectedVectorizeModalId;
   const finalSetSelectedVectorizeModalIds = setSelectedVectorizeModalIds || storeSetSelectedVectorizeModalIds;
 
+  // Optimize ConnectionLines props to prevent re-renders
+  const connectionLinesProps = React.useMemo(() => ({
+    connections: externalConnections ?? [],
+    activeDrag: connectionManager.activeDrag,
+    selectedConnectionId: connectionManager.selectedConnectionId,
+    onSelectConnection: connectionManager.setSelectedConnectionId,
+    onDeleteConnection: connectionManager.handleDeleteConnection,
+    onPersistConnectorCreate: onPersistConnectorCreate,
+    onPersistConnectorDelete: onPersistConnectorDelete,
+    stageRef: stageRef,
+    position: position,
+    scale: scale,
+    isInteracting: isInteracting,
+    viewportUpdateKey: viewportUpdateKey,
+    scriptFrameModalStates: scriptFrameModalStates,
+    sceneFrameModalStates: sceneFrameModalStates,
+  }), [
+    externalConnections,
+    connectionManager.activeDrag,
+    connectionManager.selectedConnectionId,
+    connectionManager.handleDeleteConnection,
+    onPersistConnectorCreate,
+    onPersistConnectorDelete,
+    stageRef,
+    position,
+    scale,
+    isInteracting,
+    viewportUpdateKey,
+    scriptFrameModalStates,
+    sceneFrameModalStates
+  ]);
+
   return (
     <>
-      <Suspense fallback={null}>
-        <ConnectionLines
-          connections={externalConnections ?? []}
-          activeDrag={connectionManager.activeDrag}
-          selectedConnectionId={connectionManager.selectedConnectionId}
-          onSelectConnection={connectionManager.setSelectedConnectionId}
-          onDeleteConnection={connectionManager.handleDeleteConnection}
-          onPersistConnectorCreate={onPersistConnectorCreate}
-          onPersistConnectorDelete={onPersistConnectorDelete}
-          stageRef={stageRef}
-          position={position}
-          scale={scale}
-          isInteracting={isInteracting}
-          viewportUpdateKey={viewportUpdateKey}
-          scriptFrameModalStates={scriptFrameModalStates}
-          sceneFrameModalStates={sceneFrameModalStates}
-        />
-      </Suspense>
+      <ConnectionLines {...connectionLinesProps} />
 
 
       {/* TextInputOverlays restored for AI Text functionality */}
@@ -812,10 +826,6 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
 
 
       <ComponentCreationMenu
-        componentMenu={connectionManager.componentMenu}
-        componentMenuSearch={connectionManager.componentMenuSearch}
-        setComponentMenu={connectionManager.setComponentMenu}
-        setComponentMenuSearch={connectionManager.setComponentMenuSearch}
         scale={scale}
         position={position}
         onPersistTextModalCreate={onPersistTextModalCreate}
@@ -827,17 +837,11 @@ export const ModalOverlays: React.FC<ModalOverlaysProps> = ({
         onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
 
         onPersistRemoveBgModalCreate={onPersistRemoveBgModalCreate}
-        setRemoveBgModalStates={setRemoveBgModalStates}
         onPersistEraseModalCreate={onPersistEraseModalCreate}
-        setEraseModalStates={setEraseModalStates}
         onPersistExpandModalCreate={onPersistExpandModalCreate}
-        setExpandModalStates={setExpandModalStates}
         onPersistStoryboardModalCreate={onPersistStoryboardModalCreate}
-        setStoryboardModalStates={setStoryboardModalStates}
         onPersistVectorizeModalCreate={onPersistVectorizeModalCreate}
-        setVectorizeModalStates={setVectorizeModalStates}
         onPersistNextSceneModalCreate={onPersistNextSceneModalCreate}
-        setNextSceneModalStates={setNextSceneModalStates}
         onPersistConnectorCreate={onPersistConnectorCreate}
       />
 

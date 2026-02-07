@@ -4,11 +4,20 @@ import React, { useMemo } from 'react';
 import { ComponentMenu } from './types';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
+import { useComponentMenuStore } from '@/modules/stores/componentMenuStore';
+import {
+  useUpscaleStore,
+  useMultiangleCameraStore,
+  useRemoveBgStore,
+  useEraseStore,
+  useExpandStore,
+  useVectorizeStore,
+  useNextSceneStore,
+  useStoryboardStore,
+} from '@/modules/stores';
+import { getComponentConfig } from './ComponentConfig';
+
 interface ComponentCreationMenuProps {
-  componentMenu: ComponentMenu | null;
-  componentMenuSearch: string;
-  setComponentMenu: (menu: ComponentMenu | null) => void;
-  setComponentMenuSearch: (search: string) => void;
   scale: number;
   position: { x: number; y: number };
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
@@ -16,29 +25,17 @@ interface ComponentCreationMenuProps {
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistMusicModalCreate?: (modal: { id: string; x: number; y: number; generatedMusicUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  setUpscaleModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }) => void | Promise<void>;
-  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  setEraseModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistExpandModalCreate?: (modal: { id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean }) => void | Promise<void>;
-  setExpandModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
-  setVectorizeModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
-  setNextSceneModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
-  setStoryboardModalStates?: React.Dispatch<React.SetStateAction<any[]>>;
   onPersistConnectorCreate?: (connector: any) => void | Promise<void>;
 }
 
 export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
-  componentMenu,
-  componentMenuSearch,
-  setComponentMenu,
-  setComponentMenuSearch,
   scale,
   position,
   onPersistTextModalCreate,
@@ -46,23 +43,52 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
   onPersistVideoModalCreate,
   onPersistMusicModalCreate,
   onPersistUpscaleModalCreate,
-  setUpscaleModalStates,
   onPersistMultiangleCameraModalCreate,
-  setMultiangleCameraModalStates,
   onPersistRemoveBgModalCreate,
-  setRemoveBgModalStates,
   onPersistEraseModalCreate,
-  setEraseModalStates,
   onPersistExpandModalCreate,
-  setExpandModalStates,
   onPersistVectorizeModalCreate,
-  setVectorizeModalStates,
   onPersistNextSceneModalCreate,
-  setNextSceneModalStates,
   onPersistStoryboardModalCreate,
-  setStoryboardModalStates,
   onPersistConnectorCreate,
 }) => {
+  const isOpen = useComponentMenuStore(state => state.isOpen);
+  const menuPosition = useComponentMenuStore(state => state.position);
+  const sourceNodeId = useComponentMenuStore(state => state.sourceNodeId);
+  const sourceNodeType = useComponentMenuStore(state => state.sourceNodeType);
+  const connectionColor = useComponentMenuStore(state => state.connectionColor);
+  const componentMenuSearch = useComponentMenuStore(state => state.search);
+
+  const closeMenu = useComponentMenuStore(state => state.closeMenu);
+  const setSearch = useComponentMenuStore(state => state.setSearch);
+
+  // Store Setters
+  const setUpscaleModalStates = useUpscaleStore(state => state.setUpscaleModalStates);
+  const setMultiangleCameraModalStates = useMultiangleCameraStore(state => state.setMultiangleCameraModalStates);
+  const setRemoveBgModalStates = useRemoveBgStore(state => state.setRemoveBgModalStates);
+  const setEraseModalStates = useEraseStore(state => state.setEraseModalStates);
+  const setExpandModalStates = useExpandStore(state => state.setExpandModalStates);
+  const setVectorizeModalStates = useVectorizeStore(state => state.setVectorizeModalStates);
+  const setNextSceneModalStates = useNextSceneStore(state => state.setNextSceneModalStates);
+  const setStoryboardModalStates = useStoryboardStore(state => state.setStoryboardModalStates);
+
+  // Create a derived componentMenu object to maintain compatibility with existing logic
+  const componentMenu = useMemo(() => {
+    if (!isOpen) return null;
+    return {
+      x: menuPosition.x,
+      y: menuPosition.y,
+      canvasX: menuPosition.canvasX,
+      canvasY: menuPosition.canvasY,
+      sourceNodeId,
+      sourceNodeType,
+      connectionColor
+    };
+  }, [isOpen, menuPosition, sourceNodeId, sourceNodeType, connectionColor]);
+
+  // Alias setters for compatibility
+  const setComponentMenu = (val: any) => !val && closeMenu();
+  const setComponentMenuSearch = setSearch;
   const isDark = useIsDarkTheme();
 
   // Color Palette based on theme
@@ -256,25 +282,27 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
 
               if (comp.type === 'text' && onPersistTextModalCreate) {
                 newComponentId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('text');
                 const newText = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
                   value: '',
                   autoFocusInput: false,
-                  frameWidth: 400,
-                  frameHeight: 400,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                 };
                 Promise.resolve(onPersistTextModalCreate(newText)).catch(console.error);
               } else if (comp.type === 'image' && onPersistImageModalCreate) {
                 newComponentId = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('image');
                 const newImage = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
                   generatedImageUrl: null,
-                  frameWidth: 600,
-                  frameHeight: 600, // Standardized 1:1
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   model: 'Google Nano Banana',
                   frame: 'Square',
                   aspectRatio: '1:1',
@@ -283,13 +311,14 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 Promise.resolve(onPersistImageModalCreate(newImage)).catch(console.error);
               } else if (comp.type === 'video' && onPersistVideoModalCreate) {
                 newComponentId = `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('video');
                 const newVideo = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
                   generatedVideoUrl: null,
-                  frameWidth: 600,
-                  frameHeight: 338, // Standardized 16:9
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   model: 'Seedance 1.0 Pro',
                   frame: 'Frame',
                   aspectRatio: '16:9',
@@ -299,13 +328,14 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                 Promise.resolve(onPersistVideoModalCreate(newVideo)).catch(console.error);
               } else if (comp.type === 'music' && onPersistMusicModalCreate) {
                 newComponentId = `music-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('music');
                 const newMusic = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
                   generatedMusicUrl: null,
-                  frameWidth: 600,
-                  frameHeight: 300,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   model: 'MusicGen',
                   frame: 'Frame',
                   aspectRatio: '1:1',
@@ -315,6 +345,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
               } else if (comp.id === 'upscale-plugin' && comp.type === 'plugin' && onPersistUpscaleModalCreate && setUpscaleModalStates) {
                 // Create upscale plugin modal
                 newComponentId = `upscale-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('upscale');
                 const newUpscale = {
                   id: newComponentId,
                   x: canvasX,
@@ -324,8 +355,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   localUpscaledImageUrl: null,
                   model: 'Crystal Upscaler',
                   scale: 2,
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isUpscaling: false,
                 };
                 setUpscaleModalStates(prev => [...prev, newUpscale]);
@@ -333,18 +364,21 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
               } else if (comp.id === 'multiangle-camera-plugin' && comp.type === 'plugin' && onPersistMultiangleCameraModalCreate && setMultiangleCameraModalStates) {
                 // Create multiangle camera plugin modal
                 newComponentId = `multiangle-camera-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('multiangle-camera');
                 const newMultiangleCamera = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
                   sourceImageUrl: null,
                   isExpanded: false,
+                  // Note: Multiangle camera might not use frameWidth/Height in same way, but good to have defaults
                 };
                 setMultiangleCameraModalStates(prev => [...prev, newMultiangleCamera]);
                 Promise.resolve(onPersistMultiangleCameraModalCreate(newMultiangleCamera)).catch(console.error);
               } else if (comp.id === 'removebg-plugin' && comp.type === 'plugin' && onPersistRemoveBgModalCreate && setRemoveBgModalStates) {
                 // Create remove bg plugin modal
                 newComponentId = `removebg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('removebg');
                 const newRemoveBg = {
                   id: newComponentId,
                   x: canvasX,
@@ -355,8 +389,8 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   model: '851-labs/background-remover',
                   backgroundType: 'rgba (transparent)',
                   scaleValue: 0.5,
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isRemovingBg: false,
                 };
                 setRemoveBgModalStates(prev => [...prev, newRemoveBg]);
@@ -364,6 +398,7 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
               } else if (comp.id === 'erase-plugin' && comp.type === 'plugin' && onPersistEraseModalCreate && setEraseModalStates) {
                 // Create erase plugin modal
                 newComponentId = `erase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('erase');
                 const newErase = {
                   id: newComponentId,
                   x: canvasX,
@@ -372,14 +407,15 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   sourceImageUrl: null,
                   localErasedImageUrl: null,
                   model: 'bria/eraser',
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isErasing: false,
                 };
                 setEraseModalStates(prev => [...prev, newErase]);
                 Promise.resolve(onPersistEraseModalCreate(newErase)).catch(console.error);
               } else if (comp.id === 'expand-plugin' && comp.type === 'plugin' && onPersistExpandModalCreate && setExpandModalStates) {
                 newComponentId = `expand-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('expand');
                 const newExpand = {
                   id: newComponentId,
                   x: canvasX,
@@ -388,14 +424,15 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   sourceImageUrl: null,
                   localExpandedImageUrl: null,
                   model: 'expand/base',
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isExpanding: false,
                 };
                 setExpandModalStates(prev => [...prev, newExpand]);
                 Promise.resolve(onPersistExpandModalCreate(newExpand)).catch(console.error);
               } else if (comp.id === 'vectorize-plugin' && comp.type === 'plugin' && onPersistVectorizeModalCreate && setVectorizeModalStates) {
                 newComponentId = `vectorize-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('vectorize');
                 const newVectorize = {
                   id: newComponentId,
                   x: canvasX,
@@ -404,14 +441,15 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   sourceImageUrl: null,
                   localVectorizedImageUrl: null,
                   mode: 'simple',
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isVectorizing: false,
                 };
                 setVectorizeModalStates(prev => [...prev, newVectorize]);
                 Promise.resolve(onPersistVectorizeModalCreate(newVectorize)).catch(console.error);
               } else if (comp.id === 'next-scene-plugin' && comp.type === 'plugin' && onPersistNextSceneModalCreate && setNextSceneModalStates) {
                 newComponentId = `nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('next-scene');
                 const newNextScene = {
                   id: newComponentId,
                   x: canvasX,
@@ -420,20 +458,21 @@ export const ComponentCreationMenu: React.FC<ComponentCreationMenuProps> = ({
                   sourceImageUrl: null,
                   localNextSceneImageUrl: null,
                   mode: 'scene',
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                   isProcessing: false,
                 };
                 setNextSceneModalStates(prev => [...prev, newNextScene]);
                 Promise.resolve(onPersistNextSceneModalCreate(newNextScene)).catch(console.error);
               } else if (comp.id === 'storyboard-plugin' && comp.type === 'plugin' && onPersistStoryboardModalCreate && setStoryboardModalStates) {
                 newComponentId = `storyboard-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                const config = getComponentConfig('storyboard');
                 const newStoryboard = {
                   id: newComponentId,
                   x: canvasX,
                   y: canvasY,
-                  frameWidth: 400,
-                  frameHeight: 500,
+                  frameWidth: config.defaultWidth,
+                  frameHeight: config.defaultHeight,
                 };
                 setStoryboardModalStates(prev => [...prev, newStoryboard]);
                 Promise.resolve(onPersistStoryboardModalCreate(newStoryboard)).catch(console.error);

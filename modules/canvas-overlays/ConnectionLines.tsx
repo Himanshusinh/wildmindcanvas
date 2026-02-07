@@ -22,6 +22,7 @@ import {
   EdgeToolbar,
   EdgeTypes
 } from '@xyflow/react';
+import { getComponentConfig } from './ComponentConfig';
 import { Scissors } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import './ConnectionLines.css';
@@ -52,6 +53,8 @@ import {
   useTextStore
 } from '@/modules/stores';
 import { getComponentType } from './utils';
+import { useComponentMenuStore } from '@/modules/stores/componentMenuStore';
+
 
 // --- Configuration ---
 const handleStyle = {
@@ -103,6 +106,8 @@ const GhostNode = React.memo(({ data, isConnectable }: any) => {
       }, 150);
     }
   }, [syncHover]);
+
+
 
   const isPlugin = !['text', 'image', 'video', 'music'].includes(type);
   const showHandles = isPlugin || isHovered || isSelected || (isConnecting && (isValidTarget || isSource)) || isHandleHovered || hasConnections;
@@ -285,15 +290,24 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   scriptFrameModalStates = [],
   sceneFrameModalStates = [],
 }) => {
+  const openMenu = useComponentMenuStore(s => s.openMenu);
+  const { setViewport, screenToFlowPosition, getNode } = useReactFlow(); // Get setViewport from internal context
   const [isMiniMapVisible, setIsMiniMapVisible] = useState(false);
+
+  // Sync React Flow viewport with main canvas position/scale
+  useEffect(() => {
+    setViewport({ x: position.x, y: position.y, zoom: scale });
+  }, [position.x, position.y, scale, setViewport]);
+
   const [menu, setMenu] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  const connectionMadeRef = useRef(false);
   const miniMapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   // UseReactFlow must be used inside ReactFlowProvider
-  const { setViewport } = useReactFlow();
+  // UseReactFlow hooks consolidated above
 
   // Dynamic MiniMap Visibility: Show on move/zoom, hide after inactivity
   useEffect(() => {
@@ -413,17 +427,37 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     });
 
     const allNodes: Node[] = [];
-    const add = (states: any[], width: number, height: number, typeLabel: string, yOffset = 0) => {
+    const add = (states: any[], _ignoredWidth: number, _ignoredHeight: number, typeLabel: string, yOffset = 0) => {
+      // Get config for this component type
+      const config = getComponentConfig(typeLabel);
+
+      // Determine dimensions:
+      // 1. If it's a plugin (has iconSize > 0), use the icon size for the ghost node handles
+      //    This ensures handles align with the visual icon, even if the "frame" state is larger (for popup).
+      // 2. Otherwise, use state frame dimensions or config defaults.
+      const isPlugin = config.iconSize > 0;
+
       states.forEach(state => {
+        let nodeWidth: number;
+        let nodeHeight: number;
+
+        if (isPlugin) {
+          nodeWidth = config.iconSize;
+          nodeHeight = config.iconSize;
+        } else {
+          nodeWidth = state.frameWidth || config.defaultWidth;
+          nodeHeight = state.frameHeight || config.defaultHeight;
+        }
+
         allNodes.push({
           id: state.id,
           type: 'ghost',
           position: { x: state.x, y: state.y + yOffset },
-          width: state.frameWidth || width,
-          height: state.frameHeight || height,
+          width: nodeWidth,
+          height: nodeHeight,
           style: {
-            width: state.frameWidth || width,
-            height: state.frameHeight || height,
+            width: nodeWidth,
+            height: nodeHeight,
             background: 'transparent',
             border: 'none',
             boxShadow: 'none',
@@ -519,17 +553,50 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
     }
   }, [onPersistConnectorCreate, checkConnectionValidity]);
 
-  const onConnectStart = useCallback((event: any, { nodeId }: any) => {
+  const connectingSourceIdRef = useRef<string | null>(null);
+
+  const onConnectStart = useCallback((_: any, { nodeId }: any) => {
     console.log('[ConnectionLines] onConnectStart:', nodeId);
-    setIsConnecting(true);
     setConnectingSourceId(nodeId);
+    connectingSourceIdRef.current = nodeId;
+    setIsConnecting(true);
   }, []);
 
-  const onConnectEnd = useCallback(() => {
-    console.log('[ConnectionLines] onConnectEnd');
+  const onConnectEnd = useCallback((event: any, connectionState: any) => {
+    const sourceId = connectingSourceIdRef.current;
+
+    // Check if the connection is valid (handled by React Flow)
+    // If not valid, it means it was dropped on the pane or an invalid target
+    if (!connectionState?.isValid && sourceId) {
+      // It was a drop without connection. Trigger the menu.
+      const clientX = event.clientX || (event.changedTouches && event.changedTouches[0]?.clientX);
+      const clientY = event.clientY || (event.changedTouches && event.changedTouches[0]?.clientY);
+
+      if (clientX && clientY) {
+        const sourceNode = getNode(sourceId);
+        const sourceNodeType = (sourceNode?.data?.type as string) || getComponentType(sourceId) || 'image';
+
+        // Since this ReactFlow instance is an overlay with identity transform (0,0,1),
+        // screenToFlowPosition just returns screen coordinates.
+        // We need to calculate the actual world coordinates based on the main canvas's position and scale.
+        const worldX = (clientX - position.x) / scale;
+        const worldY = (clientY - position.y) / scale;
+
+        openMenu({
+          sourceNodeId: sourceId,
+          sourceNodeType,
+          canvasX: worldX,
+          canvasY: worldY,
+          x: clientX,
+          y: clientY,
+        });
+      }
+    }
+
     setIsConnecting(false);
     setConnectingSourceId(null);
-  }, []);
+    connectingSourceIdRef.current = null;
+  }, [getNode, openMenu, position.x, position.y, scale]);
 
 
   return (
@@ -541,11 +608,12 @@ const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
         position: 'fixed',
         top: 0,
         left: 0,
-        pointerEvents: 'none',
+        // CRITICAL FIX: allow pointer events when connecting so we can catch the drop on the pane
+        pointerEvents: isConnecting ? 'all' : 'none',
         zIndex: 0
       }}
     >
-      <div style={{ width: '100%', height: '100%', pointerEvents: 'none' }}>
+      <div style={{ width: '100%', height: '100%', pointerEvents: isConnecting ? 'all' : 'none' }}>
         <ReactFlow
           nodes={nodes}
           edges={renderedEdges}
