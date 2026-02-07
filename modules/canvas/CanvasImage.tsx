@@ -7,6 +7,7 @@ import { ImageUpload } from '@/core/types/canvas';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
+import { useCanvasCoordinates } from './hooks/useCanvasCoordinates';
 
 interface CanvasImageProps {
   imageData: ImageUpload;
@@ -68,6 +69,8 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const currentPositionRef = useRef<{ x: number; y: number }>({ x: imageData.x || 50, y: imageData.y || 50 });
   const isVideo = imageData.type === 'video';
 
+  const { screenToCanvas } = useCanvasCoordinates({ position, scale });
+
   // Sync with imageData when not dragging, but skip if we just finished dragging
   // This prevents the position from being reset to the old value before parent updates
   useEffect(() => {
@@ -114,8 +117,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       const pointer = stage.getPointerPosition();
       if (!pointer) return;
 
-      const worldX = (pointer.x - position.x) / scale;
-      const worldY = (pointer.y - position.y) / scale;
+      const { x: worldX, y: worldY } = screenToCanvas(pointer);
       const newX = worldX - dragOffsetRef.current.x;
       const newY = worldY - dragOffsetRef.current.y;
 
@@ -155,7 +157,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       window.removeEventListener('touchend', handleMouseUp, true);
       window.removeEventListener('touchcancel', handleMouseUp, true);
     };
-  }, [isDraggingImage, position.x, position.y, scale, onUpdate, stageRef]);
+  }, [isDraggingImage, position.x, position.y, scale, onUpdate, stageRef, screenToCanvas]);
 
   // Don't render if no URL (text elements don't have URLs)
   if (!imageData.url) return null;
@@ -521,8 +523,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           const pointer = stage.getPointerPosition();
           if (!pointer) return;
 
-          const worldX = (pointer.x - position.x) / scale;
-          const worldY = (pointer.y - position.y) / scale;
+          const { x: worldX, y: worldY } = screenToCanvas(pointer);
           dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
 
           setIsDraggingImage(true);
@@ -602,8 +603,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           const pointer = stage.getPointerPosition();
           if (!pointer) return;
 
-          const worldX = (pointer.x - position.x) / scale;
-          const worldY = (pointer.y - position.y) / scale;
+          const { x: worldX, y: worldY } = screenToCanvas(pointer);
           dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
 
           setIsDraggingImage(true);

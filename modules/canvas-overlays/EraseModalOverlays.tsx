@@ -9,13 +9,7 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { useEraseModalStates, useEraseStore, useEraseSelection } from '@/modules/stores';
 
 interface EraseModalOverlaysProps {
-  eraseModalStates: EraseModalState[] | undefined;
-  selectedEraseModalId: string | null | undefined;
-  selectedEraseModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setEraseModalStates: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
-  setSelectedEraseModalId: (id: string | null) => void;
-  setSelectedEraseModalIds: (ids: string[]) => void;
   onErase?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
@@ -34,13 +28,7 @@ interface EraseModalOverlaysProps {
 }
 
 export const EraseModalOverlays = React.memo<EraseModalOverlaysProps>(({
-  eraseModalStates: propEraseModalStates,
-  selectedEraseModalId: propSelectedEraseModalId,
-  selectedEraseModalIds: propSelectedEraseModalIds,
   clearAllSelections,
-  setEraseModalStates: propSetEraseModalStates,
-  setSelectedEraseModalId: propSetSelectedEraseModalId,
-  setSelectedEraseModalIds: propSetSelectedEraseModalIds,
   onErase,
   onPersistEraseModalCreate,
   onPersistEraseModalMove,
@@ -61,12 +49,21 @@ export const EraseModalOverlays = React.memo<EraseModalOverlaysProps>(({
   const storeSetEraseModalStates = useEraseStore(state => state.setEraseModalStates);
   const { selectedId: storeSelectedEraseModalId, selectedIds: storeSelectedEraseModalIds, setSelectedId: storeSetSelectedEraseModalId, setSelectedIds: storeSetSelectedEraseModalIds } = useEraseSelection();
 
+  /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
   const eraseModalStates = propEraseModalStates || storeEraseModalStates;
   const setEraseModalStates = propSetEraseModalStates || storeSetEraseModalStates;
   const selectedEraseModalId = propSelectedEraseModalId || storeSelectedEraseModalId;
   const selectedEraseModalIds = propSelectedEraseModalIds || storeSelectedEraseModalIds;
   const setSelectedEraseModalId = propSetSelectedEraseModalId || storeSetSelectedEraseModalId;
   const setSelectedEraseModalIds = propSetSelectedEraseModalIds || storeSetSelectedEraseModalIds;
+  */
+  // Use store directly
+  const eraseModalStates = storeEraseModalStates;
+  const setEraseModalStates = storeSetEraseModalStates;
+  const selectedEraseModalId = storeSelectedEraseModalId;
+  const selectedEraseModalIds = storeSelectedEraseModalIds;
+  const setSelectedEraseModalId = storeSetSelectedEraseModalId;
+  const setSelectedEraseModalIds = storeSetSelectedEraseModalIds;
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

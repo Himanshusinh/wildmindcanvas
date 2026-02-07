@@ -3,6 +3,7 @@ import React, { useMemo, useRef } from 'react';
 import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { useCanvasSelection } from '../hooks/useCanvasSelection';
+import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 
 
 import { ContextMenu } from '@/modules/ui-global/ContextMenu';
@@ -57,6 +58,9 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     isInteracting = false,
     setIsComponentDragging
 }) => {
+    // Standardized coordinates
+    const { screenToCanvas } = useCanvasCoordinates({ position, scale });
+
     // Zustand Store - Get image and video modal states (replaces from canvasState)
     const imageModalStates = useImageModalStates();
     const videoModalStates = useVideoModalStates();
@@ -68,13 +72,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         // REMOVED: videoModalStates, setVideoModalStates (now managed by Zustand store)
         videoEditorModalStates, setVideoEditorModalStates,
         imageEditorModalStates, setImageEditorModalStates,
-        removeBgModalStates, setRemoveBgModalStates,
-        eraseModalStates, setEraseModalStates,
-        expandModalStates, setExpandModalStates,
-        vectorizeModalStates, setVectorizeModalStates,
-        nextSceneModalStates, setNextSceneModalStates,
-        compareModalStates, setCompareModalStates,
-        storyboardModalStates, setStoryboardModalStates,
         scriptFrameModalStates, setScriptFrameModalStates,
         sceneFrameModalStates, setSceneFrameModalStates,
     } = canvasState;
@@ -89,13 +86,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds, setSelectedVideoEditorModalId, selectedVideoEditorModalId,
         selectedImageEditorModalIds, setSelectedImageEditorModalIds, setSelectedImageEditorModalId, selectedImageEditorModalId,
-        selectedRemoveBgModalId, selectedRemoveBgModalIds, setSelectedRemoveBgModalId, setSelectedRemoveBgModalIds,
-        selectedEraseModalId, selectedEraseModalIds, setSelectedEraseModalId, setSelectedEraseModalIds,
-        selectedExpandModalId, selectedExpandModalIds, setSelectedExpandModalId, setSelectedExpandModalIds,
-        selectedVectorizeModalIds, setSelectedVectorizeModalIds, setSelectedVectorizeModalId, selectedVectorizeModalId,
-        selectedNextSceneModalIds, setSelectedNextSceneModalIds, setSelectedNextSceneModalId, selectedNextSceneModalId,
-        selectedCompareModalIds, setSelectedCompareModalIds, setSelectedCompareModalId, selectedCompareModalId,
-        selectedStoryboardModalIds, setSelectedStoryboardModalIds, setSelectedStoryboardModalId, selectedStoryboardModalId,
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         contextMenuPosition, contextMenuModalType, contextMenuOpen, setContextMenuOpen,
@@ -103,8 +93,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     } = canvasSelection;
 
     // --- VIEWPORT-BASED VIRTUALIZATION ---
-    const viewX = (-position.x) / scale;
-    const viewY = (-position.y) / scale;
+    const { x: viewX, y: viewY } = screenToCanvas({ x: 0, y: 0 });
     const viewW = viewportSize.width / scale;
     const viewH = viewportSize.height / scale;
     const PADDING = 1200; // world units around viewport
@@ -134,28 +123,36 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     const prevVirtualizedVideoRef = useRef<typeof videoModalStates>([]);
 
     const virtualizedImageModalStates = useMemo(() => {
-        if (isInteracting) {
-            // During interaction, use previous state to avoid lag
-            return prevVirtualizedImageRef.current;
-        }
-        const filtered = imageModalStates.filter((m: { x: number; y: number; frameWidth?: number; frameHeight?: number }) =>
+        const filtered = imageModalStates.filter((m: any) =>
             isRectInViewport(
                 m.x,
                 m.y,
-                m.frameWidth ?? 600,
-                m.frameHeight ?? 400,
+                m.width ?? m.frameWidth ?? 600,
+                m.height ?? m.frameHeight ?? 400,
             )
         );
+
+        // Smart Memoization: Only update reference if the set of visible items actually changed.
+        // During panning, the world coordinates of items don't change, only the viewport does.
+        // So unless an item enters/exits the viewport, the list of visible items (by reference) remains identical.
+        const prev = prevVirtualizedImageRef.current;
+        if (prev.length === filtered.length) {
+            let hasChanged = false;
+            for (let i = 0; i < prev.length; i++) {
+                if (prev[i] !== filtered[i]) {
+                    hasChanged = true;
+                    break;
+                }
+            }
+            if (!hasChanged) return prev;
+        }
+
         prevVirtualizedImageRef.current = filtered;
         return filtered;
-    }, [imageModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY, isInteracting]);
+    }, [imageModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY]);
 
     const virtualizedVideoModalStates = useMemo(() => {
-        if (isInteracting) {
-            // During interaction, use previous state to avoid lag
-            return prevVirtualizedVideoRef.current;
-        }
-        const filtered = videoModalStates.filter((m: { x: number; y: number; frameWidth?: number; frameHeight?: number }) =>
+        const filtered = videoModalStates.filter((m: any) =>
             isRectInViewport(
                 m.x,
                 m.y,
@@ -163,9 +160,22 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 m.frameHeight ?? 400,
             )
         );
+
+        const prev = prevVirtualizedVideoRef.current;
+        if (prev.length === filtered.length) {
+            let hasChanged = false;
+            for (let i = 0; i < prev.length; i++) {
+                if (prev[i] !== filtered[i]) {
+                    hasChanged = true;
+                    break;
+                }
+            }
+            if (!hasChanged) return prev;
+        }
+
         prevVirtualizedVideoRef.current = filtered;
         return filtered;
-    }, [videoModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY, isInteracting]);
+    }, [videoModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY]);
 
     const {
         onPersistImageModalCreate, onPersistImageModalMove, onPersistImageModalDelete,
@@ -214,12 +224,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 videoEditorModalStates={videoEditorModalStates}
                 imageEditorModalStates={imageEditorModalStates}
                 isComponentDraggable={isComponentDraggable}
-                removeBgModalStates={removeBgModalStates}
-                eraseModalStates={eraseModalStates}
-                expandModalStates={expandModalStates}
-                vectorizeModalStates={vectorizeModalStates}
-                nextSceneModalStates={nextSceneModalStates}
-                storyboardModalStates={storyboardModalStates}
                 scriptFrameModalStates={scriptFrameModalStates}
                 sceneFrameModalStates={sceneFrameModalStates}
                 imageModalStates={virtualizedImageModalStates}
@@ -230,15 +234,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 onConnectionsChange={props.onConnectionsChange}
                 onPersistConnectorCreate={props.onPersistConnectorCreate}
                 onPersistConnectorDelete={props.onPersistConnectorDelete}
-
-
-
-                compareModalStates={compareModalStates}
-                selectedCompareModalId={selectedCompareModalId}
-                selectedCompareModalIds={selectedCompareModalIds}
-                setCompareModalStates={setCompareModalStates}
-                setSelectedCompareModalId={setSelectedCompareModalId}
-                setSelectedCompareModalIds={setSelectedCompareModalIds}
                 onPersistCompareModalCreate={onPersistCompareModalCreate}
                 onPersistCompareModalMove={onPersistCompareModalMove}
                 onPersistCompareModalDelete={onPersistCompareModalDelete}
@@ -253,18 +248,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 selectedImageEditorModalId={selectedImageEditorModalId}
                 selectedImageEditorModalIds={selectedImageEditorModalIds}
 
-                selectedRemoveBgModalId={selectedRemoveBgModalId}
-                selectedRemoveBgModalIds={selectedRemoveBgModalIds}
-                selectedEraseModalId={selectedEraseModalId}
-                selectedEraseModalIds={selectedEraseModalIds}
-                selectedExpandModalId={selectedExpandModalId}
-                selectedExpandModalIds={selectedExpandModalIds}
-                selectedVectorizeModalId={selectedVectorizeModalId}
-                selectedVectorizeModalIds={selectedVectorizeModalIds}
-                selectedNextSceneModalId={selectedNextSceneModalId}
-                selectedNextSceneModalIds={selectedNextSceneModalIds}
-                selectedStoryboardModalId={selectedStoryboardModalId}
-                selectedStoryboardModalIds={selectedStoryboardModalIds}
                 selectedIds={selectedIds}
                 setSelectionOrder={setSelectionOrder}
                 clearAllSelections={clearAllSelections}
@@ -276,24 +259,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 setSelectedImageEditorModalId={setSelectedImageEditorModalId}
                 setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
 
-                setRemoveBgModalStates={setRemoveBgModalStates}
-                setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
-                setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
-                setEraseModalStates={setEraseModalStates}
-                setSelectedEraseModalId={setSelectedEraseModalId}
-                setSelectedEraseModalIds={setSelectedEraseModalIds}
-                setExpandModalStates={setExpandModalStates}
-                setSelectedExpandModalId={setSelectedExpandModalId}
-                setSelectedExpandModalIds={setSelectedExpandModalIds}
-                setVectorizeModalStates={setVectorizeModalStates}
-                setSelectedVectorizeModalId={setSelectedVectorizeModalId}
-                setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
-                setNextSceneModalStates={setNextSceneModalStates}
-                setSelectedNextSceneModalId={setSelectedNextSceneModalId}
-                setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
-                setStoryboardModalStates={setStoryboardModalStates}
-                setSelectedStoryboardModalId={setSelectedStoryboardModalId}
-                setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
                 setScriptFrameModalStates={setScriptFrameModalStates as any}
                 // setSelectedScriptFrameModalIds={selectedScriptFrameModalIds as any}
                 // setSceneFrameModalStates={setSceneFrameModalStates as any}

@@ -27,13 +27,7 @@ interface StoryboardModalState {
 }
 
 interface StoryboardModalOverlaysProps {
-  storyboardModalStates: StoryboardModalState[] | undefined;
-  selectedStoryboardModalId: string | null | undefined;
-  selectedStoryboardModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setStoryboardModalStates: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
-  setSelectedStoryboardModalId: (id: string | null) => void;
-  setSelectedStoryboardModalIds: (ids: string[]) => void;
   onPersistStoryboardModalCreate?: (modal: { id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistStoryboardModalMove?: (id: string, updates: Partial<{ x: number; y: number; frameWidth?: number; frameHeight?: number; characterNamesMap?: Record<number, string>; propsNamesMap?: Record<number, string>; backgroundNamesMap?: Record<number, string>; namedImages?: { characters?: Record<string, string>; backgrounds?: Record<string, string>; props?: Record<string, string> } }>) => void | Promise<void>;
   onPersistStoryboardModalDelete?: (id: string) => void | Promise<void>;
@@ -58,13 +52,7 @@ interface StoryboardModalOverlaysProps {
 }
 
 export const StoryboardModalOverlays = React.memo<StoryboardModalOverlaysProps>(({
-  storyboardModalStates,
-  selectedStoryboardModalId,
-  selectedStoryboardModalIds,
   clearAllSelections,
-  setStoryboardModalStates,
-  setSelectedStoryboardModalId,
-  setSelectedStoryboardModalIds,
   onPersistStoryboardModalCreate,
   onPersistStoryboardModalMove,
   onPersistStoryboardModalDelete,
@@ -89,6 +77,7 @@ export const StoryboardModalOverlays = React.memo<StoryboardModalOverlaysProps>(
   } = useStoryboardSelection();
   const storeSetStoryboardModalStates = useStoryboardStore((state) => state.setStoryboardModalStates);
 
+  /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
   const finalStoryboardModalStates = storyboardModalStates || storeStoryboardModalStates;
   const finalSelectedStoryboardModalId = selectedStoryboardModalId !== undefined ? selectedStoryboardModalId : storeSelectedStoryboardModalId;
   const finalSelectedStoryboardModalIds = selectedStoryboardModalIds !== undefined ? selectedStoryboardModalIds : storeSelectedStoryboardModalIds;
@@ -96,6 +85,15 @@ export const StoryboardModalOverlays = React.memo<StoryboardModalOverlaysProps>(
   const finalSetStoryboardModalStates = setStoryboardModalStates || storeSetStoryboardModalStates;
   const finalSetSelectedStoryboardModalId = setSelectedStoryboardModalId || storeSetSelectedStoryboardModalId;
   const finalSetSelectedStoryboardModalIds = setSelectedStoryboardModalIds || storeSetSelectedStoryboardModalIds;
+  */
+  // Use store directly
+  const finalStoryboardModalStates = storeStoryboardModalStates;
+  const finalSelectedStoryboardModalId = storeSelectedStoryboardModalId;
+  const finalSelectedStoryboardModalIds = storeSelectedStoryboardModalIds;
+
+  const finalSetStoryboardModalStates = storeSetStoryboardModalStates;
+  const finalSetSelectedStoryboardModalId = storeSetSelectedStoryboardModalId;
+  const finalSetSelectedStoryboardModalIds = storeSetSelectedStoryboardModalIds;
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

@@ -8,12 +8,6 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { useExpandModalStates, useExpandStore, useExpandSelection } from '@/modules/stores';
 
 interface ExpandModalOverlaysProps {
-  expandModalStates: ExpandModalState[] | undefined;
-  selectedExpandModalId: string | null | undefined;
-  selectedExpandModalIds: string[] | undefined;
-  setSelectedExpandModalId: (id: string | null) => void;
-  setSelectedExpandModalIds: (ids: string[]) => void;
-  setExpandModalStates: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
   clearAllSelections: () => void;
   onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onPersistExpandModalCreate?: (modal: ExpandModalState) => void | Promise<void>;
@@ -33,12 +27,6 @@ interface ExpandModalOverlaysProps {
 }
 
 export const ExpandModalOverlays = React.memo<ExpandModalOverlaysProps>(({
-  expandModalStates: propExpandModalStates,
-  selectedExpandModalId: propSelectedExpandModalId,
-  selectedExpandModalIds: propSelectedExpandModalIds,
-  setSelectedExpandModalId: propSetSelectedExpandModalId,
-  setSelectedExpandModalIds: propSetSelectedExpandModalIds,
-  setExpandModalStates: propSetExpandModalStates,
   clearAllSelections,
   onExpand,
   onPersistExpandModalCreate,
@@ -60,12 +48,21 @@ export const ExpandModalOverlays = React.memo<ExpandModalOverlaysProps>(({
   const storeSetExpandModalStates = useExpandStore(state => state.setExpandModalStates);
   const { selectedId: storeSelectedExpandModalId, selectedIds: storeSelectedExpandModalIds, setSelectedId: storeSetSelectedExpandModalId, setSelectedIds: storeSetSelectedExpandModalIds } = useExpandSelection();
 
+  /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
   const expandModalStates = propExpandModalStates || storeExpandModalStates;
   const setExpandModalStates = propSetExpandModalStates || storeSetExpandModalStates;
   const selectedExpandModalId = propSelectedExpandModalId || storeSelectedExpandModalId;
   const selectedExpandModalIds = propSelectedExpandModalIds || storeSelectedExpandModalIds;
   const setSelectedExpandModalId = propSetSelectedExpandModalId || storeSetSelectedExpandModalId;
   const setSelectedExpandModalIds = propSetSelectedExpandModalIds || storeSetSelectedExpandModalIds;
+  */
+  // Use store directly
+  const expandModalStates = storeExpandModalStates;
+  const setExpandModalStates = storeSetExpandModalStates;
+  const selectedExpandModalId = storeSelectedExpandModalId;
+  const selectedExpandModalIds = storeSelectedExpandModalIds;
+  const setSelectedExpandModalId = storeSetSelectedExpandModalId;
+  const setSelectedExpandModalIds = storeSetSelectedExpandModalIds;
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

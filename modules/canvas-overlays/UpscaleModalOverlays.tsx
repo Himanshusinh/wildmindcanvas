@@ -9,14 +9,7 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { useUpscaleModalStates, useUpscaleSelection, useUpscaleStore } from '@/modules/stores';
 
 interface UpscaleModalOverlaysProps {
-  // REMOVED: upscaleModalStates, selectedUpscaleModalId, selectedUpscaleModalIds, setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand)
-  // upscaleModalStates: UpscaleModalState[] | undefined;
-  // selectedUpscaleModalId: string | null | undefined;
-  // selectedUpscaleModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  // setUpscaleModalStates: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
-  // setSelectedUpscaleModalId: (id: string | null) => void;
-  // setSelectedUpscaleModalIds: (ids: string[]) => void;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => Promise<string | null>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }>) => void | Promise<void>;
@@ -35,13 +28,7 @@ interface UpscaleModalOverlaysProps {
 }
 
 export const UpscaleModalOverlays = React.memo<UpscaleModalOverlaysProps>(({
-  // upscaleModalStates,
-  // selectedUpscaleModalId,
-  // selectedUpscaleModalIds,
   clearAllSelections,
-  // setUpscaleModalStates,
-  // setSelectedUpscaleModalId,
-  // setSelectedUpscaleModalIds,
   onUpscale,
   onPersistUpscaleModalCreate,
   onPersistUpscaleModalMove,

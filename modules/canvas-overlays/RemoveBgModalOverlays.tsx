@@ -9,13 +9,7 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { useRemoveBgModalStates, useRemoveBgStore, useRemoveBgSelection } from '@/modules/stores';
 
 interface RemoveBgModalOverlaysProps {
-  removeBgModalStates: RemoveBgModalState[] | undefined;
-  selectedRemoveBgModalId: string | null | undefined;
-  selectedRemoveBgModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setRemoveBgModalStates: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
-  setSelectedRemoveBgModalId: (id: string | null) => void;
-  setSelectedRemoveBgModalIds: (ids: string[]) => void;
   onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; isRemovingBg?: boolean; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; isRemovingBg?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
@@ -34,13 +28,7 @@ interface RemoveBgModalOverlaysProps {
 }
 
 export const RemoveBgModalOverlays = React.memo<RemoveBgModalOverlaysProps>(({
-  removeBgModalStates: propRemoveBgModalStates,
-  selectedRemoveBgModalId: propSelectedRemoveBgModalId,
-  selectedRemoveBgModalIds: propSelectedRemoveBgModalIds,
   clearAllSelections,
-  setRemoveBgModalStates: propSetRemoveBgModalStates,
-  setSelectedRemoveBgModalId: propSetSelectedRemoveBgModalId,
-  setSelectedRemoveBgModalIds: propSetSelectedRemoveBgModalIds,
   onRemoveBg,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
@@ -61,12 +49,11 @@ export const RemoveBgModalOverlays = React.memo<RemoveBgModalOverlaysProps>(({
   const storeSetRemoveBgModalStates = useRemoveBgStore(state => state.setRemoveBgModalStates);
   const { selectedId: storeSelectedRemoveBgModalId, selectedIds: storeSelectedRemoveBgModalIds, setSelectedId: storeSetSelectedRemoveBgModalId, setSelectedIds: storeSetSelectedRemoveBgModalIds } = useRemoveBgSelection();
 
-  const removeBgModalStates = propRemoveBgModalStates || storeRemoveBgModalStates || [];
-  const setRemoveBgModalStates = propSetRemoveBgModalStates || storeSetRemoveBgModalStates;
-  const selectedRemoveBgModalId = propSelectedRemoveBgModalId || storeSelectedRemoveBgModalId;
-  const selectedRemoveBgModalIds = propSelectedRemoveBgModalIds || storeSelectedRemoveBgModalIds;
-  const setSelectedRemoveBgModalId = propSetSelectedRemoveBgModalId || storeSetSelectedRemoveBgModalId;
-  const setSelectedRemoveBgModalIds = propSetSelectedRemoveBgModalIds || storeSetSelectedRemoveBgModalIds;
+  const setRemoveBgModalStates = useRemoveBgStore(state => state.setRemoveBgModalStates);
+  const { selectedId: selectedRemoveBgModalId, selectedIds: selectedRemoveBgModalIds, setSelectedId: setSelectedRemoveBgModalId, setSelectedIds: setSelectedRemoveBgModalIds } = useRemoveBgSelection();
+
+  // Removed: Prop fallback logic. State is now strictly managed by Zustand.
+  const removeBgModalStates = storeRemoveBgModalStates || [];
 
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

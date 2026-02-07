@@ -7,6 +7,7 @@ import { INFINITE_CANVAS_SIZE } from '@/core/canvas/canvasHelpers';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { useCanvasSelection } from '../hooks/useCanvasSelection';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
+import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { usePatternImage } from '../hooks/usePatternImage';
 import { CanvasImage } from '../CanvasImage';
 import { CanvasVideoNode } from '../CanvasVideoNode';
@@ -158,6 +159,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
     const { stageRef, layerRef } = refs;
     const patternImage = usePatternImage();
+    const { screenToCanvas } = useCanvasCoordinates({ position, scale });
 
     // Helper or prop? Usually imported helper
     const isDraggable = (id: string) => {
@@ -217,8 +219,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     {/* Dynamic Viewport Background */}
                     {(() => {
                         const padding = 2000 / scale;
-                        const viewX = -position.x / scale;
-                        const viewY = -position.y / scale;
+                        const { x: viewX, y: viewY } = screenToCanvas({ x: 0, y: 0 });
                         const viewW = viewportSize.width / scale;
                         const viewH = viewportSize.height / scale;
 

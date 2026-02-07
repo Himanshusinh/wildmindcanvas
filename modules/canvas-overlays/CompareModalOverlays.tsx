@@ -5,13 +5,7 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { useCompareStore, useCompareSelection, useCompareModalStates } from '@/modules/stores';
 
 interface CompareModalOverlaysProps {
-    compareModalStates: CompareModalState[];
-    selectedCompareModalId: string | null;
-    selectedCompareModalIds: string[];
     clearAllSelections: () => void;
-    setCompareModalStates: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
-    setSelectedCompareModalId: (id: string | null) => void;
-    setSelectedCompareModalIds: (ids: string[]) => void;
     onPersistCompareModalCreate?: (modal: CompareModalState) => void | Promise<void>;
     onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
     onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
@@ -27,13 +21,7 @@ interface CompareModalOverlaysProps {
 }
 
 export const CompareModalOverlays = React.memo<CompareModalOverlaysProps>(({
-    compareModalStates,
-    selectedCompareModalId,
-    selectedCompareModalIds,
     clearAllSelections,
-    setCompareModalStates,
-    setSelectedCompareModalId,
-    setSelectedCompareModalIds,
     onPersistCompareModalCreate,
     onPersistCompareModalMove,
     onPersistCompareModalDelete,
@@ -48,20 +36,20 @@ export const CompareModalOverlays = React.memo<CompareModalOverlaysProps>(({
     selectedIds = [],
 }) => {
     // Zustand Store
-    const storeCompareModalStates = useCompareModalStates();
-    const storeSelectedCompareModalId = useCompareStore(state => state.selectedId);
-    const storeSelectedCompareModalIds = useCompareStore(state => state.selectedIds);
-    const storeSetSelectedCompareModalId = useCompareStore(state => state.setSelectedId);
-    const storeSetSelectedCompareModalIds = useCompareStore(state => state.setSelectedIds);
-    const storeSetCompareModalStates = useCompareStore(state => state.setCompareModalStates);
+    const compareModalStates = useCompareModalStates();
+    const selectedCompareModalId = useCompareStore(state => state.selectedId);
+    const selectedCompareModalIds = useCompareStore(state => state.selectedIds);
+    const setSelectedCompareModalId = useCompareStore(state => state.setSelectedId);
+    const setSelectedCompareModalIds = useCompareStore(state => state.setSelectedIds);
+    const setCompareModalStates = useCompareStore(state => state.setCompareModalStates);
 
-    const finalCompareModalStates = compareModalStates || storeCompareModalStates;
-    const finalSelectedCompareModalId = selectedCompareModalId !== undefined ? selectedCompareModalId : storeSelectedCompareModalId;
-    const finalSelectedCompareModalIds = selectedCompareModalIds !== undefined ? selectedCompareModalIds : storeSelectedCompareModalIds;
+    const finalCompareModalStates = compareModalStates;
+    const finalSelectedCompareModalId = selectedCompareModalId;
+    const finalSelectedCompareModalIds = selectedCompareModalIds;
 
-    const finalSetCompareModalStates = setCompareModalStates || storeSetCompareModalStates;
-    const finalSetSelectedCompareModalId = setSelectedCompareModalId || storeSetSelectedCompareModalId;
-    const finalSetSelectedCompareModalIds = setSelectedCompareModalIds || storeSetSelectedCompareModalIds;
+    const finalSetCompareModalStates = setCompareModalStates;
+    const finalSetSelectedCompareModalId = setSelectedCompareModalId;
+    const finalSetSelectedCompareModalIds = setSelectedCompareModalIds;
 
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

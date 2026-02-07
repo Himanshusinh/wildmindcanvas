@@ -8,6 +8,7 @@ import { useCanvasSelection } from './useCanvasSelection';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
 import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE, findBlankSpace } from '@/core/canvas/canvasHelpers';
 import { useGroupLogic } from './useGroupLogic';
+import { useCanvasCoordinates } from './useCanvasCoordinates';
 import { useImageModalStates, useVideoModalStates, useMusicModalStates, useUpscaleModalStates, useMultiangleCameraModalStates, useRemoveBgModalStates, useEraseModalStates, useExpandModalStates, useImageStore, useVideoStore, useMusicStore, useRemoveBgStore, useEraseStore, useExpandStore } from '@/modules/stores';
 
 // Module-level variable to debounce creation across Strict Mode remounts
@@ -163,6 +164,11 @@ export function useCanvasEvents(
     useEffect(() => { positionRef.current = position; }, [position]);
     useEffect(() => { scaleRef.current = scale; }, [scale]);
     useEffect(() => { isPanningRef.current = isPanning; }, [isPanning]);
+
+    const { screenToCanvas, canvasToScreen } = useCanvasCoordinates({
+        position,
+        scale
+    });
 
     // Ref to cache stage bounding box to avoid forced reflow during mousemove
     const stageRectRef = useRef<DOMRect | null>(null);
@@ -461,10 +467,7 @@ export function useCanvasEvents(
         if (stage) {
             const pointerPos = stage.getPointerPosition();
             if (pointerPos) {
-                const canvasPos = {
-                    x: (pointerPos.x - position.x) / scale,
-                    y: (pointerPos.y - position.y) / scale,
-                };
+                const canvasPos = screenToCanvas(pointerPos);
 
                 if (selectionTightRect) {
                     const rect = selectionTightRect;
@@ -520,7 +523,7 @@ export function useCanvasEvents(
         if (isShiftSelection && clickedOnEmpty) {
             if (pointerPos) {
                 setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
-                setPendingSelectionStartCanvas({ x: (pointerPos.x - position.x) / scale, y: (pointerPos.y - position.y) / scale });
+                setPendingSelectionStartCanvas(screenToCanvas(pointerPos));
                 setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
                 setSelectionBox(null);
                 setSelectionTightRect(null);
@@ -532,8 +535,7 @@ export function useCanvasEvents(
         if (isCursorTool && e.evt.button === 0) {
             if (!clickedOnEmpty) return;
             if (pointerPos) {
-                const canvasX = (pointerPos.x - position.x) / scale;
-                const canvasY = (pointerPos.y - position.y) / scale;
+                const { x: canvasX, y: canvasY } = screenToCanvas(pointerPos);
                 setSelectionRectCoords({
                     x1: canvasX, y1: canvasY, x2: canvasX, y2: canvasY
                 });
@@ -575,8 +577,7 @@ export function useCanvasEvents(
             const pointer = stage.getPointerPosition();
             if (!pointer) return;
 
-            const currentX = (pointer.x - position.x) / scale;
-            const currentY = (pointer.y - position.y) / scale;
+            const { x: currentX, y: currentY } = screenToCanvas(pointer);
 
             setSelectionBox({
                 ...selectionBox,
@@ -606,8 +607,7 @@ export function useCanvasEvents(
             const pointerY = e.clientY - rectSize.top;
 
             // Convert to canvas coordinates
-            const currentX = (pointerX - position.x) / scale;
-            const currentY = (pointerY - position.y) / scale;
+            const { x: currentX, y: currentY } = screenToCanvas({ x: pointerX, y: pointerY });
 
             setSelectionBox({
                 ...selectionBox,

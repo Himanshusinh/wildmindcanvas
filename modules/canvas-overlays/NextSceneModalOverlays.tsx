@@ -9,13 +9,7 @@ import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtil
 import { useNextSceneStore, useNextSceneSelection, useNextSceneModalStates } from '@/modules/stores';
 
 interface NextSceneModalOverlaysProps {
-    nextSceneModalStates: NextSceneModalState[] | undefined;
-    selectedNextSceneModalId: string | null | undefined;
-    selectedNextSceneModalIds: string[] | undefined;
     clearAllSelections: () => void;
-    setNextSceneModalStates: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
-    setSelectedNextSceneModalId: (id: string | null) => void;
-    setSelectedNextSceneModalIds: (ids: string[]) => void;
     onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
     onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
     onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
@@ -33,13 +27,7 @@ interface NextSceneModalOverlaysProps {
 }
 
 export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
-    nextSceneModalStates,
-    selectedNextSceneModalId,
-    selectedNextSceneModalIds,
     clearAllSelections,
-    setNextSceneModalStates,
-    setSelectedNextSceneModalId,
-    setSelectedNextSceneModalIds,
     onPersistNextSceneModalCreate,
     onPersistNextSceneModalMove,
     onPersistNextSceneModalDelete,
@@ -64,6 +52,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
     } = useNextSceneSelection();
     const { setNextSceneModalStates: storeSetNextSceneModalStates } = useNextSceneStore();
 
+    /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
     const finalNextSceneModalStates = nextSceneModalStates || storeNextSceneModalStates;
     const finalSelectedNextSceneModalId = selectedNextSceneModalId !== undefined ? selectedNextSceneModalId : storeSelectedNextSceneModalId;
     const finalSelectedNextSceneModalIds = selectedNextSceneModalIds !== undefined ? selectedNextSceneModalIds : storeSelectedNextSceneModalIds;
@@ -71,6 +60,15 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
     const finalSetNextSceneModalStates = setNextSceneModalStates || storeSetNextSceneModalStates;
     const finalSetSelectedNextSceneModalId = setSelectedNextSceneModalId || storeSetSelectedNextSceneModalId;
     const finalSetSelectedNextSceneModalIds = setSelectedNextSceneModalIds || storeSetSelectedNextSceneModalIds;
+    */
+    // Use store directly
+    const finalNextSceneModalStates = storeNextSceneModalStates;
+    const finalSelectedNextSceneModalId = storeSelectedNextSceneModalId;
+    const finalSelectedNextSceneModalIds = storeSelectedNextSceneModalIds;
+
+    const finalSetNextSceneModalStates = storeSetNextSceneModalStates;
+    const finalSetSelectedNextSceneModalId = storeSetSelectedNextSceneModalId;
+    const finalSetSelectedNextSceneModalIds = storeSetSelectedNextSceneModalIds;
 
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 

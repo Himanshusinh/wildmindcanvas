@@ -16,16 +16,7 @@ interface MultiangleCameraModalState {
 }
 
 interface MultiangleCameraModalOverlaysProps {
-  // REMOVED: multiangleCameraModalStates (now managed by store)
-  // multiangleCameraModalStates: MultiangleCameraModalState[] | undefined;
-  // REMOVED: selectedMultiangleCameraModalId, selectedMultiangleCameraModalIds (now managed by store)
-  // selectedMultiangleCameraModalId: string | null | undefined;
-  // selectedMultiangleCameraModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  // REMOVED: setMultiangleCameraModalStates, setSelectedMultiangleCameraModalId, setSelectedMultiangleCameraModalIds (now managed by store)
-  // setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
-  // setSelectedMultiangleCameraModalId: (id: string | null) => void;
-  // setSelectedMultiangleCameraModalIds: (ids: string[]) => void;
   onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null }) => void | Promise<void>;
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number; sourceImageUrl?: string | null }>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
@@ -45,16 +36,7 @@ interface MultiangleCameraModalOverlaysProps {
 }
 
 export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverlaysProps> = ({
-  // REMOVED: multiangleCameraModalStates (now managed by store)
-  // multiangleCameraModalStates,
-  // REMOVED: selectedMultiangleCameraModalId, selectedMultiangleCameraModalIds (now managed by store)
-  // selectedMultiangleCameraModalId,
-  // selectedMultiangleCameraModalIds,
   clearAllSelections,
-  // REMOVED: setMultiangleCameraModalStates, setSelectedMultiangleCameraModalId, setSelectedMultiangleCameraModalIds (now managed by store)
-  // setMultiangleCameraModalStates,
-  // setSelectedMultiangleCameraModalId,
-  // setSelectedMultiangleCameraModalIds,
   onPersistMultiangleCameraModalCreate,
   onPersistMultiangleCameraModalMove,
   onPersistMultiangleCameraModalDelete,

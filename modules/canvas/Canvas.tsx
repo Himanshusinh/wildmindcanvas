@@ -7,6 +7,7 @@ import { useCanvasState } from './hooks/useCanvasState';
 import { useCanvasSelection } from './hooks/useCanvasSelection';
 import { useCanvasEvents } from './hooks/useCanvasEvents';
 import { useGroupLogic } from './hooks/useGroupLogic';
+import { useCanvasCoordinates } from './hooks/useCanvasCoordinates';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { applyStageCursor, findAvailablePositionNear } from '@/core/canvas/canvasHelpers';
 import { CanvasStage } from './components/CanvasStage';
@@ -268,6 +269,9 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
   useEffect(() => {
     // console.log('[Canvas State] pos:', position, 'scale:', scale);
   }, [position, scale]);
+
+  const { getCanvasPointFromEvent } = useCanvasCoordinates({ position, scale });
+
   // No local state for selectedGroupIds, it's in useCanvasSelection
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
@@ -986,8 +990,7 @@ export const Canvas: React.FC<CanvasProps> = (props) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const x = (e.clientX - rect.left - position.x) / scale;
-    const y = (e.clientY - rect.top - position.y) / scale;
+    const { x, y } = getCanvasPointFromEvent(e, containerRef.current!);
 
     if (json) {
       try {

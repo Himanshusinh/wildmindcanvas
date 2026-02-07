@@ -5,6 +5,7 @@ import { Group, Image as KonvaImage } from 'react-konva';
 import Konva from 'konva';
 import { VideoModalState } from '@/modules/canvas-overlays/types';
 import { buildProxyMediaUrl } from '@/core/api/proxyUtils';
+import { useCanvasCoordinates } from './hooks/useCanvasCoordinates';
 
 // Global registry for video elements to allow external control (from HTML overlays)
 if (typeof window !== 'undefined') {
@@ -55,6 +56,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
     const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const currentPositionRef = useRef<{ x: number; y: number }>({ x: videoState.x || 50, y: videoState.y || 50 });
     const justFinishedDragRef = useRef(false);
+    const { screenToCanvas } = useCanvasCoordinates({ position, scale });
 
     // Register/Unregister video element
     useEffect(() => {
@@ -75,61 +77,60 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
         const incomingY = videoState.y || 50;
         setCurrentX(incomingX);
         setCurrentY(incomingY);
-    currentPositionRef.current = { x: incomingX, y: incomingY };
+        currentPositionRef.current = { x: incomingX, y: incomingY };
     }, [videoState.x, videoState.y, isDragging]);
 
-  // Manual drag handling (same pattern as music modal)
-  useEffect(() => {
-    if (!isDragging) return;
+    // Manual drag handling (same pattern as music modal)
+    useEffect(() => {
+        if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-      const stage = stageRef?.current;
-      if (!stage) return;
+        const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+            const stage = stageRef?.current;
+            if (!stage) return;
 
-      stage.setPointersPositions(e as any);
-      const pointer = stage.getPointerPosition();
-      if (!pointer) return;
+            stage.setPointersPositions(e as any);
+            const pointer = stage.getPointerPosition();
+            if (!pointer) return;
 
-      const worldX = (pointer.x - position.x) / scale;
-      const worldY = (pointer.y - position.y) / scale;
-      const newX = worldX - dragOffsetRef.current.x;
-      const newY = worldY - dragOffsetRef.current.y;
+            const { x: worldX, y: worldY } = screenToCanvas(pointer);
+            const newX = worldX - dragOffsetRef.current.x;
+            const newY = worldY - dragOffsetRef.current.y;
 
-      setCurrentX(newX);
-      setCurrentY(newY);
-      currentPositionRef.current = { x: newX, y: newY };
-    };
+            setCurrentX(newX);
+            setCurrentY(newY);
+            currentPositionRef.current = { x: newX, y: newY };
+        };
 
-    const handleMouseUp = () => {
-      if (!isDragging) return;
+        const handleMouseUp = () => {
+            if (!isDragging) return;
 
-      const finalX = currentPositionRef.current.x;
-      const finalY = currentPositionRef.current.y;
+            const finalX = currentPositionRef.current.x;
+            const finalY = currentPositionRef.current.y;
 
-      setIsDragging(false);
-      justFinishedDragRef.current = true;
+            setIsDragging(false);
+            justFinishedDragRef.current = true;
 
-      onUpdate?.({ x: finalX, y: finalY });
+            onUpdate?.({ x: finalX, y: finalY });
 
-      setTimeout(() => {
-        justFinishedDragRef.current = false;
-      }, 50);
-    };
+            setTimeout(() => {
+                justFinishedDragRef.current = false;
+            }, 50);
+        };
 
-    window.addEventListener('mousemove', handleMouseMove, true);
-    window.addEventListener('mouseup', handleMouseUp, true);
-    window.addEventListener('touchmove', handleMouseMove, { capture: true, passive: false });
-    window.addEventListener('touchend', handleMouseUp, true);
-    window.addEventListener('touchcancel', handleMouseUp, true);
+        window.addEventListener('mousemove', handleMouseMove, true);
+        window.addEventListener('mouseup', handleMouseUp, true);
+        window.addEventListener('touchmove', handleMouseMove, { capture: true, passive: false });
+        window.addEventListener('touchend', handleMouseUp, true);
+        window.addEventListener('touchcancel', handleMouseUp, true);
 
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove, true);
-      window.removeEventListener('mouseup', handleMouseUp, true);
-      window.removeEventListener('touchmove', handleMouseMove, true as any);
-      window.removeEventListener('touchend', handleMouseUp, true);
-      window.removeEventListener('touchcancel', handleMouseUp, true);
-    };
-  }, [isDragging, position.x, position.y, scale, onUpdate, stageRef]);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove, true);
+            window.removeEventListener('mouseup', handleMouseUp, true);
+            window.removeEventListener('touchmove', handleMouseMove, true as any);
+            window.removeEventListener('touchend', handleMouseUp, true);
+            window.removeEventListener('touchcancel', handleMouseUp, true);
+        };
+    }, [isDragging, position.x, position.y, scale, onUpdate, stageRef, screenToCanvas]);
 
     useEffect(() => {
         let mounted = true;
@@ -274,8 +275,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 const pointer = stage.getPointerPosition();
                 if (!pointer) return;
 
-                const worldX = (pointer.x - position.x) / scale;
-                const worldY = (pointer.y - position.y) / scale;
+                const { x: worldX, y: worldY } = screenToCanvas(pointer);
                 dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
 
                 setIsDragging(true);
@@ -290,8 +290,7 @@ export const CanvasVideoNode: React.FC<CanvasVideoNodeProps> = ({
                 const pointer = stage.getPointerPosition();
                 if (!pointer) return;
 
-                const worldX = (pointer.x - position.x) / scale;
-                const worldY = (pointer.y - position.y) / scale;
+                const { x: worldX, y: worldY } = screenToCanvas(pointer);
                 dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
 
                 setIsDragging(true);

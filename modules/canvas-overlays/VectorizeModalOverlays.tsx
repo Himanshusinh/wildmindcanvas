@@ -14,13 +14,7 @@ import {
 } from '@/modules/stores';
 
 interface VectorizeModalOverlaysProps {
-  vectorizeModalStates?: VectorizeModalState[];
-  selectedVectorizeModalId?: string | null;
-  selectedVectorizeModalIds?: string[];
   clearAllSelections: () => void;
-  setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>> | ((states: any) => void);
-  setSelectedVectorizeModalId?: (id: string | null) => void;
-  setSelectedVectorizeModalIds?: (ids: string[]) => void;
   onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onPersistVectorizeModalMove?: (id: string, updates: Partial<{ x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }>) => void | Promise<void>;
@@ -39,13 +33,7 @@ interface VectorizeModalOverlaysProps {
 }
 
 export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
-  vectorizeModalStates: propsVectorizeModalStates,
-  selectedVectorizeModalId: propsSelectedVectorizeModalId,
-  selectedVectorizeModalIds: propsSelectedVectorizeModalIds,
   clearAllSelections,
-  setVectorizeModalStates: propsSetVectorizeModalStates,
-  setSelectedVectorizeModalId: propsSetSelectedVectorizeModalId,
-  setSelectedVectorizeModalIds: propsSetSelectedVectorizeModalIds,
   onVectorize,
   onPersistVectorizeModalCreate,
   onPersistVectorizeModalMove,
@@ -75,15 +63,15 @@ export const VectorizeModalOverlays = React.memo<VectorizeModalOverlaysProps>(({
   } = useVectorizeSelection();
 
   // effective state
-  const vectorizeModalStates = propsVectorizeModalStates || storeVectorizeModalStates;
-  const setVectorizeModalStates = propsSetVectorizeModalStates || storeSetVectorizeModalStates;
+  const vectorizeModalStates = storeVectorizeModalStates;
+  const setVectorizeModalStates = storeSetVectorizeModalStates;
 
   // Final selection
-  const selectedVectorizeModalId = propsSelectedVectorizeModalId !== undefined ? propsSelectedVectorizeModalId : storeSelectedVectorizeModalId;
-  const selectedVectorizeModalIds = propsSelectedVectorizeModalIds || storeSelectedVectorizeModalIds;
+  const selectedVectorizeModalId = storeSelectedVectorizeModalId;
+  const selectedVectorizeModalIds = storeSelectedVectorizeModalIds;
 
-  const setSelectedVectorizeModalId = propsSetSelectedVectorizeModalId || storeSetSelectedVectorizeModalId;
-  const setSelectedVectorizeModalIds = propsSetSelectedVectorizeModalIds || storeSetSelectedVectorizeModalIds;
+  const setSelectedVectorizeModalId = storeSetSelectedVectorizeModalId;
+  const setSelectedVectorizeModalIds = storeSetSelectedVectorizeModalIds;
 
   return (
     <>
