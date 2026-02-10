@@ -558,6 +558,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Image modal shortcut
         if (e.key === 'i') {
+          if (e.ctrlKey || e.metaKey) return;
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.image || 0;
@@ -588,6 +589,9 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Video modal shortcut
         if (e.key === 'v') {
+          // Prevent if Ctrl/Cmd is pressed (Paste)
+          if (e.ctrlKey || e.metaKey) return;
+
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.video || 0;
@@ -619,6 +623,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Music modal shortcut
         if (e.key === 'm') {
+          if (e.ctrlKey || e.metaKey) return;
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.music || 0;
