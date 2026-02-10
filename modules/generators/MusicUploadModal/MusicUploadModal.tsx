@@ -5,9 +5,10 @@ import '@/modules/ui-global/common/canvasCaptureGuard';
 import { MusicModalTooltip } from './MusicModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { MusicModalFrame } from './MusicModalFrame';
-import { MusicModalNodes } from './MusicModalNodes';
+
 import { MusicModalControls } from './MusicModalControls';
 import { MusicModalTabs, MusicCategory } from './MusicModalTabs';
+import { useMusicStore } from '@/modules/stores';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { DialogueInput } from '../../canvas-overlays/types';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
@@ -98,6 +99,8 @@ interface MusicUploadModalProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   onPersistMusicModalCreate?: (modal: any) => void | Promise<void>;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
@@ -119,6 +122,8 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   onDownload,
   onDuplicate,
   isSelected,
+  isAttachedToChat,
+  selectionOrder,
   initialModel,
   initialFrame,
   initialAspectRatio,
@@ -158,6 +163,9 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const [selectedModel, setSelectedModel] = useState(initialModel ?? 'MiniMax Music 2');
   const [selectedFrame, setSelectedFrame] = useState(initialFrame ?? 'Frame');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio ?? '1:1');
+
+  if (!id) return null;
+
   const [lyricsPrompt, setLyricsPrompt] = useState(initialLyrics ?? '');
   const [sampleRate, setSampleRate] = useState(initialSampleRate ?? '44100');
   const [bitrate, setBitrate] = useState(initialBitrate ?? '256000');
@@ -192,6 +200,29 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
 
   // Refs to track initial props for cycle-free syncing
   const initialCategoryRef = useRef(initialCategory);
@@ -231,6 +262,17 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     window.addEventListener('canvas-node-active', handleActive as any);
     return () => window.removeEventListener('canvas-node-active', handleActive as any);
   }, []);
+
+  const musicModalStates = useMusicStore(s => s.musicModalStates);
+  const updateMusicModal = useMusicStore(s => s.updateMusicModal);
+  const modalState = useMemo(() => musicModalStates.find(m => m.id === id), [musicModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
+  // Sync isHovered state with store
+  useEffect(() => {
+    updateMusicModal(id, { isHovered });
+  }, [id, isHovered, updateMusicModal]);
 
   // Listen for pin toggle keyboard shortcut (P key)
   useEffect(() => {
@@ -851,29 +893,52 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
     }
   };
 
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render so effect has access to latest values
+  useEffect(() => {
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDraggingContainer) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
 
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
-      onPositionChange(newCanvasX, newCanvasY);
+      state.onPositionChange(newCanvasX, newCanvasY);
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDraggingContainer(false);
-      if (onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      const state = dragStateRef.current;
+      if (state.onPositionCommit && lastCanvasPosRef.current) {
+        state.onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
       }
     };
 
@@ -885,7 +950,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange]);
+  }, [isDraggingContainer]);
 
 
   if (!isOpen) return null;
@@ -900,19 +965,35 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
       data-overlay-id={id}
       onMouseDown={handleMouseDown}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true)}
+      onMouseLeave={() => requestHoverState(false)}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,
       }}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       <MusicModalTooltip
-        isHovered={isHovered}
+        isHovered={effectiveIsHovered}
         scale={scale}
         activeCategory={effectiveCategory}
       />
@@ -946,14 +1027,7 @@ export const MusicUploadModal: React.FC<MusicUploadModalProps> = ({
           onCategoryChange={setActiveCategory}
         />
 
-        <MusicModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={!!isSelected}
-          globalDragActive={globalDragActive}
-          activeCategory={effectiveCategory}
-        />
+
       </div>
 
       {effectiveCategory && (

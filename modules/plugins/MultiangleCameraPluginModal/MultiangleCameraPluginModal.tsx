@@ -10,7 +10,7 @@ import { Camera3DControl } from './Camera3DControl';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -44,6 +44,8 @@ interface MultiangleCameraPluginModalProps {
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalProps> = ({
@@ -76,6 +78,8 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
   images = [],
   onPersistConnectorCreate,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -502,10 +506,10 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
 
     try {
       let result: string | null = null;
-      
+
       if (category === 'view-morph' && onQwenMultipleAngles) {
         // Use Qwen Multiple Angles API for View Morph
-      const imageUrl = sourceImageUrl;
+        const imageUrl = sourceImageUrl;
         if (!imageUrl) {
           throw new Error('Source image is required');
         }
@@ -513,7 +517,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
         // API expects: 0=close, 10=far (opposite interpretation)
         // So we invert: apiZoom = 10 - uiZoom
         const apiZoom = 10 - zoom;
-        
+
         console.log('[MultiangleCameraPluginModal] Calling onQwenMultipleAngles with:', {
           imageUrls: [imageUrl],
           horizontalAngle,
@@ -521,14 +525,14 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
           uiZoom: zoom,
           apiZoom,
           additionalPrompt: prompt,
-        loraScale,
+          loraScale,
         });
         result = await onQwenMultipleAngles(
           [imageUrl],
           horizontalAngle,
           verticalAngle,
           apiZoom, // Use inverted zoom for API
-        prompt || undefined,
+          prompt || undefined,
           loraScale
         );
       } else {
@@ -590,6 +594,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -598,6 +603,22 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={onContextMenu}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}
@@ -671,18 +692,13 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
             <circle cx="12" cy="13" r="4" />
           </svg>
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
       </div>
 
       {/* Full-screen popup overlay - like expand plugin */}
-        {isPopupOpen && (
+      {isPopupOpen && (
         <div
           data-multiangle-popup
           style={{
@@ -799,7 +815,7 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
             >
               {/* Left spacer */}
               <div style={{ width: '120px' }} />
-              
+
               {/* Center - Category Switch */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
                 <CategorySwitch
@@ -907,17 +923,17 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
                   padding: '0',
                 }}
               >
-                  <Camera3DControl
-                    horizontalAngle={horizontalAngle}
-                    verticalAngle={verticalAngle}
-                    zoom={zoom}
-                    onHorizontalAngleChange={setHorizontalAngle}
-                    onVerticalAngleChange={setVerticalAngle}
-                    onZoomChange={setZoom}
-                    scale={1}
-                    sourceImageUrl={sourceImageUrl}
-                    showButtons={false}
-                  />
+                <Camera3DControl
+                  horizontalAngle={horizontalAngle}
+                  verticalAngle={verticalAngle}
+                  zoom={zoom}
+                  onHorizontalAngleChange={setHorizontalAngle}
+                  onVerticalAngleChange={setVerticalAngle}
+                  onZoomChange={setZoom}
+                  scale={1}
+                  sourceImageUrl={sourceImageUrl}
+                  showButtons={false}
+                />
               </div>
             ) : (
               /* MultiView: Left Sidebar + Image Preview */
@@ -951,100 +967,100 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
                       overflowY: 'auto',
                       overflowX: 'hidden',
                       padding: '24px',
-                    paddingBottom: '96px', // leave room for sticky footer
-              }}
-            >
-              <MultiangleCameraControls
+                      paddingBottom: '96px', // leave room for sticky footer
+                    }}
+                  >
+                    <MultiangleCameraControls
                       scale={1}
                       category={category}
-                sourceImageUrl={sourceImageUrl}
-                frameBorderColor={frameBorderColor}
-                frameBorderWidth={frameBorderWidth}
+                      sourceImageUrl={sourceImageUrl}
+                      frameBorderColor={frameBorderColor}
+                      frameBorderWidth={frameBorderWidth}
                       extraTopPadding={0}
-                onHoverChange={setIsHovered}
+                      onHoverChange={setIsHovered}
                       onCategoryChange={(newCategory) => {
                         setCategory(newCategory);
                         if (onOptionsChange) {
                           onOptionsChange({ category: newCategory } as any);
                         }
                       }}
-                prompt={prompt}
-                loraScale={loraScale}
-                aspectRatio={aspectRatio}
-                moveForward={moveForward}
-                verticalTilt={verticalTilt}
-                rotateDegrees={rotateDegrees}
-                useWideAngle={useWideAngle}
+                      prompt={prompt}
+                      loraScale={loraScale}
+                      aspectRatio={aspectRatio}
+                      moveForward={moveForward}
+                      verticalTilt={verticalTilt}
+                      rotateDegrees={rotateDegrees}
+                      useWideAngle={useWideAngle}
                       horizontalAngle={horizontalAngle}
                       verticalAngle={verticalAngle}
                       zoom={zoom}
-                isGenerating={isGenerating}
+                      isGenerating={isGenerating}
                       multiangleCategory={multiangleCategory}
                       multiangleModel={multiangleModel}
                       multiangleResolution={multiangleResolution}
-                onPromptChange={setPrompt}
-                onLoraScaleChange={setLoraScale}
-                onAspectRatioChange={setAspectRatio}
-                onMoveForwardChange={setMoveForward}
-                onVerticalTiltChange={setVerticalTilt}
-                onRotateDegreesChange={setRotateDegrees}
-                onUseWideAngleChange={setUseWideAngle}
+                      onPromptChange={setPrompt}
+                      onLoraScaleChange={setLoraScale}
+                      onAspectRatioChange={setAspectRatio}
+                      onMoveForwardChange={setMoveForward}
+                      onVerticalTiltChange={setVerticalTilt}
+                      onRotateDegreesChange={setRotateDegrees}
+                      onUseWideAngleChange={setUseWideAngle}
                       onHorizontalAngleChange={setHorizontalAngle}
                       onVerticalAngleChange={setVerticalAngle}
                       onZoomChange={setZoom}
                       onMultiangleCategoryChange={setMultiangleCategory}
                       onMultiangleModelChange={setMultiangleModel}
                       onMultiangleResolutionChange={setMultiangleResolution}
-                onGenerate={handleGenerate}
-                embeddedInPopup={true}
-                hideGenerateButton={true}
-              />
+                      onGenerate={handleGenerate}
+                      embeddedInPopup={true}
+                      hideGenerateButton={true}
+                    />
                   </div>
 
-                {/* Sticky footer (MultiView) */}
-                <div
-                  style={{
-                    position: 'sticky',
-                    bottom: 0,
-                    padding: '16px 24px',
-                    borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #e5e7eb',
-                    background: isDark ? 'rgba(26, 26, 26, 0.92)' : 'rgba(248, 249, 250, 0.92)',
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={!sourceImageUrl || isGenerating}
+                  {/* Sticky footer (MultiView) */}
+                  <div
                     style={{
-                      width: '100%',
-                      padding: `12px 16px`,
-                      fontSize: `13px`,
-                      fontWeight: 700,
-                      backgroundColor: (!sourceImageUrl || isGenerating) ? (isDark ? '#4a4a4a' : '#9ca3af') : SELECTION_COLOR,
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: `10px`,
-                      cursor: (!sourceImageUrl || isGenerating) ? 'not-allowed' : 'pointer',
-                      transition: 'background-color 0.2s ease, transform 0.08s ease',
-                      opacity: (!sourceImageUrl || isGenerating) ? 0.65 : 1,
-                    }}
-                    onMouseDown={(e) => {
-                      if (!(!sourceImageUrl || isGenerating)) {
-                        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.99)';
-                      }
-                    }}
-                    onMouseUp={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                      position: 'sticky',
+                      bottom: 0,
+                      padding: '16px 24px',
+                      borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #e5e7eb',
+                      background: isDark ? 'rgba(26, 26, 26, 0.92)' : 'rgba(248, 249, 250, 0.92)',
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
                     }}
                   >
-                    {isGenerating ? 'Generating...' : 'Generate Multiangle'}
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={!sourceImageUrl || isGenerating}
+                      style={{
+                        width: '100%',
+                        padding: `12px 16px`,
+                        fontSize: `13px`,
+                        fontWeight: 700,
+                        backgroundColor: (!sourceImageUrl || isGenerating) ? (isDark ? '#4a4a4a' : '#9ca3af') : SELECTION_COLOR,
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: `10px`,
+                        cursor: (!sourceImageUrl || isGenerating) ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s ease, transform 0.08s ease',
+                        opacity: (!sourceImageUrl || isGenerating) ? 0.65 : 1,
+                      }}
+                      onMouseDown={(e) => {
+                        if (!(!sourceImageUrl || isGenerating)) {
+                          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.99)';
+                        }
+                      }}
+                      onMouseUp={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+                      }}
+                    >
+                      {isGenerating ? 'Generating...' : 'Generate Multiangle'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Right Side - Image Preview */}
@@ -1080,124 +1096,124 @@ export const MultiangleCameraPluginModal: React.FC<MultiangleCameraPluginModalPr
                       transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
                     }}
                   >
-              <MultiangleCameraImageFrame
-                id={id}
+                    <MultiangleCameraImageFrame
+                      id={id}
                       scale={1}
                       frameBorderColor="transparent"
                       frameBorderWidth={0}
-                isDraggingContainer={isDraggingContainer}
-                isHovered={isHovered}
-                isSelected={isSelected || false}
-                sourceImageUrl={sourceImageUrl}
-                onMouseDown={handleMouseDown}
-                onSelect={onSelect}
-                fillContainer={true}
-              />
+                      isDraggingContainer={isDraggingContainer}
+                      isHovered={isHovered}
+                      isSelected={isSelected || false}
+                      sourceImageUrl={sourceImageUrl}
+                      onMouseDown={handleMouseDown}
+                      onSelect={onSelect}
+                      fillContainer={true}
+                    />
                   </div>
-            </div>
-          </div>
-        )}
+                </div>
+              </div>
+            )}
 
-        {/* Bottom Action Buttons - Only for View Morph */}
-        {category === 'view-morph' && (
-          <div
-            style={{
-              padding: '16px 20px',
-              flexShrink: 0,
-              backgroundColor: 'transparent',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ display: 'flex', gap: '8px', maxWidth: '500px', width: '100%' }}>
-              {/* Reset Button */}
-              <button
-                onClick={() => {
-                  setHorizontalAngle(0);
-                  setVerticalAngle(0);
-                  setZoom(0);
-                  if (onOptionsChange) {
-                    onOptionsChange({ horizontalAngle: 0, verticalAngle: 0, zoom: 0 } as any);
-                  }
-                }}
+            {/* Bottom Action Buttons - Only for View Morph */}
+            {category === 'view-morph' && (
+              <div
                 style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  color: isDark ? '#e5e5e5' : '#4b5563',
-                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
+                  padding: '16px 20px',
+                  flexShrink: 0,
+                  backgroundColor: 'transparent',
                   display: 'flex',
-                  alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
-                  e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-                  e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
+                  alignItems: 'center',
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
-                  <path d="M21 3v5h-5"></path>
-                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
-                  <path d="M3 21v-5h5"></path>
-                </svg>
-                <span>Reset</span>
-              </button>
+                <div style={{ display: 'flex', gap: '8px', maxWidth: '500px', width: '100%' }}>
+                  {/* Reset Button */}
+                  <button
+                    onClick={() => {
+                      setHorizontalAngle(0);
+                      setVerticalAngle(0);
+                      setZoom(0);
+                      if (onOptionsChange) {
+                        onOptionsChange({ horizontalAngle: 0, verticalAngle: 0, zoom: 0 } as any);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                      color: isDark ? '#e5e5e5' : '#4b5563',
+                      border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+                      e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                      e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)';
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                      <path d="M21 3v5h-5"></path>
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                      <path d="M3 21v-5h5"></path>
+                    </svg>
+                    <span>Reset</span>
+                  </button>
 
-              {/* Generate Button */}
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                style={{
-                  flex: 1,
-                  padding: '10px 16px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  backgroundColor: SELECTION_COLOR,
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease',
-                  opacity: isGenerating ? 0.7 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!isGenerating) {
-                    e.currentTarget.style.backgroundColor = '#3d6edb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isGenerating) {
-                    e.currentTarget.style.backgroundColor = SELECTION_COLOR;
-                  }
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                  <path d="M2 17l10 5 10-5"></path>
-                  <path d="M2 12l10 5 10-5"></path>
-                </svg>
-                <span>Generate</span>
-              </button>
-            </div>
+                  {/* Generate Button */}
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      backgroundColor: SELECTION_COLOR,
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: isGenerating ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease',
+                      opacity: isGenerating ? 0.7 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isGenerating) {
+                        e.currentTarget.style.backgroundColor = '#3d6edb';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isGenerating) {
+                        e.currentTarget.style.backgroundColor = SELECTION_COLOR;
+                      }
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                      <path d="M2 17l10 5 10-5"></path>
+                      <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                    <span>Generate</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </div>
       )}
     </PluginNodeShell>

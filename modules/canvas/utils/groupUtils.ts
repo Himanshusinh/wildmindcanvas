@@ -1,7 +1,15 @@
 
 import { CanvasItemsData } from '../types';
 
-export function getItemBounds(itemId: string, data: CanvasItemsData): { x: number; y: number; width: number; height: number } | null {
+export function getItemBounds(
+    itemId: string,
+    data: CanvasItemsData,
+    additionalStates: {
+        removeBgModalStates?: any[];
+        eraseModalStates?: any[];
+        expandModalStates?: any[];
+    } = {}
+): { x: number; y: number; width: number; height: number } | null {
     const {
         images,
         textInputStates,
@@ -9,9 +17,9 @@ export function getItemBounds(itemId: string, data: CanvasItemsData): { x: numbe
         videoModalStates,
         musicModalStates,
         upscaleModalStates,
-        removeBgModalStates,
-        eraseModalStates,
-        expandModalStates,
+        // REMOVED: removeBgModalStates
+        // REMOVED: eraseModalStates
+        // REMOVED: expandModalStates
         vectorizeModalStates,
         nextSceneModalStates,
         compareModalStates,
@@ -20,6 +28,10 @@ export function getItemBounds(itemId: string, data: CanvasItemsData): { x: numbe
         sceneFrameModalStates,
         videoEditorModalStates
     } = data;
+
+    const removeBgModalStates = additionalStates.removeBgModalStates || [];
+    const eraseModalStates = additionalStates.eraseModalStates || [];
+    const expandModalStates = additionalStates.expandModalStates || [];
 
     // Check images
     const image = images.find(img => img.elementId === itemId);
@@ -94,7 +106,15 @@ export function getItemBounds(itemId: string, data: CanvasItemsData): { x: numbe
     return null;
 }
 
-export function calculateGroupBounds(itemIds: string[], data: CanvasItemsData): { x: number; y: number; width: number; height: number } | null {
+export function calculateGroupBounds(
+    itemIds: string[],
+    data: CanvasItemsData,
+    additionalStates: {
+        removeBgModalStates?: any[];
+        eraseModalStates?: any[];
+        expandModalStates?: any[];
+    } = {}
+): { x: number; y: number; width: number; height: number } | null {
     if (itemIds.length === 0) return null;
 
     let minX = Infinity;
@@ -103,7 +123,7 @@ export function calculateGroupBounds(itemIds: string[], data: CanvasItemsData): 
     let maxY = -Infinity;
 
     itemIds.forEach(id => {
-        const bounds = getItemBounds(id, data);
+        const bounds = getItemBounds(id, data, additionalStates);
         if (bounds) {
             minX = Math.min(minX, bounds.x);
             minY = Math.min(minY, bounds.y);

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { ScriptFrame } from '@/modules/plugins/StoryboardPluginModal/ScriptFrame';
-import { PluginConnectionNodes } from '@/modules/plugins/PluginComponents';
+
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 
 interface ScriptFrameModalState {
@@ -270,12 +270,7 @@ const ScriptFrameModal: React.FC<ScriptFrameModalProps> = ({
           transition: 'box-shadow 0.2s ease, border 0.2s ease',
         }}
       >
-        <PluginConnectionNodes
-          id={frame.id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={isSelected}
-        />
+
 
         <ModalActionIcons
           isSelected={isSelected}

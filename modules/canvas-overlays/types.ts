@@ -9,6 +9,12 @@ export interface TextModalState {
   sentValue?: string; // Value sent to connected components (only updated when arrow is clicked)
   autoFocusInput?: boolean;
   isPinned?: boolean;
+  smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[];
+  frameWidth?: number;
+  frameHeight?: number;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface ImageModalState {
@@ -27,7 +33,11 @@ export interface ImageModalState {
   imageCount?: number;
   resolution?: string;
   isGenerating?: boolean;
+  isProcessing?: boolean;
   isPinned?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface VideoModalState {
@@ -49,6 +59,9 @@ export interface VideoModalState {
   provider?: string;
   isExpanded?: boolean;
   isPinned?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface VideoEditorModalState {
@@ -116,6 +129,9 @@ export interface MusicModalState {
   duration?: number;
   promptInfluence?: number;
   loop?: boolean;
+  isHovered?: boolean;
+  isHandleHovered?: boolean;
+  error?: string | null;
 }
 
 export interface UpscaleModalState {
@@ -135,6 +151,7 @@ export interface UpscaleModalState {
   faceEnhanceStrength?: number;
   topazModel?: string;
   faceEnhanceCreativity?: number;
+  error?: string | null;
 }
 
 export interface MultiangleCameraModalState {
@@ -159,6 +176,7 @@ export interface RemoveBgModalState {
   frameHeight?: number;
   isRemovingBg?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface CompareModalState {
@@ -172,6 +190,7 @@ export interface CompareModalState {
   prompt?: string;
   model?: string;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface EraseModalState {
@@ -186,6 +205,7 @@ export interface EraseModalState {
   frameHeight?: number;
   isErasing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface ExpandModalState {
@@ -200,6 +220,7 @@ export interface ExpandModalState {
   frameHeight?: number;
   isExpanding?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface VectorizeModalState {
@@ -214,6 +235,7 @@ export interface VectorizeModalState {
   frameHeight?: number;
   isVectorizing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 export interface NextSceneModalState {
@@ -228,6 +250,7 @@ export interface NextSceneModalState {
   frameHeight?: number;
   isProcessing?: boolean;
   isExpanded?: boolean;
+  error?: string | null;
 }
 
 
@@ -242,6 +265,7 @@ export interface StoryboardModalState {
   characterNamesMap?: Record<number, string>;
   propsNamesMap?: Record<number, string>;
   backgroundNamesMap?: Record<number, string>;
+  error?: string | null;
 }
 
 export interface CanvasTextState {
@@ -262,6 +286,7 @@ export interface CanvasTextState {
   rotation?: number;
   textDecoration?: string; // 'none' | 'underline' | 'line-through'
   htmlContent?: string;
+  error?: string | null;
 }
 
 export interface ScriptFrameModalState {
@@ -273,6 +298,7 @@ export interface ScriptFrameModalState {
   frameHeight: number;
   text: string;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 export interface SceneFrameModalState {
@@ -288,6 +314,7 @@ export interface SceneFrameModalState {
   characterIds?: string[];       // IDs of characters present in this scene
   locationId?: string;           // ID of the location where scene takes place
   mood?: string;                 // Emotional tone of the scene
+  error?: string | null;
 }
 
 export interface Connection {
@@ -323,116 +350,140 @@ export interface ComponentMenu {
 }
 
 export interface ModalOverlaysProps {
-  textInputStates: TextModalState[];
+  // textInputStates: TextModalState[]; // REMOVED: Managed by Zustand store
   imageModalStates: ImageModalState[];
   videoModalStates: VideoModalState[];
   videoEditorModalStates?: VideoEditorModalState[];
   imageEditorModalStates?: ImageEditorModalState[];
-  musicModalStates: MusicModalState[];
-  upscaleModalStates?: UpscaleModalState[];
-  removeBgModalStates?: RemoveBgModalState[];
-  eraseModalStates?: EraseModalState[];
-  expandModalStates?: ExpandModalState[];
-  vectorizeModalStates?: VectorizeModalState[];
-  nextSceneModalStates?: NextSceneModalState[];
-  storyboardModalStates?: StoryboardModalState[];
+  // REMOVED: musicModalStates (now managed by store)
+  // REMOVED: upscaleModalStates (now managed by store)
+  // REMOVED: removeBgModalStates (now managed by store)
+  // removeBgModalStates?: RemoveBgModalState[];
+  // REMOVED: eraseModalStates (now managed by store)
+  // eraseModalStates?: EraseModalState[];
+  // REMOVED: expandModalStates (now managed by store)
+  // expandModalStates?: ExpandModalState[];
+  // REMOVED: vectorizeModalStates (now managed by store)
+  // vectorizeModalStates?: VectorizeModalState[];
+  // REMOVED: nextSceneModalStates (now managed by store)
+  // nextSceneModalStates?: NextSceneModalState[];
+  // REMOVED: storyboardModalStates (now managed by store)
+  // storyboardModalStates?: StoryboardModalState[];
   scriptFrameModalStates?: ScriptFrameModalState[];
   sceneFrameModalStates?: SceneFrameModalState[];
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
 
   // Compare Plugin
-  compareModalStates?: CompareModalState[];
-  selectedCompareModalId?: string | null;
-  selectedCompareModalIds?: string[];
-  setCompareModalStates?: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
-  setSelectedCompareModalId?: (id: string | null) => void;
-  setSelectedCompareModalIds?: (ids: string[]) => void;
+  // REMOVED: compareModalStates (now managed by store)
+  // compareModalStates?: CompareModalState[];
+  // selectedCompareModalId?: string | null;
+  // selectedCompareModalIds?: string[];
+  // setCompareModalStates?: React.Dispatch<React.SetStateAction<CompareModalState[]>>;
+  // setSelectedCompareModalId?: (id: string | null) => void;
+  // setSelectedCompareModalIds?: (ids: string[]) => void;
   onPersistCompareModalCreate?: (modal: CompareModalState) => void | Promise<void>;
   onPersistCompareModalMove?: (id: string, updates: Partial<CompareModalState>) => void | Promise<void>;
   onPersistCompareModalDelete?: (id: string) => void | Promise<void>;
 
-  // Multiangle Camera Plugin
-  multiangleCameraModalStates?: MultiangleCameraModalState[];
-  selectedMultiangleCameraModalId?: string | null;
-  selectedMultiangleCameraModalIds?: string[];
-  setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
-  setSelectedMultiangleCameraModalId?: (id: string | null) => void;
-  setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
+  // Viewport / LOD flags (optional)
+  viewportSize?: { width: number; height: number };
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
+  isInteracting?: boolean;
+  setIsComponentDragging?: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // REMOVED: Multiangle Camera props (now managed by store)
+  // multiangleCameraModalStates?: MultiangleCameraModalState[];
+  // selectedMultiangleCameraModalId?: string | null;
+  // selectedMultiangleCameraModalIds?: string[];
+  // setMultiangleCameraModalStates?: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
+  // setSelectedMultiangleCameraModalId?: (id: string | null) => void;
+  // setSelectedMultiangleCameraModalIds?: (ids: string[]) => void;
   onPersistMultiangleCameraModalCreate?: (modal: MultiangleCameraModalState) => void | Promise<void>;
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<MultiangleCameraModalState>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
   onMultiangleCamera?: (sourceImageUrl?: string, prompt?: string, loraScale?: number, aspectRatio?: string, moveForward?: number, verticalTilt?: number, rotateDegrees?: number, useWideAngle?: boolean) => Promise<string | null>;
   onQwenMultipleAngles?: (imageUrls: string[], horizontalAngle?: number, verticalAngle?: number, zoom?: number, additionalPrompt?: string, loraScale?: number) => Promise<string | null>;
-
-  selectedTextInputId: string | null;
-  selectedTextInputIds: string[];
-  selectedImageModalId: string | null;
-  selectedImageModalIds: string[];
-  selectedVideoModalId: string | null;
-  selectedVideoModalIds: string[];
+  // selectedTextInputId: string | null; // REMOVED: Managed by Zustand store
+  // selectedTextInputIds: string[]; // REMOVED: Managed by Zustand store
+  // REMOVED: selectedImageModalId, selectedImageModalIds (now managed by Zustand store)
+  // selectedImageModalId: string | null;
+  // selectedImageModalIds: string[];
+  // REMOVED: selectedVideoModalId, selectedVideoModalIds (now managed by Zustand store)
+  // selectedVideoModalId: string | null;
+  // selectedVideoModalIds: string[];
   selectedVideoEditorModalId?: string | null;
   selectedVideoEditorModalIds?: string[];
   selectedImageEditorModalId?: string | null;
   selectedImageEditorModalIds?: string[];
-  selectedMusicModalId: string | null;
-  selectedMusicModalIds: string[];
-  selectedUpscaleModalId?: string | null;
-  selectedUpscaleModalIds?: string[];
-  selectedRemoveBgModalId?: string | null;
-  selectedRemoveBgModalIds?: string[];
-  selectedEraseModalId?: string | null;
-  selectedEraseModalIds?: string[];
-  selectedExpandModalId?: string | null;
-  selectedExpandModalIds?: string[];
-  selectedVectorizeModalId?: string | null;
-  selectedVectorizeModalIds?: string[];
-  selectedNextSceneModalId?: string | null;
-  selectedNextSceneModalIds?: string[];
-  selectedStoryboardModalId?: string | null;
-  selectedStoryboardModalIds?: string[];
+  // REMOVED: selectedMusicModalId, selectedMusicModalIds (now managed by Zustand store)
+  // selectedMusicModalId: string | null;
+  // selectedMusicModalIds: string[];
+  // REMOVED: selectedUpscaleModalId, selectedUpscaleModalIds (now managed by Zustand store)
+  // selectedUpscaleModalId?: string | null;
+  // selectedUpscaleModalIds?: string[];
+  // REMOVED: selectedRemoveBgModalId (now managed by store)
+  // selectedRemoveBgModalId?: string | null;
+  // selectedRemoveBgModalIds?: string[];
+  // selectedEraseModalId?: string | null;
+  // selectedEraseModalIds?: string[];
+  // selectedExpandModalId?: string | null;
+  // selectedExpandModalIds?: string[];
+  // selectedVectorizeModalId?: string | null;
+  // selectedVectorizeModalIds?: string[];
+  // selectedNextSceneModalId?: string | null;
+  // selectedNextSceneModalIds?: string[];
+  // selectedStoryboardModalId?: string | null;
+  // selectedStoryboardModalIds?: string[];
   clearAllSelections: () => void;
-  setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>;
-  setSelectedTextInputId: (id: string | null) => void;
-  setSelectedTextInputIds: (ids: string[]) => void;
+  // setTextInputStates: React.Dispatch<React.SetStateAction<TextModalState[]>>; // REMOVED: Managed by store
+  // setSelectedTextInputId: (id: string | null) => void; // REMOVED: Managed by store
+  // setSelectedTextInputIds: (ids: string[]) => void; // REMOVED: Managed by store
   setSelectedImageIndices: React.Dispatch<React.SetStateAction<number[]>>;
-  setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
-  setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
-  setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setImageModalStates, setSelectedImageModalId, setSelectedImageModalIds (now managed by Zustand store)
+  // setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
+  // setSelectedImageModalId: (id: string | null) => void;
+  // setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds (now managed by Zustand store)
+  // setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
+  // setSelectedVideoModalId: (id: string | null) => void;
+  // setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setVideoEditorModalStates?: React.Dispatch<React.SetStateAction<VideoEditorModalState[]>>;
   setSelectedVideoEditorModalId?: (id: string | null) => void;
   setSelectedVideoEditorModalIds?: (ids: string[]) => void;
   setImageEditorModalStates?: React.Dispatch<React.SetStateAction<ImageEditorModalState[]>>;
   setSelectedImageEditorModalId?: (id: string | null) => void;
   setSelectedImageEditorModalIds?: (ids: string[]) => void;
-  setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
-  setSelectedMusicModalId: (id: string | null) => void;
-  setSelectedMusicModalIds: (ids: string[]) => void;
-  setUpscaleModalStates?: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
-  setSelectedUpscaleModalId?: (id: string | null) => void;
-  setSelectedUpscaleModalIds?: (ids: string[]) => void;
-  setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
-  setSelectedRemoveBgModalId?: (id: string | null) => void;
-  setSelectedRemoveBgModalIds?: (ids: string[]) => void;
-  setEraseModalStates?: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
-  setSelectedEraseModalId?: (id: string | null) => void;
-  setSelectedEraseModalIds?: (ids: string[]) => void;
-  setExpandModalStates?: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
-  setSelectedExpandModalId?: (id: string | null) => void;
-  setSelectedExpandModalIds?: (ids: string[]) => void;
-  setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
-  setSelectedVectorizeModalId?: (id: string | null) => void;
-  setSelectedVectorizeModalIds?: (ids: string[]) => void;
-  setNextSceneModalStates?: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
-  setSelectedNextSceneModalId?: (id: string | null) => void;
-  setSelectedNextSceneModalIds?: (ids: string[]) => void;
-  setStoryboardModalStates?: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
+  // REMOVED: setMusicModalStates, setSelectedMusicModalId, setSelectedMusicModalIds (now managed by Zustand store)
+  // setMusicModalStates: React.Dispatch<React.SetStateAction<MusicModalState[]>>;
+  // setSelectedMusicModalId: (id: string | null) => void;
+  // setSelectedMusicModalIds: (ids: string[]) => void;
+  // REMOVED: setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by Zustand store)
+  // setUpscaleModalStates?: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
+  // setSelectedUpscaleModalId?: (id: string | null) => void;
+  // setSelectedUpscaleModalIds?: (ids: string[]) => void;
+  // REMOVED: setRemoveBgModalStates (now managed by store)
+  // setRemoveBgModalStates?: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
+  // setSelectedRemoveBgModalId?: (id: string | null) => void;
+  // setSelectedRemoveBgModalIds?: (ids: string[]) => void;
+  // setEraseModalStates?: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
+  // setSelectedEraseModalId?: (id: string | null) => void;
+  // setSelectedEraseModalIds?: (ids: string[]) => void;
+  // setExpandModalStates?: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
+  // setSelectedExpandModalId?: (id: string | null) => void;
+  // setSelectedExpandModalIds?: (ids: string[]) => void;
+  // setVectorizeModalStates?: React.Dispatch<React.SetStateAction<VectorizeModalState[]>>;
+  // setSelectedVectorizeModalId?: (id: string | null) => void;
+  // setSelectedVectorizeModalIds?: (ids: string[]) => void;
+  // setNextSceneModalStates?: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
+  // setSelectedNextSceneModalId?: (id: string | null) => void;
+  // setSelectedNextSceneModalIds?: (ids: string[]) => void;
+  // setStoryboardModalStates?: React.Dispatch<React.SetStateAction<StoryboardModalState[]>>;
   setScriptFrameModalStates?: React.Dispatch<React.SetStateAction<ScriptFrameModalState[]>>;
-  setSelectedStoryboardModalId?: (id: string | null) => void;
-  setSelectedStoryboardModalIds?: (ids: string[]) => void;
+  // setSelectedStoryboardModalId?: (id: string | null) => void;
+  // setSelectedStoryboardModalIds?: (ids: string[]) => void;
   setSelectionTightRect?: (rect: { x: number; y: number; width: number; height: number } | null) => void;
   setIsDragSelection?: (value: boolean) => void;
   images?: ImageUpload[];
@@ -528,7 +579,7 @@ export interface ModalOverlaysProps {
   onSceneFramePositionChange?: (frameId: string, x: number, y: number) => void;
   onSceneFramePositionCommit?: (frameId: string, x: number, y: number) => void;
   onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean }>) => void | Promise<void>;
+  onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; sentValue?: string; isPinned?: boolean; smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[] }>) => void | Promise<void>;
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
   connections?: Connection[];
   onConnectionsChange?: (connections: Connection[]) => void;
@@ -559,7 +610,7 @@ export interface ModalOverlaysProps {
   onPersistRichTextDelete?: (id: string) => void | Promise<void>;
   projectId?: string | null;
   isComponentDraggable?: (id: string) => boolean;
-  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+
   isUIHidden?: boolean;
   isChatOpen?: boolean;
 }

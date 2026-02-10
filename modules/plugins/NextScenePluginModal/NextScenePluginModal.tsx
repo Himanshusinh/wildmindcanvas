@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { NextSceneLabel } from './NextSceneLabel';
 // import { ModalActionIcons } from '../../common/ModalActionIcons'; // Not used in Vectorize either
@@ -9,7 +9,7 @@ import { NextSceneImageFrame } from './NextSceneImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImages, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { API_BASE_URL } from '@/core/api/api';
@@ -66,16 +66,18 @@ interface NextScenePluginModalProps {
     loraScale?: number;
   }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { nextSceneImageUrl?: string | null; isProcessing?: boolean; isExpanded?: boolean }) => void;
-  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean; isProcessing?: boolean }) => void | Promise<void>;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; isProcessing?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
-export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
+export const NextScenePluginModal = React.memo<NextScenePluginModalProps>(({
   isOpen,
   isExpanded,
   id,
@@ -110,6 +112,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   images = [],
   onPersistConnectorCreate,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +129,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   const [prompt, setPrompt] = useState<string>(initialPrompt || '');
   const [aspectRatio, setAspectRatio] = useState<string>(initialAspectRatio || '1:1');
   const [loraScale, setLoraScale] = useState<number>(initialLoraScale !== undefined ? initialLoraScale : 1.15);
+  const [multiangleModel, setMultiangleModel] = useState<string>('google/nano-banana-pro');
   const [trueGuidanceScale, setTrueGuidanceScale] = useState<number>(0);
 
   const onOptionsChangeRef = useLatestRef(onOptionsChange);
@@ -226,6 +231,34 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
   });
 
 
+  const [multiangleCategory, setMultiangleCategory] = useState<string>('human');
+
+  // Multi-angle prompt templates (matching MultiangleCameraPlugin)
+  const HUMAN_BASE = `Maintain perfect consistency with the person in the input image — same face identity, hairstyle, clothing, skin tone, accessories, and body proportions. Do NOT modify or beautify the person. The only change should be camera angle. High-resolution photorealistic output.`;
+  const HUMAN_ANGLES = [
+    'Generate a straight front-facing portrait of the person, eye-level camera, full clarity of facial features.',
+    'Show the person from a 45° front-left angle, revealing face + left side slightly rotated.',
+    'Generate the person from a 45° front-right perspective, natural rotation with visibility of front and right side.',
+    'Produce a clean left-side profile (pure side angle), only left silhouette and features visible.',
+    'Generate a pure right-side profile view, showing full right body/face outline.',
+    'Show the person from 45° back-left angle, back visible with slight left side exposure.',
+    'Generate a 45° back-right perspective, showing back and partial right view.',
+    'Produce a direct back-facing view of the person, full back detail visible.',
+    'Generate a slightly top-down camera angle of the person, head/upper body visible, perspective from above.'
+  ];
+  const PRODUCT_BASE = `Maintain perfect consistency with the product in the input image — same shape, geometry, material, texture, branding, labels, colors, proportions, and design. Do NOT redesign or add new elements. Only the camera angle should change. High-quality product photography style.`;
+  const PRODUCT_ANGLES = [
+    'Generate a front-facing view of the product, centered, eye-level camera.',
+    'Show the product from a 45° front-left angle, revealing front and left surfaces.',
+    'Generate the product from a 45° front-right angle, showing both front and right sides naturally.',
+    'Produce a pure left-side view of the product with no front surface visible.',
+    'Generate a pure right-side profile of the product with only right surface visible.',
+    'Generate a 45° back-left angle view, rear surface visible along with a bit of left side.',
+    'Show a 45° back-right perspective, displaying back area and partial right surface.',
+    'Produce a direct rear-facing view, full backside of the product visible.',
+    'Generate a top-down camera angle, product visible from above with dimensional depth.'
+  ];
+
   const handleNextScene = async () => {
     console.log('[NextScenePluginModal] handleNextScene called', {
       isProcessing,
@@ -252,7 +285,173 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       onOptionsChange({ isProcessing: true } as any);
     }
 
-    // Original single scene/nextscene logic below
+    // --- MULTI-SCENE LOGIC (9 Angles) ---
+    if (mode === 'nextscene') {
+      try {
+        const projectId = window.location.pathname.split('/project/')[1] || 'default-project';
+
+        // Determine prompts based on category
+        const isHuman = multiangleCategory === 'human';
+        const basePrompt = isHuman ? HUMAN_BASE : PRODUCT_BASE;
+        const angles = isHuman ? HUMAN_ANGLES : PRODUCT_ANGLES;
+
+        const MULTIANGLE_SHOT_PROMPTS = angles.map((angleText, index) => ({
+          shot: `Angle ${index + 1}`,
+          // Cleaner prompt construction: Base + Angle + User Instruction
+          prompt: `${basePrompt} ${angleText}${prompt ? ` Style: ${prompt}` : ''}`
+        }));
+
+        // Calculate frame dimensions
+        const [w, h] = aspectRatio.split(':').map(Number);
+        const ar = w && h ? (w / h) : 1;
+        const baseSize = 600;
+        const frameWidth = Math.round(baseSize);
+        const frameHeight = Math.round(baseSize / ar);
+
+        // Grid Layout
+        const modalIds: string[] = [];
+        const gridCols = 3;
+        const gap = 12;
+        const horizontalGap = frameWidth + gap;
+        const verticalGap = frameHeight + gap;
+
+        // Start to the right of plugin
+        const startX = x + (150 * scale) / scale;
+        // Center vertically relative to plugin center (y+50)
+        const gridHeight = (3 * frameHeight + 2 * gap);
+        const startY = y + 50 - (gridHeight / 2);
+
+        // CREATE 9 MODALS (Optimistic)
+        for (let i = 0; i < 9; i++) {
+          const col = i % gridCols;
+          const row = Math.floor(i / gridCols);
+          const modalId = `image-nextscene-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+          modalIds.push(modalId);
+
+          const targetX = startX + (col * horizontalGap) / scale;
+          const targetY = startY + (row * verticalGap) / scale;
+
+          if (onPersistImageModalCreate) {
+            onPersistImageModalCreate({
+              id: modalId,
+              x: targetX,
+              y: targetY,
+              generatedImageUrl: null,
+              frameWidth,
+              frameHeight,
+              model: 'NextScene Multi', // Identifier
+              frame: 'Frame',
+              aspectRatio: aspectRatio || '1:1',
+              prompt: MULTIANGLE_SHOT_PROMPTS[i].prompt,
+              isProcessing: true,
+            });
+          }
+
+          // Connect plugin to each modal
+          if (onPersistConnectorCreate && id) {
+            onPersistConnectorCreate({
+              from: id,
+              to: modalId,
+              color: SELECTION_COLOR,
+              fromX: x + (100 * scale) + 20,
+              fromY: y + (50 * scale),
+              toX: targetX,
+              toY: targetY + (frameHeight / 2),
+              fromAnchor: 'send',
+              toAnchor: 'receive',
+            });
+          }
+        }
+
+        // GENERATE 9 IMAGES PARALLEL
+        console.log('[NextScenePluginModal] Generating 9 multi-scene shots in parallel...');
+
+        const generationPromises = MULTIANGLE_SHOT_PROMPTS.map(async (shot, index) => {
+          const shotPrompt = shot.prompt;
+          const modalId = modalIds[index];
+
+          try {
+            // Re-using next-scene API structure but per image
+            // Note: We use the fetch directly here to match the single-scene structure or use the helper
+            // The single scene uses: /api/canvas/next-scene
+            // We should use the same endpoint but per image, or use generateImageForCanvas if compatible.
+            // Given the plan said "Use standard 9-angle prompts... via generateImageForCanvas(parallel requests)", I will try generateImageForCanvas.
+            // However, NextScene usually hits a specific endpoint. Let's stick to the consistent NextScene payload structure for best results, OR use the helper if it wraps correctly.
+            // The single scene logic uses manual fetch to /api/canvas/next-scene. I will duplicate that for now to be safe and consistent with NextScene requirements (e.g. meta tags).
+
+            const payload = {
+              image: sourceImageUrl,
+              prompt: shotPrompt, // Specific prompt for this angle
+              aspectRatio: aspectRatio,
+              lora_scale: loraScale,
+              model: multiangleModel,
+              mode: mode, // 'nextscene'
+              images: connectedImageSources,
+              true_guidance_scale: trueGuidanceScale,
+              guidance_scale: trueGuidanceScale,
+              output_format: "webp",
+              output_quality: 95,
+              meta: {
+                source: 'canvas',
+                projectId: projectId,
+                elementId: id,
+                modalId: modalId, // Pass the specific modal ID 
+                subTask: `angle-${index}`
+              }
+            };
+
+            const response = await fetch(`${API_BASE_URL}/api/canvas/next-scene`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.message || 'Generation failed');
+            }
+            const data = await response.json();
+            const resultUrl = data.data?.url;
+
+            if (resultUrl) {
+              if (onUpdateImageModalState) {
+                onUpdateImageModalState(modalId, {
+                  generatedImageUrl: resultUrl,
+                  isProcessing: false,
+                });
+              }
+              return { index, success: true, url: resultUrl };
+            } else {
+              throw new Error('No URL returned');
+            }
+
+          } catch (error: any) {
+            console.error(`[NextScene] Failed to generate shot ${index}:`, error);
+            if (onUpdateImageModalState) {
+              onUpdateImageModalState(modalId, { isProcessing: false });
+            }
+            return { index, success: false, error: error.message };
+          }
+        });
+
+        const results = await Promise.all(generationPromises);
+        const successCount = results.filter(r => r.success).length;
+
+        if (successCount === 0) alert('All multi-scene generations failed.');
+        else if (successCount < 9) alert(`${successCount}/9 images generated successfully.`);
+
+      } catch (error: any) {
+        console.error('[NextScenePluginModal] Multi-scene error:', error);
+        alert(`Generation failed: ${error.message}`);
+      } finally {
+        setIsProcessing(false);
+        if (onOptionsChange) onOptionsChange({ isProcessing: false } as any);
+      }
+      return;
+    }
+
+    // --- SINGLE SCENE LOGIC (Existing) ---
     // 1. Create a new image modal placeholder immediately (Optimistic UI)
     const newModalId = `image-nextscene-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const frameWidth = 600;
@@ -273,7 +472,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         frame: 'Frame', // Media frame style
         aspectRatio: aspectRatio || '1:1',
         prompt: prompt,
-        isGenerating: true, // Show loading spinner
+        isProcessing: true, // Show loading spinner
       });
     }
 
@@ -301,15 +500,18 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         prompt: prompt,
         aspectRatio: aspectRatio,
         lora_scale: loraScale,
+        model: multiangleModel,
         mode: mode,
         images: connectedImageSources,
         true_guidance_scale: trueGuidanceScale,
+        guidance_scale: trueGuidanceScale,
         output_format: "webp",
         output_quality: 95,
         meta: {
           source: 'canvas',
           projectId: projectId,
-          elementId: id
+          elementId: id,
+          modalId: newModalId // Pass the specific modal ID
         }
       };
 
@@ -335,7 +537,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
         if (onUpdateImageModalState) {
           onUpdateImageModalState(newModalId, {
             generatedImageUrl: resultUrl,
-            isGenerating: false,
+            isProcessing: false,
           });
         }
 
@@ -360,7 +562,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       // Update loading state on error
       if (onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
-          isGenerating: false,
+          isProcessing: false,
+          error: (error as any)?.message || 'Generation failed',
         });
       }
     } finally {
@@ -380,6 +583,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -388,6 +592,22 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={onContextMenu}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Plugin node design with icon and label */}
       <div
         data-frame-id={id ? `${id}-frame` : undefined}
@@ -418,8 +638,6 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           }}
         >
           Next Scene
-
-          {/* Delete button removed in favor of context menu */}
         </div>
 
         {/* Main plugin container - Circular */}
@@ -462,12 +680,7 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}
@@ -529,6 +742,14 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
                 onTrueGuidanceScaleChange={(val) => {
                   setTrueGuidanceScale(val);
                 }}
+                multiangleCategory={multiangleCategory}
+                onMultiangleCategoryChange={(val) => {
+                  setMultiangleCategory(val);
+                }}
+                multiangleModel={multiangleModel}
+                onMultiangleModelChange={(val) => {
+                  setMultiangleModel(val);
+                }}
               />
               <NextSceneImageFrame
                 id={id}
@@ -548,7 +769,8 @@ export const NextScenePluginModal: React.FC<NextScenePluginModalProps> = ({
           </div>
         )}
       </div>
-
     </PluginNodeShell>
   );
-};
+});
+
+NextScenePluginModal.displayName = 'NextScenePluginModal';

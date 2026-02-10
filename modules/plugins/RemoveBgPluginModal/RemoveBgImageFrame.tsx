@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
 interface RemoveBgImageFrameProps {
@@ -136,12 +136,7 @@ export const RemoveBgImageFrame: React.FC<RemoveBgImageFrameProps> = ({
         </div>
       )}
 
-      <PluginConnectionNodes
-        id={id}
-        scale={scale}
-        isHovered={isHovered}
-        isSelected={isSelected}
-      />
+
     </div>
   );
 };

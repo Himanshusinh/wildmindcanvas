@@ -6,6 +6,7 @@ import { GroupContainerState } from '@/core/types/groupContainer';
 import { Html } from 'react-konva-utils';
 import { Palette, Highlighter, Ungroup, ChevronDown, Droplets, Minus, Plus } from 'lucide-react';
 import { CanvasImage } from './CanvasImage';
+import { useRemoveBgModalStates, useEraseModalStates, useExpandModalStates } from '@/modules/stores';
 
 interface GroupContainerOverlayProps {
     groups: GroupContainerState[];
@@ -25,9 +26,12 @@ interface GroupContainerOverlayProps {
     musicModalStates?: any[];
     upscaleModalStates?: any[];
     multiangleCameraModalStates?: any[];
-    removeBgModalStates?: any[];
-    eraseModalStates?: any[];
-    expandModalStates?: any[];
+    // REMOVED: removeBgModalStates (via store)
+    // removeBgModalStates?: any[];
+    // REMOVED: eraseModalStates (via store)
+    // eraseModalStates?: any[];
+    // REMOVED: expandModalStates (via store)
+    // expandModalStates?: any[];
     vectorizeModalStates?: any[];
     nextSceneModalStates?: any[];
     compareModalStates?: any[];
@@ -64,9 +68,12 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
     musicModalStates = [],
     upscaleModalStates = [],
     multiangleCameraModalStates = [],
-    removeBgModalStates = [],
-    eraseModalStates = [],
-    expandModalStates = [],
+    // REMOVED: removeBgModalStates (via store)
+    // removeBgModalStates = [],
+    // REMOVED: eraseModalStates (via store)
+    // eraseModalStates = [],
+    // REMOVED: expandModalStates (via store)
+    // expandModalStates = [],
     vectorizeModalStates = [],
     nextSceneModalStates = [],
     compareModalStates = [],
@@ -78,6 +85,9 @@ export const GroupContainerOverlay: React.FC<GroupContainerOverlayProps> = ({
     stageRef,
     onPersistMove,
 }) => {
+    const removeBgModalStates = useRemoveBgModalStates();
+    const eraseModalStates = useEraseModalStates();
+    const expandModalStates = useExpandModalStates();
     const selectedGroupId = selectedGroupIds.length === 1 ? selectedGroupIds[0] : null;
     const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');

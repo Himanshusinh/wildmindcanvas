@@ -132,7 +132,34 @@ export function useRealtimeConnection({ projectId, setters }: UseRealtimeConnect
     client.on(handleEvent);
     client.connect(projectId);
 
+    // bfcache support: close socket on pagehide, reconnect on pageshow
+    const handlePageHide = () => {
+      console.log('[Realtime] Page hidden (bfcache), disconnecting...');
+      // Disconnect cleanly so browser can freeze the page
+      try { client.disconnect(); } catch (e) { console.error(e); }
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      // If persisted is true, page was restored from bfcache
+      if (event.persisted) {
+        console.log('[Realtime] Page restored from bfcache, reconnecting...');
+        // Small delay to ensure browser networking is fully awake
+        setTimeout(() => {
+          client.connect(projectId);
+        }, 100);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', handlePageHide);
+      window.addEventListener('pageshow', handlePageShow);
+    }
+
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pagehide', handlePageHide);
+        window.removeEventListener('pageshow', handlePageShow);
+      }
       client.off(handleEvent);
       client.disconnect();
     };

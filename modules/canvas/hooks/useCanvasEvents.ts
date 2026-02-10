@@ -8,6 +8,8 @@ import { useCanvasSelection } from './useCanvasSelection';
 import { getComponentDimensions } from '../utils/getComponentDimensions';
 import { applyStageCursor, getClientRect, INFINITE_CANVAS_SIZE, findBlankSpace } from '@/core/canvas/canvasHelpers';
 import { useGroupLogic } from './useGroupLogic';
+import { useCanvasCoordinates } from './useCanvasCoordinates';
+import { useImageModalStates, useVideoModalStates, useMusicModalStates, useUpscaleModalStates, useMultiangleCameraModalStates, useRemoveBgModalStates, useEraseModalStates, useExpandModalStates, useImageStore, useVideoStore, useMusicStore, useRemoveBgStore, useEraseStore, useExpandStore } from '@/modules/stores';
 
 // Module-level variable to debounce creation across Strict Mode remounts
 let globalLastTextCreateTime = 0;
@@ -54,6 +56,23 @@ export function useCanvasEvents(
         navigationMode = 'trackpad'
     } = canvasLocalState;
 
+    // Zustand Store Hooks
+    const imageModalStates = useImageModalStates();
+    const videoModalStates = useVideoModalStates();
+    const musicModalStates = useMusicModalStates();
+    const upscaleModalStates = useUpscaleModalStates();
+    const multiangleCameraModalStates = useMultiangleCameraModalStates();
+
+    const { setImageModalStates } = useImageStore();
+    const { setVideoModalStates } = useVideoStore();
+    const { setMusicModalStates } = useMusicStore();
+    const removeBgModalStates = useRemoveBgModalStates();
+    const { setRemoveBgModalStates } = useRemoveBgStore();
+    const eraseModalStates = useEraseModalStates();
+    const { setEraseModalStates } = useEraseStore();
+    const expandModalStates = useExpandModalStates();
+    const { setExpandModalStates } = useExpandStore();
+
     const {
         // setCanvasTextStates, // REMOVED: use effectiveSetCanvasTextStates
         effectiveCanvasTextStates,
@@ -62,17 +81,16 @@ export function useCanvasEvents(
         images,
         textInputStates,
         setTextInputStates,
-        imageModalStates,
-        setImageModalStates,
-        videoModalStates,
-        setVideoModalStates,
-        musicModalStates,
-        setMusicModalStates,
-        upscaleModalStates,
-        multiangleCameraModalStates,
-        removeBgModalStates,
-        eraseModalStates,
-        expandModalStates,
+        // REMOVED: imageModalStates, setImageModalStates (now using store hooks)
+        // REMOVED: videoModalStates, setVideoModalStates (now using store hooks)
+        // REMOVED: musicModalStates, setMusicModalStates (now using store hooks)
+        // REMOVED: upscaleModalStates, multiangleCameraModalStates (now using store hooks)
+        // REMOVED: removeBgModalStates (now using store hooks)
+        // removeBgModalStates,
+        // REMOVED: eraseModalStates (via store)
+        // eraseModalStates,
+        // REMOVED: expandModalStates (via store)
+        // expandModalStates,
         vectorizeModalStates,
         nextSceneModalStates,
         compareModalStates,
@@ -141,10 +159,40 @@ export function useCanvasEvents(
     const positionRef = useRef(position);
     const scaleRef = useRef(scale);
     const isPanningRef = useRef(isPanning);
+    const lastPanningEndTimeRef = useRef<number>(0);
 
     useEffect(() => { positionRef.current = position; }, [position]);
     useEffect(() => { scaleRef.current = scale; }, [scale]);
     useEffect(() => { isPanningRef.current = isPanning; }, [isPanning]);
+
+    const { screenToCanvas, canvasToScreen } = useCanvasCoordinates({
+        position,
+        scale
+    });
+
+    // Ref to cache stage bounding box to avoid forced reflow during mousemove
+    const stageRectRef = useRef<DOMRect | null>(null);
+
+    const updateStageRect = useCallback(() => {
+        if (stageRef.current) {
+            const container = stageRef.current.container();
+            if (container) {
+                stageRectRef.current = container.getBoundingClientRect();
+            }
+        }
+    }, [stageRef]);
+
+    useEffect(() => {
+        if (isSelecting) {
+            updateStageRect();
+            window.addEventListener('resize', updateStageRect);
+            window.addEventListener('scroll', updateStageRect, true);
+        }
+        return () => {
+            window.removeEventListener('resize', updateStageRect);
+            window.removeEventListener('scroll', updateStageRect, true);
+        };
+    }, [isSelecting, updateStageRect]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -250,18 +298,33 @@ export function useCanvasEvents(
         const id = `${selectedTool}-${Date.now()}`;
 
         if (selectedTool === 'image') {
-            const { x, y } = findSmartPosition(600, 400); // Default image modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 600); // Standardized to 600x600 (1:1)
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 600,
+                frame: 'Square',
+                aspectRatio: '1:1'
+            };
             setImageModalStates(prev => [...prev, newState]);
             onPersistImageModalCreate?.(newState);
         } else if (selectedTool === 'video') {
-            const { x, y } = findSmartPosition(600, 400); // Default video modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 338); // Standardized to 600x338 (16:9)
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 338,
+                aspectRatio: '16:9'
+            };
             setVideoModalStates(prev => [...prev, newState]);
             onPersistVideoModalCreate?.(newState);
         } else if (selectedTool === 'music') {
-            const { x, y } = findSmartPosition(600, 300); // Default music modal size
-            const newState = { id, x, y, frameWidth: 512, frameHeight: 512 };
+            const { x, y } = findSmartPosition(600, 300); // Logic for music remains same but using standardization
+            const newState = {
+                id, x, y,
+                frameWidth: 600,
+                frameHeight: 300
+            };
             setMusicModalStates(prev => [...prev, newState]);
             onPersistMusicModalCreate?.(newState);
         } else if (selectedTool === 'rich-text') {
@@ -306,8 +369,14 @@ export function useCanvasEvents(
 
                 console.log('[useCanvasEvents] Creating AI Text (TextInput)');
                 // Estimated size of new text input
-                const { x, y } = findSmartPosition(400, 140);
-                const newState = { id, x, y, value: '', autoFocusInput: false };
+                const { x, y } = findSmartPosition(400, 400); // Standardized to 400x400
+                const newState = {
+                    id, x, y,
+                    value: '',
+                    autoFocusInput: false,
+                    frameWidth: 400,
+                    frameHeight: 400
+                };
                 setTextInputStates(prev => [...prev, newState]);
                 onPersistTextModalCreate?.(newState);
             } else {
@@ -366,14 +435,39 @@ export function useCanvasEvents(
         const isResizeHandle = target.name() === 'resize-handle';
         const isStartingSelection = (isCursorTool || isShiftSelection) && !isPanKey && e.evt.button === 0;
 
+        // Middle mouse button (button 1) unconditionally triggers panning
+        if (e.evt.button === 1) {
+            const stage = e.target.getStage();
+            if (stage) {
+                e.evt.preventDefault();
+                setIsMiddleButtonPressed(true);
+                setIsPanning(true);
+                isPanningRef.current = true; // Immediate ref sync
+                stage.draggable(true);
+                stage.startDrag(); // Force immediate start to avoid jumping
+                applyStageCursorWrapper('grabbing', true);
+            }
+            return;
+        }
+
+        const shouldPan = (isMoveTool || isPanKey) && !isShiftSelection;
+        if (clickedOnEmpty && e.evt.button === 0 && shouldPan) {
+            const stage = e.target.getStage();
+            if (stage) {
+                setIsPanning(true);
+                isPanningRef.current = true; // Immediate ref sync
+                stage.draggable(true);
+                stage.startDrag(); // Force immediate start to avoid jumping
+                applyStageCursorWrapper('grabbing', true);
+            }
+            return;
+        }
+
         let isInsideSelection = false;
         if (stage) {
             const pointerPos = stage.getPointerPosition();
             if (pointerPos) {
-                const canvasPos = {
-                    x: (pointerPos.x - position.x) / scale,
-                    y: (pointerPos.y - position.y) / scale,
-                };
+                const canvasPos = screenToCanvas(pointerPos);
 
                 if (selectionTightRect) {
                     const rect = selectionTightRect;
@@ -429,7 +523,7 @@ export function useCanvasEvents(
         if (isShiftSelection && clickedOnEmpty) {
             if (pointerPos) {
                 setPendingSelectionStartScreen({ x: pointerPos.x, y: pointerPos.y });
-                setPendingSelectionStartCanvas({ x: (pointerPos.x - position.x) / scale, y: (pointerPos.y - position.y) / scale });
+                setPendingSelectionStartCanvas(screenToCanvas(pointerPos));
                 setSelectionStartPoint({ x: pointerPos.x, y: pointerPos.y });
                 setSelectionBox(null);
                 setSelectionTightRect(null);
@@ -438,21 +532,10 @@ export function useCanvasEvents(
             return;
         }
 
-        if (isMoveTool && clickedOnEmpty && e.evt.button === 0) {
-            const stage = e.target.getStage();
-            if (stage) {
-                setIsPanning(true);
-                stage.draggable(true);
-                applyStageCursorWrapper('grabbing', true);
-            }
-            return;
-        }
-
         if (isCursorTool && e.evt.button === 0) {
             if (!clickedOnEmpty) return;
             if (pointerPos) {
-                const canvasX = (pointerPos.x - position.x) / scale;
-                const canvasY = (pointerPos.y - position.y) / scale;
+                const { x: canvasX, y: canvasY } = screenToCanvas(pointerPos);
                 setSelectionRectCoords({
                     x1: canvasX, y1: canvasY, x2: canvasX, y2: canvasY
                 });
@@ -466,8 +549,7 @@ export function useCanvasEvents(
             return;
         }
 
-        const shouldPan = isPanKey && !isShiftSelection;
-        if (clickedOnEmpty && e.evt.button === 0 && !isShiftSelection && (isMoveTool || isPanKey)) {
+        if (shouldPan && clickedOnElement && isMoveTool && e.evt.button === 0) {
             const stage = e.target.getStage();
             if (stage) {
                 setIsPanning(true);
@@ -477,27 +559,7 @@ export function useCanvasEvents(
             return;
         }
 
-        if (shouldPan) {
-            const stage = e.target.getStage();
-            if (stage) {
-                if (e.evt.button === 1) {
-                    e.evt.preventDefault();
-                    e.evt.stopPropagation();
-                    setIsMiddleButtonPressed(true);
-                    return;
-                }
-                setIsPanning(true);
-                stage.draggable(true);
-                applyStageCursorWrapper('grabbing', true);
-            }
-        } else if (clickedOnElement && isMoveTool) {
-            const stage = e.target.getStage();
-            if (stage) {
-                setIsPanning(true);
-                stage.draggable(true);
-                applyStageCursorWrapper('grabbing', true);
-            }
-        } else if (clickedOnElement) {
+        if (clickedOnElement) {
             setIsDraggingFromElement(true);
             const stage = e.target.getStage();
             if (stage) {
@@ -515,8 +577,7 @@ export function useCanvasEvents(
             const pointer = stage.getPointerPosition();
             if (!pointer) return;
 
-            const currentX = (pointer.x - position.x) / scale;
-            const currentY = (pointer.y - position.y) / scale;
+            const { x: currentX, y: currentY } = screenToCanvas(pointer);
 
             setSelectionBox({
                 ...selectionBox,
@@ -526,19 +587,72 @@ export function useCanvasEvents(
         }
     };
 
+    // Window-level mouse move handler to update selection box even when mouse is over HTML modals
+    useEffect(() => {
+        if (!isSelecting || !selectionBox) return;
+
+        const handleWindowMouseMove = (e: MouseEvent) => {
+            // Use cached rect if available, fallback only if necessary
+            let rectSize = stageRectRef.current;
+            if (!rectSize && stageRef.current) {
+                const stageContainer = stageRef.current.container();
+                if (stageContainer) {
+                    rectSize = stageContainer.getBoundingClientRect();
+                    stageRectRef.current = rectSize;
+                }
+            }
+            if (!rectSize) return;
+
+            const pointerX = e.clientX - rectSize.left;
+            const pointerY = e.clientY - rectSize.top;
+
+            // Convert to canvas coordinates
+            const { x: currentX, y: currentY } = screenToCanvas({ x: pointerX, y: pointerY });
+
+            setSelectionBox({
+                ...selectionBox,
+                currentX,
+                currentY
+            });
+        };
+
+
+        window.addEventListener('mousemove', handleWindowMouseMove, { passive: true });
+        return () => {
+            window.removeEventListener('mousemove', handleWindowMouseMove);
+        };
+    }, [isSelecting, selectionBox, position.x, position.y, scale, stageRef]);
+
     const handleStageMouseUp = (e: KonvaEventObject<MouseEvent>) => {
-        if (e.evt.button === 1) {
-            setIsMiddleButtonPressed(false);
+        // Robust Panning Cleanup (Ref-based to avoid closure staleness)
+        if (isPanningRef.current) {
             setIsPanning(false);
+            isPanningRef.current = false; // Immediate ref sync
+            setIsMiddleButtonPressed(false);
             const stage = e.target.getStage();
-            if (stage) stage.draggable(false);
-            e.evt.preventDefault();
-            e.evt.stopPropagation();
+            if (stage) {
+                stage.stopDrag(); // Ensure Konva stops
+                stage.draggable(false);
+                // Clear DOM override to allow React styles to take over
+                try { stage.container().style.cursor = ''; } catch (err) { }
+            }
+            // Auto-select cursor tool after panning ends
+            if (selectedTool === 'move' || e.evt.button === 1) {
+                onToolSelect?.('cursor');
+                // "Instant Pointer Click" - Automatically deselect and trigger background click
+                clearAllSelections(true);
+                props.onBackgroundClick?.();
+            }
+
+            // Only stop propagation if we were actually panning
+            if (e.evt.button === 1) {
+                e.evt.preventDefault();
+                e.evt.stopPropagation();
+            }
             return;
         }
 
         // Selection Rect Logic
-        // Fix: Use selectionBox for coordinates as it tracks Drag. selectionRectCoords is often stale.
         const hasDrag = selectionBox && isSelecting;
         if (selectionRectCoords || hasDrag) {
             let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
@@ -562,193 +676,190 @@ export function useCanvasEvents(
                 };
 
                 const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+                const canvasItemsData = {
+                    ...canvasState,
+                    canvasTextStates: effectiveCanvasTextStates,
+                    imageModalStates,
+                    videoModalStates,
+                    musicModalStates,
+                    upscaleModalStates,
+                    multiangleCameraModalStates,
+                    removeBgModalStates,
+                    eraseModalStates,
+                    expandModalStates,
+                };
 
-                const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
-                // ... initialize all other arrays
-                const newSelectedImageModalIds = isMultiSelect ? [...selectedImageModalIds] : [];
-                const newSelectedTextInputIds = isMultiSelect ? [...selectedTextInputIds] : [];
-                const newSelectedRichTextIds = isMultiSelect ? [...selectedRichTextIds] : [];
-                // (Shortened for brevity, implement logic similarly for all)
-
-                // Helper to check intersection
                 const checkIntersection = (itemRect: { x: number; y: number; width: number; height: number; rotation?: number }) => {
                     const componentRect = getClientRect(itemRect);
                     return Konva.Util.haveIntersection(selectionRect, componentRect);
                 };
 
+                const newSelectedIndices: number[] = isMultiSelect ? [...selectedImageIndices] : [];
+                const newSelectedImageModalIds = isMultiSelect ? [...selectedImageModalIds] : [];
+                const newSelectedVideoModalIds = isMultiSelect ? [...selectedVideoModalIds] : [];
+                const newSelectedVideoEditorModalIds = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
+                const newSelectedImageEditorModalIds = isMultiSelect ? [...selectedImageEditorModalIds] : [];
+                const newSelectedMusicModalIds = isMultiSelect ? [...selectedMusicModalIds] : [];
+                const newSelectedTextInputIds = isMultiSelect ? [...selectedTextInputIds] : [];
+                const newSelectedNextSceneModalIds = isMultiSelect ? [...selectedNextSceneModalIds] : [];
+                const newSelectedMultiangleCameraModalIds = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
+                const newSelectedVectorizeModalIds = isMultiSelect ? [...selectedVectorizeModalIds] : [];
+                const newSelectedRemoveBgModalIds = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
+                const newSelectedUpscaleModalIds = isMultiSelect ? [...selectedUpscaleModalIds] : [];
+                const newSelectedEraseModalIds = isMultiSelect ? [...selectedEraseModalIds] : [];
+                const newSelectedExpandModalIds = isMultiSelect ? [...selectedExpandModalIds] : [];
+                const newSelectedCompareModalIds = isMultiSelect ? [...selectedCompareModalIds] : [];
+                const newSelectedStoryboardModalIds = isMultiSelect ? [...selectedStoryboardModalIds] : [];
+                const newSelectedScriptFrameModalIds = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
+                const newSelectedSceneFrameModalIds = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
+                const newSelectedGroupIds = isMultiSelect ? [...selectedGroupIds] : [];
+                const newSelectedRichTextIds = isMultiSelect ? [...selectedRichTextIds] : [];
+                const newSelectedCanvasTextIds = isMultiSelect ? [...selectedCanvasTextIds] : [];
+
                 // Check intersection for all types
-                // Images
                 images.forEach((img, idx) => {
                     if (img.type === 'image' || img.type === 'video') {
-                        const dims = getComponentDimensions('image', idx, canvasState as any);
+                        const dims = getComponentDimensions('image', idx, canvasItemsData);
                         if (checkIntersection({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height, rotation: img.rotation || 0 })) {
                             if (!newSelectedIndices.includes(idx)) newSelectedIndices.push(idx);
                         }
                     }
                 });
 
-                // Image Modals 
                 imageModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('imageModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('imageModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedImageModalIds.includes(modal.id)) newSelectedImageModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedVideoModalIds = isMultiSelect ? [...selectedVideoModalIds] : [];
                 videoModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('videoModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('videoModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVideoModalIds.includes(modal.id)) newSelectedVideoModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedVideoEditorModalIds = isMultiSelect ? [...selectedVideoEditorModalIds] : [];
                 videoEditorModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('videoEditorModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('videoEditorModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVideoEditorModalIds.includes(modal.id)) newSelectedVideoEditorModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedImageEditorModalIds = isMultiSelect ? [...selectedImageEditorModalIds] : [];
                 imageEditorModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('imageEditorModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('imageEditorModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedImageEditorModalIds.includes(modal.id)) newSelectedImageEditorModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedMusicModalIds = isMultiSelect ? [...selectedMusicModalIds] : [];
                 musicModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('musicModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('musicModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedMusicModalIds.includes(modal.id)) newSelectedMusicModalIds.push(modal.id);
                     }
                 });
 
                 textInputStates.forEach((input: any) => {
-                    const dims = getComponentDimensions('input', input.id, canvasState as any);
+                    const dims = getComponentDimensions('input', input.id, canvasItemsData);
                     if (checkIntersection({ x: input.x, y: input.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedTextInputIds.includes(input.id)) newSelectedTextInputIds.push(input.id);
                     }
                 });
 
-                const newSelectedNextSceneModalIds = isMultiSelect ? [...selectedNextSceneModalIds] : [];
                 nextSceneModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('nextSceneModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('nextSceneModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedNextSceneModalIds.includes(modal.id)) newSelectedNextSceneModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedMultiangleCameraModalIds = isMultiSelect ? [...selectedMultiangleCameraModalIds] : [];
                 multiangleCameraModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('multiangleCameraModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('multiangleCameraModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedMultiangleCameraModalIds.includes(modal.id)) newSelectedMultiangleCameraModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedVectorizeModalIds = isMultiSelect ? [...selectedVectorizeModalIds] : [];
                 vectorizeModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('vectorizeModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('vectorizeModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedVectorizeModalIds.includes(modal.id)) newSelectedVectorizeModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedRemoveBgModalIds = isMultiSelect ? [...selectedRemoveBgModalIds] : [];
                 removeBgModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('removeBgModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('removeBgModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedRemoveBgModalIds.includes(modal.id)) newSelectedRemoveBgModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedUpscaleModalIds = isMultiSelect ? [...selectedUpscaleModalIds] : [];
                 upscaleModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('upscaleModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('upscaleModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedUpscaleModalIds.includes(modal.id)) newSelectedUpscaleModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedEraseModalIds = isMultiSelect ? [...selectedEraseModalIds] : [];
                 eraseModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('eraseModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('eraseModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedEraseModalIds.includes(modal.id)) newSelectedEraseModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedExpandModalIds = isMultiSelect ? [...selectedExpandModalIds] : [];
                 expandModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('expandModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('expandModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedExpandModalIds.includes(modal.id)) newSelectedExpandModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedCompareModalIds = isMultiSelect ? [...selectedCompareModalIds] : [];
                 compareModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('compareModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('compareModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedCompareModalIds.includes(modal.id)) newSelectedCompareModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedStoryboardModalIds = isMultiSelect ? [...selectedStoryboardModalIds] : [];
                 storyboardModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('storyboardModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('storyboardModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedStoryboardModalIds.includes(modal.id)) newSelectedStoryboardModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedScriptFrameModalIds = isMultiSelect ? [...selectedScriptFrameModalIds] : [];
                 scriptFrameModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('scriptFrameModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('scriptFrameModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedScriptFrameModalIds.includes(modal.id)) newSelectedScriptFrameModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedSceneFrameModalIds = isMultiSelect ? [...selectedSceneFrameModalIds] : [];
                 sceneFrameModalStates.forEach((modal: any) => {
-                    const dims = getComponentDimensions('sceneFrameModal', modal.id, canvasState as any);
+                    const dims = getComponentDimensions('sceneFrameModal', modal.id, canvasItemsData);
                     if (checkIntersection({ x: modal.x, y: modal.y, width: dims.width, height: dims.height })) {
                         if (!newSelectedSceneFrameModalIds.includes(modal.id)) newSelectedSceneFrameModalIds.push(modal.id);
                     }
                 });
 
-                const newSelectedGroupIds = isMultiSelect ? [...selectedGroupIds] : [];
                 canvasState.groupContainerStates.forEach((group: any) => {
                     if (checkIntersection({ x: group.x, y: group.y, width: group.width, height: group.height })) {
                         if (!newSelectedGroupIds.includes(group.id)) newSelectedGroupIds.push(group.id);
                     }
                 });
 
-                const newSelectedCanvasTextIds = isMultiSelect ? [...selectedCanvasTextIds] : [];
-
                 richTextStates.forEach((text: any) => {
-                    const dims = getComponentDimensions('rich-text', text.id, canvasState as any);
-                    // Robust AABB Check (Manual) to fail-safe against rotation/clientRect issues
-                    const textRect = { x: text.x, y: text.y, width: dims.width, height: dims.height };
-                    const intersects = !(
-                        selectionRect.x > textRect.x + textRect.width ||
-                        selectionRect.x + selectionRect.width < textRect.x ||
-                        selectionRect.y > textRect.y + textRect.height ||
-                        selectionRect.y + selectionRect.height < textRect.y
-                    );
-
-                    if (intersects) {
+                    const dims = getComponentDimensions('rich-text', text.id, canvasItemsData);
+                    if (checkIntersection({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 })) {
                         if (!newSelectedRichTextIds.includes(text.id)) newSelectedRichTextIds.push(text.id);
                     }
                 });
 
                 effectiveCanvasTextStates.forEach((text: any) => {
-                    const dims = getComponentDimensions('text', text.id, canvasState as any);
+                    const dims = getComponentDimensions('text', text.id, canvasItemsData);
                     if (checkIntersection({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 })) {
                         if (!newSelectedCanvasTextIds.includes(text.id)) newSelectedCanvasTextIds.push(text.id);
                     }
@@ -777,14 +888,13 @@ export function useCanvasEvents(
                 setSelectedRichTextIds(newSelectedRichTextIds);
                 setSelectedCanvasTextIds(newSelectedCanvasTextIds);
 
-                // Calculate tight bounding box for all selected items
+                // Calculate bounds for selected items
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                 let transMinX = Infinity, transMinY = Infinity, transMaxX = -Infinity, transMaxY = -Infinity;
                 let hasSelection = false;
                 let hasTransformerSelection = false;
 
                 const updateBounds = (rect: { x: number; y: number; width: number; height: number; rotation?: number }, includeInTransformer: boolean = true) => {
-                    // Use getClientRect to account for rotation/transform/shadows
                     hasSelection = true;
                     const client = getClientRect(rect);
                     minX = Math.min(minX, client.x);
@@ -801,13 +911,11 @@ export function useCanvasEvents(
                     }
                 };
 
-                // Check bounds for selected items
                 newSelectedIndices.forEach(idx => {
                     const img = images[idx];
                     const dims = getComponentDimensions('image', idx, canvasState as any);
                     updateBounds({ x: img.x || 0, y: img.y || 0, width: dims.width, height: dims.height });
                 });
-
                 newSelectedImageModalIds.forEach(id => {
                     const modal = imageModalStates.find((m: any) => m.id === id);
                     if (modal) {
@@ -815,7 +923,6 @@ export function useCanvasEvents(
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
-
                 newSelectedVideoModalIds.forEach(id => {
                     const modal = videoModalStates.find((m: any) => m.id === id);
                     if (modal) {
@@ -823,7 +930,6 @@ export function useCanvasEvents(
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
-
                 newSelectedMusicModalIds.forEach(id => {
                     const modal = musicModalStates.find((m: any) => m.id === id);
                     if (modal) {
@@ -831,7 +937,6 @@ export function useCanvasEvents(
                         updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
                     }
                 });
-
                 newSelectedTextInputIds.forEach(id => {
                     const input = textInputStates.find((t: any) => t.id === id);
                     if (input) {
@@ -839,137 +944,17 @@ export function useCanvasEvents(
                         updateBounds({ x: input.x, y: input.y, width: dims.width, height: dims.height });
                     }
                 });
-
-                newSelectedNextSceneModalIds.forEach(id => {
-                    const modal = nextSceneModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('nextSceneModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedMultiangleCameraModalIds.forEach(id => {
-                    const modal = multiangleCameraModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('multiangleCameraModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedVideoEditorModalIds.forEach(id => {
-                    const modal = videoEditorModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('videoEditorModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedImageEditorModalIds.forEach(id => {
-                    const modal = imageEditorModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('imageEditorModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedVectorizeModalIds.forEach(id => {
-                    const modal = vectorizeModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('vectorizeModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedRemoveBgModalIds.forEach(id => {
-                    const modal = removeBgModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('removeBgModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedUpscaleModalIds.forEach(id => {
-                    const modal = upscaleModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('upscaleModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedEraseModalIds.forEach(id => {
-                    const modal = eraseModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('eraseModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedExpandModalIds.forEach(id => {
-                    const modal = expandModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('expandModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedCompareModalIds.forEach(id => {
-                    const modal = compareModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('compareModal', id, canvasState as any);
-                        const offsetX = (dims.width - 100) / 2;
-                        updateBounds({ x: modal.x - offsetX, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedStoryboardModalIds.forEach(id => {
-                    const modal = storyboardModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('storyboardModal', id, canvasState as any);
-                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedScriptFrameModalIds.forEach(id => {
-                    const modal = scriptFrameModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('scriptFrameModal', id, canvasState as any);
-                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
-                newSelectedSceneFrameModalIds.forEach(id => {
-                    const modal = sceneFrameModalStates.find((m: any) => m.id === id);
-                    if (modal) {
-                        const dims = getComponentDimensions('sceneFrameModal', id, canvasState as any);
-                        updateBounds({ x: modal.x, y: modal.y, width: dims.width, height: dims.height });
-                    }
-                });
-
                 newSelectedGroupIds.forEach(id => {
                     const group = canvasState.groupContainerStates.find((g: any) => g.id === id);
-                    if (group) {
-                        updateBounds({ x: group.x, y: group.y, width: group.width, height: group.height });
-                    }
+                    if (group) updateBounds({ x: group.x, y: group.y, width: group.width, height: group.height });
                 });
-
                 newSelectedRichTextIds.forEach(id => {
                     const text = richTextStates.find((t: any) => t.id === id);
                     if (text) {
                         const dims = getComponentDimensions('rich-text', id, canvasState as any);
-                        // Include RichText in transformer bounds
                         updateBounds({ x: text.x, y: text.y, width: dims.width, height: dims.height, rotation: text.rotation || 0 }, true);
                     }
                 });
-
                 newSelectedCanvasTextIds.forEach(id => {
                     const text = effectiveCanvasTextStates.find((t: any) => t.id === id);
                     if (text) {
@@ -984,45 +969,14 @@ export function useCanvasEvents(
                 setIsSelecting(false);
 
                 if (hasSelection) {
-                    const totalCount = newSelectedIndices.length +
-                        newSelectedImageModalIds.length +
-                        newSelectedVideoModalIds.length +
-                        newSelectedVideoEditorModalIds.length +
-                        newSelectedImageEditorModalIds.length +
-                        newSelectedMusicModalIds.length +
-                        newSelectedTextInputIds.length +
-                        newSelectedUpscaleModalIds.length +
-                        newSelectedMultiangleCameraModalIds.length +
-                        newSelectedRemoveBgModalIds.length +
-                        newSelectedEraseModalIds.length +
-                        newSelectedExpandModalIds.length +
-                        newSelectedVectorizeModalIds.length +
-                        newSelectedNextSceneModalIds.length +
-                        newSelectedCompareModalIds.length +
-                        newSelectedStoryboardModalIds.length +
-                        newSelectedScriptFrameModalIds.length +
-                        newSelectedSceneFrameModalIds.length +
-                        newSelectedGroupIds.length +
-                        newSelectedRichTextIds.length +
-                        newSelectedCanvasTextIds.length;
-
+                    const totalCount = newSelectedIndices.length + newSelectedImageModalIds.length + newSelectedVideoModalIds.length +
+                        newSelectedTextInputIds.length + newSelectedGroupIds.length + newSelectedRichTextIds.length + newSelectedCanvasTextIds.length;
                     const isOnlyTextItems = (newSelectedRichTextIds.length > 0 || newSelectedCanvasTextIds.length > 0) &&
                         (newSelectedRichTextIds.length + newSelectedCanvasTextIds.length === totalCount);
                     const padding = isOnlyTextItems ? 0 : 5;
-                    setSelectionTightRect({
-                        x: minX - padding,
-                        y: minY - padding,
-                        width: (maxX - minX) + (padding * 2),
-                        height: (maxY - minY) + (padding * 2)
-                    });
-
+                    setSelectionTightRect({ x: minX - padding, y: minY - padding, width: (maxX - minX) + (padding * 2), height: (maxY - minY) + (padding * 2) });
                     if (hasTransformerSelection) {
-                        setSelectionTransformerRect({
-                            x: transMinX - padding,
-                            y: transMinY - padding,
-                            width: (transMaxX - transMinX) + (padding * 2),
-                            height: (transMaxY - transMinY) + (padding * 2)
-                        });
+                        setSelectionTransformerRect({ x: transMinX - padding, y: transMinY - padding, width: (transMaxX - transMinX) + (padding * 2), height: (transMaxY - transMinY) + (padding * 2) });
                     } else {
                         setSelectionTransformerRect(null);
                     }
@@ -1031,7 +985,6 @@ export function useCanvasEvents(
                     setSelectionTransformerRect(null);
                 }
             } else {
-                // Cleared because too small
                 setSelectionBox(null);
                 setSelectionRectCoords(null);
                 setIsSelecting(false);
@@ -1041,7 +994,7 @@ export function useCanvasEvents(
     };
 
     const handleStageDragMove = (e: KonvaEventObject<DragEvent>) => {
-        if (!isPanning) return;
+        if (!isPanningRef.current) return;
         const stage = e.target.getStage();
         if (!stage) return;
 
@@ -1059,7 +1012,11 @@ export function useCanvasEvents(
             const newPos = { x: stage.x(), y: stage.y() };
             setPosition(newPos);
             updateViewportCenter?.(newPos, scale);
-            applyStageCursorWrapper('grab');
+
+            // Clear DOM override to allow React styles to take over
+            try { stage.container().style.cursor = ''; } catch (err) { }
+
+            lastPanningEndTimeRef.current = Date.now();
         }
     };
 
@@ -1100,9 +1057,17 @@ export function useCanvasEvents(
         const stage = stageRef.current;
         if (!stage) return;
         const handleWheel = (e: WheelEvent) => {
+            // Priority 1: If panning via middle button, don't allow wheel zoom/pan to interfere
             if (isMiddleButtonPressed) {
                 e.preventDefault(); e.stopPropagation(); return;
             }
+
+            // Priority 2: Ignore wheel events for a brief period after panning/dragging ends
+            // This blocks "momentum" scroll events from trackpads/mice from causing drift
+            if (Date.now() - lastPanningEndTimeRef.current < 300) {
+                e.preventDefault(); e.stopPropagation(); return;
+            }
+
             if ((e.target as HTMLElement).closest('[data-component-menu]')) return;
 
             e.preventDefault();
@@ -1112,22 +1077,26 @@ export function useCanvasEvents(
             if (navigationMode === 'mouse') isZoomAction = !isModifier;
 
             if (!isZoomAction) {
-                // Pan
+                // Pan action via wheel
                 if (stage) {
+                    // Safety: ensure draggable is off so wheel doesn't conflict with Konva's internal drag
                     stage.draggable(false);
                     if (isPanningRef.current) setIsPanning(false);
                 }
-                requestAnimationFrame(() => {
-                    setPosition(prev => {
-                        const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
-                        setTimeout(() => updateViewportCenter?.(newPos, scaleRef.current), 0);
-                        return newPos;
-                    });
+
+                // Use instantaneous state updates for wheel panning (removes inertia drift lagging)
+                setPosition(prev => {
+                    const newPos = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+                    // Notify viewport change immediately
+                    if (updateViewportCenter && (prev.x !== newPos.x || prev.y !== newPos.y)) {
+                        updateViewportCenter(newPos, scaleRef.current);
+                    }
+                    return newPos;
                 });
                 return;
             }
 
-            // Zoom
+            // Zoom action via wheel
             const oldScale = scaleRef.current;
             const pointer = stage.getPointerPosition();
             if (!pointer) return;
@@ -1139,8 +1108,15 @@ export function useCanvasEvents(
 
             setScale(clampedScale);
             const newPos = { x: pointer.x - mousePointTo.x * clampedScale, y: pointer.y - mousePointTo.y * clampedScale };
-            setPosition(newPos);
-            setTimeout(() => updateViewportCenter?.(newPos, clampedScale), 0);
+
+            setPosition(prev => {
+                if (prev.x === newPos.x && prev.y === newPos.y) return prev;
+                // Sync viewport center
+                if (updateViewportCenter) {
+                    updateViewportCenter(newPos, clampedScale);
+                }
+                return newPos;
+            });
         };
 
         const container = containerRef.current;
@@ -1149,6 +1125,45 @@ export function useCanvasEvents(
             return () => container.removeEventListener('wheel', handleWheel);
         }
     }, [stageRef, containerRef, isMiddleButtonPressed, navigationMode, setPosition, setScale, updateViewportCenter]);
+
+    // Global mouseup handler to catch releases outside the canvas
+    useEffect(() => {
+        const handleGlobalMouseUp = (e: MouseEvent) => {
+            if (isPanningRef.current) {
+                setIsMiddleButtonPressed(false);
+                setIsPanning(false);
+                isPanningRef.current = false; // Immediate ref sync
+                const stage = stageRef.current;
+                if (stage) {
+                    stage.stopDrag();
+                    stage.draggable(false);
+
+                    // Sync final position to state to prevent jumping on next click
+                    const newPos = { x: stage.x(), y: stage.y() };
+                    setPosition(newPos);
+                    updateViewportCenter?.(newPos, scaleRef.current);
+
+                    // Clear DOM override to allow React styles to take over
+                    try { stage.container().style.cursor = ''; } catch (err) { }
+
+                    // Auto-select cursor tool after pan ends
+                    if (selectedTool === 'move' || e.button === 1) {
+                        onToolSelect?.('cursor');
+                        // "Instant Pointer Click" - Automatically deselect and trigger background click
+                        clearAllSelections(true);
+                        props.onBackgroundClick?.();
+                    }
+
+                    lastPanningEndTimeRef.current = Date.now();
+                }
+            }
+        };
+
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [isMiddleButtonPressed, stageRef, selectedTool, onToolSelect]);
 
 
     // Mouse Move tracking for drag vs click
@@ -1160,7 +1175,9 @@ export function useCanvasEvents(
                 const stage = stageRef.current;
                 if (stage) {
                     setIsPanning(true);
+                    isPanningRef.current = true; // Immediate ref sync
                     stage.draggable(true);
+                    stage.startDrag(); // Force immediate start to avoid jumping
                     applyStageCursorWrapper('grabbing', true);
                     stage.find('Image').forEach(node => node.draggable(false));
                 }

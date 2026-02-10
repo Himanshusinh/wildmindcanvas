@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Konva from 'konva';
 import { SceneFrame } from '@/modules/plugins/StoryboardPluginModal/SceneFrame';
-import { PluginConnectionNodes } from '@/modules/plugins/PluginComponents';
+
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 
 interface SceneFrameModalState {
@@ -30,7 +30,7 @@ interface SceneFrameModalOverlaysProps {
     clearAllSelections: () => void;
 }
 
-export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = ({
+export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = React.memo(({
     sceneFrameModalStates,
     onDelete,
     onDuplicate,
@@ -43,8 +43,6 @@ export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = (
     clearAllSelections,
 }) => {
     const [isDark, setIsDark] = useState(false);
-
-    console.log('[SceneFrameModalOverlays] Rendering with states:', sceneFrameModalStates);
 
     useEffect(() => {
         const checkTheme = () => {
@@ -75,7 +73,21 @@ export const SceneFrameModalOverlays: React.FC<SceneFrameModalOverlaysProps> = (
             ))}
         </>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison to prevent unnecessary re-renders
+    return (
+        prevProps.sceneFrameModalStates === nextProps.sceneFrameModalStates &&
+        prevProps.scale === nextProps.scale &&
+        prevProps.position.x === nextProps.position.x &&
+        prevProps.position.y === nextProps.position.y &&
+        prevProps.onDelete === nextProps.onDelete &&
+        prevProps.onDuplicate === nextProps.onDuplicate &&
+        prevProps.onContentUpdate === nextProps.onContentUpdate &&
+        prevProps.onPositionChange === nextProps.onPositionChange &&
+        prevProps.onPositionCommit === nextProps.onPositionCommit &&
+        prevProps.clearAllSelections === nextProps.clearAllSelections
+    );
+});
 
 // Individual scene frame modal with dragging functionality
 interface SceneFrameModalProps {
@@ -319,12 +331,7 @@ const SceneFrameModal: React.FC<SceneFrameModalProps> = ({
                     pointerEvents: 'auto',
                 }}
             >
-                <PluginConnectionNodes
-                    id={frame.id}
-                    scale={scale}
-                    isHovered={isHovered}
-                    isSelected={isSelected}
-                />
+
                 <ModalActionIcons
                     isSelected={isSelected}
                     scale={scale}

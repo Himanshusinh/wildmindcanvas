@@ -1,5 +1,5 @@
 import { ImageUpload } from '@/core/types/canvas';
-import * as THREE from 'three';
+import { Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3 } from 'three';
 
 export interface Model3DProps {
   modelData: ImageUpload;
@@ -19,16 +19,16 @@ export interface SphericalCoords {
 export interface Model3DRefs {
   containerRef: React.RefObject<HTMLDivElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  sceneRef: React.RefObject<THREE.Scene | null>;
-  cameraRef: React.RefObject<THREE.PerspectiveCamera | null>;
-  rendererRef: React.RefObject<THREE.WebGLRenderer | null>;
-  modelRef: React.RefObject<THREE.Group | null>;
+  sceneRef: React.RefObject<Scene | null>;
+  cameraRef: React.RefObject<PerspectiveCamera | null>;
+  rendererRef: React.RefObject<WebGLRenderer | null>;
+  modelRef: React.RefObject<Group | null>;
   animationFrameRef: React.RefObject<number | null>;
   isDraggingRef: React.RefObject<boolean>;
   lastMousePosRef: React.RefObject<{ x: number; y: number }>;
   currentRotationRef: React.RefObject<{ x: number; y: number }>;
   currentZoomRef: React.RefObject<number>;
-  targetRef: React.RefObject<THREE.Vector3>;
+  targetRef: React.RefObject<Vector3>;
   sphericalRef: React.RefObject<SphericalCoords>;
   isPanningRef: React.RefObject<boolean>;
   panStartRef: React.RefObject<{ x: number; y: number }>;

@@ -492,15 +492,15 @@ export async function generateImageForCanvas(
         }
         return String(value);
       };
-      
+
       // Try to extract error message, handling "[object Object]" case
       let errorMessage = extractErrorMessage(result?.message) || extractErrorMessage(result?.error);
-      
+
       // Special handling: If message contains "[object Object]", try to extract actual error
       if (errorMessage && typeof errorMessage === 'string' && errorMessage.includes('[object Object]')) {
         // The backend error message contains "[object Object]", try to find the actual error
         console.log('[generateImageForCanvas] Message contains "[object Object]", attempting deep extraction...');
-        
+
         // Try to extract from nested structures
         if (result && typeof result === 'object') {
           // Check result.data for error details
@@ -516,15 +516,15 @@ export async function generateImageForCanvas(
               errorMessage = `Validation failed: ${validationErrors}`;
             } else if (typeof result.data === 'object') {
               // Try to extract from data object
-              const dataError = extractErrorMessage(result.data.error) || 
-                               extractErrorMessage(result.data.message) ||
-                               extractErrorMessage(result.data);
+              const dataError = extractErrorMessage(result.data.error) ||
+                extractErrorMessage(result.data.message) ||
+                extractErrorMessage(result.data);
               if (dataError && !dataError.includes('[object Object]')) {
                 errorMessage = dataError;
               }
             }
           }
-          
+
           // Check for error property that might be an object
           if (result.error && typeof result.error === 'object' && !Array.isArray(result.error)) {
             const errorObj = result.error;
@@ -543,15 +543,15 @@ export async function generateImageForCanvas(
                   }).join(', ');
                   errorMessage = `Error details: ${errorDetails}`;
                 }
-              } catch {}
+              } catch { }
             }
           }
-          
+
           // If still contains "[object Object]", try to get more context from the result
           if (errorMessage.includes('[object Object]')) {
             // Log the full result structure for debugging
             console.error('[generateImageForCanvas] Full result structure:', JSON.stringify(result, null, 2));
-            
+
             // Try to find any string property that might contain the actual error
             const stringProps: string[] = [];
             const findStringProps = (obj: any, depth = 0): void => {
@@ -567,14 +567,14 @@ export async function generateImageForCanvas(
               }
             };
             findStringProps(result);
-            
+
             if (stringProps.length > 0) {
               errorMessage = stringProps.join('; ');
             }
           }
         }
       }
-      
+
       // If errorMessage is empty or "[object Object]", try to extract from result object itself
       if (!errorMessage || errorMessage === '[object Object]' || errorMessage.includes('[object Object]')) {
         // Try to find error details in the result object
@@ -597,12 +597,12 @@ export async function generateImageForCanvas(
           }
         }
       }
-      
+
       // Final fallback
       if (!errorMessage || errorMessage === '[object Object]') {
         errorMessage = `HTTP ${response.status}: ${response.statusText}`;
       }
-      
+
       // If it's a validation error, try to extract more details
       // The error handler returns: { responseStatus: "error", message: "...", data: errors.array() }
       if (response.status === 422 || response.status === 400) {
@@ -662,12 +662,12 @@ export async function generateImageForCanvas(
       } else if (result?.error) {
         errorMessage = extractErrorMessage(result.error);
       }
-      
+
       // Final safety check - ensure errorMessage is always a string
       if (typeof errorMessage !== 'string') {
         errorMessage = JSON.stringify(errorMessage);
       }
-      
+
       // Log full error details for debugging
       console.error('[generateImageForCanvas] Request failed:', {
         status: response.status,
@@ -681,7 +681,7 @@ export async function generateImageForCanvas(
           sourceImageUrl: processedSourceImageUrl ? 'present' : 'missing',
         }
       });
-      
+
       throw new Error(errorMessage || 'Failed to generate image');
     }
 
@@ -1616,6 +1616,44 @@ export async function expandImageForCanvas(
 }
 
 /**
+ * General conversational chat (no canvas context)
+ * Calls the /chat/general endpoint for pure general questions without any platform context
+ */
+export async function queryGeneralChat(
+  message: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+): Promise<string> {
+  try {
+    const response = await fetch(`${API_GATEWAY_URL}/chat/general`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message.trim(),
+        conversationHistory,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to get response' }));
+      throw new Error(error.message || 'Failed to get response');
+    }
+
+    const result = await response.json();
+    if (result.responseStatus === 'error') {
+      throw new Error(result.message || 'Failed to get response');
+    }
+
+    return result.data?.response || result.response || 'I apologize, but I could not generate a response.';
+  } catch (error: any) {
+    console.error('[queryGeneralChat] Error:', error);
+    throw error;
+  }
+}
+
+/**
  * Query canvas prompt enhancement
  * Calls the /canvas/query endpoint to enhance prompts or get answers
  */
@@ -1627,7 +1665,12 @@ export async function queryCanvasPrompt(
   text: string,
   maxNewTokens?: number,
   options?: QueryCanvasPromptOptions
-): Promise<{ type: 'image' | 'video' | 'music' | 'answer'; enhanced_prompt: string | null; response: string | null }> {
+): Promise<{
+  type: 'image' | 'video' | 'music' | 'answer';
+  enhanced_prompt: string | null;
+  response: string | null;
+  smart_tokens?: any[];
+}> {
   const MAX_ATTEMPTS = 4;
   const ATTEMPT_TIMEOUT_MS = 45000; // 45 seconds per attempt
   const RETRY_DELAY_MS = 3500;

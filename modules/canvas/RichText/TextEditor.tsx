@@ -71,6 +71,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         return () => window.removeEventListener('keydown', handleEscape);
     }, [onClose]);
 
+    const inverseScale = 1 / scale;
+
     return (
         <Html
             groupProps={{
@@ -81,30 +83,41 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             divProps={{
                 style: {
                     pointerEvents: 'none',
+                    zIndex: 15000,
                 }
             }}
         >
             <div
                 className="relative"
                 style={{
-                    transform: `scale(${scale})`,
+                    // Html already handles stage scale, applying it here causes double-scaling
                     transformOrigin: 'top left',
-                    // Compensate for scale expansion if needed, but relative positioning usually handles it
-                    // For the floating toolbar, we want it to stay centered
                 }}
             >
-                <RichTextToolbar
-                    fontFamily={fontFamily}
-                    fontSize={fontSize}
-                    fontWeight={fontWeight}
-                    fontStyle={fontStyle}
-                    textDecoration={textDecoration}
-                    fill={fill}
-                    align={align}
-                    backgroundColor={backgroundColor}
-                    onChange={onUpdate}
-                    position={{ x: width / 2, y: -20 }} // Position relative to the editor div
-                />
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: width / 2,
+                        top: -24 * inverseScale, // Compensate gap for scale
+                        transform: `scale(${inverseScale}) translate(-50%, -100%)`,
+                        transformOrigin: 'bottom center',
+                        pointerEvents: 'auto',
+                        zIndex: 15000,
+                    }}
+                >
+                    <RichTextToolbar
+                        fontFamily={fontFamily}
+                        fontSize={fontSize}
+                        fontWeight={fontWeight}
+                        fontStyle={fontStyle}
+                        textDecoration={textDecoration}
+                        fill={fill}
+                        align={align}
+                        backgroundColor={backgroundColor}
+                        onChange={onUpdate}
+                        position={{ x: 0, y: 0 }} // Managed by parent div's transform
+                    />
+                </div>
                 <div
                     ref={divRef}
                     contentEditable

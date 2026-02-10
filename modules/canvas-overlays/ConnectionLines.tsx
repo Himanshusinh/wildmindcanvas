@@ -1,38 +1,261 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  ReactFlow,
+  useReactFlow,
+  Background,
+  Controls,
+  Edge,
+  Node,
+  ReactFlowProvider,
+  Handle,
+  Position,
+  MarkerType,
+  BaseEdge,
+  getBezierPath,
+  EdgeProps,
+  EdgeLabelRenderer,
+  Panel,
+  MiniMap,
+  EdgeToolbar,
+  EdgeTypes
+} from '@xyflow/react';
+import { getComponentConfig } from './ComponentConfig';
+import { Scissors } from 'lucide-react';
+import '@xyflow/react/dist/style.css';
+import './ConnectionLines.css';
 import { Connection, ActiveDrag } from './types';
-import { computeNodeCenter, computeStrokeForScale, computeCircleRadiusForScale } from './utils';
-import Konva from 'konva';
+import {
+  useImageModalStates,
+  useVideoModalStates,
+  useMusicModalStates,
+  useTextModalStates,
+  useUpscaleModalStates,
+  useRemoveBgModalStates,
+  useMultiangleCameraModalStates,
+  useEraseModalStates,
+  useExpandModalStates,
+  useVectorizeModalStates,
+  useNextSceneModalStates,
+  useStoryboardModalStates,
+  useCompareModalStates,
+  useImageEditorModalStates,
+  useVideoEditorModalStates,
+  useSelectedImageModalIds,
+  useSelectedVideoModalIds,
+  useSelectedMusicModalIds,
+  useSelectedTextModalIds,
+  useImageStore,
+  useVideoStore,
+  useMusicStore,
+  useTextStore
+} from '@/modules/stores';
+import { getComponentType } from './utils';
+import { useComponentMenuStore } from '@/modules/stores/componentMenuStore';
 
-let connectionAnimationStylesInjected = false;
-const ensureConnectionAnimationStyles = () => {
-  if (connectionAnimationStylesInjected || typeof document === 'undefined') return;
-  const style = document.createElement('style');
-  style.id = 'connection-line-animations';
-  style.innerHTML = `
-    @keyframes connection-line-dash {
-      0% {
-        stroke-dashoffset: var(--sweepStart, 0);
-        opacity: 0.15;
-      }
-      30% {
-        opacity: 0.8;
-      }
-      70% {
-        opacity: 0.95;
-      }
-      100% {
-        stroke-dashoffset: 0;
-        opacity: 0.15;
-      }
-    }
-  `;
-  document.head.appendChild(style);
-  connectionAnimationStylesInjected = true;
+
+// --- Configuration ---
+const handleStyle = {
+  width: 24,
+  height: 24,
+  backgroundColor: '#fff',
+  border: '2px solid #777',
+  borderRadius: '50%',
+  zIndex: 100,
+  pointerEvents: 'auto' as const,
+  cursor: 'crosshair !important' as any,
 };
 
-const GLOW_GRADIENT_ID = 'connection-line-glow-gradient';
+// --- Ghost Node Component ---
+const GhostNode = React.memo(({ data, isConnectable }: any) => {
+  const { id, type, isHovered, isSelected, isValidTarget, isHandleHovered, isConnecting, isSource, hasConnections, checkConnectionValidity } = data;
+
+  // Use store actions with selectors to prevent unnecessary re-renders of the GhostNode
+  const updateImageModal = useImageStore(s => s.updateImageModal);
+  const updateVideoModal = useVideoStore(s => s.updateVideoModal);
+  const updateMusicModal = useMusicStore(s => s.updateMusicModal);
+  const updateTextModal = useTextStore(s => s.updateTextModal);
+
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncHover = useCallback((hovered: boolean) => {
+    if (!id) return;
+    const updates = { isHandleHovered: hovered };
+    switch (type) {
+      case 'image': updateImageModal(id, updates); break;
+      case 'video': updateVideoModal(id, updates); break;
+      case 'music': updateMusicModal(id, updates); break;
+      case 'text': updateTextModal(id, updates); break;
+    }
+  }, [id, type, updateImageModal, updateVideoModal, updateMusicModal, updateTextModal]);
+
+  const requestHoverState = useCallback((next: boolean) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      syncHover(true);
+    } else {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        syncHover(false);
+        hoverTimeoutRef.current = null;
+      }, 150);
+    }
+  }, [syncHover]);
+
+
+
+  const isPlugin = !['text', 'image', 'video', 'music'].includes(type);
+  const showHandles = isPlugin || isHovered || isSelected || (isConnecting && (isValidTarget || isSource)) || isHandleHovered || hasConnections;
+
+  if (!showHandles) {
+    return (
+      <div
+        style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'absolute', top: 0, left: 0 }}
+        onMouseEnter={() => syncHover(true)}
+      />
+    );
+  }
+
+  const useOffset = ['image', 'video', 'music', 'text'].includes(type);
+  const rightHandleTop = useOffset ? '20%' : '50%';
+  const leftHandleTop = useOffset ? '80%' : '50%';
+
+  return (
+    <div
+      data-node-id={id}
+      data-component-type={type}
+      style={{ width: '100%', height: '100%', pointerEvents: 'none', position: 'relative' }}
+    >
+      <div
+        style={{ position: 'absolute', right: -24, top: rightHandleTop, transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        onMouseEnter={() => requestHoverState(true)}
+        onMouseLeave={() => requestHoverState(false)}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{ ...handleStyle, right: 0, zIndex: 9999 }}
+          id="send"
+          isConnectable={isConnectable}
+          isValidConnection={(connection) => checkConnectionValidity(connection.source, connection.target)}
+        />
+      </div>
+      <div
+        style={{ position: 'absolute', left: -24, top: leftHandleTop, transform: 'translateY(-50%)', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'all', cursor: 'crosshair !important' } as any}
+        onMouseEnter={() => requestHoverState(true)}
+        onMouseLeave={() => requestHoverState(false)}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{ ...handleStyle, left: 0, zIndex: 9999 }}
+          id="receive"
+          isConnectable={isConnectable}
+          isValidConnection={(connection) => checkConnectionValidity(connection.source, connection.target)}
+        />
+      </div>
+    </div>
+  );
+});
+
+// --- Scissors Edge Component ---
+const ScissorsEdge = (props: EdgeProps) => {
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected } = props;
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition
+  });
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{ ...props.style, strokeWidth: isHovered || selected ? 4 : 2 }}
+        markerStart={props.markerStart}
+        markerEnd={props.markerEnd}
+        interactionWidth={props.interactionWidth}
+      />
+      <g
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        style={{ pointerEvents: 'all' }}
+      >
+        {/* Transparent thick path for easier hovering */}
+        <path
+          d={edgePath}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={20}
+        />
+        <EdgeToolbar
+          edgeId={id}
+          x={labelX}
+          y={labelY}
+          isVisible={isHovered || selected}
+          style={{ pointerEvents: 'all' }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              (data as any)?.onDelete?.(id);
+            }}
+            style={{
+              background: 'white',
+              border: '1px solid #ddd',
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+              color: '#ff4d4f',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+            className="scissors-delete-btn"
+            title="Delete Connection"
+          >
+            <Scissors size={16} />
+          </button>
+        </EdgeToolbar>
+      </g>
+    </>
+  );
+};
+
+const nodeTypes = { ghost: GhostNode };
+const edgeTypes: EdgeTypes = { scissors: ScissorsEdge };
+
+const getMiniMapNodeColor = (node: any) => {
+  return '#3b82f6'; // Single consistent blue color for all nodes
+};
+
+// --- Context Menu ---
+const ConnectionContextMenu = ({ id, top, left, onDelete }: any) => (
+  <div style={{ top, left, position: 'absolute', zIndex: 10000, background: 'white', border: '1px solid #ccc', padding: 5, borderRadius: 4, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+    <p style={{ margin: '0.2em 0.5em', fontSize: '12px', color: '#666' }}>Connection: {id}</p>
+    {onDelete && (
+      <button
+        onClick={onDelete}
+        style={{ width: '100%', textAlign: 'left', padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer', color: 'red' }}
+      >
+        Delete
+      </button>
+    )}
+  </div>
+);
 
 interface ConnectionLinesProps {
   connections: Connection[];
@@ -40,363 +263,456 @@ interface ConnectionLinesProps {
   selectedConnectionId: string | null;
   onSelectConnection: (id: string | null) => void;
   onDeleteConnection?: (id: string) => void;
-  stageRef: React.RefObject<Konva.Stage | null>;
+  onPersistConnectorCreate?: (conn: any) => void;
+  onPersistConnectorDelete?: (id: string) => void;
+  stageRef: React.RefObject<any>;
   position: { x: number; y: number };
   scale: number;
-  textInputStates: any[];
-  imageModalStates: any[];
-  videoModalStates: any[];
-  musicModalStates: any[];
-  upscaleModalStates?: any[];
-  multiangleCameraModalStates?: any[];
-  removeBgModalStates?: any[];
-  eraseModalStates?: any[];
-  expandModalStates?: any[];
-  vectorizeModalStates?: any[];
-  nextSceneModalStates?: any[];
-  storyboardModalStates?: any[];
+  viewportUpdateKey: number;
+  isInteracting?: boolean;
   scriptFrameModalStates?: any[];
   sceneFrameModalStates?: any[];
-  viewportUpdateKey: number;
 }
 
-export const ConnectionLines: React.FC<ConnectionLinesProps> = ({
+const MIN_DISTANCE = 150;
+
+const ConnectionLinesContent: React.FC<ConnectionLinesProps> = ({
   connections,
-  activeDrag,
   selectedConnectionId,
   onSelectConnection,
   onDeleteConnection,
-  stageRef,
+  onPersistConnectorCreate,
+  onPersistConnectorDelete,
   position,
   scale,
-  textInputStates,
-  imageModalStates,
-  videoModalStates,
-  musicModalStates,
-  upscaleModalStates,
-  multiangleCameraModalStates,
-  removeBgModalStates,
-  eraseModalStates,
-  expandModalStates,
-  vectorizeModalStates,
-  nextSceneModalStates,
-  storyboardModalStates,
-  scriptFrameModalStates,
-  sceneFrameModalStates,
   viewportUpdateKey,
+  isInteracting,
+  scriptFrameModalStates = [],
+  sceneFrameModalStates = [],
 }) => {
-  // Force recalculation key that updates immediately (no animation delay)
-  const [recalcKey, setRecalcKey] = useState(0);
+  const openMenu = useComponentMenuStore(s => s.openMenu);
+  const { setViewport, screenToFlowPosition, getNode } = useReactFlow(); // Get setViewport from internal context
+  const [isMiniMapVisible, setIsMiniMapVisible] = useState(false);
 
+  // Sync React Flow viewport with main canvas position/scale
   useEffect(() => {
-    ensureConnectionAnimationStyles();
+    setViewport({ x: position.x, y: position.y, zoom: scale });
+  }, [position.x, position.y, scale, setViewport]);
+
+  const [menu, setMenu] = useState<any>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  const connectionMadeRef = useRef(false);
+  const miniMapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // UseReactFlow must be used inside ReactFlowProvider
+  // UseReactFlow hooks consolidated above
+
+  // Dynamic MiniMap Visibility: Show on move/zoom, hide after inactivity
+  useEffect(() => {
+    // Show MiniMap
+    setIsMiniMapVisible(true);
+
+    // Clear existing timeout
+    if (miniMapTimeoutRef.current) {
+      clearTimeout(miniMapTimeoutRef.current);
+    }
+
+    // Set hide timeout
+    miniMapTimeoutRef.current = setTimeout(() => {
+      setIsMiniMapVisible(false);
+      miniMapTimeoutRef.current = null;
+    }, 2000); // Hide after 2 seconds of inactivity
+
+    return () => {
+      if (miniMapTimeoutRef.current) {
+        clearTimeout(miniMapTimeoutRef.current);
+      }
+    };
+  }, [position.x, position.y, scale, viewportUpdateKey]);
+
+  // Sync Konva viewport to React Flow
+  useEffect(() => {
+    setViewport({ x: position.x, y: position.y, zoom: scale });
+  }, [position.x, position.y, scale, setViewport, viewportUpdateKey]);
+
+  // Store Selectors
+  const imageModalStates = useImageModalStates();
+  const videoModalStates = useVideoModalStates();
+  const musicModalStates = useMusicModalStates();
+  const textInputStates = useTextModalStates();
+  const upscaleModalStates = useUpscaleModalStates();
+  const removeBgModalStates = useRemoveBgModalStates();
+  const multiangleCameraModalStates = useMultiangleCameraModalStates();
+  const eraseModalStates = useEraseModalStates();
+  const expandModalStates = useExpandModalStates();
+  const vectorizeModalStates = useVectorizeModalStates();
+  const nextSceneModalStates = useNextSceneModalStates();
+  const storyboardModalStates = useStoryboardModalStates();
+  const compareModalStates = useCompareModalStates();
+  const imageEditorModalStates = useImageEditorModalStates();
+  const videoEditorModalStates = useVideoEditorModalStates();
+
+  const selectedImageIds = useSelectedImageModalIds();
+  const selectedVideoIds = useSelectedVideoModalIds();
+  const selectedMusicIds = useSelectedMusicModalIds();
+  const selectedTextIds = useSelectedTextModalIds();
+
+  const allSelectedIdsSet = useMemo(() => new Set([
+    ...selectedImageIds,
+    ...selectedVideoIds,
+    ...selectedMusicIds,
+    ...selectedTextIds
+  ]), [selectedImageIds, selectedVideoIds, selectedMusicIds, selectedTextIds]);
+
+  // Identify all nodes that are currently generating/processing to trigger edge animation
+  const generatingIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    imageModalStates.forEach(m => { if (m.isGenerating || m.isProcessing) ids.add(m.id); });
+    videoModalStates.forEach(m => { if (m.status === 'processing' || m.status === 'generating' || (m.taskId && !m.generatedVideoUrl)) ids.add(m.id); });
+    musicModalStates.forEach(m => { if (m.isGenerating) ids.add(m.id); });
+    upscaleModalStates.forEach(m => { if (m.isUpscaling) ids.add(m.id); });
+    removeBgModalStates.forEach(m => { if (m.isRemovingBg) ids.add(m.id); });
+    eraseModalStates.forEach(m => { if (m.isErasing) ids.add(m.id); });
+    expandModalStates.forEach(m => { if (m.isExpanding) ids.add(m.id); });
+    vectorizeModalStates.forEach(m => { if (m.isVectorizing) ids.add(m.id); });
+    nextSceneModalStates.forEach(m => { if (m.isProcessing) ids.add(m.id); });
+    scriptFrameModalStates.forEach(m => { if (m.isLoading) ids.add(m.id); });
+
+    return ids;
+  }, [
+    imageModalStates, videoModalStates, musicModalStates, upscaleModalStates,
+    removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, scriptFrameModalStates
+  ]);
+
+  // Sync Viewport
+  useEffect(() => {
+    setViewport({ x: position.x, y: position.y, zoom: scale });
+  }, [position.x, position.y, scale, setViewport, viewportUpdateKey]);
+
+  const checkConnectionValidity = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return false;
+    const fromType = getComponentType(fromId);
+    const toType = getComponentType(toId);
+    if (!fromType || !toType) return false;
+
+    const allowedMap: Record<string, string[]> = {
+      text: ['image', 'video', 'music', 'storyboard'],
+      image: ['image', 'media-image', 'video', 'media-video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      video: ['video', 'media-video'],
+      music: ['video', 'media-video'],
+      nextscene: ['image', 'media-image', 'video', 'media-video', 'upscale', 'multianglecamera', 'removebg', 'erase', 'expand', 'vectorize', 'nextscene', 'storyboard'],
+      upscale: ['image', 'media-image', 'video', 'media-video'],
+      removebg: ['image', 'media-image', 'video', 'media-video'],
+      multianglecamera: ['image', 'media-image', 'video', 'media-video'],
+      erase: ['image', 'media-image', 'video', 'media-video'],
+      expand: ['image', 'media-image', 'video', 'media-video'],
+      vectorize: ['image', 'media-image', 'video', 'media-video'],
+      storyboard: ['sceneframe'],
+    };
+
+    const isValid = allowedMap[fromType]?.includes(toType) || false;
+    console.log(`[ConnectionLines] Validity Check: ${fromId}(${fromType}) -> ${toId}(${toType}) = ${isValid}`);
+    return isValid;
   }, []);
 
-  // Force immediate recalculation when scale or position changes (no animation)
-  useEffect(() => {
-    // Update immediately without delay to prevent animation
-    setRecalcKey(prev => prev + 1);
-  }, [scale, position.x, position.y, viewportUpdateKey]);
+  const nodes: Node[] = useMemo(() => {
+    const connectedNodeIds = new Set<string>();
+    connections.forEach(conn => {
+      connectedNodeIds.add(conn.from);
+      connectedNodeIds.add(conn.to);
+    });
 
-  const generatingNodeIds = useMemo(() => {
-    const ids = new Set<string>();
-    imageModalStates?.forEach(modal => {
-      if (modal?.id && modal.isGenerating) ids.add(modal.id);
-    });
-    videoModalStates?.forEach(modal => {
-      if (!modal?.id) return;
-      const status = typeof modal.status === 'string' ? modal.status.toLowerCase() : undefined;
-      if (status && ['completed', 'succeeded', 'success', 'failed', 'error', 'cancelled', 'canceled'].includes(status)) {
-        return;
-      }
-      if (status && status.length > 0) {
-        ids.add(modal.id);
-      }
-    });
-    musicModalStates?.forEach(modal => {
-      if (modal?.id && (modal as any).isGenerating) ids.add(modal.id);
-    });
-    upscaleModalStates?.forEach(modal => {
-      if (modal?.id && modal.isUpscaling) ids.add(modal.id);
-    });
-    removeBgModalStates?.forEach(modal => {
-      if (modal?.id && modal.isRemovingBg) ids.add(modal.id);
-    });
-    eraseModalStates?.forEach(modal => {
-      if (modal?.id && modal.isErasing) ids.add(modal.id);
-    });
-    expandModalStates?.forEach(modal => {
-      if (modal?.id && modal.isExpanding) ids.add(modal.id);
-    });
-    vectorizeModalStates?.forEach(modal => {
-      if (modal?.id && modal.isVectorizing) ids.add(modal.id);
-    });
-    scriptFrameModalStates?.forEach(modal => {
-      if (modal?.id && modal.isLoading) ids.add(modal.id);
-    });
-    nextSceneModalStates?.forEach(modal => {
-      if (modal?.id && modal.isProcessing) ids.add(modal.id);
-    });
-    return ids;
-  }, [imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, scriptFrameModalStates]);
+    const allNodes: Node[] = [];
+    const add = (states: any[], _ignoredWidth: number, _ignoredHeight: number, typeLabel: string, yOffset = 0) => {
+      // Get config for this component type
+      const config = getComponentConfig(typeLabel);
 
-  // Memoize connection lines to recalculate when viewport changes
-  const connectionLines = useMemo(() => {
-    // Filter out duplicates and compute connection lines
-    const seen = new Set<string>();
-    const domCache = new Map<string, Element | null>();
+      // Determine dimensions:
+      // 1. If it's a plugin (has iconSize > 0), use the icon size for the ghost node handles
+      //    This ensures handles align with the visual icon, even if the "frame" state is larger (for popup).
+      // 2. Otherwise, use state frame dimensions or config defaults.
+      const isPlugin = config.iconSize > 0;
 
-    return connections
-      .map(conn => {
-        // Create a unique key for deduplication
-        const uniqueKey = `${conn.from}-${conn.to}`;
+      states.forEach(state => {
+        let nodeWidth: number;
+        let nodeHeight: number;
 
-        // Skip if we've already seen this connection
-        if (seen.has(uniqueKey)) {
-          return null;
+        if (isPlugin) {
+          nodeWidth = config.iconSize;
+          nodeHeight = config.iconSize;
+        } else {
+          nodeWidth = state.frameWidth || config.defaultWidth;
+          nodeHeight = state.frameHeight || config.defaultHeight;
         }
-        seen.add(uniqueKey);
 
-        const fromCenter = computeNodeCenter(conn.from, conn.fromAnchor || 'send', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache);
-        const toCenter = computeNodeCenter(conn.to, conn.toAnchor || 'receive', stageRef, position, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, domCache);
-        if (!fromCenter || !toCenter) {
-          // Debug: log when nodes can't be found
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[ConnectionLines] Could not compute node centers:', {
-              from: conn.from,
-              to: conn.to,
-              fromCenter,
-              toCenter,
-              fromNode: document.querySelector(`[data-node-id="${conn.from}"][data-node-side="send"]`),
-              toNode: document.querySelector(`[data-node-id="${conn.to}"][data-node-side="receive"]`),
-            });
-          }
-          return null;
-        }
-        return { ...conn, fromX: fromCenter.x, fromY: fromCenter.y, toX: toCenter.x, toY: toCenter.y };
-      })
-      .filter(Boolean) as Array<{ id?: string; from: string; to: string; color: string; fromX: number; fromY: number; toX: number; toY: number }>;
-  }, [connections, position.x, position.y, scale, textInputStates, imageModalStates, videoModalStates, musicModalStates, upscaleModalStates, multiangleCameraModalStates, removeBgModalStates, eraseModalStates, expandModalStates, vectorizeModalStates, nextSceneModalStates, storyboardModalStates, scriptFrameModalStates, sceneFrameModalStates, viewportUpdateKey, recalcKey, stageRef]);
+        allNodes.push({
+          id: state.id,
+          type: 'ghost',
+          position: { x: state.x, y: state.y + yOffset },
+          width: nodeWidth,
+          height: nodeHeight,
+          style: {
+            width: nodeWidth,
+            height: nodeHeight,
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
+            pointerEvents: isConnecting ? 'auto' : 'none'
+          },
+          data: {
+            id: state.id,
+            type: typeLabel,
+            isHovered: !!state.isHovered,
+            isHandleHovered: !!state.isHandleHovered,
+            isSelected: allSelectedIdsSet.has(state.id),
+            isConnecting,
+            isSource: connectingSourceId === state.id,
+            hasConnections: connectedNodeIds.has(state.id),
+            isValidTarget: connectingSourceId ? checkConnectionValidity(connectingSourceId, state.id) : false,
+            checkConnectionValidity
+          },
+          draggable: false,
+          connectable: true,
+        });
+      });
+    };
+
+    add(textInputStates, 400, 400, 'text');
+    add(imageModalStates, 600, 600, 'image');
+    add(videoModalStates, 600, 338, 'video');
+    add(musicModalStates, 600, 300, 'music');
+    add(upscaleModalStates, 110, 110, 'upscale', 25);
+    add(removeBgModalStates, 110, 110, 'removebg', 25);
+    add(multiangleCameraModalStates, 110, 110, 'multiangle-camera', 25);
+    add(eraseModalStates, 110, 110, 'erase', 25);
+    add(expandModalStates, 110, 110, 'expand', 25);
+    add(vectorizeModalStates, 110, 110, 'vectorize', 25);
+    add(nextSceneModalStates, 110, 110, 'next-scene', 25);
+    add(storyboardModalStates, 110, 110, 'storyboard', 25);
+    add(compareModalStates, 110, 110, 'compare', 25);
+    add(imageEditorModalStates, 110, 110, 'image-editor', 25);
+    add(videoEditorModalStates, 110, 110, 'video-editor', 25);
+    add(scriptFrameModalStates, 600, 400, 'scriptframe');
+    add(sceneFrameModalStates, 600, 400, 'sceneframe');
+
+    return allNodes;
+  }, [
+    textInputStates, imageModalStates, videoModalStates, musicModalStates,
+    upscaleModalStates, removeBgModalStates, multiangleCameraModalStates,
+    eraseModalStates, expandModalStates, vectorizeModalStates,
+    nextSceneModalStates, storyboardModalStates, compareModalStates,
+    imageEditorModalStates, videoEditorModalStates, scriptFrameModalStates,
+    sceneFrameModalStates, viewportUpdateKey,
+    allSelectedIdsSet, isConnecting, connectingSourceId, checkConnectionValidity,
+    connections // Added connections to dependencies
+  ]);
+
+  const renderedEdges = useMemo(() => {
+    return connections.map((conn, index) => {
+      const edgeId = conn.id || `edge-${index}`;
+      const isSelected = selectedConnectionId === edgeId;
+      const isGenerating = generatingIds.has(conn.from) || generatingIds.has(conn.to);
+
+      return {
+        id: edgeId,
+        source: conn.from,
+        target: conn.to,
+        sourceHandle: 'send',
+        targetHandle: 'receive',
+        type: 'scissors',
+        animated: isGenerating,
+        selected: isSelected,
+        style: {
+          stroke: isGenerating ? '#437eb5' : (isSelected ? '#94a3b8' : (conn.color || '#437eb5')),
+          strokeWidth: isSelected ? 4 : 2,
+          strokeDasharray: (isGenerating || isSelected) ? '6 4' : undefined,
+          animation: isGenerating
+            ? 'marching-ants 0.5s linear infinite'
+            : (isSelected ? 'marching-ants 1s linear infinite' : undefined),
+          transition: 'stroke 0.2s ease, stroke-width 0.2s ease',
+        },
+        data: { onDelete: onDeleteConnection }
+      };
+    });
+  }, [connections, selectedConnectionId, onDeleteConnection, generatingIds]);
+
+  const onConnect = useCallback((params: any) => {
+    console.log('[ConnectionLines] onConnect triggered:', params);
+    if (checkConnectionValidity(params.source, params.target)) {
+      onPersistConnectorCreate?.({
+        from: params.source,
+        to: params.target,
+        color: '#3b82f6',
+        fromAnchor: 'send',
+        toAnchor: 'receive',
+      });
+    }
+  }, [onPersistConnectorCreate, checkConnectionValidity]);
+
+  const connectingSourceIdRef = useRef<string | null>(null);
+
+  const onConnectStart = useCallback((_: any, { nodeId }: any) => {
+    console.log('[ConnectionLines] onConnectStart:', nodeId);
+    setConnectingSourceId(nodeId);
+    connectingSourceIdRef.current = nodeId;
+    setIsConnecting(true);
+  }, []);
+
+  const onConnectEnd = useCallback((event: any, connectionState: any) => {
+    const sourceId = connectingSourceIdRef.current;
+
+    // Check if the connection is valid (handled by React Flow)
+    // If not valid, it means it was dropped on the pane or an invalid target
+    if (!connectionState?.isValid && sourceId) {
+      // It was a drop without connection. Trigger the menu.
+      const clientX = event.clientX || (event.changedTouches && event.changedTouches[0]?.clientX);
+      const clientY = event.clientY || (event.changedTouches && event.changedTouches[0]?.clientY);
+
+      if (clientX && clientY) {
+        const sourceNode = getNode(sourceId);
+        const sourceNodeType = (sourceNode?.data?.type as string) || getComponentType(sourceId) || 'image';
+
+        // Since this ReactFlow instance is an overlay with identity transform (0,0,1),
+        // screenToFlowPosition just returns screen coordinates.
+        // We need to calculate the actual world coordinates based on the main canvas's position and scale.
+        const worldX = (clientX - position.x) / scale;
+        const worldY = (clientY - position.y) / scale;
+
+        openMenu({
+          sourceNodeId: sourceId,
+          sourceNodeType,
+          canvasX: worldX,
+          canvasY: worldY,
+          x: clientX,
+          y: clientY,
+        });
+      }
+    }
+
+    setIsConnecting(false);
+    setConnectingSourceId(null);
+    connectingSourceIdRef.current = null;
+  }, [getNode, openMenu, position.x, position.y, scale]);
+
 
   return (
-    <svg
+    <div
+      ref={ref}
       style={{
+        width: '100vw',
+        height: '100vh',
         position: 'fixed',
         top: 0,
         left: 0,
-        width: '100vw',
-        height: '100vh',
-        pointerEvents: 'none',
-        zIndex: 1000, // Lower than all components (2000+) so lines appear behind
-        transition: 'none', // Disable all transitions
-        transform: 'none', // Ensure no transforms affect the SVG
-        // No viewBox - use pixel coordinates directly to ensure circles maintain fixed size
+        // CRITICAL FIX: allow pointer events when connecting so we can catch the drop on the pane
+        pointerEvents: isConnecting ? 'all' : 'none',
+        zIndex: 0
       }}
     >
-      <defs>
-        <linearGradient id={GLOW_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#1b3a68" stopOpacity="0" />
-          <stop offset="35%" stopColor="#60a5fa" stopOpacity="0.9" />
-          <stop offset="65%" stopColor="#60a5fa" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#1b3a68" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {connectionLines.map((line, index) => {
-        const connectionId = line.id || `conn-${line.from}-${line.to}-${index}`;
-        const isSelected = selectedConnectionId === connectionId;
-        const isLineGenerating = generatingNodeIds.has(line.to);
-        // When selected, match the active drag line style exactly
-        const strokeColor = '#4C83FF'; // Same color as active drag
-        // When selected, use same width calculation as active drag (1.6 scaled)
-        const strokeWidth = isSelected ? computeStrokeForScale(1.6, scale) : computeStrokeForScale(2, scale);
-        const glowWidth = Math.max(5, 7 * scale);
-        const sweepWidth = Math.max(6, 9 * scale);
-        const dx = line.toX - line.fromX;
-        const dy = line.toY - line.fromY;
-        const approxLength = Math.max(48, Math.hypot(dx, dy) + Math.abs(dy) * 0.55);
-        const sweepSegmentLength = Math.max(Math.min(approxLength * 0.8, 220 * scale), 70);
-        const sweepStartOffset = approxLength + sweepSegmentLength + Math.max(30, 40 * scale);
-        const dashAnimationDuration = Math.max(1.6, (approxLength + sweepSegmentLength) / (100 * Math.max(scale, 0.4)));
+      <div style={{ width: '100%', height: '100%', pointerEvents: isConnecting ? 'all' : 'none' }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={renderedEdges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          panOnDrag={false}
+          zoomOnScroll={false}
+          panOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
+          nodesDraggable={false}
+          nodesConnectable={true}
+          elementsSelectable={true}
+          proOptions={{ hideAttribution: true }}
 
-        // Bezier Control Point Logic
-        // Enforce a minimum straight segment ("2cm" approx 65px) coming out of the nodes
-        const minStraight = 65 * scale;
-
-        // Calculate control distance
-        // For standard flow (Left->Right), we allow some scaling but cap it to prevent huge loops.
-        // For reverse flow (Right->Left), we strictly cap it to ensure consistent loop size.
-        const absDx = Math.abs(dx);
-        // Base control distance is usually half distance or minStraight
-        let controlDist = Math.max(absDx * 0.5, minStraight);
-
-        // Cap the control distance to ensure curvature consistency ("don't increase curve when far")
-        // approx 250px max loop size
-        const maxLoop = 250 * scale;
-        controlDist = Math.min(controlDist, maxLoop);
-
-        // CP1 extends Right from source. CP2 extends Left from target.
-        const cp1x = line.fromX + controlDist;
-        const cp2x = line.toX - controlDist;
-
-        const pathData = `M ${line.fromX} ${line.fromY} C ${cp1x} ${line.fromY}, ${cp2x} ${line.toY}, ${line.toX} ${line.toY}`;
-
-        return (
-          <g key={connectionId}>
-            {/* Dashed helper line showing connection path (like in demo) */}
-            <path
-              d={pathData}
-              stroke="#666"
-              strokeWidth={computeStrokeForScale(3, scale)}
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={`${10 * scale} ${10 * scale} 0 ${10 * scale}`}
-              opacity={0.3}
+          onEdgeClick={(e, edge) => {
+            e.stopPropagation();
+            onSelectConnection(edge.id);
+          }}
+          onEdgeContextMenu={(e, edge) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setMenu({ id: edge.id, top: e.clientY, left: e.clientX });
+          }}
+          onPaneClick={() => setMenu(null)}
+          onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
+          style={{ width: '100%', height: '100%', background: 'transparent' }}
+        >
+          {typeof document !== 'undefined' && createPortal(
+            <MiniMap
+              position="bottom-right"
+              nodeColor={getMiniMapNodeColor}
+              nodeStrokeColor="#4C83FF"
+              nodeStrokeWidth={2}
+              nodeBorderRadius={8}
+              maskColor="rgba(255, 255, 255, 0.25)"
+              bgColor="#0f0f14"
               style={{
-                pointerEvents: 'none',
-                transition: 'none',
+                backgroundColor: '#0f0f14',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '16px',
+                margin: '24px',
+                padding: 0,
+                boxShadow: '0 12px 48px -12px rgba(0, 0, 0, 0.5)',
+                width: 250,
+                height: 150,
+                overflow: 'hidden',
+                zIndex: 9999,
+                opacity: isMiniMapVisible ? 1 : 0,
+                pointerEvents: isMiniMapVisible ? 'all' : 'none',
+                transition: 'opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: isMiniMapVisible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.95)',
               }}
-            />
-            {/* Main connection line */}
-            <path
-              d={pathData}
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={isSelected ? `${6 * scale} ${4 * scale}` : 'none'}
-              style={{
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.18))',
-                pointerEvents: 'auto', // Make path clickable
-                cursor: 'pointer',
-                transition: 'none', // Disable transitions to prevent animation
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                // Toggle selection: if already selected, deselect; otherwise select
-                if (isSelected) {
-                  onSelectConnection(null);
-                } else {
-                  onSelectConnection(connectionId);
-                }
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.stroke = '#2a4d73';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2.2, scale));
-                } else {
-                  // Keep selected state (same as active drag)
-                  e.currentTarget.style.stroke = '#4C83FF';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(1.6, scale));
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.stroke = '#4C83FF';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(2, scale));
-                } else {
-                  // Keep selected state (same as active drag)
-                  e.currentTarget.style.stroke = '#4C83FF';
-                  e.currentTarget.style.strokeWidth = String(computeStrokeForScale(1.6, scale));
-                }
-              }}
-            />
-            {isLineGenerating && (
-              <>
-                {[-dashAnimationDuration / 2, 0].map((delay, idx) => (
-                  <path
-                    key={`${connectionId}-glow-${idx}`}
-                    d={pathData}
-                    stroke={`url(#${GLOW_GRADIENT_ID})`}
-                    strokeWidth={idx === 0 ? glowWidth : sweepWidth}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={`${Math.max(sweepSegmentLength, 1)} ${approxLength}`}
-                    style={{
-                      pointerEvents: 'none',
-                      filter: idx === 0 ? 'blur(7px)' : 'drop-shadow(0 0 18px rgba(201,236,255,0.9))',
-                      '--sweepStart': sweepStartOffset, // Pass as CSS variable
-                      animationName: 'connection-line-dash',
-                      animationDuration: `${dashAnimationDuration}s`,
-                      animationTimingFunction: 'linear',
-                      animationIterationCount: 'infinite',
-                      animationDelay: `${delay}s`,
-                    } as React.CSSProperties}
-                  />
-                ))}
-              </>
-            )}
-            <circle
-              cx={line.fromX}
-              cy={line.fromY}
-              r={computeCircleRadiusForScale(3, scale)}
-              fill={strokeColor}
-              style={{
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                transition: 'none', // Disable transitions to prevent animation
-                transform: 'none', // Ensure no transforms affect circle size
-                // Circle radius is fixed at 2px via computeCircleRadiusForScale to match background dots
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                // Delete the connection when clicking on the node circle
-                if (onDeleteConnection) {
-                  onDeleteConnection(connectionId);
-                }
-              }}
-            />
-            <circle
-              cx={line.toX}
-              cy={line.toY}
-              r={computeCircleRadiusForScale(3, scale)}
-              fill={strokeColor}
-              style={{
-                pointerEvents: 'auto',
-                cursor: 'pointer',
-                transition: 'none', // Disable transitions to prevent animation
-                transform: 'none', // Ensure no transforms affect circle size
-                // Circle radius is fixed at 2px via computeCircleRadiusForScale to match background dots
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                // Delete the connection when clicking on the node circle
-                if (onDeleteConnection) {
-                  onDeleteConnection(connectionId);
-                }
-              }}
-            />
-          </g>
-        );
-      })}
-      {activeDrag && (
-        <>
-          {/* Dashed helper line for active drag */}
-          <path
-            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${activeDrag.startX + 100 * scale} ${activeDrag.startY}, ${activeDrag.currentX - 100 * scale} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-            stroke="#666"
-            strokeWidth={computeStrokeForScale(3, scale)}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${10 * scale} ${10 * scale} 0 ${10 * scale}`}
-            opacity={0.3}
-            style={{
-              pointerEvents: 'none',
-            }}
-          />
-          {/* Main active drag line */}
-          <path
-            d={`M ${activeDrag.startX} ${activeDrag.startY} C ${activeDrag.startX + 100 * scale} ${activeDrag.startY}, ${activeDrag.currentX - 100 * scale} ${activeDrag.currentY}, ${activeDrag.currentX} ${activeDrag.currentY}`}
-            stroke="#4C83FF"
-            strokeWidth={computeStrokeForScale(1.6, scale)}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${6 * scale} ${4 * scale}`}
-          />
-        </>
-      )}
-    </svg>
+              pannable
+              zoomable
+            />,
+            document.body
+          )}
+          <style>{`
+            .react-flow { background: transparent !important; }
+            .react-flow__panel { background: transparent !important; }
+            .react-flow__viewport .react-flow__node { background: transparent !important; border: none !important; box-shadow: none !important; pointer-events: ${isConnecting ? 'auto' : 'none'} !important; }
+            .react-flow__minimap { pointer-events: all !important; }
+            .react-flow__minimap-mask { pointer-events: none !important; }
+            .react-flow__edge { pointer-events: all !important; cursor: pointer; }
+            .react-flow__edge-path { cursor: pointer; }
+            .react-flow__handle { pointer-events: all !important; cursor: crosshair; }
+            .react-flow__pane { pointer-events: ${isConnecting ? 'all' : 'none'} !important; background: transparent !important; }
+            .scissors-delete-btn:hover { background: #ff4d4f !important; color: white !important; transform: scale(1.1); }
+          `}</style>
+          {menu && <ConnectionContextMenu {...menu} onDelete={() => {
+            onDeleteConnection?.(menu.id);
+            setMenu(null);
+          }} />}
+        </ReactFlow>
+      </div>
+      <style>{`
+        .react-flow__edge-path.animated {
+          stroke-dasharray: 6 4;
+          animation: marching-ants 1s linear infinite;
+        }
+
+        @keyframes marching-ants {
+          from {
+            stroke-dashoffset: 20;
+          }
+          to {
+            stroke-dashoffset: 0;
+          }
+        }
+      `}</style>
+    </div>
   );
 };
 
+export const ConnectionLines = (props: ConnectionLinesProps) => (
+  <ReactFlowProvider>
+    <ConnectionLinesContent {...props} />
+  </ReactFlowProvider>
+);

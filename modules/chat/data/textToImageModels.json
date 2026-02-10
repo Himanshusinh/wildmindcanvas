@@ -32,21 +32,50 @@
       "description": "Generate images at 2K, 4K, or higher resolutions",
       "supported": true,
       "modelsCount": 13,
-      "resolutions": ["1K", "2K", "4K", "1024", "1440", "1024x1024", "1024x2048"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K",
+        "1024",
+        "1440",
+        "1024x1024",
+        "1024x2048"
+      ],
       "useCase": "Professional quality images for print, web, or presentations"
     },
     "aspectRatioControl": {
       "name": "Aspect Ratio Control",
       "description": "Control the width-to-height ratio of generated images",
       "supported": true,
-      "supportedRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "16:10", "10:16"],
+      "supportedRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "21:9",
+        "9:21",
+        "16:10",
+        "10:16"
+      ],
       "useCase": "Create images optimized for specific platforms (Instagram, YouTube, banners, etc.)"
     },
     "resolutionControl": {
       "name": "Resolution Control",
       "description": "Select specific resolution for image output",
       "supported": true,
-      "availableResolutions": ["512", "768", "1024", "1280", "1440", "1K", "2K", "4K"],
+      "availableResolutions": [
+        "512",
+        "768",
+        "1024",
+        "1280",
+        "1440",
+        "1K",
+        "2K",
+        "4K"
+      ],
       "useCase": "Optimize file size and quality based on intended use"
     },
     "turboMode": {
@@ -60,7 +89,11 @@
       "name": "Quality Tiers",
       "description": "Different quality levels from standard to cinematic",
       "supported": true,
-      "tiers": ["standard", "cinematic", "premium"],
+      "tiers": [
+        "standard",
+        "cinematic",
+        "premium"
+      ],
       "useCase": "Match quality to project requirements and budget"
     }
   },
@@ -75,16 +108,30 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1024"],
-      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "resolutions": [
+        "1024"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 4,
       "isDefault": false,
       "isHighRes": false,
       "isTurbo": true,
-      "strengths": ["fast", "turbo", "draft"],
+      "strengths": [
+        "fast",
+        "turbo",
+        "draft"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -98,13 +145,26 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1024", "1440"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "resolutions": [
+        "1024",
+        "1440"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4"
+      ],
       "maxBatch": 4,
       "isDefault": true,
       "isHighRes": false,
       "isTurbo": true,
-      "strengths": ["fast", "sketch", "draft"],
+      "strengths": [
+        "fast",
+        "sketch",
+        "draft"
+      ],
       "imageToImage": true
     },
     {
@@ -117,13 +177,26 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K", "4K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4"
+      ],
       "maxBatch": 4,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["balanced", "standard"],
+      "strengths": [
+        "balanced",
+        "standard"
+      ],
       "imageToImage": true
     },
     {
@@ -136,13 +209,33 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K", "1024x2048"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9", "9:21", "16:10", "10:16"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "1024x2048"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "21:9",
+        "9:21",
+        "16:10",
+        "10:16"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["quality", "rich", "detailed"],
+      "strengths": [
+        "quality",
+        "rich",
+        "detailed"
+      ],
       "imageToImage": true
     },
     {
@@ -155,13 +248,23 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K"],
-      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "resolutions": [
+        "1K",
+        "2K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["context", "large-scale"],
+      "strengths": [
+        "context",
+        "large-scale"
+      ],
       "imageToImage": true
     },
     {
@@ -174,8 +277,15 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K"],
-      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "resolutions": [
+        "1K",
+        "2K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
@@ -192,16 +302,37 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1K", "2K", "4K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "21:9"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["artistic", "surreal", "dreamy"],
+      "strengths": [
+        "artistic",
+        "surreal",
+        "dreamy"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -215,16 +346,36 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K", "4K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "21:9"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["4k", "ultra-hd"],
+      "strengths": [
+        "4k",
+        "ultra-hd"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": true
     },
@@ -238,17 +389,35 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1024x1024", "1024x768", "768x1024"],
-      "aspectRatios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+      "resolutions": [
+        "1024x1024",
+        "1024x768",
+        "768x1024"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "4:3",
+        "3:4",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 4,
       "isDefault": true,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["realistic", "prompt-adherence", "text-rendering"],
+      "strengths": [
+        "realistic",
+        "prompt-adherence",
+        "text-rendering"
+      ],
       "qualityTier": "standard",
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -262,17 +431,33 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1024x1024"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "2:3", "3:2"],
+      "resolutions": [
+        "1024x1024"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "2:3",
+        "3:2"
+      ],
       "maxBatch": 4,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["artistic", "lighting", "composition"],
+      "strengths": [
+        "artistic",
+        "lighting",
+        "composition"
+      ],
       "qualityTier": "cinematic",
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -286,16 +471,36 @@
         "contentToContent": true,
         "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
       },
-      "resolutions": ["1K", "2K", "4K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3",
+        "21:9"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["latest", "vibrant"],
+      "strengths": [
+        "latest",
+        "vibrant"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": true
     },
@@ -309,16 +514,32 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1K", "2K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+      "resolutions": [
+        "1K",
+        "2K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["photorealistic", "google"],
+      "strengths": [
+        "photorealistic",
+        "google"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -333,15 +554,26 @@
         "description": "Text-to-Image (T2I) only"
       },
       "resolutions": [],
-      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 4,
       "isDefault": false,
       "isHighRes": false,
       "isTurbo": true,
-      "strengths": ["speed", "quick"],
+      "strengths": [
+        "speed",
+        "quick"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -355,16 +587,31 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1K", "2K", "4K"],
-      "aspectRatios": ["1:1", "16:9", "9:16"],
+      "resolutions": [
+        "1K",
+        "2K",
+        "4K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
-      "strengths": ["ultra-quality", "premium"],
+      "strengths": [
+        "ultra-quality",
+        "premium"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -378,15 +625,28 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1K", "2K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "21:9", "9:21"],
+      "resolutions": [
+        "1K",
+        "2K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "21:9",
+        "9:21"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -400,15 +660,28 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1K", "2K"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "21:9", "9:21"],
+      "resolutions": [
+        "1K",
+        "2K"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "21:9",
+        "9:21"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": true,
       "isTurbo": false,
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     },
@@ -419,21 +692,34 @@
       "outputType": "image",
       "supports": {
         "textToContent": true,
-        "contentToContent": true,
-        "description": "Supports both Text-to-Image (T2I) and Image-to-Image (I2I)"
+        "contentToContent": false,
+        "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["1024"],
-      "aspectRatios": ["1:1", "3:2", "2:3"],
+      "resolutions": [
+        "1024"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "3:2",
+        "2:3"
+      ],
       "maxBatch": 1,
       "isDefault": false,
       "isHighRes": false,
       "isTurbo": false,
-      "strengths": ["dalle", "conversational"],
+      "strengths": [
+        "dalle",
+        "conversational"
+      ],
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
-      "imageToImage": true
+      "imageToImage": false
     },
     {
       "id": "p-image",
@@ -445,15 +731,33 @@
         "contentToContent": false,
         "description": "Text-to-Image (T2I) only"
       },
-      "resolutions": ["512", "768", "1024", "1280", "1440"],
-      "aspectRatios": ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"],
+      "resolutions": [
+        "512",
+        "768",
+        "1024",
+        "1280",
+        "1440"
+      ],
+      "aspectRatios": [
+        "1:1",
+        "16:9",
+        "9:16",
+        "4:3",
+        "3:4",
+        "3:2",
+        "2:3"
+      ],
       "maxBatch": 4,
       "isDefault": false,
       "isHighRes": false,
       "isTurbo": true,
       "contracts": {
-        "accepts": ["text"],
-        "produces": ["image"]
+        "accepts": [
+          "text"
+        ],
+        "produces": [
+          "image"
+        ]
       },
       "imageToImage": false
     }
@@ -493,20 +797,15 @@
       "id": "seedream-4.5",
       "name": "Seedream 4.5",
       "description": "Latest Seedream version with I2I support"
-    },
-    {
-      "id": "chatgpt-1.5",
-      "name": "ChatGPT 1.5",
-      "description": "DALL-E powered model with I2I support"
     }
   ],
   "summary": {
     "totalModels": 17,
     "modelsByCapability": {
-      "textToImageOnly": 10,
-      "textToImageAndImageToImage": 7,
+      "textToImageOnly": 11,
+      "textToImageAndImageToImage": 6,
       "imageToImageOnly": 0,
-      "imageToImageSupported": 7
+      "imageToImageSupported": 6
     },
     "modelsByResolution": {
       "supports1K": 15,
@@ -523,7 +822,7 @@
       "1": 10,
       "4": 7
     },
-    "imageToImageModelsCount": 7
+    "imageToImageModelsCount": 6
   },
   "fieldDescriptions": {
     "id": "Unique identifier for the model (used in API calls)",

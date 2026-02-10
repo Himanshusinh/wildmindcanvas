@@ -167,8 +167,13 @@ export function buildProxyThumbnailUrl(
   }
 
   if (!pathToUse) {
-    // For external URLs, can't generate thumbnails
-    return resourceUrl;
+    if (resourceUrl.startsWith('http')) {
+      // For external URLs, treat full URL as the path to be proxied
+      pathToUse = resourceUrl;
+    } else {
+      // If no path extraction possible and not a URL, return original
+      return resourceUrl;
+    }
   }
 
   const params = new URLSearchParams({

@@ -7,6 +7,7 @@ import { ImageUpload } from '@/core/types/canvas';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
+import { useCanvasCoordinates } from './hooks/useCanvasCoordinates';
 
 interface CanvasImageProps {
   imageData: ImageUpload;
@@ -43,6 +44,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const isDraggingImageRef = useRef(false);
   // Smooth hover state management to prevent flickering
   const [isMediaHovered, setIsMediaHovered] = useState(false);
   // Use drag position if dragging, otherwise use imageData position
@@ -56,15 +58,18 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
   const timeUpdateRef = useRef<number | null>(null);
   const wasPlayingBeforeDrag = useRef(false);
   const originalAspectRatio = useRef<number>(1);
-  const dragRafRef = useRef<number | null>(null);
   const transformRafRef = useRef<number | null>(null);
   const groupRef = useRef<Konva.Group>(null);
   const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const justFinishedDragRef = useRef(false);
+  const dragEndCleanupRef = useRef<(() => void) | null>(null);
   const lastSentPositionRef = useRef<{ x: number; y: number } | null>(null);
   const lastReceivedPositionRef = useRef<{ x: number; y: number } | null>(null);
   const currentPositionRef = useRef<{ x: number; y: number }>({ x: imageData.x || 50, y: imageData.y || 50 });
   const isVideo = imageData.type === 'video';
+
+  const { screenToCanvas } = useCanvasCoordinates({ position, scale });
 
   // Sync with imageData when not dragging, but skip if we just finished dragging
   // This prevents the position from being reset to the old value before parent updates
@@ -94,6 +99,65 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       }
     }
   }, [imageData.x, imageData.y, isDraggingImage]);
+
+  // Keep ref in sync to avoid stale-closure bugs in global pointer handlers
+  useEffect(() => {
+    isDraggingImageRef.current = isDraggingImage;
+  }, [isDraggingImage]);
+
+  // Manual drag handling (same pattern as music modal)
+  useEffect(() => {
+    if (!isDraggingImage) return;
+
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      const stage = stageRef?.current;
+      if (!stage) return;
+
+      stage.setPointersPositions(e as any);
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      const { x: worldX, y: worldY } = screenToCanvas(pointer);
+      const newX = worldX - dragOffsetRef.current.x;
+      const newY = worldY - dragOffsetRef.current.y;
+
+      setCurrentX(newX);
+      setCurrentY(newY);
+      currentPositionRef.current = { x: newX, y: newY };
+      dragPositionRef.current = { x: newX, y: newY };
+    };
+
+    const handleMouseUp = () => {
+      if (!isDraggingImageRef.current) return;
+
+      const finalX = currentPositionRef.current.x;
+      const finalY = currentPositionRef.current.y;
+
+      setIsDraggingImage(false);
+      isDraggingImageRef.current = false;
+      justFinishedDragRef.current = true;
+
+      onUpdate?.({ x: finalX, y: finalY });
+
+      setTimeout(() => {
+        justFinishedDragRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, true);
+    window.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('touchmove', handleMouseMove, { capture: true, passive: false });
+    window.addEventListener('touchend', handleMouseUp, true);
+    window.addEventListener('touchcancel', handleMouseUp, true);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('touchmove', handleMouseMove, true as any);
+      window.removeEventListener('touchend', handleMouseUp, true);
+      window.removeEventListener('touchcancel', handleMouseUp, true);
+    };
+  }, [isDraggingImage, position.x, position.y, scale, onUpdate, stageRef, screenToCanvas]);
 
   // Don't render if no URL (text elements don't have URLs)
   if (!imageData.url) return null;
@@ -213,7 +277,7 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
       };
     } else {
       // Use global cache for images
-      imageCache.load(url)
+      imageCache.load(url, imageData.priority === 'high' ? 'high' : 'auto')
         .then((image) => {
           if (mounted) {
             setImg(image);
@@ -440,83 +504,39 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
         name={`canvas-image-${index}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        draggable={isDraggable}
-        x={x}
-        y={y}
+        draggable={false}
+        x={currentX}
+        y={currentY}
         rotation={rotation}
         {...(isUploadedMedia && { 'data-no-resize': 'true' })}
         onDragStart={(e) => {
+          // Konva drag disabled; manual drag handles movement.
+        }}
+        onMouseDown={(e) => {
+          if (!isDraggable) return;
+          if (e.evt.button !== undefined && e.evt.button !== 0) return;
+
+          const stage = stageRef?.current;
+          if (!stage) return;
+
+          stage.setPointersPositions(e.evt);
+          const pointer = stage.getPointerPosition();
+          if (!pointer) return;
+
+          const { x: worldX, y: worldY } = screenToCanvas(pointer);
+          dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
+
           setIsDraggingImage(true);
-          // Store initial drag position to prevent snap-back
-          const node = e.target as Konva.Group;
-          const startX = node.x();
-          const startY = node.y();
-          dragPositionRef.current = { x: startX, y: startY };
-          // Update position immediately to prevent snap-back
-          setCurrentX(startX);
-          setCurrentY(startY);
-          currentPositionRef.current = { x: startX, y: startY };
-        }}
-        onDragEnd={(e) => {
-          const node = e.target as Konva.Group;
-          // Get the final position from the node
-          const finalX = node.x();
-          const finalY = node.y();
-          // Clean up RAF
-          if (dragRafRef.current) {
-            cancelAnimationFrame(dragRafRef.current);
-            dragRafRef.current = null;
-          }
-          // Update position immediately to prevent snap-back
-          setCurrentX(finalX);
-          setCurrentY(finalY);
-          currentPositionRef.current = { x: finalX, y: finalY };
-          // Store the position we're sending to parent
-          lastSentPositionRef.current = { x: finalX, y: finalY };
-          // Mark that we just finished dragging to prevent immediate sync
-          justFinishedDragRef.current = true;
-          // Clear drag state
-          setIsDraggingImage(false);
-          dragPositionRef.current = null;
-          // Notify parent of position change
-          onUpdate?.({
-            x: finalX,
-            y: finalY,
-          });
-          // Allow sync after a short delay to let parent update
-          // Use setTimeout to ensure parent has time to process the update
-          // Increased to 500ms to better handle busy canvases/slower persistence
-          setTimeout(() => {
-            justFinishedDragRef.current = false;
-          }, 500);
-        }}
-        onDragMove={(e) => {
-          // Update drag position ref and state during move
-          const node = e.target as Konva.Group;
-          const newX = node.x();
-          const newY = node.y();
-          dragPositionRef.current = { x: newX, y: newY };
-          // Update parent with real-time position during drag for action icons
-          if (isDraggingImage) {
-            onUpdate?.({
-              x: newX,
-              y: newY,
+          isDraggingImageRef.current = true;
+
+          setIsSelected(true);
+          if (onSelect) {
+            onSelect({
+              ctrlKey: e.evt.ctrlKey,
+              metaKey: e.evt.metaKey,
+              shiftKey: e.evt.shiftKey,
             });
           }
-          // Update state to prevent snap-back (throttled via RAF)
-          if (!dragRafRef.current) {
-            dragRafRef.current = requestAnimationFrame(() => {
-              dragRafRef.current = null;
-              if (isDraggingImage && dragPositionRef.current) {
-                setCurrentX(dragPositionRef.current.x);
-                setCurrentY(dragPositionRef.current.y);
-                currentPositionRef.current = { x: dragPositionRef.current.x, y: dragPositionRef.current.y };
-              }
-            });
-          }
-          // Let Konva handle visual movement
-          const layer = (e.target as Konva.Node).getLayer();
-          layer?.batchDraw();
         }}
         onTransform={(e) => {
           // Disable transform for uploaded images - frame size should be static like generation frames
@@ -573,19 +593,22 @@ export const CanvasImage: React.FC<CanvasImageProps> = ({
           node.scaleY(1);
           onUpdate?.({ width: newWidth, height: newHeight, rotation: newRotation });
         }}
-        onMouseDown={(e) => {
-          e.cancelBubble = true;
-          setIsSelected(true);
-          if (onSelect) {
-            onSelect({
-              ctrlKey: e.evt.ctrlKey,
-              metaKey: e.evt.metaKey,
-              shiftKey: e.evt.shiftKey,
-            });
-          }
-        }}
         onTouchStart={(e) => {
-          e.cancelBubble = true;
+          if (!isDraggable) return;
+
+          const stage = stageRef?.current;
+          if (!stage) return;
+
+          stage.setPointersPositions(e.evt);
+          const pointer = stage.getPointerPosition();
+          if (!pointer) return;
+
+          const { x: worldX, y: worldY } = screenToCanvas(pointer);
+          dragOffsetRef.current = { x: worldX - currentX, y: worldY - currentY };
+
+          setIsDraggingImage(true);
+          isDraggingImageRef.current = true;
+
           setIsSelected(true);
           if (onSelect) {
             onSelect({

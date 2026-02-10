@@ -172,101 +172,102 @@ export const ImageModalControls: React.FC<ImageModalControlsProps> = ({
           gap: `${12 * scale}px`,
           pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
           overflow: 'visible',
-          zIndex: 1,
+          zIndex: 3,
           // Add left, right and bottom borders to match the frame border color/weight
           borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
           borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
           borderBottom: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+          marginTop: `${-frameBorderWidth * scale}px`, // Pull up to overlap border
           transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
         }}
       >
         {/* Prompt Input */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: `${4 * scale}px` }}>
-        <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>
-          <input
-            className="prompt-input"
-            type="text"
-            value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                onGenerate();
-              }
-            }}
-            placeholder="Enter prompt here..."
-            disabled={isPromptDisabled}
-            style={{
-              flex: 1,
-              padding: `${10 * scale}px ${14 * scale}px`,
-              backgroundColor: inputBg,
-              border: 'none',
-              borderRadius: `${10 * scale}px`,
-              fontSize: controlFontSize,
-              color: inputText,
-              outline: 'none',
-              cursor: isPromptDisabled ? 'not-allowed' : 'text',
-              opacity: isPromptDisabled ? 0.7 : 1,
-              transition: 'background-color, color',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
-              e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.border = 'none';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={onGenerate}
+          <div style={{ display: 'flex', gap: `${8 * scale}px`, alignItems: 'center' }}>
+            <input
+              className="prompt-input"
+              type="text"
+              value={prompt}
+              onChange={(e) => onPromptChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onGenerate();
+                }
+              }}
+              placeholder="Enter prompt here..."
+              disabled={isPromptDisabled}
+              style={{
+                flex: 1,
+                padding: `${10 * scale}px ${14 * scale}px`,
+                backgroundColor: inputBg,
+                border: 'none',
+                borderRadius: `${10 * scale}px`,
+                fontSize: controlFontSize,
+                color: inputText,
+                outline: 'none',
+                cursor: isPromptDisabled ? 'not-allowed' : 'text',
+                opacity: isPromptDisabled ? 0.7 : 1,
+                transition: 'background-color, color',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.border = `1px solid ${frameBorderColor}`;
+                e.currentTarget.style.boxShadow = `0 0 0 ${1 * scale}px ${frameBorderColor}`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.border = 'none';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={onGenerate}
               disabled={!prompt.trim() || isGenerating || isLocked || prompt.trim().length > 5000}
               title={isLocked ? lockReason : (prompt.trim().length > 5000 ? 'Prompt is too long (max 5000 characters)' : undefined)}
-            style={{
-              width: `${40 * scale}px`,
-              height: `${40 * scale}px`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              style={{
+                width: `${40 * scale}px`,
+                height: `${40 * scale}px`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 backgroundColor: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? SELECTION_COLOR : 'rgba(0, 0, 0, 0.1)',
-              border: 'none',
-              borderRadius: `${10 * scale}px`,
+                border: 'none',
+                borderRadius: `${10 * scale}px`,
                 cursor: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? 'pointer' : 'not-allowed',
-              color: 'white',
+                color: 'white',
                 boxShadow: (prompt.trim() && !isGenerating && !isLocked && prompt.trim().length <= 5000) ? `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)` : 'none',
-              padding: 0,
-              opacity: (isGenerating || isLocked) ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => {
+                padding: 0,
+                opacity: (isGenerating || isLocked) ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
                 if (prompt.trim() && !isLocked && prompt.trim().length <= 5000) {
-                e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
-              }
-            }}
-            onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = `0 ${6 * scale}px ${16 * scale}px rgba(76, 131, 255, 0.5)`;
+                }
+              }}
+              onMouseLeave={(e) => {
                 if (prompt.trim() && !isLocked && prompt.trim().length <= 5000) {
-                e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
-              }
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {isLocked ? (
-              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            ) : isGenerating ? (
-              <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeDasharray="31.416" strokeDashoffset="31.416">
-                  <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite" />
-                  <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite" />
-                </path>
-              </svg>
-            ) : (
-              <GenerateArrowIcon scale={scale} />
-            )}
-          </button>
+                  e.currentTarget.style.boxShadow = `0 ${4 * scale}px ${12 * scale}px rgba(76, 131, 255, 0.4)`;
+                }
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {isLocked ? (
+                <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              ) : isGenerating ? (
+                <svg width={18 * scale} height={18 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeDasharray="31.416" strokeDashoffset="31.416">
+                    <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite" />
+                    <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite" />
+                  </path>
+                </svg>
+              ) : (
+                <GenerateArrowIcon scale={scale} />
+              )}
+            </button>
           </div>
           {/* Character Counter */}
           {prompt.length > 0 && (

@@ -1,18 +1,22 @@
 
-import React from 'react';
+import React, { useMemo, useRef } from 'react';
 import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { useCanvasSelection } from '../hooks/useCanvasSelection';
-import { ModalOverlays } from '@/modules/canvas-overlays';
-import { CanvasImageConnectionNodes } from '../CanvasImageConnectionNodes';
+import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
+
+
 import { ContextMenu } from '@/modules/ui-global/ContextMenu';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { SettingsPopup } from '@/modules/ui-global/Settings';
-// import { ComponentCreationMenu } from '../../canvas-overlays/components/ComponentCreationMenu';
-// import { UnifiedCanvasOverlay } from '@/modules/canvas-overlays/UnifiedCanvasOverlay';
-// import { LoadingOverlay } from '@/modules/ui-global/LoadingOverlay';
 import Konva from 'konva';
-
+// Zustand Store - Image & Video State Management
+import {
+    useImageModalStates, useVideoModalStates, useRemoveBgModalStates, useRemoveBgSelection, useRemoveBgStore,
+    useEraseModalStates, useEraseSelection, useEraseStore,
+    useExpandModalStates, useExpandSelection, useExpandStore,
+} from '@/modules/stores';
+import { ModalOverlays } from '../../canvas-overlays';
 interface CanvasOverlaysProps {
     canvasState: ReturnType<typeof useCanvasState>;
     canvasSelection: ReturnType<typeof useCanvasSelection>;
@@ -28,8 +32,10 @@ interface CanvasOverlaysProps {
     setIsSettingsOpen: (isOpen: boolean) => void;
     activeGenerationCount: number;
     onFitView: () => void;
-    setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+
     isChatOpen?: boolean;
+    isInteracting?: boolean;
+    setIsComponentDragging?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
@@ -47,26 +53,25 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
     setIsSettingsOpen,
     activeGenerationCount,
     onFitView,
-    setGenerationQueue,
-    isChatOpen
+
+    isChatOpen,
+    isInteracting = false,
+    setIsComponentDragging
 }) => {
+    // Standardized coordinates
+    const { screenToCanvas } = useCanvasCoordinates({ position, scale });
+
+    // Zustand Store - Get image and video modal states (replaces from canvasState)
+    const imageModalStates = useImageModalStates();
+    const videoModalStates = useVideoModalStates();
+
     const {
         images,
         textInputStates, setTextInputStates,
-        imageModalStates, setImageModalStates,
-        videoModalStates, setVideoModalStates,
+        // REMOVED: imageModalStates, setImageModalStates (now managed by Zustand)
+        // REMOVED: videoModalStates, setVideoModalStates (now managed by Zustand store)
         videoEditorModalStates, setVideoEditorModalStates,
         imageEditorModalStates, setImageEditorModalStates,
-        musicModalStates, setMusicModalStates,
-        upscaleModalStates, setUpscaleModalStates,
-        multiangleCameraModalStates, setMultiangleCameraModalStates,
-        removeBgModalStates, setRemoveBgModalStates,
-        eraseModalStates, setEraseModalStates,
-        expandModalStates, setExpandModalStates,
-        vectorizeModalStates, setVectorizeModalStates,
-        nextSceneModalStates, setNextSceneModalStates,
-        compareModalStates, setCompareModalStates,
-        storyboardModalStates, setStoryboardModalStates,
         scriptFrameModalStates, setScriptFrameModalStates,
         sceneFrameModalStates, setSceneFrameModalStates,
     } = canvasState;
@@ -77,24 +82,100 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         selectedImageIndices, setSelectedImageIndices,
         selectedTextInputIds, setSelectedTextInputIds, setSelectedTextInputId, selectedTextInputId,
         selectedImageModalIds, setSelectedImageModalIds, setSelectedImageModalId, selectedImageModalId,
+        // REMOVED: selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId (now managed by Zustand store)
         selectedVideoModalIds, setSelectedVideoModalIds, setSelectedVideoModalId, selectedVideoModalId,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds, setSelectedVideoEditorModalId, selectedVideoEditorModalId,
         selectedImageEditorModalIds, setSelectedImageEditorModalIds, setSelectedImageEditorModalId, selectedImageEditorModalId,
-        selectedMusicModalIds, setSelectedMusicModalIds, setSelectedMusicModalId, selectedMusicModalId,
-        selectedUpscaleModalIds, setSelectedUpscaleModalIds, setSelectedUpscaleModalId, selectedUpscaleModalId,
-        selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalId, selectedMultiangleCameraModalId,
-        selectedRemoveBgModalIds, setSelectedRemoveBgModalIds, setSelectedRemoveBgModalId, selectedRemoveBgModalId,
-        selectedEraseModalIds, setSelectedEraseModalIds, setSelectedEraseModalId, selectedEraseModalId,
-        selectedExpandModalIds, setSelectedExpandModalIds, setSelectedExpandModalId, selectedExpandModalId,
-        selectedVectorizeModalIds, setSelectedVectorizeModalIds, setSelectedVectorizeModalId, selectedVectorizeModalId,
-        selectedNextSceneModalIds, setSelectedNextSceneModalIds, setSelectedNextSceneModalId, selectedNextSceneModalId,
-        selectedCompareModalIds, setSelectedCompareModalIds, setSelectedCompareModalId, selectedCompareModalId,
-        selectedStoryboardModalIds, setSelectedStoryboardModalIds, setSelectedStoryboardModalId, selectedStoryboardModalId,
         selectedScriptFrameModalIds, setSelectedScriptFrameModalIds,
         selectedSceneFrameModalIds, setSelectedSceneFrameModalIds,
         contextMenuPosition, contextMenuModalType, contextMenuOpen, setContextMenuOpen,
         setSelectionOrder,
     } = canvasSelection;
+
+    // --- VIEWPORT-BASED VIRTUALIZATION ---
+    const { x: viewX, y: viewY } = screenToCanvas({ x: 0, y: 0 });
+    const viewW = viewportSize.width / scale;
+    const viewH = viewportSize.height / scale;
+    const PADDING = 1200; // world units around viewport
+
+    const viewportBounds = {
+        minX: viewX - PADDING,
+        minY: viewY - PADDING,
+        maxX: viewX + viewW + PADDING,
+        maxY: viewY + viewH + PADDING,
+    };
+
+    const isRectInViewport = (
+        x: number,
+        y: number,
+        w: number = 600,
+        h: number = 400,
+    ) => {
+        const { minX, minY, maxX, maxY } = viewportBounds;
+        const rX2 = x + w;
+        const rY2 = y + h;
+        return !(rX2 < minX || x > maxX || rY2 < minY || y > maxY);
+    };
+
+    // Virtualize image and video modals based on viewport
+    // Skip recalculation during interaction to prevent lag
+    const prevVirtualizedImageRef = useRef<typeof imageModalStates>([]);
+    const prevVirtualizedVideoRef = useRef<typeof videoModalStates>([]);
+
+    const virtualizedImageModalStates = useMemo(() => {
+        const filtered = imageModalStates.filter((m: any) =>
+            isRectInViewport(
+                m.x,
+                m.y,
+                m.width ?? m.frameWidth ?? 600,
+                m.height ?? m.frameHeight ?? 400,
+            )
+        );
+
+        // Smart Memoization: Only update reference if the set of visible items actually changed.
+        // During panning, the world coordinates of items don't change, only the viewport does.
+        // So unless an item enters/exits the viewport, the list of visible items (by reference) remains identical.
+        const prev = prevVirtualizedImageRef.current;
+        if (prev.length === filtered.length) {
+            let hasChanged = false;
+            for (let i = 0; i < prev.length; i++) {
+                if (prev[i] !== filtered[i]) {
+                    hasChanged = true;
+                    break;
+                }
+            }
+            if (!hasChanged) return prev;
+        }
+
+        prevVirtualizedImageRef.current = filtered;
+        return filtered;
+    }, [imageModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY]);
+
+    const virtualizedVideoModalStates = useMemo(() => {
+        const filtered = videoModalStates.filter((m: any) =>
+            isRectInViewport(
+                m.x,
+                m.y,
+                m.frameWidth ?? 600,
+                m.frameHeight ?? 400,
+            )
+        );
+
+        const prev = prevVirtualizedVideoRef.current;
+        if (prev.length === filtered.length) {
+            let hasChanged = false;
+            for (let i = 0; i < prev.length; i++) {
+                if (prev[i] !== filtered[i]) {
+                    hasChanged = true;
+                    break;
+                }
+            }
+            if (!hasChanged) return prev;
+        }
+
+        prevVirtualizedVideoRef.current = filtered;
+        return filtered;
+    }, [videoModalStates, viewportBounds.minX, viewportBounds.minY, viewportBounds.maxX, viewportBounds.maxY]);
 
     const {
         onPersistImageModalCreate, onPersistImageModalMove, onPersistImageModalDelete,
@@ -127,136 +208,57 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
         <>
             {/* {isLoading && <LoadingOverlay message="Loading canvas..." />} */}
 
-            <CanvasImageConnectionNodes
-                images={images}
-                stageRef={stageRef}
-                position={position}
-                scale={scale}
-                selectedImageIndices={selectedImageIndices}
-            />
+
+
 
             <ModalOverlays
                 isChatOpen={isChatOpen}
                 stageRef={stageRef as any}
                 scale={scale}
                 position={position}
-                textInputStates={textInputStates}
-                imageModalStates={imageModalStates}
-                videoModalStates={videoModalStates}
+                viewportSize={viewportSize}
+                showFineDetails={scale >= 0.8}
+                showLabelsOnly={scale >= 0.4 && scale < 0.8}
+                isZoomedOut={scale < 0.4}
+                isInteracting={isInteracting}
                 videoEditorModalStates={videoEditorModalStates}
                 imageEditorModalStates={imageEditorModalStates}
-                musicModalStates={musicModalStates}
-                upscaleModalStates={upscaleModalStates}
                 isComponentDraggable={isComponentDraggable}
-                multiangleCameraModalStates={multiangleCameraModalStates}
-                removeBgModalStates={removeBgModalStates}
-                eraseModalStates={eraseModalStates}
-                expandModalStates={expandModalStates}
-                vectorizeModalStates={vectorizeModalStates}
-                nextSceneModalStates={nextSceneModalStates}
-                storyboardModalStates={storyboardModalStates}
                 scriptFrameModalStates={scriptFrameModalStates}
                 sceneFrameModalStates={sceneFrameModalStates}
+                imageModalStates={virtualizedImageModalStates}
+                videoModalStates={virtualizedVideoModalStates}
 
                 // Connections
                 connections={canvasState.connections}
                 onConnectionsChange={props.onConnectionsChange}
                 onPersistConnectorCreate={props.onPersistConnectorCreate}
                 onPersistConnectorDelete={props.onPersistConnectorDelete}
-
-
-
-                compareModalStates={compareModalStates}
-                selectedCompareModalId={selectedCompareModalId}
-                selectedCompareModalIds={selectedCompareModalIds}
-                setCompareModalStates={setCompareModalStates}
-                setSelectedCompareModalId={setSelectedCompareModalId}
-                setSelectedCompareModalIds={setSelectedCompareModalIds}
                 onPersistCompareModalCreate={onPersistCompareModalCreate}
                 onPersistCompareModalMove={onPersistCompareModalMove}
                 onPersistCompareModalDelete={onPersistCompareModalDelete}
 
-                selectedMultiangleCameraModalId={selectedMultiangleCameraModalId}
-                selectedMultiangleCameraModalIds={selectedMultiangleCameraModalIds}
-                setMultiangleCameraModalStates={setMultiangleCameraModalStates}
-                setSelectedMultiangleCameraModalId={setSelectedMultiangleCameraModalId}
-                setSelectedMultiangleCameraModalIds={setSelectedMultiangleCameraModalIds}
                 onPersistMultiangleCameraModalCreate={onPersistMultiangleCameraModalCreate}
                 onPersistMultiangleCameraModalMove={onPersistMultiangleCameraModalMove}
                 onPersistMultiangleCameraModalDelete={onPersistMultiangleCameraModalDelete}
                 onMultiangleCamera={props.onMultiangleCamera}
                 onQwenMultipleAngles={props.onQwenMultipleAngles}
-
-                selectedTextInputId={selectedTextInputId}
-                selectedTextInputIds={selectedTextInputIds}
-                selectedImageModalId={selectedImageModalId}
-                selectedImageModalIds={selectedImageModalIds}
-                selectedVideoModalId={selectedVideoModalId}
-                selectedVideoModalIds={selectedVideoModalIds}
                 selectedVideoEditorModalId={selectedVideoEditorModalId}
                 selectedVideoEditorModalIds={selectedVideoEditorModalIds}
                 selectedImageEditorModalId={selectedImageEditorModalId}
                 selectedImageEditorModalIds={selectedImageEditorModalIds}
-                selectedMusicModalId={selectedMusicModalId}
-                selectedMusicModalIds={selectedMusicModalIds}
-                selectedUpscaleModalId={selectedUpscaleModalId}
-                selectedUpscaleModalIds={selectedUpscaleModalIds}
-                selectedRemoveBgModalId={selectedRemoveBgModalId}
-                selectedRemoveBgModalIds={selectedRemoveBgModalIds}
-                selectedEraseModalId={selectedEraseModalId}
-                selectedEraseModalIds={selectedEraseModalIds}
-                selectedExpandModalId={selectedExpandModalId}
-                selectedExpandModalIds={selectedExpandModalIds}
-                selectedVectorizeModalId={selectedVectorizeModalId}
-                selectedVectorizeModalIds={selectedVectorizeModalIds}
-                selectedNextSceneModalId={selectedNextSceneModalId}
-                selectedNextSceneModalIds={selectedNextSceneModalIds}
-                selectedStoryboardModalId={selectedStoryboardModalId}
-                selectedStoryboardModalIds={selectedStoryboardModalIds}
+
                 selectedIds={selectedIds}
                 setSelectionOrder={setSelectionOrder}
-
                 clearAllSelections={clearAllSelections}
-                setTextInputStates={setTextInputStates}
-                setSelectedTextInputId={setSelectedTextInputId}
-                setSelectedTextInputIds={setSelectedTextInputIds}
                 setSelectedImageIndices={setSelectedImageIndices}
-                setImageModalStates={setImageModalStates}
-                setSelectedImageModalId={setSelectedImageModalId}
-                setSelectedImageModalIds={setSelectedImageModalIds}
-                setVideoModalStates={setVideoModalStates}
-                setSelectedVideoModalId={setSelectedVideoModalId}
-                setSelectedVideoModalIds={setSelectedVideoModalIds}
                 setVideoEditorModalStates={setVideoEditorModalStates}
                 setSelectedVideoEditorModalId={setSelectedVideoEditorModalId}
                 setSelectedVideoEditorModalIds={setSelectedVideoEditorModalIds}
                 setImageEditorModalStates={setImageEditorModalStates}
                 setSelectedImageEditorModalId={setSelectedImageEditorModalId}
                 setSelectedImageEditorModalIds={setSelectedImageEditorModalIds}
-                setMusicModalStates={setMusicModalStates}
-                setSelectedMusicModalId={setSelectedMusicModalId}
-                setSelectedMusicModalIds={setSelectedMusicModalIds}
-                setUpscaleModalStates={setUpscaleModalStates}
-                setSelectedUpscaleModalId={setSelectedUpscaleModalId}
-                setSelectedUpscaleModalIds={setSelectedUpscaleModalIds}
-                setRemoveBgModalStates={setRemoveBgModalStates}
-                setSelectedRemoveBgModalId={setSelectedRemoveBgModalId}
-                setSelectedRemoveBgModalIds={setSelectedRemoveBgModalIds}
-                setEraseModalStates={setEraseModalStates}
-                setSelectedEraseModalId={setSelectedEraseModalId}
-                setSelectedEraseModalIds={setSelectedEraseModalIds}
-                setExpandModalStates={setExpandModalStates}
-                setSelectedExpandModalId={setSelectedExpandModalId}
-                setSelectedExpandModalIds={setSelectedExpandModalIds}
-                setVectorizeModalStates={setVectorizeModalStates}
-                setSelectedVectorizeModalId={setSelectedVectorizeModalId}
-                setSelectedVectorizeModalIds={setSelectedVectorizeModalIds}
-                setNextSceneModalStates={setNextSceneModalStates}
-                setSelectedNextSceneModalId={setSelectedNextSceneModalId}
-                setSelectedNextSceneModalIds={setSelectedNextSceneModalIds}
-                setStoryboardModalStates={setStoryboardModalStates}
-                setSelectedStoryboardModalId={setSelectedStoryboardModalId}
-                setSelectedStoryboardModalIds={setSelectedStoryboardModalIds}
+
                 setScriptFrameModalStates={setScriptFrameModalStates as any}
                 // setSelectedScriptFrameModalIds={selectedScriptFrameModalIds as any}
                 // setSceneFrameModalStates={setSceneFrameModalStates as any}
@@ -335,7 +337,7 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
 
                 projectId={props.projectId}
                 isUIHidden={props.isUIHidden}
-                setGenerationQueue={setGenerationQueue}
+
             />
 
             {isSettingsOpen && (
@@ -367,7 +369,6 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
                 showDuplicate={true}
             />
 
-            {/* Clear Studio Context Menu (Right Click on Empty Canvas) */}
             {contextMenuOpen && contextMenuModalType === 'canvas' && (
                 <PluginContextMenu
                     x={contextMenuPosition.x}
@@ -383,9 +384,10 @@ export const CanvasOverlays: React.FC<CanvasOverlaysProps> = ({
             )}
 
             {/* <UnifiedCanvasOverlay
-                imageModalStates={imageModalStates}
+                // REMOVED: imageModalStates, setImageModalStates (now managed by Zustand)
+                // imageModalStates={imageModalStates}
                 setTextInputStates={setTextInputStates}
-                setImageModalStates={setImageModalStates}
+                // setImageModalStates={setImageModalStates}
                 setVideoModalStates={setVideoModalStates}
                 setMusicModalStates={setMusicModalStates}
                 onPersistTextModalCreate={props.onPersistTextModalCreate}

@@ -1,35 +1,35 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
+import { Scene, PerspectiveCamera, WebGLRenderer, Group, Vector3 } from 'three';
 import { Model3DProps, Model3DRefs, SphericalCoords } from './types';
 import { useModel3DLoader } from './useModel3DLoader';
 import { useModel3DScene } from './useModel3DScene';
 import { useModel3DControls } from './useModel3DControls';
 import { Model3DZoomControls } from './Model3DZoomControls';
 
-export const Model3D: React.FC<Model3DProps> = ({ 
-  modelData, 
-  x, 
-  y, 
-  width, 
+export const Model3D: React.FC<Model3DProps> = ({
+  modelData,
+  x,
+  y,
+  width,
   height,
-  onUpdate 
+  onUpdate
 }) => {
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const modelRef = useRef<THREE.Group | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
+  const modelRef = useRef<Group | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  
+
   const isDraggingRef = useRef(false);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const currentRotationRef = useRef({ x: modelData.rotationX ?? 0, y: modelData.rotationY ?? 0 });
   const currentZoomRef = useRef(modelData.zoom ?? 1);
-  const targetRef = useRef(new THREE.Vector3(0, 0, 0));
+  const targetRef = useRef(new Vector3(0, 0, 0));
   const sphericalRef = useRef<SphericalCoords>({ radius: 5, theta: 0, phi: Math.PI / 2 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -59,10 +59,10 @@ export const Model3D: React.FC<Model3DProps> = ({
   const rotationX = modelData.rotationX ?? 0;
   const rotationY = modelData.rotationY ?? 0;
   const zoom = modelData.zoom ?? 1;
-  
+
   const [isDragging, setIsDragging] = useState(false);
-  const [model, setModel] = useState<THREE.Group | null>(null);
-  
+  const [model, setModel] = useState<Group | null>(null);
+
   const { loadModel, isLoading, error } = useModel3DLoader();
 
   // Load model
@@ -147,7 +147,7 @@ export const Model3D: React.FC<Model3DProps> = ({
           Error: {error}
         </div>
       )}
-      
+
       {/* Zoom Controls */}
       {!isLoading && !error && (
         <Model3DZoomControls refs={refs} onUpdate={onUpdate} />

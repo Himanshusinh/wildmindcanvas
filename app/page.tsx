@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { CompareGenerator } from '@/modules/canvas-app/types';
-import { Canvas } from '@/modules/canvas';
-import GenerationQueue, { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
 import { ToolbarPanel } from '@/modules/ui-global/ToolbarPanel';
-import { Header } from '@/modules/ui-global/Header';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
+
 import { AuthGuard } from '@/modules/ui-global/AuthGuard';
-import { Profile } from '@/modules/ui-global/Profile/Profile';
-import LibrarySidebar from '@/modules/canvas/LibrarySidebar';
-import PluginSidebar from '@/modules/canvas/PluginSidebar';
+
+// Lazy load heavy components
+const Canvas = dynamic(() => import('@/modules/canvas').then(m => m.Canvas), { ssr: false });
+const Header = dynamic(() => import('@/modules/ui-global/Header').then(m => m.Header), { ssr: false });
+const LibrarySidebar = dynamic(() => import('@/modules/canvas/LibrarySidebar'), { ssr: false });
+const PluginSidebar = dynamic(() => import('@/modules/canvas/PluginSidebar'), { ssr: false });
 import { ImageUpload } from '@/core/types/canvas';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem, getStorageInfo, StorageInfo } from '@/core/api/api';
+import { useMediaUpload } from '@/modules/canvas/hooks/useMediaUpload';
+import { usePasteHandler } from '@/modules/canvas/hooks/usePasteHandler';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/core/api/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/core/api/canvasApi';
 import { ProjectSelector } from '@/modules/ui-global/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/core/api/canvasApi';
@@ -121,13 +126,25 @@ export function CanvasApp({ user }: CanvasAppProps) {
     richTextStates, setRichTextStates,
     groupContainerStates, setGroupContainerStates,
     connectors, setConnectors,
-    generationQueue, setGenerationQueue,
     execute, undo, redo, canUndo, canRedo,
     doc
   } = canvasStore;
 
   // Use UI visibility hook
   const { isUIHidden, setIsUIHidden } = useUIVisibility();
+
+  // --- MEDIA UPLOAD & PASTE HANDLER ---
+  const { processMediaFile, handleMultipleFilesUpload } = useMediaUpload({
+    projectId,
+    viewportCenterCallback: () => viewportCenterRef.current,
+    setImages,
+    setImageGenerators,
+    setVideoGenerators,
+  });
+
+  usePasteHandler({
+    onPasteFiles: handleMultipleFilesUpload,
+  });
 
   // Allow full-screen plugin popups (like Multiangle) to hide global UI chrome
   useEffect(() => {
@@ -212,7 +229,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     richTextStates,
     groupContainerStates,
     connectors,
-    generationQueue,
+
     showImageGenerationModal: false,
   };
 
@@ -222,7 +239,6 @@ export function CanvasApp({ user }: CanvasAppProps) {
   const prevProjectIdRef = useRef<string | null>(null);
 
   // Clear all state when project changes (new project or switching projects)
-  // Clear all state when project changes (new project or switching projects)
   useEffect(() => {
     // Only clear if projectId actually changed (not on initial mount with same projectId)
     if (projectId && prevProjectIdRef.current !== projectId) {
@@ -231,6 +247,10 @@ export function CanvasApp({ user }: CanvasAppProps) {
         from: prevProjectIdRef.current,
         to: projectId,
       });
+
+      // CRITICAL: Reset snapshot loaded flag so new project can load
+      snapshotLoadedRef.current = false;
+
       // Reset viewport to center
       viewportCenterRef.current = {
         x: 25000,
@@ -241,10 +261,11 @@ export function CanvasApp({ user }: CanvasAppProps) {
       // Update ref to track current projectId
       prevProjectIdRef.current = projectId;
     } else if (!projectId) {
-      // If projectId is cleared, reset the ref
+      // If projectId is cleared, reset the ref and loaded flag
       prevProjectIdRef.current = null;
+      snapshotLoadedRef.current = false;
     }
-  }, [projectId, loadSnapshot]); // Only run when projectId changes
+  }, [projectId]); // Only run when projectId changes
 
 
 
@@ -399,16 +420,35 @@ export function CanvasApp({ user }: CanvasAppProps) {
     if (!projectId || !snapshotLoadedRef.current) return;
 
     const timeout = setTimeout(async () => {
+      // CRITICAL: Check if projectId changed during debounce
+      if (projectId !== docRef.current.id) {
+        console.log('[AutoSave] ProjectId changed during save, aborting:', {
+          expected: projectId,
+          docId: docRef.current.id
+        });
+        return;
+      }
+
       if (docRef.current.version === 0) return;
 
       const nodeCount = Object.keys(docRef.current.nodes).length;
       console.log('[AutoSave] Saving snapshot...', {
         projectId,
+        docId: docRef.current.id,
         version: docRef.current.version,
         nodeCount,
         nodesKeys: Object.keys(docRef.current.nodes),
         nodes: docRef.current.nodes
       });
+
+      // CRITICAL: Double-check projectId matches before saving
+      if (projectId !== docRef.current.id) {
+        console.error('[AutoSave] ProjectId mismatch, aborting save:', {
+          projectId,
+          docId: docRef.current.id
+        });
+        return;
+      }
 
       if (nodeCount === 0 && (imageGenerators.length > 0 || videoGenerators.length > 0)) {
         console.error('[AutoSave] 🚨 CRITICAL STATE MISMATCH: Doc nodes empty but generators exist in compatibility view!', {
@@ -471,217 +511,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
   // Handler assignments will be done after handlers are created (after processMediaFile)
 
-  const handleMultipleFilesUpload = (files: File[]) => {
-    // Find the main GLTF file
-    const gltfFile = files.find(f => f.name.toLowerCase().endsWith('.gltf'));
-    if (!gltfFile) {
-      // If no GLTF file, process files individually
-      files.forEach((file, index) => {
-        processMediaFile(file, images.length + index);
-      });
-      return;
-    }
 
-    // Create a map of related files (bin, textures, etc.)
-    const relatedFiles = new Map<string, { file: File; url: string }>();
-    files.forEach(file => {
-      if (file !== gltfFile) {
-        const fileName = file.name;
-        const url = URL.createObjectURL(file);
-        const fileInfo = { file, url };
-
-        // Store with multiple keys for flexible lookup
-        // 1. Full filename
-        relatedFiles.set(fileName, fileInfo);
-
-        // 2. Just the filename (without path)
-        const pathParts = fileName.split(/[/\\]/);
-        const justFileName = pathParts[pathParts.length - 1];
-        if (justFileName !== fileName) {
-          relatedFiles.set(justFileName, fileInfo);
-        }
-
-        // 3. Filename with common texture paths
-        // GLTF files often reference textures like "textures/image.png"
-        const normalizedPath = fileName.replace(/\\/g, '/');
-        relatedFiles.set(normalizedPath, fileInfo);
-
-        // 4. Just the base name (without extension) for partial matching
-        const baseName = justFileName.split('.').slice(0, -1).join('.');
-        if (baseName) {
-          relatedFiles.set(baseName, fileInfo);
-        }
-      }
-    });
-
-    // Process the GLTF file with related files
-    const url = URL.createObjectURL(gltfFile);
-    const center = viewportCenterRef.current;
-    const offsetX = (images.length % 3) * 50;
-    const offsetY = Math.floor(images.length / 3) * 50;
-    const modelX = center.x - 400 / 2 + offsetX;
-    const modelY = center.y - 400 / 2 + offsetY;
-
-    const elementId = `element - ${Date.now()} -${Math.random().toString(36).substr(2, 9)} `;
-    const newImage: ImageUpload = {
-      file: gltfFile,
-      url,
-      type: 'model3d',
-      x: modelX,
-      y: modelY,
-      width: 400,
-      height: 400,
-      rotationX: 0,
-      rotationY: 0,
-      zoom: 1,
-      elementId,
-      relatedFiles,
-    };
-
-    // Create Element in local state (optimistic + save implicit via autosave)
-    setImages(prev => [...prev, newImage]);
-  };
-
-  const processMediaFile = async (file: File, offsetIndex: number = 0) => {
-    const fileType = file.type.toLowerCase();
-    const fileName = file.name.toLowerCase();
-
-    // 1. Generate deterministic IDs safely
-    const baseId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    const modalId = fileType.startsWith('video/') ? `video-${baseId}` : `image-${baseId}`;
-    const elementId = `element-${baseId}`;
-
-    // 2. Create local blob URL for immediate display
-    const blobUrl = URL.createObjectURL(file);
-
-    // 3. Define background upload logic
-    const uploadInBackground = async () => {
-      if (!projectId) return;
-
-      try {
-        const convertFileToDataUri = (file: File): Promise<string> => {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        };
-
-        const isImage = fileType.startsWith('image/');
-        const isVideoFile = fileType.startsWith('video/') ||
-          ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp']
-            .some(ext => fileName.endsWith(ext));
-
-        if (isImage || isVideoFile) {
-          const dataUri = await convertFileToDataUri(file);
-          const { saveUploadedMedia } = await import('@/core/api/api');
-          const result = await saveUploadedMedia(dataUri, isImage ? 'image' : 'video', projectId);
-
-          if (result.success && result.url) {
-            // 4. On success, update the existing node with the real URL
-            if (isImage) {
-              setImageGenerators(prev => prev.map(g => g.id === modalId ? { ...g, generatedImageUrl: result.url } : g));
-            } else {
-              setVideoGenerators(prev => prev.map(g => g.id === modalId ? { ...g, generatedVideoUrl: result.url } : g));
-            }
-
-            // Trigger library refresh
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('library-refresh'));
-            }, 1000);
-          }
-        }    
-      } catch (err) {
-        console.warn('[processMediaFile] Background upload failed, keeping local blob:', err);
-      }
-    };
-
-    // Trigger upload but don't await it
-    uploadInBackground();
-
-    // 4. Render UI immediately using blobUrl
-    const isModel3D = ['.obj', '.gltf', '.glb', '.fbx', '.mb', '.ma'].some(ext => fileName.endsWith(ext));
-    const isVideo = fileType.startsWith('video/') || ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.3gp'].some(ext => fileName.endsWith(ext));
-
-    // Calculate position
-    const center = viewportCenterRef.current;
-    const offsetX = (offsetIndex % 3) * 50;
-    const offsetY = Math.floor(offsetIndex / 3) * 50;
-
-    if (isModel3D) {
-      const modelX = center.x - 200 + offsetX;
-      const modelY = center.y - 200 + offsetY;
-      setImages(prev => [...prev, {
-        type: 'model3d',
-        url: blobUrl,
-        x: modelX, y: modelY, width: 400, height: 400,
-        zoom: 1, rotationX: 0, rotationY: 0,
-        elementId
-      }]);
-
-    } else if (isVideo) {
-      const video = document.createElement('video');
-      video.src = blobUrl;
-      video.preload = 'metadata';
-      video.onloadedmetadata = () => {
-        const naturalWidth = video.videoWidth || 800;
-        const naturalHeight = video.videoHeight || 600;
-        const maxFrameWidth = 600;
-        const aspectRatio = naturalWidth / naturalHeight;
-        const frameWidth = maxFrameWidth;
-        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        if (naturalHeight > naturalWidth) {
-          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
-        }
-
-        const modalX = center.x - frameWidth / 2 + offsetX;
-        const modalY = center.y - frameHeight / 2 + offsetY;
-
-        setVideoGenerators(prev => [...prev, {
-          id: modalId,
-          x: modalX, y: modalY,
-          frameWidth, frameHeight,
-          model: 'Uploaded Video',
-          frame: 'Frame',
-          aspectRatio: `${Math.round(aspectRatio * 10) / 10}: 1`,
-          prompt: '',
-          duration: video.duration || 5,
-          resolution: '720p',
-          generatedVideoUrl: blobUrl
-        }]);
-      };
-    } else {
-      // Image logic
-      const img = new Image();
-      img.onload = () => {
-        const naturalWidth = img.naturalWidth || 800;
-        const naturalHeight = img.naturalHeight || 600;
-        const maxFrameWidth = 600;
-        const aspectRatio = naturalWidth / naturalHeight;
-        const frameWidth = maxFrameWidth;
-        let frameHeight = Math.max(400, Math.round(maxFrameWidth / aspectRatio));
-        if (naturalHeight > naturalWidth) {
-          frameHeight = Math.max(400, Math.round(maxFrameWidth * aspectRatio));
-        }
-
-        const modalX = center.x - frameWidth / 2 + offsetX;
-        const modalY = center.y - frameHeight / 2 + offsetY;
-
-        setImageGenerators(prev => [...prev, {
-          id: modalId,
-          x: modalX, y: modalY,
-          frameWidth, frameHeight,
-          model: 'Uploaded Image',
-          frame: 'Frame',
-          aspectRatio: `${Math.round(aspectRatio * 10) / 10}: 1`,
-          prompt: '',
-          generatedImageUrl: blobUrl
-        }]);
-      };
-      img.src = blobUrl;
-    }
-  };
 
   // Wrap snapshot actions
 
@@ -857,6 +687,8 @@ export function CanvasApp({ user }: CanvasAppProps) {
 
 
   const handleProjectSelect = (project: CanvasProject) => {
+    // CRITICAL: Reset snapshot loaded flag when selecting a project
+    snapshotLoadedRef.current = false;
     setProjectId(project?.id || null);
     setShowProjectSelector(false);
   };
@@ -1160,18 +992,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
     }
 
     // Add to generation queue
-    const queueId = `video - ${modalId || 'video'} -${Date.now()} -${Math.random().toString(36).slice(2)} `;
-    const queueItem: GenerationQueueItem = {
-      id: queueId,
-      type: 'video',
-      operationName: 'Generating Video',
-      prompt: prompt.trim(),
-      model,
-      total: 1,
-      index: 1,
-      startedAt: Date.now(),
-    };
-    setGenerationQueue((prev) => [...prev, queueItem]);
+
 
     try {
       console.log('Generate video:', { prompt, model, frame, aspectRatio, duration, resolution, firstFrameUrl, lastFrameUrl });
@@ -1201,9 +1022,18 @@ export function CanvasApp({ user }: CanvasAppProps) {
       };
     } catch (error: any) {
       console.error('Error generating video:', error);
-      // Remove from queue on error
-      setGenerationQueue((prev) => prev.filter((item) => item.id !== queueId));
-      alert(error.message || 'Failed to generate video. Please try again.');
+      const errorMessage = error.message || 'Failed to generate video. Please try again.';
+
+      // Use notification store instead of alert
+      useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+
+      // Persist error state in the specific generator frame
+      if (modalId) {
+        setVideoGenerators(prev => prev.map(m =>
+          m.id === modalId ? { ...m, error: errorMessage } : m
+        ));
+      }
+
       return { generationId: undefined, taskId: undefined };
     }
   };
@@ -1396,41 +1226,41 @@ export function CanvasApp({ user }: CanvasAppProps) {
                 // ✅ VALIDATION: Limit image-to-video connections to maximum 2
                 const targetVideoId = connector.to;
                 const sourceImageId = connector.from;
-                
+
                 // Helper function to check if a node ID is an image node
                 const isImageNode = (nodeId: string): boolean => {
                   return imageGenerators.some(ig => ig.id === nodeId) ||
-                         images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
+                    images.some(img => (img as any).elementId === nodeId || (img as any).id === nodeId);
                 };
-                
+
                 // Helper function to check if a node ID is a video node
                 const isVideoNode = (nodeId: string): boolean => {
                   return videoGenerators.some(vg => vg.id === nodeId);
                 };
-                
+
                 // Check if this is an image-to-video connection
                 const isTargetVideo = isVideoNode(targetVideoId);
                 const isSourceImage = isImageNode(sourceImageId);
-                
+
                 if (isTargetVideo && isSourceImage) {
                   // Count existing connections from images to this video
-                  const existingImageToVideoConnections = connectors.filter(c => 
+                  const existingImageToVideoConnections = connectors.filter(c =>
                     c.to === targetVideoId && isImageNode(c.from)
                   );
-                  
+
                   if (existingImageToVideoConnections.length >= 2) {
                     console.warn(`[Connection Validation] ❌ BLOCKED: Video ${targetVideoId} already has ${existingImageToVideoConnections.length} image connections (maximum 2 allowed)`);
                     console.warn(`[Connection Validation] Existing connections:`, existingImageToVideoConnections.map(c => c.from));
                     console.warn(`[Connection Validation] Attempted connection from: ${sourceImageId}`);
-                    
+
                     // Show user-friendly error message
                     alert(`⚠️ Connection Limit Reached\n\nThis video generation frame already has 2 image connections (maximum allowed).\n\nPlease disconnect an existing image connection first if you want to connect a different image.`);
                     return; // Reject the connection
                   }
-                  
+
                   console.log(`[Connection Validation] ✅ ALLOWED: Video ${targetVideoId} will have ${existingImageToVideoConnections.length + 1} image connection(s) (limit: 2)`);
                 }
-                
+
                 // ✅ Connection is valid - proceed with creation
                 const cid = connector.id || `connector-${Date.now()}`;
                 setConnectors(prev => [...prev, {
@@ -1548,7 +1378,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
               }}
 
               onPluginSidebarOpen={() => setIsPluginSidebarOpen(true)}
-              setGenerationQueue={setGenerationQueue}
+
 
               onPersistCanvasTextCreate={(text) => {
                 setCanvasTextStates(prev => [...prev, text]);

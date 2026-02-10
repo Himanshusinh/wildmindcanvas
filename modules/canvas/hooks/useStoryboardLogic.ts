@@ -4,14 +4,18 @@ import { CanvasProps, CanvasItemsData } from '../types';
 import { useCanvasState } from './useCanvasState';
 import { generateScenesFromStory, queryCanvasPrompt, createStitchedReferenceImage } from '@/core/api/api';
 import { StoryWorld, StorySceneOutline } from '@/core/types/storyWorld';
+import { useImageModalStates, useImageStore } from '@/modules/stores';
 
 export function useStoryboardLogic(
     canvasState: ReturnType<typeof useCanvasState>,
     props: CanvasProps
 ) {
+    const imageModalStates = useImageModalStates();
+    const { setImageModalStates } = useImageStore();
+
     const {
         images,
-        imageModalStates,
+        // REMOVED: imageModalStates (via store)
         storyboardModalStates,
         setStoryboardModalStates,
         sceneFrameModalStates,
@@ -23,7 +27,7 @@ export function useStoryboardLogic(
     } = canvasState;
 
     const {
-        setGenerationQueue,
+
         projectId,
         onPersistStoryboardModalMove,
         onPersistSceneFrameModalCreate,
@@ -383,27 +387,8 @@ export function useStoryboardLogic(
 
         } catch (error) {
             console.error('[Canvas] ❌ Error generating scenes internal:', error);
-            if (setGenerationQueue) {
-                const errorId = `error-scene-gen-${Date.now()}`;
-                setGenerationQueue((prev) => [
-                    ...prev,
-                    {
-                        id: errorId,
-                        type: 'error',
-                        operationName: 'Scene Generation Failed',
-                        model: 'Gemini',
-                        total: 1,
-                        index: 0,
-                        startedAt: Date.now(),
-                        error: true,
-                    },
-                ]);
-                setTimeout(() => {
-                    setGenerationQueue((current) => current.filter(item => item.id !== errorId));
-                }, 5000);
-            }
         }
-    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalCreate, onPersistConnectorCreate, setGenerationQueue]);
+    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalCreate, onPersistConnectorCreate]);
 
 
     const handleSmartSceneUpdate = useCallback(async (
@@ -551,7 +536,7 @@ export function useStoryboardLogic(
                     // "const associatedImages = imageModalStates.filter(...)".
                     // Since imageModalStates is in dependency array, we are fine.
 
-                    const associatedImages = canvasState.imageModalStates.filter((img: any) => img.id.includes(sceneToDelete.id));
+                    const associatedImages = imageModalStates.filter((img: any) => img.id.includes(sceneToDelete.id));
                     for (const img of associatedImages) {
                         // Call setter from canvasState (need to import it)
                         // We destructured setImageModalStates? No, we didn't destructure it at the top!
@@ -580,7 +565,7 @@ export function useStoryboardLogic(
         } catch (error) {
             console.error('[Canvas] Error in smart scene update:', error);
         }
-    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalMove, onPersistSceneFrameModalCreate, onPersistConnectorCreate, onPersistSceneFrameModalDelete, onPersistConnectorDelete, canvasState.imageModalStates, connections]); // Missing dependencies like setImageModalStates
+    }, [upsertStoryWorld, setSceneFrameModalStates, onPersistSceneFrameModalMove, onPersistSceneFrameModalCreate, onPersistConnectorCreate, onPersistSceneFrameModalDelete, onPersistConnectorDelete, imageModalStates, connections, setImageModalStates]);
 
 
     const handleGenerateScenesFromStoryboard = useCallback(async (
@@ -663,31 +648,7 @@ export function useStoryboardLogic(
         if (!scriptText || !scriptText.trim() || !hasActiveConnection) {
             console.warn('[Canvas] ⚠️ No script text found or no active connection. Please connect a text input with a generated story.');
 
-            // Show error in queue instead of alert
-            if (setGenerationQueue) {
-                const errorId = `error-${storyboardId}-${Date.now()}`;
-                setGenerationQueue((prev) => [
-                    ...prev,
-                    {
-                        id: errorId,
-                        type: 'error',
-                        operationName: 'Connect Script First',
-                        model: '',
-                        total: 1,
-                        index: 0,
-                        startedAt: Date.now(),
-                        error: true,
-                        completed: false,
-                    },
-                ]);
 
-                // Remove error message after 5 seconds
-                setTimeout(() => {
-                    setGenerationQueue((current) =>
-                        current.filter(item => item.id !== errorId)
-                    );
-                }, 5000);
-            }
             return;
         }
 
@@ -699,23 +660,7 @@ export function useStoryboardLogic(
 
         console.log(`[Canvas] ${isUpdate ? '🔄 Updating' : '✨ Generating'} storyboard with ${existingScenes.length} existing scenes`);
 
-        // Add to queue for scene generation
-        if (setGenerationQueue) {
-            const queueId = `scene-${storyboardId}-${Date.now()}`;
-            setGenerationQueue((prev) => [
-                ...prev,
-                {
-                    id: queueId,
-                    type: 'scene',
-                    operationName: isUpdate ? 'Updating Scenes' : 'Generating Scenes',
-                    model: 'Gemini',
-                    total: 1,
-                    index: 0,
-                    startedAt: Date.now(),
-                    completed: false,
-                },
-            ]);
-        }
+
 
         // Create stitched reference image from all connected images
         let stitchedImageUrl: string | undefined = undefined;
@@ -751,28 +696,8 @@ export function useStoryboardLogic(
         // Generate scenes directly from the script text
         await handleGenerateScenesFromStoryboard(storyboardId, scriptText);
 
-        // Remove scene generation from queue
-        if (setGenerationQueue) {
-            setGenerationQueue((prev) => {
-                // Mark as completed with timestamp
-                const updated = prev.map(item => {
-                    if (item.type === 'scene' && item.id.includes(storyboardId)) {
-                        return { ...item, completed: true, completedAt: Date.now() };
-                    }
-                    return item;
-                });
 
-                // Remove completed items after 1 second
-                setTimeout(() => {
-                    setGenerationQueue((current) =>
-                        current.filter(item => !(item.completed && item.type === 'scene' && item.id.includes(storyboardId)))
-                    );
-                }, 1000);
-
-                return updated;
-            });
-        }
-    }, [storyboardModalStates, connections, textInputStates, sceneFrameModalStates, setGenerationQueue, createStitchedImageForStoryboard, setStoryboardModalStates, onPersistStoryboardModalMove, handleGenerateScenesFromStoryboard]);
+    }, [storyboardModalStates, connections, textInputStates, sceneFrameModalStates, createStitchedImageForStoryboard, setStoryboardModalStates, onPersistStoryboardModalMove, handleGenerateScenesFromStoryboard]);
 
 
     return {

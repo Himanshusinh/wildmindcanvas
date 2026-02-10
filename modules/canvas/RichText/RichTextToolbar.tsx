@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Palette, Baseline } from 'lucide-react';
 
 interface RichTextToolbarProps {
@@ -47,39 +47,90 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [isBgPickerOpen, setIsBgPickerOpen] = useState(false);
 
+    // Smart placement state
+    const [fontPlacement, setFontPlacement] = useState<'top' | 'bottom'>('top');
+    const [colorPlacement, setColorPlacement] = useState<'top' | 'bottom'>('top');
+    const [bgPlacement, setBgPlacement] = useState<'top' | 'bottom'>('top');
+
+    const toolbarRef = useRef<HTMLDivElement>(null);
+
     const preventBlur = (e: React.MouseEvent) => {
         // Prevent the editor from losing focus when clicking on the toolbar
         e.preventDefault();
     };
 
+    const handleToggleFont = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!isFontDropdownOpen && toolbarRef.current) {
+            const rect = toolbarRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            // Dropdown height is ~256px (max-h-64)
+            setFontPlacement(spaceBelow < 260 ? 'top' : 'bottom');
+        }
+        setIsFontDropdownOpen(!isFontDropdownOpen);
+        setIsColorPickerOpen(false);
+        setIsBgPickerOpen(false);
+    };
+
+    const handleToggleColor = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!isColorPickerOpen && toolbarRef.current) {
+            const rect = toolbarRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            // Color picker height is ~140px
+            setColorPlacement(spaceBelow < 150 ? 'top' : 'bottom');
+        }
+        setIsColorPickerOpen(!isColorPickerOpen);
+        setIsFontDropdownOpen(false);
+        setIsBgPickerOpen(false);
+    };
+
+    const handleToggleBg = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!isBgPickerOpen && toolbarRef.current) {
+            const rect = toolbarRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setBgPlacement(spaceBelow < 150 ? 'top' : 'bottom');
+        }
+        setIsBgPickerOpen(!isBgPickerOpen);
+        setIsFontDropdownOpen(false);
+        setIsColorPickerOpen(false);
+    };
+
     return (
         <div
-            className="absolute z-[2000] flex items-center gap-1 p-1 bg-zinc-900/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 select-none animate-in fade-in zoom-in duration-200"
+            ref={toolbarRef}
+            className="absolute z-[15000] flex items-center gap-1 p-1 bg-zinc-900/90 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 select-none animate-in fade-in zoom-in duration-200"
             style={{
                 left: position.x,
                 top: position.y - 12,
                 transform: 'translate(-50%, -100%)',
                 minWidth: 'max-content',
-                pointerEvents: 'auto'
+                maxWidth: '90vw',
+                pointerEvents: 'auto',
+                fontSize: '12px'
             }}
             onMouseDown={preventBlur}
+            onWheel={(e) => e.stopPropagation()}
         >
             {/* Font Family Dropdown */}
             <div className="relative">
                 <button
                     onMouseDown={preventBlur}
-                    onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+                    onClick={handleToggleFont}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 text-white transition-all duration-200 cursor-pointer"
                 >
-                    <span className="text-[13px] font-medium w-24 text-left truncate" style={{ fontFamily }}>
+                    <span className="text-[11px] font-medium w-20 text-left truncate" style={{ fontFamily }}>
                         {FONT_FAMILIES.find(f => f.value === fontFamily)?.label || fontFamily}
                     </span>
-                    <Type size={14} className="opacity-50 pointer-events-none" />
+                    <Type size={12} className="opacity-50 pointer-events-none" />
                 </button>
                 {isFontDropdownOpen && (
                     <div
-                        className="absolute bottom-full left-0 mb-2 w-48 max-h-64 overflow-y-auto bg-zinc-900 border border-white/10 rounded-xl shadow-2xl py-1 z-50 pointer-events-auto"
+                        className={`absolute left-0 w-48 max-h-64 overflow-y-auto bg-zinc-900 border border-white/10 rounded-xl shadow-2xl py-1 z-50 pointer-events-auto ${fontPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                            }`}
                         onMouseDown={preventBlur}
+                        onWheel={(e) => e.stopPropagation()}
                     >
                         {FONT_FAMILIES.map(font => (
                             <button
@@ -89,7 +140,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                                     onChange({ fontFamily: font.value });
                                     setIsFontDropdownOpen(false);
                                 }}
-                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-white/10 transition-colors ${fontFamily === font.value ? 'text-blue-400 bg-blue-400/10' : 'text-zinc-300'}`}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-white/10 transition-colors ${fontFamily === font.value ? 'text-blue-400 bg-blue-400/10' : 'text-zinc-300'}`}
                                 style={{ fontFamily: font.value }}
                             >
                                 {font.label}
@@ -112,7 +163,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                 >
                     <span className="text-lg leading-none pointer-events-none">-</span>
                 </button>
-                <div className="w-10 text-center text-[13px] font-medium text-white">
+                <div className="w-8 text-center text-[11px] font-medium text-white">
                     {fontSize}
                 </div>
                 <button
@@ -138,7 +189,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${fontWeight === 'bold' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Bold"
                 >
-                    <Bold size={16} className="pointer-events-none" />
+                    <Bold size={14} className="pointer-events-none" />
                 </button>
                 <button
                     onMouseDown={preventBlur}
@@ -148,7 +199,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${fontStyle === 'italic' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Italic"
                 >
-                    <Italic size={16} className="pointer-events-none" />
+                    <Italic size={14} className="pointer-events-none" />
                 </button>
                 <button
                     onMouseDown={preventBlur}
@@ -158,7 +209,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                     className={`p-2 rounded-lg transition-colors cursor-pointer ${textDecoration === 'underline' ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                     title="Underline"
                 >
-                    <Underline size={16} className="pointer-events-none" />
+                    <Underline size={14} className="pointer-events-none" />
                 </button>
             </div>
 
@@ -178,7 +229,7 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
                         className={`p-2 rounded-lg transition-all duration-200 cursor-pointer ${align === value ? 'bg-blue-500/20 text-blue-400' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                         title={`Align ${label}`}
                     >
-                        <Icon size={16} className="pointer-events-none" />
+                        <Icon size={14} className="pointer-events-none" />
                     </button>
                 ))}
             </div>
@@ -189,17 +240,19 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
             <div className="relative">
                 <button
                     onMouseDown={preventBlur}
-                    onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+                    onClick={handleToggleColor}
                     className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex flex-col items-center gap-0.5 cursor-pointer"
                     title="Text Color"
                 >
-                    <Palette size={16} className="pointer-events-none" />
+                    <Palette size={14} className="pointer-events-none" />
                     <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: fill === 'transparent' ? '#fff' : fill }}></div>
                 </button>
                 {isColorPickerOpen && (
                     <div
-                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl grid grid-cols-4 gap-3 z-50 pointer-events-auto min-w-[160px]"
+                        className={`absolute left-1/2 -translate-x-1/2 p-3 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl grid grid-cols-4 gap-3 z-50 pointer-events-auto min-w-[160px] ${colorPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                            }`}
                         onMouseDown={preventBlur}
+                        onWheel={(e) => e.stopPropagation()}
                     >
                         {COLORS.map(c => (
                             <button
@@ -223,17 +276,19 @@ export const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
             <div className="relative">
                 <button
                     onMouseDown={preventBlur}
-                    onClick={() => setIsBgPickerOpen(!isBgPickerOpen)}
-                    className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex flex-col items-center gap-0.5"
+                    onClick={handleToggleBg}
+                    className="p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors flex flex-col items-center gap-0.5 cursor-pointer"
                     title="Background Color"
                 >
-                    <Baseline size={16} className="pointer-events-none" />
+                    <Baseline size={14} className="pointer-events-none" />
                     <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: backgroundColor || 'transparent', border: backgroundColor === 'transparent' ? '1px solid rgba(255,255,255,0.2)' : 'none' }}></div>
                 </button>
                 {isBgPickerOpen && (
                     <div
-                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl grid grid-cols-4 gap-3 z-50 pointer-events-auto min-w-[160px]"
+                        className={`absolute left-1/2 -translate-x-1/2 p-3 bg-zinc-900 border border-white/10 rounded-xl shadow-2xl grid grid-cols-4 gap-3 z-50 pointer-events-auto min-w-[160px] ${bgPlacement === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                            }`}
                         onMouseDown={preventBlur}
+                        onWheel={(e) => e.stopPropagation()}
                     >
                         {COLORS.map(c => (
                             <button

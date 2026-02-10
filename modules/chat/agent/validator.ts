@@ -128,9 +128,9 @@ export function validateCanvasPlan(plan: CanvasInstructionPlan, ctx?: { requirem
   const videoModelName = firstVideoCfg?.model as string | undefined;
   const videoModel = findVideoModelRecord(videoModelName);
   if (videoSteps.length > 0) {
-    const supportedDur = ((videoModel as any)?.temporal?.supportedOutputSeconds as number[] | undefined) || (textToVideoModels.features?.durationControl?.supportedDurations as number[] | undefined) || [];
-    const supportedRes = ((videoModel as any)?.resolutions as string[] | undefined) || (textToVideoModels.features?.resolutionControl?.availableResolutions as string[] | undefined) || [];
-    const supportedAR = ((videoModel as any)?.aspectRatios as string[] | undefined) || (textToVideoModels.features?.aspectRatioControl?.supportedRatios as string[] | undefined) || [];
+    const supportedDur = (videoModel?.temporal?.supportedDurations as number[] | undefined) || (textToVideoModels.features?.durationControl?.supportedDurations as number[] | undefined) || [];
+    const supportedRes = (videoModel?.resolutions as string[] | undefined) || (textToVideoModels.features?.resolutionControl?.availableResolutions as string[] | undefined) || [];
+    const supportedAR = (videoModel?.aspectRatios as string[] | undefined) || (textToVideoModels.features?.aspectRatioControl?.supportedRatios as string[] | undefined) || [];
 
     // duration: check each clip duration
     const clipDurations: number[] = [];

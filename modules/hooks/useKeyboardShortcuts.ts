@@ -2,6 +2,21 @@
 
 import { useEffect, useRef } from 'react';
 import { ImageUpload } from '@/core/types/canvas';
+// Zustand Store - Image & Video State Management
+// Zustand Store - Image & Video State Management
+import {
+  useImageStore, useImageModalStates, useImageSelection, useVideoStore, useVideoModalStates, useVideoSelection,
+  useMusicStore,
+  useMusicModalStates, useMusicSelection,
+  useUpscaleStore,
+  useUpscaleModalStates, useUpscaleSelection,
+  useMultiangleCameraStore,
+  useMultiangleCameraModalStates, useMultiangleCameraSelection,
+  useRemoveBgStore, useRemoveBgModalStates, useRemoveBgSelection,
+  useEraseStore, useEraseModalStates, useEraseSelection,
+  useExpandStore, useExpandModalStates, useExpandSelection,
+  useTextStore, useTextModalStates
+} from '@/modules/stores';
 
 interface UseKeyboardShortcutsProps {
   // Undo/Redo
@@ -21,7 +36,6 @@ interface UseKeyboardShortcutsProps {
   selectedImageIndices: number[];
   selectedImageModalIds: string[];
   selectedVideoModalIds: string[];
-  selectedMusicModalIds: string[];
   selectedTextInputIds: string[];
   selectedCanvasTextIds?: string[];
   selectedRichTextIds?: string[];
@@ -32,10 +46,9 @@ interface UseKeyboardShortcutsProps {
   position: { x: number; y: number };
   scale: number;
   findAvailablePositionNearWrapper: (x: number, y: number) => { x: number; y: number };
-  setTextInputStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setImageModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setMusicModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  // setTextInputStates: React.Dispatch<React.SetStateAction<any[]>>; // REMOVED: Managed by store
+
+
   onPersistTextModalCreate?: (modal: any) => void | Promise<void>;
   onPersistImageModalCreate?: (modal: any) => void | Promise<void>;
   onPersistVideoModalCreate?: (modal: any) => void | Promise<void>;
@@ -85,6 +98,15 @@ interface UseKeyboardShortcutsProps {
   setSelectedVideoEditorModalIds: (ids: string[]) => void;
   onPersistVideoEditorModalDelete?: (id: string) => void | Promise<void>;
 
+  // Image Editor deletion
+  selectedImageEditorModalIds: string[];
+  selectedImageEditorModalId: string | null;
+  imageEditorModalStates: any[];
+  setImageEditorModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  setSelectedImageEditorModalId: (id: string | null) => void;
+  setSelectedImageEditorModalIds: (ids: string[]) => void;
+  onPersistImageEditorModalDelete?: (id: string) => void | Promise<void>;
+
   // Music deletion
   selectedMusicModalId: string | null;
   setSelectedMusicModalId: (id: string | null) => void;
@@ -98,48 +120,49 @@ interface UseKeyboardShortcutsProps {
   onPersistTextModalDelete?: (id: string) => void | Promise<void>;
 
   // Other modal deletions
-  selectedUpscaleModalIds: string[];
-  selectedUpscaleModalId: string | null;
-  upscaleModalStates: any[];
-  setUpscaleModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedUpscaleModalId: (id: string | null) => void;
-  setSelectedUpscaleModalIds: (ids: string[]) => void;
+  // REMOVED: Upscale props (now managed by store)
+  // selectedUpscaleModalIds: string[];
+  // selectedUpscaleModalId: string | null;
+  // upscaleModalStates: any[];
+  // setUpscaleModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  // setSelectedUpscaleModalId: (id: string | null) => void;
+  // setSelectedUpscaleModalIds: (ids: string[]) => void;
   onPersistUpscaleModalDelete?: (id: string) => void | Promise<void>;
 
   // Multiangle Camera deletion
-  selectedMultiangleCameraModalIds: string[];
-  selectedMultiangleCameraModalId: string | null;
-  multiangleCameraModalStates: any[];
-  setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedMultiangleCameraModalId: (id: string | null) => void;
-  setSelectedMultiangleCameraModalIds: (ids: string[]) => void;
+  // REMOVED: Multiangle Camera props (now managed by store)
+  // selectedMultiangleCameraModalIds: string[];
+  // selectedMultiangleCameraModalId: string | null;
+  // multiangleCameraModalStates: any[];
+  // setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  // setSelectedMultiangleCameraModalId: (id: string | null) => void;
+  // setSelectedMultiangleCameraModalIds: (ids: string[]) => void;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
 
   // RemoveBG deletion
-  selectedRemoveBgModalIds: string[];
-  selectedRemoveBgModalId: string | null;
-  removeBgModalStates: any[];
-  setRemoveBgModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedRemoveBgModalId: (id: string | null) => void;
-  setSelectedRemoveBgModalIds: (ids: string[]) => void;
+  // REMOVED: RemoveBG deletion props (now managed by store)
+  // selectedRemoveBgModalIds: string[];
+  // selectedRemoveBgModalId: string | null;
+  // removeBgModalStates: any[];
+  // setRemoveBgModalStates: React.Dispatch<React.SetStateAction<any[]>>;
+  // setSelectedRemoveBgModalId: (id: string | null) => void;
+  // setSelectedRemoveBgModalIds: (ids: string[]) => void;
   onPersistRemoveBgModalDelete?: (id: string) => void | Promise<void>;
 
-  // Erase deletion
-  selectedEraseModalIds: string[];
-  selectedEraseModalId: string | null;
-  eraseModalStates: any[];
-  setEraseModalStates: React.Dispatch<React.SetStateAction<any[]>>;
-  setSelectedEraseModalId: (id: string | null) => void;
-  setSelectedEraseModalIds: (ids: string[]) => void;
+  // REMOVED: eraseModalStates, setEraseModalStates, ... (via store)
+  // selectedEraseModalIds, selectedEraseModalId, eraseModalStates, setEraseModalStates, setSelectedEraseModalId, setSelectedEraseModalIds,
   onPersistEraseModalDelete?: (id: string) => void | Promise<void>;
 
   // Expand deletion
+  // REMOVED: expandModalStates props (now managed by store)
+  /*
   selectedExpandModalIds: string[];
   selectedExpandModalId: string | null;
   expandModalStates: any[];
   setExpandModalStates: React.Dispatch<React.SetStateAction<any[]>>;
   setSelectedExpandModalId: (id: string | null) => void;
   setSelectedExpandModalIds: (ids: string[]) => void;
+  */
   onPersistExpandModalDelete?: (id: string) => void | Promise<void>;
 
   // Vectorize deletion
@@ -215,9 +238,10 @@ interface UseKeyboardShortcutsProps {
 
   // Select All
   images: ImageUpload[];
-  textInputStates: any[];
-  imageModalStates: any[];
-  videoModalStates: any[];
+  // textInputStates: any[]; // REMOVED: Managed by store
+  // REMOVED: imageModalStates, videoModalStates (now using Zustand store)
+  // imageModalStates: any[];
+  // videoModalStates: any[];
   musicModalStates: any[];
   richTextStates?: any[];
 
@@ -246,7 +270,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     selectedImageIndices,
     selectedImageModalIds,
     selectedVideoModalIds,
-    selectedMusicModalIds,
+    // REMOVED: selectedMusicModalIds (now managed by Zustand store)
+    // selectedMusicModalIds,
     selectedTextInputIds,
     selectedCanvasTextIds = [],
     lastCreateTimesRef,
@@ -254,10 +279,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     position,
     scale,
     findAvailablePositionNearWrapper,
-    setTextInputStates,
-    setImageModalStates,
-    setVideoModalStates,
-    setMusicModalStates,
+
     onPersistTextModalCreate,
     onPersistImageModalCreate,
     onPersistVideoModalCreate,
@@ -296,41 +318,38 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedVideoEditorModalId,
     setSelectedVideoEditorModalIds,
     onPersistVideoEditorModalDelete,
-    selectedMusicModalId,
-    setSelectedMusicModalId,
-    setSelectedMusicModalIds,
+    selectedImageEditorModalIds = [],
+    selectedImageEditorModalId,
+    imageEditorModalStates = [],
+    setImageEditorModalStates,
+    setSelectedImageEditorModalId,
+    setSelectedImageEditorModalIds,
+    onPersistImageEditorModalDelete,
+    // REMOVED: selectedMusicModalId, setSelectedMusicModalId, setSelectedMusicModalIds (now managed by store)
     onPersistMusicModalDelete,
     selectedTextInputId,
     setSelectedTextInputId,
     setSelectedTextInputIds,
     onPersistTextModalDelete,
-    selectedUpscaleModalIds,
-    selectedUpscaleModalId,
-    upscaleModalStates,
-    setUpscaleModalStates,
-    setSelectedUpscaleModalId,
-    setSelectedUpscaleModalIds,
+
+    // REMOVED: selectedUpscaleModalIds, selectedUpscaleModalId, upscaleModalStates, setUpscaleModalStates, setSelectedUpscaleModalId, setSelectedUpscaleModalIds (now managed by store)
     onPersistUpscaleModalDelete,
-    selectedMultiangleCameraModalIds = [],
-    selectedMultiangleCameraModalId,
-    multiangleCameraModalStates = [],
-    setMultiangleCameraModalStates,
-    setSelectedMultiangleCameraModalId,
-    setSelectedMultiangleCameraModalIds,
+    // Multiangle
+    // selectedMultiangleCameraModalIds, selectedMultiangleCameraModalId, onPersistMultiangleCameraModalDelete, setSelectedMultiangleCameraModalId, setSelectedMultiangleCameraModalIds, multiangleCameraModalStates,
+
     onPersistMultiangleCameraModalDelete,
-    selectedRemoveBgModalIds,
-    selectedRemoveBgModalId,
-    removeBgModalStates,
-    setRemoveBgModalStates,
-    setSelectedRemoveBgModalId,
-    setSelectedRemoveBgModalIds,
+    // REMOVED: selectedRemoveBgModalIds, ... (now using hooks)
+    // selectedRemoveBgModalIds,
+    // selectedRemoveBgModalId,
+    // removeBgModalStates,
+    // setRemoveBgModalStates,
+    // setSelectedRemoveBgModalId,
+    // setSelectedRemoveBgModalIds,
     onPersistRemoveBgModalDelete,
-    selectedEraseModalIds,
-    selectedEraseModalId,
-    eraseModalStates,
-    setEraseModalStates,
-    setSelectedEraseModalId,
-    setSelectedEraseModalIds,
+    // REMOVED: eraseModalStates, setEraseModalStates, ... (via store)
+    // selectedEraseModalIds, selectedEraseModalId,
+    // eraseModalStates, setEraseModalStates,
+    // setSelectedEraseModalId, setSelectedEraseModalIds,
     onPersistEraseModalDelete,
     selectedVectorizeModalIds,
     selectedVectorizeModalId,
@@ -339,12 +358,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedVectorizeModalId,
     setSelectedVectorizeModalIds,
     onPersistVectorizeModalDelete,
-    selectedExpandModalIds,
-    selectedExpandModalId,
-    expandModalStates,
-    setExpandModalStates,
-    setSelectedExpandModalId,
-    setSelectedExpandModalIds,
+    // REMOVED: expandModalStates, ... (now using hooks)
+    // selectedExpandModalIds, selectedExpandModalId,
+    // expandModalStates, setExpandModalStates,
+    // setSelectedExpandModalId, setSelectedExpandModalIds,
     onPersistExpandModalDelete,
     selectedStoryboardModalIds,
     selectedStoryboardModalId,
@@ -389,10 +406,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     onPersistGroupDelete,
     richTextStates,
     images,
-    textInputStates,
-    imageModalStates,
-    videoModalStates,
-    musicModalStates,
+
     setScale,
     setPosition,
     updateViewportCenter,
@@ -406,7 +420,42 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     setSelectedRichTextId,
     setSelectedRichTextIds,
     onPersistRichTextDelete,
+    // ... props
   } = props;
+
+  // Zustand Hooks
+  const removeBgModalStates = useRemoveBgModalStates();
+  const { setRemoveBgModalStates } = useRemoveBgStore();
+  /* REMOVED DUPLICATE */
+  const { selectedId: selectedRemoveBgModalId, selectedIds: selectedRemoveBgModalIds, setSelectedId: setSelectedRemoveBgModalId, setSelectedIds: setSelectedRemoveBgModalIds } = useRemoveBgSelection();
+
+  const eraseModalStates = useEraseModalStates();
+  const { setEraseModalStates } = useEraseStore();
+  const { selectedId: selectedEraseModalId, selectedIds: selectedEraseModalIds, setSelectedId: setSelectedEraseModalId, setSelectedIds: setSelectedEraseModalIds } = useEraseSelection();
+
+  // Zustand Store - Get image and video modal states (replaces props)
+  const imageModalStates = useImageModalStates();
+  const videoModalStates = useVideoModalStates();
+  const musicModalStates = useMusicModalStates();
+  const { addMusicModal, setSelectedMusicModalId, setSelectedMusicModalIds } = useMusicStore();
+  const { selectedId: selectedMusicModalId, selectedIds: selectedMusicModalIds } = useMusicSelection();
+
+  const upscaleModalStates = useUpscaleModalStates();
+  const { setSelectedUpscaleModalId, setSelectedUpscaleModalIds } = useUpscaleStore();
+
+  const { selectedId: selectedUpscaleModalId, selectedIds: selectedUpscaleModalIds } = useUpscaleSelection();
+
+  const multiangleCameraModalStates = useMultiangleCameraModalStates();
+  const { setSelectedMultiangleCameraModalId, setSelectedMultiangleCameraModalIds } = useMultiangleCameraStore();
+  const { selectedId: selectedMultiangleCameraModalId, selectedIds: selectedMultiangleCameraModalIds } = useMultiangleCameraSelection();
+
+  const expandModalStates = useExpandModalStates();
+  const { addExpandModal, setSelectedExpandModalId, setSelectedExpandModalIds, setExpandModalStates } = useExpandStore();
+  const { selectedId: selectedExpandModalId, selectedIds: selectedExpandModalIds } = useExpandSelection();
+
+  // Text Store
+  const textInputStates = useTextModalStates();
+  const setTextInputStates = useTextStore(state => state.setTextModalStates);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Undo/Redo
@@ -509,6 +558,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Image modal shortcut
         if (e.key === 'i') {
+          if (e.ctrlKey || e.metaKey) return;
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.image || 0;
@@ -518,8 +568,18 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             const canvasY = (viewportSize.height / 2 - position.y) / scale;
             const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
             const newId = `img-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: pos.x, y: pos.y };
-            setImageModalStates(prev => [...prev, newModal]);
+            const newModal = {
+              id: newId,
+              x: pos.x,
+              y: pos.y,
+              frameWidth: 600,
+              frameHeight: 600, // Default 1:1 aspect ratio
+              frame: 'Square',
+              aspectRatio: '1:1'
+            };
+            // Use Zustand store instead
+            const { addImageModal } = useImageStore.getState();
+            addImageModal(newModal);
             if (onPersistImageModalCreate) {
               Promise.resolve(onPersistImageModalCreate(newModal)).catch(console.error);
             }
@@ -529,6 +589,9 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Video modal shortcut
         if (e.key === 'v') {
+          // Prevent if Ctrl/Cmd is pressed (Paste)
+          if (e.ctrlKey || e.metaKey) return;
+
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.video || 0;
@@ -538,8 +601,19 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             const canvasY = (viewportSize.height / 2 - position.y) / scale;
             const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
             const newId = `video-${Date.now()}-${Math.random()}`;
-            const newModal = { id: newId, x: pos.x, y: pos.y };
-            setVideoModalStates(prev => [...prev, newModal]);
+            const newModal = {
+              id: newId,
+              x: pos.x,
+              y: pos.y,
+              frameWidth: 600,
+              frameHeight: 338, // Default 16:9 aspect ratio
+              aspectRatio: '16:9'
+            };
+
+            // Use Zustand and persist
+            const { addVideoModal } = useVideoStore.getState();
+            addVideoModal(newModal as any);
+
             if (onPersistVideoModalCreate) {
               Promise.resolve(onPersistVideoModalCreate(newModal)).catch(console.error);
             }
@@ -549,6 +623,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
         // Music modal shortcut
         if (e.key === 'm') {
+          if (e.ctrlKey || e.metaKey) return;
           e.preventDefault();
           const now = Date.now();
           const last = lastCreateTimesRef.current.music || 0;
@@ -559,7 +634,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             const pos = findAvailablePositionNearWrapper(canvasX, canvasY);
             const newId = `music-${Date.now()}-${Math.random()}`;
             const newModal = { id: newId, x: pos.x, y: pos.y };
-            setMusicModalStates(prev => [...prev, newModal]);
+
+            // Use Zustand and persist
+            addMusicModal(newModal as any);
+
             if (onPersistMusicModalCreate) {
               Promise.resolve(onPersistMusicModalCreate(newModal)).catch(console.error);
             }
@@ -620,14 +698,16 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           if (selectedVideoModalIds) allIds.push(...selectedVideoModalIds);
           if (selectedVideoEditorModalId) allIds.push(selectedVideoEditorModalId);
           if (selectedVideoEditorModalIds) allIds.push(...selectedVideoEditorModalIds);
+          if (selectedImageEditorModalId) allIds.push(selectedImageEditorModalId);
+          if (selectedImageEditorModalIds && selectedImageEditorModalIds.length > 0) allIds.push(...selectedImageEditorModalIds);
           if (selectedMusicModalId) allIds.push(selectedMusicModalId);
-          if (selectedMusicModalIds) allIds.push(...selectedMusicModalIds);
+          if (selectedMusicModalIds && selectedMusicModalIds.length > 0) allIds.push(...selectedMusicModalIds);
           if (selectedTextInputId) allIds.push(selectedTextInputId);
-          if (selectedTextInputIds) allIds.push(...selectedTextInputIds);
+          if (selectedTextInputIds && selectedTextInputIds.length > 0) allIds.push(...selectedTextInputIds);
           if (selectedUpscaleModalId) allIds.push(selectedUpscaleModalId);
-          if (selectedUpscaleModalIds) allIds.push(...selectedUpscaleModalIds);
+          if (selectedUpscaleModalIds && selectedUpscaleModalIds.length > 0) allIds.push(...selectedUpscaleModalIds);
           if (selectedMultiangleCameraModalId) allIds.push(selectedMultiangleCameraModalId);
-          if (selectedMultiangleCameraModalIds) allIds.push(...selectedMultiangleCameraModalIds);
+          if (selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.length > 0) allIds.push(...selectedMultiangleCameraModalIds);
           if (selectedRemoveBgModalId) allIds.push(selectedRemoveBgModalId);
           if (selectedRemoveBgModalIds) allIds.push(...selectedRemoveBgModalIds);
           if (selectedEraseModalId) allIds.push(selectedEraseModalId);
@@ -651,6 +731,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
           const uniqueIds = Array.from(new Set(allIds)).filter(id => !!id);
 
+          console.log('[Keyboard Delete] All collected IDs:', allIds);
+          console.log('[Keyboard Delete] Unique IDs:', uniqueIds);
+          console.log('[Keyboard Delete] MultiangleCamera selection:', {
+            selectedMultiangleCameraModalId,
+            selectedMultiangleCameraModalIds,
+            hasId: !!selectedMultiangleCameraModalId,
+            hasIds: selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.length > 0
+          });
+
           if (uniqueIds.length > 0 && onBulkDelete) {
             console.log('[Keyboard] Triggering Bulk Delete for:', uniqueIds);
             onBulkDelete(uniqueIds);
@@ -658,6 +747,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             // Clear all local selection states
             setSelectedImageIndices([]);
             setSelectedImageIndex(null);
+            // Clear image and video selections (using Zustand store)
             setSelectedImageModalIds([]);
             setSelectedImageModalId(null);
             setSelectedVideoModalIds([]);
@@ -666,8 +756,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             setSelectedMusicModalId(null);
             setSelectedTextInputIds([]);
             setSelectedTextInputId(null);
+            setSelectedTextInputId(null);
             setSelectedUpscaleModalIds([]);
             setSelectedUpscaleModalId(null);
+            setSelectedMultiangleCameraModalIds([]);
             setSelectedMultiangleCameraModalIds([]);
             setSelectedMultiangleCameraModalId(null);
             setSelectedRemoveBgModalIds([]);
@@ -690,6 +782,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
             setSelectedCompareModalId(null);
             setSelectedVideoEditorModalIds([]);
             setSelectedVideoEditorModalId(null);
+            setSelectedImageEditorModalIds([]);
+            setSelectedImageEditorModalId(null);
 
             if (setSelectedCanvasTextIds) setSelectedCanvasTextIds([]);
             if (effectiveSetSelectedCanvasTextId) effectiveSetSelectedCanvasTextId(null);
@@ -721,11 +815,12 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         // effectiveSetSelectedCanvasTextIds is not in scope here as a direct array setter equivalent to textInputStates logic?
         // Wait, props has setSelectedCanvasTextIds.
 
-        // Select all modals
+        // Select all modals (using Zustand store - already defined at function top)
         const allImageModalIds = imageModalStates.map(m => m.id);
         const allVideoModalIds = videoModalStates.map(m => m.id);
         const allMusicModalIds = musicModalStates.map(m => m.id);
         const allUpscaleModalIds = upscaleModalStates.map(m => m.id);
+
         const allMultiangleModalIds = multiangleCameraModalStates.map(m => m.id);
         const allRemoveBgModalIds = removeBgModalStates.map(m => m.id);
         const allEraseModalIds = eraseModalStates.map(m => m.id);
@@ -737,6 +832,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         const allScriptFrameModalIds = scriptFrameModalStates.map(m => m.id);
         const allSceneFrameModalIds = sceneFrameModalStates.map(m => m.id);
         const allVideoEditorModalIds = videoEditorModalStates.map(m => m.id);
+        const allImageEditorModalIds = imageEditorModalStates.map(m => m.id);
         const allRichTextIds = richTextStates ? richTextStates.map((s: any) => s.id) : [];
 
         setSelectedImageIndices(allImageIndices);
@@ -750,8 +846,14 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         setSelectedMusicModalIds(allMusicModalIds);
         setSelectedMusicModalId(allMusicModalIds.length > 0 ? allMusicModalIds[0] : null);
 
+        if (allUpscaleModalIds.length > 0) {
+          setSelectedUpscaleModalIds(allUpscaleModalIds);
+          setSelectedUpscaleModalId(allUpscaleModalIds[0]);
+        } else {
+          setSelectedUpscaleModalIds([]);
+          setSelectedUpscaleModalId(null);
+        }
         setSelectedUpscaleModalIds(allUpscaleModalIds);
-        setSelectedUpscaleModalId(allUpscaleModalIds[0] || null);
         setSelectedMultiangleCameraModalIds(allMultiangleModalIds);
         setSelectedMultiangleCameraModalId(allMultiangleModalIds[0] || null);
         setSelectedRemoveBgModalIds(allRemoveBgModalIds);
@@ -774,6 +876,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         setSelectedSceneFrameModalId(allSceneFrameModalIds[0] || null);
         setSelectedVideoEditorModalIds(allVideoEditorModalIds);
         setSelectedVideoEditorModalId(allVideoEditorModalIds[0] || null);
+        setSelectedImageEditorModalIds(allImageEditorModalIds);
+        setSelectedImageEditorModalId(allImageEditorModalIds[0] || null);
 
         if (setSelectedRichTextIds) setSelectedRichTextIds(allRichTextIds);
         if (setSelectedRichTextId) setSelectedRichTextId(allRichTextIds[0] || null);
@@ -818,6 +922,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
           });
         };
 
+        // Use Zustand store for imageModalStates (already declared in outer scope)
         updateBoundsFromModal(imageModalStates, 600, 400);
         updateBoundsFromModal(videoModalStates, 600, 400);
         updateBoundsFromModal(musicModalStates, 600, 300);
@@ -833,6 +938,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
         updateBoundsFromModal(scriptFrameModalStates, 360, 260);
         updateBoundsFromModal(sceneFrameModalStates, 350, 300);
         updateBoundsFromModal(videoEditorModalStates, 600, 400);
+        updateBoundsFromModal(imageEditorModalStates, 600, 400);
 
         if (richTextStates) {
           richTextStates.forEach((t: any) => {
@@ -871,7 +977,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
       // Handle 'z' to zoom to selection or to all components
       // Do not trigger on Cmd+Z / Ctrl+Z (reserved for undo)
-      if (e.key === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
+      if (e.key.toLowerCase() === 'z' && !e.repeat && !e.metaKey && !e.ctrlKey) {
         // Avoid when typing in inputs
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
         e.preventDefault();
@@ -940,6 +1046,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     selectedImageModalIds,
     selectedVideoModalIds,
     selectedMusicModalIds,
+    selectedMusicModalId,
     selectedTextInputIds,
     selectedCanvasTextIds,
     lastCreateTimesRef,
@@ -948,9 +1055,9 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     scale,
     findAvailablePositionNearWrapper,
     setTextInputStates,
-    setImageModalStates,
-    setVideoModalStates,
-    setMusicModalStates,
+
+    // REMOVED: setMusicModalStates (now managed by useMusicStore)
+    // setMusicModalStates,
     onPersistTextModalCreate,
     onPersistImageModalCreate,
     onPersistVideoModalCreate,
@@ -998,16 +1105,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     selectedUpscaleModalIds,
     selectedUpscaleModalId,
     upscaleModalStates,
-    setUpscaleModalStates,
+    // REMOVED: setUpscaleModalStates (now managed by store)
     setSelectedUpscaleModalId,
     setSelectedUpscaleModalIds,
     onPersistUpscaleModalDelete,
-    selectedMultiangleCameraModalIds,
-    selectedMultiangleCameraModalId,
-    multiangleCameraModalStates,
-    setMultiangleCameraModalStates,
-    setSelectedMultiangleCameraModalId,
-    setSelectedMultiangleCameraModalIds,
     onPersistMultiangleCameraModalDelete,
     selectedRemoveBgModalIds,
     selectedRemoveBgModalId,
@@ -1063,8 +1164,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     onPersistCompareModalDelete,
     images,
     textInputStates,
-    imageModalStates,
-    videoModalStates,
+
     musicModalStates,
     setScale,
     setPosition,

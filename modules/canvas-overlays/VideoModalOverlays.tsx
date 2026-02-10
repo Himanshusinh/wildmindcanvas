@@ -7,6 +7,8 @@ import Konva from 'konva';
 import { VideoModalState, Connection, ImageModalState, TextModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { ImageUpload } from '@/core/types/canvas';
+// Zustand Store - Video State Management
+import { useVideoStore, useVideoModalStates, useVideoSelection } from '@/modules/stores';
 
 /**
  * Calculate aspect ratio string (e.g., "9:16") from width and height
@@ -49,13 +51,14 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
 }
 
 interface VideoModalOverlaysProps {
-  videoModalStates: VideoModalState[];
-  selectedVideoModalId: string | null;
-  selectedVideoModalIds: string[];
+  // REMOVED: These props are now managed by Zustand store
+  videoModalStates?: VideoModalState[];
+  selectedVideoModalId?: string | null;
+  selectedVideoModalIds?: string[];
   clearAllSelections: () => void;
-  setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
-  setSelectedVideoModalId: (id: string | null) => void;
-  setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // setVideoModalStates: React.Dispatch<React.SetStateAction<VideoModalState[]>>;
+  // setSelectedVideoModalId: (id: string | null) => void;
+  // setSelectedVideoModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onVideoGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, duration: number, resolution?: string, modalId?: string, firstFrameUrl?: string, lastFrameUrl?: string) => Promise<{ generationId?: string; taskId?: string; provider?: string } | null>;
   onPersistVideoModalCreate?: (modal: { id: string; x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number }) => void | Promise<void>;
   onPersistVideoModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedVideoUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; duration?: number; isPinned?: boolean }>) => void | Promise<void>;
@@ -68,20 +71,25 @@ interface VideoModalOverlaysProps {
   position: { x: number; y: number };
   textInputStates?: TextModalState[];
   isComponentDraggable?: (id: string) => boolean;
-  setGenerationQueue?: React.Dispatch<React.SetStateAction<import('@/modules/canvas/GenerationQueue').GenerationQueueItem[]>>;
+
   isChatOpen?: boolean;
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
+  // Level-of-detail flags (optional)
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
 }
 
-export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
-  videoModalStates,
-  selectedVideoModalId,
-  selectedVideoModalIds,
+export const VideoModalOverlays = React.memo<VideoModalOverlaysProps>(({
+  // REMOVED: videoModalStates, selectedVideoModalId, selectedVideoModalIds, setVideoModalStates, setSelectedVideoModalId, setSelectedVideoModalIds (now managed by Zustand store)
+  // videoModalStates,
+  // selectedVideoModalId,
+  // selectedVideoModalIds,
   clearAllSelections,
-  setVideoModalStates,
-  setSelectedVideoModalId,
-  setSelectedVideoModalIds,
+  // setVideoModalStates,
+  // setSelectedVideoModalId,
+  // setSelectedVideoModalIds,
   onVideoGenerate,
   onPersistVideoModalCreate,
   onPersistVideoModalMove,
@@ -94,11 +102,32 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
   position,
   textInputStates,
   isComponentDraggable,
-  setGenerationQueue,
+
   isChatOpen,
   selectedIds,
   setSelectionOrder,
+  showFineDetails,
+  showLabelsOnly,
+  isZoomedOut,
+  videoModalStates: propVideoModalStates,
+  selectedVideoModalId: propSelectedVideoModalId,
+  selectedVideoModalIds: propSelectedVideoModalIds,
 }) => {
+  // Zustand Store - Get video state and actions
+  const storeVideoModalStates = useVideoModalStates();
+  const { selectedId: storeSelectedVideoModalId, selectedIds: storeSelectedVideoModalIds } = useVideoSelection();
+
+  const videoModalStates = propVideoModalStates || storeVideoModalStates;
+  const selectedVideoModalId = propSelectedVideoModalId !== undefined ? propSelectedVideoModalId : storeSelectedVideoModalId;
+  const selectedVideoModalIds = propSelectedVideoModalIds !== undefined ? propSelectedVideoModalIds : storeSelectedVideoModalIds;
+
+  const setVideoModalStates = useVideoStore(state => state.setVideoModalStates);
+  const setSelectedVideoModalId = useVideoStore(state => state.setSelectedVideoModalId);
+  const setSelectedVideoModalIds = useVideoStore(state => state.setSelectedVideoModalIds);
+  const updateVideoModal = useVideoStore(state => state.updateVideoModal);
+  const removeVideoModal = useVideoStore(state => state.removeVideoModal);
+  const addVideoModal = useVideoStore(state => state.addVideoModal);
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   // Track Shift key locally for robust multi-selection
@@ -146,7 +175,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
             setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
           }}
           onClose={() => {
-            setVideoModalStates(prev => prev.filter(m => m.id !== modalState.id));
+            // Use Zustand store for deletion
+            removeVideoModal(modalState.id);
             setSelectedVideoModalId(null);
             if (onPersistVideoModalDelete) {
               Promise.resolve(onPersistVideoModalDelete(modalState.id)).catch(console.error);
@@ -182,8 +212,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                   status: 'submitted',
                 } as any)).catch(console.error);
               }
-              // Optimistic state update with tracking fields
-              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider, status: 'submitted' } : m));
+              // Optimistic state update with tracking fields (using Zustand store)
+              updateVideoModal(modalState.id, { model, frame, aspectRatio, prompt, duration: duration || modalState.duration || 5, resolution: resolution || modalState.resolution, taskId, generationId, provider, status: 'submitted' });
               if (!taskId) return null;
 
               // Determine which service to poll based on provider or model
@@ -266,12 +296,10 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                     }
 
                     if (videoUrl) {
-                      setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, generatedVideoUrl: videoUrl, status: 'completed' } : m));
+                      // Update video modal with generated URL (using Zustand store)
+                      updateVideoModal(modalState.id, { generatedVideoUrl: videoUrl, status: 'completed' });
 
-                      // Remove from generation queue
-                      if (setGenerationQueue) {
-                        setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                      }
+
 
                       if (onPersistVideoModalMove) {
                         Promise.resolve(onPersistVideoModalMove(modalState.id, {
@@ -285,15 +313,13 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                   } else if (statusVal === 'failed' || statusVal === 'error') {
                     console.error('[Canvas Video Poll] generation failed', { taskId, status: statusVal, provider });
 
-                    // Remove from generation queue
-                    if (setGenerationQueue) {
-                      setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                    }
+
 
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'failed' } as any)).catch(console.error);
                     }
-                    setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'failed' } : m));
+                    // Update status to failed (using Zustand store)
+                    updateVideoModal(modalState.id, { status: 'failed' });
                     break;
                   }
                 } catch (pollErr: any) {
@@ -301,10 +327,7 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                   if (pollErr?.status === 404 || pollErr?.isNotFound) {
                     console.error('[Canvas Video Poll] Prediction not found (404)', { taskId, provider, error: pollErr?.message });
 
-                    // Remove from generation queue
-                    if (setGenerationQueue) {
-                      setGenerationQueue(prev => prev.filter(item => !item.id.includes(modalState.id)));
-                    }
+
 
                     if (onPersistVideoModalMove) {
                       Promise.resolve(onPersistVideoModalMove(modalState.id, {
@@ -312,7 +335,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
                         error: pollErr?.message || 'Prediction not found. The prediction may have been deleted or expired.'
                       } as any)).catch(console.error);
                     }
-                    setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'failed' } : m));
+                    // Update status to failed (using Zustand store)
+                    updateVideoModal(modalState.id, { status: 'failed' });
                     break; // Stop polling
                   }
                   console.warn('[Canvas Video Poll] status check error', pollErr, { provider, taskId });
@@ -324,7 +348,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               if (onPersistVideoModalMove) {
                 Promise.resolve(onPersistVideoModalMove(modalState.id, { status: 'error' } as any)).catch(console.error);
               }
-              setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, status: 'error' } : m));
+              // Update status to error (using Zustand store)
+              updateVideoModal(modalState.id, { status: 'error' });
             }
             return null;
           }}
@@ -335,14 +360,29 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           initialDuration={modalState.duration || 5}
           initialResolution={modalState.resolution}
           initialPrompt={modalState.prompt}
+          error={modalState.error}
           onOptionsChange={(opts) => {
-            setVideoModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, duration: (opts as any).duration ?? m.duration, resolution: (opts as any).resolution ?? m.resolution, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
+            // Update video modal options (using Zustand store)
+            const modal = videoModalStates.find(m => m.id === modalState.id);
+            if (modal) {
+              updateVideoModal(modalState.id, {
+                ...opts,
+                duration: (opts as any).duration ?? modal.duration,
+                resolution: (opts as any).resolution ?? modal.resolution,
+                frameWidth: opts.frameWidth ?? modal.frameWidth,
+                frameHeight: opts.frameHeight ?? modal.frameHeight,
+                model: opts.model ?? modal.model,
+                frame: opts.frame ?? modal.frame,
+                aspectRatio: opts.aspectRatio ?? modal.aspectRatio,
+                prompt: opts.prompt ?? modal.prompt,
+              });
+            }
             if (onPersistVideoModalMove) {
               Promise.resolve(onPersistVideoModalMove(modalState.id, opts as any)).catch(console.error);
             }
           }}
           connections={connections}
-          imageModalStates={imageModalStates}
+
           images={images}
           isAttachedToChat={isChatOpen && (selectedVideoModalId === modalState.id || selectedVideoModalIds.includes(modalState.id))}
           selectionOrder={
@@ -427,7 +467,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
               y: modalState.y, // Same Y position
               generatedVideoUrl: modalState.generatedVideoUrl,
             };
-            setVideoModalStates(prev => [...prev, duplicated]);
+            // Add duplicated video modal (using Zustand store)
+            addVideoModal(duplicated);
             if (onPersistVideoModalCreate) {
               Promise.resolve(onPersistVideoModalCreate(duplicated)).catch(console.error);
             }
@@ -436,9 +477,8 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
           x={modalState.x}
           y={modalState.y}
           onPositionChange={(newX, newY) => {
-            setVideoModalStates(prev => prev.map(m =>
-              m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-            ));
+            // Update video modal position (using Zustand store)
+            updateVideoModal(modalState.id, { x: newX, y: newY });
           }}
           onPositionCommit={(finalX, finalY) => {
             if (onPersistVideoModalMove) {
@@ -497,12 +537,15 @@ export const VideoModalOverlays: React.FC<VideoModalOverlaysProps> = ({
             setSelectedVideoModalId(null);
             if (onPersistVideoModalDelete) {
               Promise.resolve(onPersistVideoModalDelete(modalId)).catch(console.error);
-              setVideoModalStates(prev => prev.filter(m => m.id !== modalId));
+              // Remove video modal (using Zustand store)
+              removeVideoModal(modalId);
             }
           }}
         />
       )}
     </>
   );
-};
+});
+
+VideoModalOverlays.displayName = 'VideoModalOverlays';
 

@@ -7,6 +7,7 @@ import { INFINITE_CANVAS_SIZE } from '@/core/canvas/canvasHelpers';
 import { useCanvasState } from '../hooks/useCanvasState';
 import { useCanvasSelection } from '../hooks/useCanvasSelection';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
+import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { usePatternImage } from '../hooks/usePatternImage';
 import { CanvasImage } from '../CanvasImage';
 import { CanvasVideoNode } from '../CanvasVideoNode';
@@ -16,6 +17,8 @@ import { RichTextNode } from '../RichText/RichTextNode';
 import { TextElements } from '../TextElements';
 import { SelectionBox } from '../SelectionBox';
 import { GroupContainerOverlay } from '../GroupContainerOverlay';
+// Zustand Store - Video State Management
+import { useVideoModalStates, useVideoSelection, useVideoStore, useImageModalStates, useMultiangleCameraModalStates, useMusicModalStates, useUpscaleModalStates, useRemoveBgModalStates, useEraseModalStates, useExpandModalStates, useImageStore, useMusicStore, useUpscaleStore, useMultiangleCameraStore, useRemoveBgStore, useEraseStore, useExpandStore, useExpandSelection } from '@/modules/stores';
 // import { isComponentDraggable } from '@/core/canvas/canvasHelpers'; // Or pass as prop if logic is complex
 
 interface CanvasStageProps {
@@ -50,6 +53,23 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     isDarkTheme = true,
     handleRichTextUpdate,
 }) => {
+    const videoModalStates = useVideoModalStates() || [];
+    const imageModalStates = useImageModalStates() || [];
+    const multiangleCameraModalStates = useMultiangleCameraModalStates() || [];
+    const musicModalStates = useMusicModalStates() || [];
+    const upscaleModalStates = useUpscaleModalStates() || [];
+    const { selectedIds: selectedVideoModalIds } = useVideoSelection();
+    const { setSelectedVideoModalIds, setVideoModalStates } = useVideoStore();
+    const { setImageModalStates } = useImageStore();
+    const { setMusicModalStates } = useMusicStore();
+    const { setUpscaleModalStates } = useUpscaleStore();
+    const { setMultiangleCameraModalStates } = useMultiangleCameraStore();
+    const removeBgModalStates = useRemoveBgModalStates() || [];
+    const { setRemoveBgModalStates } = useRemoveBgStore();
+    const expandModalStates = useExpandModalStates() || [];
+    const { setExpandModalStates } = useExpandStore();
+    const { selectedId: selectedExpandModalId, selectedIds: selectedExpandModalIds, setSelectedId: setSelectedExpandModalId, setSelectedIds: setSelectedExpandModalIds } = useExpandSelection();
+
     const {
         images,
         effectiveCanvasTextStates,
@@ -58,22 +78,31 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         handleCanvasTextUpdate,
         effectiveRichTextStates,
         // handleRichTextUpdate, // Removed duplicate
-        videoModalStates,
+        // REMOVED: videoModalStates (now using Zustand store)
+        // videoModalStates,
         groupContainerStates, setGroupContainerStates,
         setIsTextInteracting,
 
         // Pass other states needed for child components
         textInputStates,
         setTextInputStates,
-        imageModalStates, setImageModalStates,
-        setVideoModalStates,
+        // REMOVED: imageModalStates, setImageModalStates (now using Zustand store)
+        // imageModalStates, setImageModalStates,
+        // REMOVED: setVideoModalStates (now using Zustand store)
+        // setVideoModalStates,
         videoEditorModalStates, setVideoEditorModalStates,
-        musicModalStates, setMusicModalStates,
-        upscaleModalStates, setUpscaleModalStates,
-        multiangleCameraModalStates, setMultiangleCameraModalStates,
-        removeBgModalStates, setRemoveBgModalStates,
-        eraseModalStates, setEraseModalStates,
-        expandModalStates, setExpandModalStates,
+        // REMOVED: musicModalStates, setMusicModalStates (now using Zustand store)
+        // musicModalStates, setMusicModalStates,
+        // REMOVED: upscaleModalStates, setUpscaleModalStates (now using Zustand store)
+        // upscaleModalStates, setUpscaleModalStates,
+        // REMOVED: multiangleCameraModalStates, setMultiangleCameraModalStates (now using Zustand store)
+        // multiangleCameraModalStates, setMultiangleCameraModalStates,
+        // REMOVED: removeBgModalStates, setRemoveBgModalStates (now using Zustand store)
+        // removeBgModalStates, setRemoveBgModalStates,
+        // REMOVED: eraseModalStates, setEraseModalStates (via store)
+        // eraseModalStates, setEraseModalStates,
+        // REMOVED: expandModalStates, setExpandModalStates (via store)
+        // expandModalStates, setExpandModalStates,
         vectorizeModalStates, setVectorizeModalStates,
         nextSceneModalStates, setNextSceneModalStates,
         compareModalStates, setCompareModalStates,
@@ -93,14 +122,18 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
         // Pass selection states
         selectedTextInputIds, setSelectedTextInputIds,
         selectedImageModalIds, setSelectedImageModalIds,
-        selectedVideoModalIds, setSelectedVideoModalIds,
+        // REMOVED: selectedVideoModalIds, setSelectedVideoModalIds (now using Zustand store)
+        // selectedVideoModalIds, setSelectedVideoModalIds,
         selectedVideoEditorModalIds, setSelectedVideoEditorModalIds,
         selectedMusicModalIds, setSelectedMusicModalIds,
         selectedUpscaleModalIds, setSelectedUpscaleModalIds,
-        selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds,
+        // REMOVED: selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds (now using Zustand store)
+        // selectedMultiangleCameraModalIds, setSelectedMultiangleCameraModalIds,
         selectedRemoveBgModalIds, setSelectedRemoveBgModalIds,
         selectedEraseModalIds, setSelectedEraseModalIds,
-        selectedExpandModalIds, setSelectedExpandModalIds,
+        // REMOVED: selectedExpandModalId, selectedExpandModalIds (via store)
+        // selectedExpandModalId, selectedExpandModalIds,
+        // selectedExpandModalIds, setSelectedExpandModalIds,
         selectedVectorizeModalIds, setSelectedVectorizeModalIds,
         selectedNextSceneModalIds, setSelectedNextSceneModalIds,
         selectedCompareModalIds, setSelectedCompareModalIds,
@@ -126,6 +159,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 
     const { stageRef, layerRef } = refs;
     const patternImage = usePatternImage();
+    const { screenToCanvas } = useCanvasCoordinates({ position, scale });
 
     // Helper or prop? Usually imported helper
     const isDraggable = (id: string) => {
@@ -185,8 +219,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     {/* Dynamic Viewport Background */}
                     {(() => {
                         const padding = 2000 / scale;
-                        const viewX = -position.x / scale;
-                        const viewY = -position.y / scale;
+                        const { x: viewX, y: viewY } = screenToCanvas({ x: 0, y: 0 });
                         const viewW = viewportSize.width / scale;
                         const viewH = viewportSize.height / scale;
 
@@ -194,6 +227,16 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                         const rectY = viewY - padding;
                         const rectW = viewW + padding * 2;
                         const rectH = viewH + padding * 2;
+
+                        // Adaptive Grid Scale Logic
+                        const zoomLevel = scale;
+                        const exponent = Math.floor(Math.log2(1 / zoomLevel));
+                        const gridScale = Math.pow(2, Math.max(0, exponent));
+
+                        // Debug: monitor background drift components
+                        if (Date.now() % 100 < 5) { // Sample logs at ~5% to avoid flooding
+                            // console.log('[Background Debug] scale:', scale, 'position:', position, 'rectX:', rectX, 'gridScale:', gridScale);
+                        }
 
                         return (
                             <>
@@ -203,7 +246,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                     y={rectY}
                                     width={rectW}
                                     height={rectH}
-                                    fill={document.documentElement.classList.contains('dark') ? '#121212' : '#ffffff'}
+                                    fill={isDarkTheme ? '#121212' : '#ffffff'}
                                     listening={true}
                                     name="background-rect"
                                 />
@@ -216,13 +259,13 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                                         height={rectH}
                                         fillPatternImage={patternImage}
                                         fillPatternRepeat="repeat"
-                                        fillPatternScaleX={1 / Math.pow(scale, 0.9)}
-                                        fillPatternScaleY={1 / Math.pow(scale, 0.9)}
+                                        fillPatternScaleX={gridScale}
+                                        fillPatternScaleY={gridScale}
                                         fillPatternOffset={{
-                                            // Keep the dot pattern anchored in world space so it pans in the
-                                            // same direction as the canvas (no inverted/parallax drift).
-                                            x: rectX,
-                                            y: rectY
+                                            // Keep the dot pattern anchored in world space
+                                            // Must divide by gridScale because offset is in unscaled pattern space
+                                            x: rectX / gridScale,
+                                            y: rectY / gridScale
                                         }}
                                         name="background-rect"
                                         listening={false}
@@ -234,7 +277,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                 </>
 
 
-                {videoModalStates.map((videoState: any, index: number) => (
+                {(videoModalStates || []).map((videoState: any, index: number) => (
                     <CanvasVideoNode
                         key={videoState.id}
                         videoState={videoState}
@@ -411,6 +454,18 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     isSelecting={isSelecting}
                     {...canvasSelection}
                     {...canvasState}
+                    imageModalStates={imageModalStates}
+                    setImageModalStates={setImageModalStates}
+                    videoModalStates={videoModalStates}
+                    setVideoModalStates={setVideoModalStates}
+                    musicModalStates={musicModalStates}
+                    setMusicModalStates={setMusicModalStates}
+                    upscaleModalStates={upscaleModalStates}
+                    setUpscaleModalStates={setUpscaleModalStates}
+                    multiangleCameraModalStates={multiangleCameraModalStates}
+                    setMultiangleCameraModalStates={setMultiangleCameraModalStates}
+                    // REMOVED: expandModalStates (via store)
+                    // expandModalStates={expandModalStates}
                     selectedCanvasTextIds={effectiveSelectedCanvasTextIds}
                     handleImageUpdateWithGroup={groupLogic.handleImageUpdateWithGroup}
                     selectionDragOriginRef={React.useRef<{ x: number, y: number } | null>(null)}
@@ -439,9 +494,10 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
                     musicModalStates={musicModalStates}
                     upscaleModalStates={upscaleModalStates}
                     multiangleCameraModalStates={multiangleCameraModalStates}
-                    removeBgModalStates={removeBgModalStates}
-                    eraseModalStates={eraseModalStates}
-                    expandModalStates={expandModalStates}
+                    // REMOVED: removeBgModalStates (via store)
+                    // removeBgModalStates={removeBgModalStates}
+                    // REMOVED: eraseModalStates={eraseModalStates}
+                    // REMOVED: expandModalStates={expandModalStates}
                     vectorizeModalStates={vectorizeModalStates}
                     nextSceneModalStates={nextSceneModalStates}
                     compareModalStates={compareModalStates}

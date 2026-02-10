@@ -3,7 +3,7 @@ import React from 'react';
 import { ImageUpload } from '@/core/types/canvas';
 import { CanvasTextState, CompareModalState, ScriptFrameModalState } from '@/modules/canvas-overlays/types';
 import { GroupContainerState } from '@/core/types/groupContainer';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 import { StoryWorld } from '@/core/types/storyWorld';
 import { MusicGenerator } from '@/modules/canvas-app/types';
 export type { MusicGenerator };
@@ -77,7 +77,7 @@ export interface CanvasProps {
     externalStoryboardModals?: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; scriptText?: string | null }>;
     externalScriptFrameModals?: Array<{ id: string; pluginId: string; x: number; y: number; frameWidth: number; frameHeight: number; text: string }>;
     externalSceneFrameModals?: Array<{ id: string; scriptFrameId: string; sceneNumber: number; x: number; y: number; frameWidth: number; frameHeight: number; content: string }>;
-    externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
+    externalTextModals?: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean; smartTokens?: any[] }>;
     onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null }) => void | Promise<void>;
     onPersistImageModalMove?: (id: string, updates: Partial<{ x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>) => void | Promise<void>;
     onPersistImageModalDelete?: (id: string) => void | Promise<void>;
@@ -144,7 +144,7 @@ export interface CanvasProps {
     onVectorize?: (sourceImageUrl?: string, mode?: string) => Promise<string | null>;
     // Text generator (input overlay) persistence callbacks
     onPersistTextModalCreate?: (modal: { id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }) => void | Promise<void>;
-    onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string }>) => void | Promise<void>;
+    onPersistTextModalMove?: (id: string, updates: Partial<{ x: number; y: number; value?: string; smartTokens?: any[] }>) => void | Promise<void>;
     onPersistTextModalDelete?: (id: string) => void | Promise<void>;
     // Group persistence callbacks
     onPersistGroupCreate?: (group: GroupContainerState) => void | Promise<void>;
@@ -188,7 +188,7 @@ export interface CanvasProps {
     onPersistConnectorDelete?: (connectorId: string) => void | Promise<void>;
     onPluginSidebarOpen?: () => void;
     isUIHidden?: boolean;
-    setGenerationQueue?: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
+
     stageRef?: React.RefObject<any>;
     onGenerateStoryboard?: (storyboardId: string, inputs: {
         characterInput?: string;
@@ -205,7 +205,7 @@ export interface CanvasItemsData {
     images: ImageUpload[];
     canvasTextStates: CanvasTextState[];
     richTextStates: CanvasTextState[];
-    textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean }>;
+    textInputStates: Array<{ id: string; x: number; y: number; value?: string; autoFocusInput?: boolean; smartTokens?: any[] }>;
     imageModalStates: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; sourceImageUrl?: string | null; isGenerating?: boolean }>;
     videoModalStates: Array<{ id: string; x: number; y: number; generatedVideoUrl?: string | null; duration?: number; resolution?: string; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
     videoEditorModalStates: Array<{ id: string; x: number; y: number }>;
@@ -213,9 +213,9 @@ export interface CanvasItemsData {
     musicModalStates: MusicGenerator[];
     upscaleModalStates: Array<{ id: string; x: number; y: number; upscaledImageUrl?: string | null; sourceImageUrl?: string | null; localUpscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; isUpscaling?: boolean; isExpanded?: boolean }>;
     multiangleCameraModalStates: Array<{ id: string; x: number; y: number; sourceImageUrl?: string | null; isExpanded?: boolean }>;
-    removeBgModalStates: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean; isExpanded?: boolean }>;
-    eraseModalStates: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean; isExpanded?: boolean }>;
-    expandModalStates: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean; isExpanded?: boolean }>;
+    removeBgModalStates?: Array<{ id: string; x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isRemovingBg?: boolean; isExpanded?: boolean }>;
+    eraseModalStates?: Array<{ id: string; x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isErasing?: boolean; isExpanded?: boolean }>;
+    expandModalStates?: Array<{ id: string; x: number; y: number; expandedImageUrl?: string | null; sourceImageUrl?: string | null; localExpandedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; isExpanding?: boolean; isExpanded?: boolean }>;
     vectorizeModalStates: Array<{ id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean; isExpanded?: boolean }>;
     nextSceneModalStates: Array<{ id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean; isExpanded?: boolean }>;
     compareModalStates: CompareModalState[];

@@ -5,10 +5,12 @@ import '@/modules/ui-global/common/canvasCaptureGuard';
 import { ImageModalTooltip } from './ImageModalTooltip';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { ImageModalFrame } from './ImageModalFrame';
-import { ImageModalNodes } from './ImageModalNodes';
+
 import { ImageModalControls } from './ImageModalControls';
 import { buildProxyResourceUrl } from '@/core/api/proxyUtils';
 import { imageCache } from '@/core/api/imageCache';
+// Zustand Store - Image State Management
+import { useImageModalStates, useImageStore } from '@/modules/stores';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
@@ -21,6 +23,7 @@ interface ImageUploadModalProps {
   generatedImageUrl?: string | null;
   generatedImageUrls?: string[]; // Array for multiple images (when imageCount > 1)
   isGenerating?: boolean; // Show loading spinner when generating
+  isProcessing?: boolean; // Show loading spinner without auto-triggering generation
   isLocked?: boolean; // Lock generation for sequential scene generation
   lockReason?: string; // Reason why generation is locked
   stageRef: React.RefObject<any>;
@@ -46,9 +49,11 @@ interface ImageUploadModalProps {
   frameHeight?: number;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }) => void | Promise<void>;
   onImageGenerate?: (prompt: string, model: string, frame: string, aspectRatio: string, modalId?: string, imageCount?: number, sourceImageUrl?: string, width?: number, height?: number, options?: Record<string, any>) => Promise<{ url: string; images?: Array<{ url: string }> } | null>;
-  onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
+  // REMOVED: onUpdateModalState (now using Zustand store)
+  // onUpdateModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
-  imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
+  // REMOVED: imageModalStates (now using Zustand store - useImageModalStates)
+  // imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   textInputStates?: Array<{ id: string; value?: string; sentValue?: string }>;
@@ -61,6 +66,7 @@ interface ImageUploadModalProps {
   onTogglePin?: () => void;
   isAttachedToChat?: boolean;
   selectionOrder?: number;
+  error?: string | null;
 }
 
 export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
@@ -73,6 +79,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   generatedImageUrl,
   generatedImageUrls,
   isGenerating: externalIsGenerating,
+  isProcessing: externalIsProcessing,
   isLocked = false,
   lockReason = '',
   stageRef,
@@ -97,11 +104,14 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   onOptionsChange,
   onPersistImageModalCreate,
   onImageGenerate,
-  onUpdateModalState,
+  // REMOVED: onUpdateModalState (now using Zustand store)
+  // onUpdateModalState,
   connections = [],
-  imageModalStates = [],
+  // REMOVED: imageModalStates (now using Zustand store)
+  // imageModalStates = [],
   images = [],
   onPersistConnectorCreate,
+  error,
   textInputStates = [],
   sceneFrameModalStates = [],
   scriptFrameModalStates = [],
@@ -114,6 +124,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   isPinned = false,
   onTogglePin,
 }) => {
+
   // Fix 3: Strict Guard - Prevent rendering invalid modals
   if (!id) return null;
 
@@ -123,11 +134,49 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Removed local isPinned state to use prop
   const [globalDragActive, setGlobalDragActive] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const lastCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   // Track initial mouse position to distinguish clicks from drags
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageAreaRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const imageModalStates = useImageStore(s => s.imageModalStates);
+  const updateImageModal = useImageStore(s => s.updateImageModal);
+
+  // Clear error on selection
+  useEffect(() => {
+    if (isSelected && error) {
+      updateImageModal(id, { error: null });
+    }
+  }, [isSelected, error, id, updateImageModal]);
+
+  const modalState = useMemo(() => imageModalStates.find(m => m.id === id), [imageModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
+  const requestHoverState = (next: boolean, force = false) => {
+    if (next) {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      setIsHovered(true);
+      return;
+    }
+
+    if (isPinned && !force) return;
+
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
   // Track if resolution change was user-initiated to prevent useEffect from overriding it
   const userInitiatedResolutionChangeRef = useRef(false);
   // Debug Selection Props
@@ -252,6 +301,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     return null;
   }, [id, connections, textInputStates, sceneFrameModalStates]);
 
+  // Sync isHovered state with store
+  useEffect(() => {
+    updateImageModal(id, { isHovered });
+  }, [id, isHovered, updateImageModal]);
+
   // Track previous connected text value to prevent unnecessary updates
   const prevConnectedTextValueRef = useRef<string | undefined>(undefined);
   const lastReceivedSentValueRef = useRef<string | undefined>(undefined);
@@ -281,8 +335,21 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   const effectivePrompt = prompt;
 
   // Convert canvas coordinates to screen coordinates
-  const screenX = x * scale + position.x;
-  const screenY = y * scale + position.y;
+  // Clear drag position when props have caught up
+  useEffect(() => {
+    if (!isDraggingContainer && dragPosition) {
+      // Check if props have updated to match drag position (within 1px tolerance)
+      if (Math.abs(x - dragPosition.x) < 1 && Math.abs(y - dragPosition.y) < 1) {
+        setDragPosition(null);
+      }
+    }
+  }, [x, y, isDraggingContainer, dragPosition]);
+
+  // Use drag position during drag for immediate visual feedback, otherwise use props
+  const effectiveX = dragPosition ? dragPosition.x : x;
+  const effectiveY = dragPosition ? dragPosition.y : y;
+  const screenX = effectiveX * scale + position.x;
+  const screenY = effectiveY * scale + position.y;
   const frameBorderColor = isSelected ? '#4C83FF' : 'rgba(0, 0, 0, 0.3)';
   const frameBorderWidth = 2;
   const dropdownBorderColor = 'rgba(0,0,0,0.1)'; // Fixed border color for dropdowns
@@ -305,7 +372,11 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Pro 1.1 Ultra',
     'Flux Pro 1.1',
     'Upscale',
-    'Remove BG'
+    'Remove BG',
+    'ChatGPT 1.5',
+    'Z Image Turbo',
+    'P-Image',
+    'Seedream v4 4K'
   ];
   const isGenerationModel = initialModel && GENERATION_MODELS.includes(initialModel);
   const isSelectedModelGeneration = selectedModel && GENERATION_MODELS.includes(selectedModel);
@@ -367,7 +438,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     'Flux Kontext Pro',
     'Seedream v4 4K',
     'Seedream 4.5',
-    'ChatGPT 1.5',
     // 'Runway Gen4 Image',
     // 'Runway Gen4 Image Turbo'
   ];
@@ -398,17 +468,6 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
   // Priority 2: If this frame is empty but has a connected image source, use that (for image-to-image from external source)
   // Priority 3: No source (text-to-image)
   const finalSourceImageUrl = hasExistingImage ? generatedImageUrl : (sourceImageUrl || null);
-
-  console.log('[ImageUploadModal] 🔍 sourceImageUrl prop check:', {
-    modalId: id,
-    hasSourceImageUrlProp: !!sourceImageUrl,
-    sourceImageUrlProp: sourceImageUrl || 'NONE',
-    sourceImageUrlPreview: sourceImageUrl ? sourceImageUrl.substring(0, 100) + '...' : 'NONE',
-    hasExistingImage,
-    generatedImageUrl: generatedImageUrl || 'NONE',
-    finalSourceImageUrl: finalSourceImageUrl || 'NONE',
-    finalSourceImageUrlPreview: finalSourceImageUrl ? finalSourceImageUrl.substring(0, 100) + '...' : 'NONE',
-  });
 
   // Track if we've already initialized the model for image-to-image mode
   const hasInitializedImageToImageModel = useRef(false);
@@ -1102,26 +1161,25 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // Update all frames with their respective images
         // Only show images when all are ready
         for (let i = 0; i < modalIds.length && i < imageUrls.length; i++) {
-          if (onUpdateModalState) {
-            // Recalculate frame dimensions based on selected aspect ratio to ensure correct frame size
-            // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
-            const [w, h] = selectedAspectRatio.split(':').map(Number);
-            const calculatedFrameWidth = 600;
-            const ar = w && h ? (w / h) : 1;
-            const rawHeight = ar ? Math.round(calculatedFrameWidth / ar) : 600;
-            const calculatedFrameHeight = Math.max(400, rawHeight);
+          // Recalculate frame dimensions based on selected aspect ratio to ensure correct frame size
+          // This ensures the frame maintains the correct aspect ratio (e.g., 1:1 stays 1:1)
+          const [w, h] = selectedAspectRatio.split(':').map(Number);
+          const calculatedFrameWidth = 600;
+          const ar = w && h ? (w / h) : 1;
+          const rawHeight = ar ? Math.round(calculatedFrameWidth / ar) : 600;
+          const calculatedFrameHeight = Math.max(400, rawHeight);
 
-            onUpdateModalState(modalIds[i], {
-              generatedImageUrl: imageUrls[i],
-              isGenerating: false, // Mark as completed
-              model: selectedModel,
-              frame: selectedFrame,
-              aspectRatio: selectedAspectRatio, // Preserve the selected aspect ratio
-              prompt,
-              frameWidth: calculatedFrameWidth, // Use calculated dimensions based on aspect ratio
-              frameHeight: calculatedFrameHeight, // Use calculated dimensions based on aspect ratio
-            } as any);
-          }
+          // Update Zustand store instead of callback
+          updateImageModal(modalIds[i], {
+            generatedImageUrl: imageUrls[i],
+            isGenerating: false, // Mark as completed
+            model: selectedModel,
+            frame: selectedFrame,
+            aspectRatio: selectedAspectRatio, // Preserve the selected aspect ratio
+            prompt,
+            frameWidth: calculatedFrameWidth, // Use calculated dimensions based on aspect ratio
+            frameHeight: calculatedFrameHeight, // Use calculated dimensions based on aspect ratio
+          } as any);
         }
       } catch (error) {
         console.error('Error generating images:', error);
@@ -1589,7 +1647,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         // Only handle as click if mouse didn't move much (was a click, not a drag)
         wasClick = dx <= 5 && dy <= 5;
       }
-      
+
       if (wasClick) {
         console.log('[ImageUploadModal] handleClick triggering onSelect for shift-click', {
           id,
@@ -1601,7 +1659,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
         e.preventDefault();
       }
     }
-    
+
     // Clear the mouseDownPosRef after click event has been processed
     mouseDownPosRef.current = null;
   };
@@ -1648,6 +1706,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
 
     // Only allow dragging from the frame, not from controls
     if (!isInput && !isButton && !isControls) {
+      setIsDraggingContainer(true); // Set immediately like TextInput
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDragOffset({
@@ -1655,50 +1714,95 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           y: e.clientY - rect.top,
         });
       }
-      e.preventDefault();
+      // Only prevent default for left mouse button (allow right-click context menu, etc.)
+      if (e.button === 0) {
+        e.preventDefault();
+      }
       e.stopPropagation();
-      // Don't set isDraggingContainer immediately - wait to see if mouse moves
     }
   };
 
-  // Handle drag move - only start dragging if mouse actually moves
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render so effect has access to latest values
   useEffect(() => {
-    if (!mouseDownPosRef.current) return;
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!mouseDownPosRef.current) return;
-      
-      // Check if mouse has moved enough to consider it a drag (not just a click)
-      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
-      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
-      
-      // Only start dragging if mouse moved more than 5 pixels
-      if ((dx > 5 || dy > 5) && !isDraggingContainer) {
-        setIsDraggingContainer(true);
-      }
+  // Handle drag move - use RAF for smooth updates
+  useEffect(() => {
+    if (!isDraggingContainer) return;
 
-      // If dragging, update position
-      if (isDraggingContainer && containerRef.current && onPositionChange) {
+    let rafId: number | null = null;
+    let pendingEvent: MouseEvent | null = null;
+
+    const flush = () => {
+      if (!pendingEvent) return;
+      const e = pendingEvent;
+      pendingEvent = null;
+
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
+
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
-      onPositionChange(newCanvasX, newCanvasY);
+      // Update local position immediately for smooth visual feedback
+      setDragPosition({ x: newCanvasX, y: newCanvasY });
+
+      // Update Zustand store for position
+      if (id) {
+        updateImageModal(id, { x: newCanvasX, y: newCanvasY });
+      }
+      // Also call callback for persistence if provided
+      if (state.onPositionChange) {
+        state.onPositionChange(newCanvasX, newCanvasY);
+      }
       lastCanvasPosRef.current = { x: newCanvasX, y: newCanvasY };
+      rafId = null;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+
+      // Store the event and schedule RAF if not already scheduled
+      pendingEvent = e;
+      if (rafId == null) {
+        rafId = requestAnimationFrame(flush);
       }
     };
 
     const handleMouseUp = () => {
-      if (isDraggingContainer && onPositionCommit && lastCanvasPosRef.current) {
-        onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
       setIsDraggingContainer(false);
-      // Don't clear mouseDownPosRef here - we need it for the click event
-      // It will be cleared in the click handler after we check it
+      // Don't clear dragPosition immediately - wait for props to update
+      // This prevents the flicker when dropping the frame
+      const state = dragStateRef.current;
+      if (state.onPositionCommit && lastCanvasPosRef.current) {
+        state.onPositionCommit(lastCanvasPosRef.current.x, lastCanvasPosRef.current.y);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -1708,8 +1812,9 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
+      if (rafId != null) cancelAnimationFrame(rafId);
     };
-  }, [isDraggingContainer, dragOffset, scale, position, onPositionChange]);
+  }, [isDraggingContainer]); // Only re-bind when drag state changes (start/stop)
 
   if (!isOpen) return null;
 
@@ -1721,13 +1826,17 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={() => requestHoverState(true)}
+      onMouseLeave={() => requestHoverState(false)}
+      onKeyDown={(e) => {
+        // Allow keyboard events to bubble up for shortcuts (like 'z' for zoom)
+        // Don't stop propagation or prevent default for keyboard events
+      }}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         userSelect: 'none',
         opacity: isDimmed ? 0.4 : 1,
         transition: 'opacity 0.2s ease',
@@ -1735,7 +1844,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
     >
 
       {isAttachedToChat && selectionOrder && (
-        <div 
+        <div
           className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
           style={{
             left: `${-40 * scale}px`,
@@ -1896,17 +2005,18 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
           isSelected={Boolean(isSelected)}
           isDraggingContainer={isDraggingContainer}
           generatedImageUrl={(!isUploadedImage && connectedImageSource?.url && generatedImageUrl === connectedImageSource.url) ? null : generatedImageUrl}
-          isGenerating={isGenerating}
-          externalIsGenerating={externalIsGenerating}
+          isGenerating={Boolean(isGenerating || externalIsProcessing)}
+          externalIsGenerating={Boolean(externalIsGenerating || externalIsProcessing)}
           onSelect={onSelect}
           getAspectRatio={getAspectRatio}
+          error={error}
           // If an image already exists, use existing frame dimensions to prevent visual frame size change
           // If no image exists, calculate from selected aspect ratio
           // For uploaded images, don't pass width/height so aspect ratio is used
           width={(() => {
             // For uploaded images, let aspect ratio control the size
             if (isUploadedImage) {
-              return undefined;
+              return frameWidth || 600;
             }
             // If image exists, keep existing frame width; otherwise calculate from aspect ratio
             if (generatedImageUrl && frameWidth) {
@@ -1930,12 +2040,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             return Math.max(400, rawHeight); // Min 400px height
           })()}
         />
-        <ImageModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={Boolean(isSelected)}
-        />
+
       </div>
 
       {!isUploadedImage && (
@@ -1956,7 +2061,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             generatedImageUrl={generatedImageUrl}
             availableModels={availableModels}
             availableResolutions={getAvailableResolutions()}
-            isGenerating={isGenerating}
+            isGenerating={Boolean(isGenerating || externalIsProcessing)}
             isLocked={isLocked}
             lockReason={lockReason}
             isModelDropdownOpen={isModelDropdownOpen}
@@ -1975,7 +2080,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
             onModelChange={(model) => {
               setSelectedModel(model);
               setIsModelDropdownOpen(false);
-              
+
               // Ensure resolution is set correctly for Google nano banana pro
               const modelLower = model.toLowerCase();
               if (modelLower.includes('nano banana pro')) {
@@ -1985,7 +2090,7 @@ export const ImageUploadModal: React.FC<ImageUploadModalProps> = ({
                   setSelectedResolution('2K');
                 }
               }
-              
+
               let availableRatios: Array<{ value: string; label: string }>;
               if (modelLower.includes('flux')) {
                 availableRatios = [

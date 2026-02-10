@@ -9,7 +9,7 @@ import { UpscaleImageFrame } from './UpscaleImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
 import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
 import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -45,12 +45,14 @@ interface UpscalePluginModalProps {
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { upscaledImageUrl?: string | null; model?: string; scale?: number; isUpscaling?: boolean; isExpanded?: boolean; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
 export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
@@ -91,6 +93,8 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
   initialTopazModel,
   initialFaceEnhanceCreativity,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +112,14 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
 
   const [localUpscaledImageUrl, setLocalUpscaledImageUrl] = useState<string | null>(initialLocalUpscaledImageUrl ?? null);
   const onOptionsChangeRef = useLatestRef(onOptionsChange);
+
+  // Auto-close popup when zooming out past a threshold (60%)
+  useEffect(() => {
+    const zoomThreshold = 0.2;
+    if (scale < zoomThreshold && isPopupOpen) {
+      setIsPopupOpen(false);
+    }
+  }, [scale, isPopupOpen, setIsPopupOpen]);
 
   // Convert canvas coordinates to screen coordinates
   const screenX = x * scale + position.x;
@@ -348,6 +360,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
           generatedImageUrl: null,
           model: 'Upscale',
           isGenerating: false, // Clear loading state
+          error: (error as any)?.message || 'Upscale failed',
         });
       }
     } finally {
@@ -368,6 +381,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -376,6 +390,22 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={onContextMenu}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
       {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
@@ -397,14 +427,16 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         {/* Label above */}
         <div
           style={{
-            marginBottom: `${8 * scale}px`,
-            fontSize: `${12 * scale}px`,
-            fontWeight: 500,
+            marginBottom: `${10 * scale}px`,
+            fontSize: `${13 * scale}px`,
+            fontWeight: 600,
             color: isDark ? '#ffffff' : '#1a1a1a',
             textAlign: 'center',
             userSelect: 'none',
             transition: 'color 0.3s ease',
-            letterSpacing: '0.2px',
+            letterSpacing: '0.02em',
+            textTransform: 'uppercase',
+            opacity: 0.9
           }}
         >
           Upscale
@@ -414,20 +446,20 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
         <div
           style={{
             position: 'relative',
-            width: `${100 * scale}px`,
-            height: `${100 * scale}px`,
-            backgroundColor: isDark ? '#2d2d2d' : '#e5e5e5',
+            width: `${110 * scale}px`,
+            height: `${110 * scale}px`,
+            backgroundColor: isDark ? '#1e1e1e' : '#f0f0f0',
             borderRadius: '50%',
-            border: `${1.5 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#3a3a3a' : '#a0a0a0')}`,
+            border: `${2 * scale}px solid ${isSelected ? SELECTION_COLOR : (isDark ? '#333' : '#ccc')}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'opacity 0.2s ease, box-shadow 0.2s ease',
+            transition: 'background-color 0.3s ease, border-color 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease',
             boxShadow: isDark
-              ? (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.5)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.3)`)
-              : (isHovered || isSelected ? `0 ${2 * scale}px ${8 * scale}px rgba(0, 0, 0, 0.2)` : `0 ${1 * scale}px ${3 * scale}px rgba(0, 0, 0, 0.1)`),
-            transform: (isHovered || isSelected) ? `scale(1.03)` : 'scale(1)',
-            overflow: 'visible', // Allow nodes to extend beyond container
+              ? (isHovered || isSelected ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.6)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.4)`)
+              : (isHovered || isSelected ? `0 ${8 * scale}px ${24 * scale}px rgba(0, 0, 0, 0.15)` : `0 ${4 * scale}px ${12 * scale}px rgba(0, 0, 0, 0.08)`),
+            transform: (isHovered || isSelected) ? `scale(1.05)` : 'scale(1)',
+            overflow: 'visible',
             zIndex: 20,
           }}
         >
@@ -452,12 +484,7 @@ export const UpscalePluginModal: React.FC<UpscalePluginModalProps> = ({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}

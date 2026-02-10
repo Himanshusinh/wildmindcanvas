@@ -1,5 +1,5 @@
 import { ImageUpload } from '@/core/types/canvas';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+
 import { MediaItem } from '@/core/api/api';
 
 export interface ImageGenerator {
@@ -250,6 +250,7 @@ export interface TextGenerator {
   x: number;
   y: number;
   value?: string;
+  smartTokens?: import('@/modules/generators/TextInput/smartTerms').SmartToken[];
 }
 
 export interface Connector {
@@ -288,7 +289,7 @@ export interface CanvasAppState {
   richTextStates?: import('@/modules/canvas-overlays/types').CanvasTextState[];
   groupContainerStates?: import('@/core/types/groupContainer').GroupContainerState[];
   connectors: Connector[];
-  generationQueue: GenerationQueueItem[];
+
   showImageGenerationModal?: boolean;
 }
 
@@ -315,7 +316,7 @@ export interface CanvasAppSetters {
   setRichTextStates: React.Dispatch<React.SetStateAction<import('@/modules/canvas-overlays/types').CanvasTextState[]>>;
   setGroupContainerStates: React.Dispatch<React.SetStateAction<import('@/core/types/groupContainer').GroupContainerState[]>>;
   setConnectors: React.Dispatch<React.SetStateAction<Connector[]>>;
-  setGenerationQueue: React.Dispatch<React.SetStateAction<GenerationQueueItem[]>>;
+
   setShowImageGenerationModal: React.Dispatch<React.SetStateAction<boolean>>;
   setGeneratedImage?: React.Dispatch<React.SetStateAction<string | null>>;
   setGeneratedImages?: Function;

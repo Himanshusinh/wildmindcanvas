@@ -5,15 +5,10 @@ import Konva from 'konva';
 import { ExpandPluginModal } from '@/modules/plugins/ExpandPluginModal/ExpandPluginModal';
 import { Connection, ImageModalState, ExpandModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useExpandModalStates, useExpandStore, useExpandSelection } from '@/modules/stores';
 
 interface ExpandModalOverlaysProps {
-  expandModalStates: ExpandModalState[] | undefined;
-  selectedExpandModalId: string | null | undefined;
-  selectedExpandModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setExpandModalStates: React.Dispatch<React.SetStateAction<ExpandModalState[]>>;
-  setSelectedExpandModalId: (id: string | null) => void;
-  setSelectedExpandModalIds: (ids: string[]) => void;
   onExpand?: (model: string, sourceImageUrl?: string, prompt?: string, canvasSize?: [number, number], originalImageSize?: [number, number], originalImageLocation?: [number, number], aspectRatio?: string) => Promise<string | null>;
   onPersistExpandModalCreate?: (modal: ExpandModalState) => void | Promise<void>;
   onPersistExpandModalMove?: (id: string, updates: Partial<ExpandModalState>) => void | Promise<void>;
@@ -27,16 +22,12 @@ interface ExpandModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
-export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
-  expandModalStates,
-  selectedExpandModalId,
-  selectedExpandModalIds,
+export const ExpandModalOverlays = React.memo<ExpandModalOverlaysProps>(({
   clearAllSelections,
-  setExpandModalStates,
-  setSelectedExpandModalId,
-  setSelectedExpandModalIds,
   onExpand,
   onPersistExpandModalCreate,
   onPersistExpandModalMove,
@@ -50,7 +41,29 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
+  const storeExpandModalStates = useExpandModalStates();
+  const storeSetExpandModalStates = useExpandStore(state => state.setExpandModalStates);
+  const { selectedId: storeSelectedExpandModalId, selectedIds: storeSelectedExpandModalIds, setSelectedId: storeSetSelectedExpandModalId, setSelectedIds: storeSetSelectedExpandModalIds } = useExpandSelection();
+
+  /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
+  const expandModalStates = propExpandModalStates || storeExpandModalStates;
+  const setExpandModalStates = propSetExpandModalStates || storeSetExpandModalStates;
+  const selectedExpandModalId = propSelectedExpandModalId || storeSelectedExpandModalId;
+  const selectedExpandModalIds = propSelectedExpandModalIds || storeSelectedExpandModalIds;
+  const setSelectedExpandModalId = propSetSelectedExpandModalId || storeSetSelectedExpandModalId;
+  const setSelectedExpandModalIds = propSetSelectedExpandModalIds || storeSetSelectedExpandModalIds;
+  */
+  // Use store directly
+  const expandModalStates = storeExpandModalStates;
+  const setExpandModalStates = storeSetExpandModalStates;
+  const selectedExpandModalId = storeSelectedExpandModalId;
+  const selectedExpandModalIds = storeSelectedExpandModalIds;
+  const setSelectedExpandModalId = storeSetSelectedExpandModalId;
+  const setSelectedExpandModalIds = storeSetSelectedExpandModalIds;
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   return (
@@ -61,7 +74,7 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           onDuplicate={() => {
-            const modalState = expandModalStates?.find(m => m.id === contextMenu.modalId);
+            const modalState = (expandModalStates || []).find(m => m.id === contextMenu.modalId);
             if (modalState) {
               const duplicated = {
                 ...modalState,
@@ -94,6 +107,20 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedExpandModalId === modalState.id || (selectedExpandModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedExpandModalIds && selectedExpandModalIds.includes(modalState.id)) {
+                  return selectedExpandModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -193,6 +220,8 @@ export const ExpandModalOverlays: React.FC<ExpandModalOverlaysProps> = ({
       ))}
     </>
   );
-};
+});
+
+ExpandModalOverlays.displayName = 'ExpandModalOverlays';
 
 

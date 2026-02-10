@@ -3,6 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import FrameSpinner from '@/modules/ui-global/common/FrameSpinner';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
+import { buildProxyThumbnailUrl, buildProxyResourceUrl } from '@/core/api/proxyUtils';
 
 interface ImageModalFrameProps {
   id?: string;
@@ -21,6 +22,7 @@ interface ImageModalFrameProps {
   width?: number;
   height?: number;
   onContextMenu?: (e: React.MouseEvent) => void;
+  error?: string | null;
 }
 
 export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
@@ -40,6 +42,7 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
   width,
   height,
   onContextMenu,
+  error,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -72,12 +75,13 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
         height: height ? `${height * scale}px` : undefined,
         minHeight: `${(height || 400) * scale}px`,
         backgroundColor: frameBg,
-        borderRadius: (isHovered || isPinned) ? '0px' : `${20 * scale}px`,
+        borderRadius: ((isHovered || isPinned) && !isUploadedImage) ? '0px' : `${20 * scale}px`,
         // keep top/left/right borders, but remove bottom border when controls are hovered (only for generated images)
-        borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderTop: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRight: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (error && isSelected) ? `${2 * scale}px solid #ef4444` : ((isHovered || isPinned) && !isUploadedImage) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        boxSizing: 'border-box',
         boxShadow: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -94,8 +98,6 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
       {generatedImageUrl ? (
         <img
           src={(() => {
-            // Use proxy to ensure CORS success for all external images
-            const { buildProxyThumbnailUrl, buildProxyResourceUrl } = require('@/core/api/proxyUtils');
             if (generatedImageUrl.startsWith('blob:') || generatedImageUrl.startsWith('data:') || generatedImageUrl.includes('/api/proxy/')) {
               return generatedImageUrl;
             }
@@ -107,12 +109,13 @@ export const ImageModalFrame: React.FC<ImageModalFrameProps> = ({
             return buildProxyResourceUrl(generatedImageUrl);
           })()}
           alt="Generated"
+          fetchPriority="high"
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             pointerEvents: 'auto',
-            borderRadius: (isHovered || isPinned) ? '0px' : `${17 * scale}px`,
+            borderRadius: ((isHovered || isPinned) && !isUploadedImage) ? '0px' : `${17 * scale}px`,
             cursor: 'grab',
             userSelect: 'none',
             WebkitUserSelect: 'none',

@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
-import { PluginConnectionNodes, PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
+import { PluginNodeShell, useCanvasModalDrag } from '../PluginComponents';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
 interface ImageEditorTriggerProps {
@@ -18,9 +18,11 @@ interface ImageEditorTriggerProps {
     onPositionCommit?: (x: number, y: number) => void;
     onDelete?: () => void;
     onContextMenu?: (e: React.MouseEvent) => void;
+    isAttachedToChat?: boolean;
+    selectionOrder?: number;
 }
 
-export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
+export const ImageEditorTrigger = React.memo<ImageEditorTriggerProps>(({
     id,
     x,
     y,
@@ -33,6 +35,8 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
     onPositionCommit,
     onDelete,
     onContextMenu,
+    isAttachedToChat,
+    selectionOrder,
 }) => {
     const [isHovered, setIsHovered] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -67,6 +71,7 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
             containerRef={containerRef}
             screenX={screenX}
             screenY={screenY}
+            scale={scale}
             isHovered={isHovered}
             isSelected={Boolean(isSelected)}
             onMouseDown={handleMouseDown}
@@ -74,6 +79,22 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
             onMouseLeave={() => setIsHovered(false)}
             onContextMenu={onContextMenu}
         >
+            {isAttachedToChat && selectionOrder && (
+                <div
+                    className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+                    style={{
+                        left: `${-40 * scale}px`,
+                        top: `${-8 * scale}px`,
+                        width: `${32 * scale}px`,
+                        height: `${32 * scale}px`,
+                        fontSize: `${20 * scale}px`,
+                        minWidth: `${32 * scale}px`,
+                        minHeight: `${32 * scale}px`,
+                    }}
+                >
+                    {selectionOrder}
+                </div>
+            )}
             <div
                 style={{
                     position: 'relative',
@@ -138,14 +159,11 @@ export const ImageEditorTrigger: React.FC<ImageEditorTriggerProps> = ({
                         }}
                     />
 
-                    <PluginConnectionNodes
-                        id={id}
-                        scale={scale}
-                        isHovered={isHovered}
-                        isSelected={isSelected || false}
-                    />
+
                 </div>
             </div>
         </PluginNodeShell>
     );
-};
+});
+
+ImageEditorTrigger.displayName = 'ImageEditorTrigger';

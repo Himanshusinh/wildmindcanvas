@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import * as THREE from 'three';
+import { Group, LoadingManager, Box3, Vector3 } from 'three';
 import { ImageUpload } from '@/core/types/canvas';
 
 export function useModel3DLoader() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadModel = async (modelData: ImageUpload): Promise<THREE.Group | null> => {
+  const loadModel = async (modelData: ImageUpload): Promise<Group | null> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -20,68 +20,67 @@ export function useModel3DLoader() {
       }
 
       const fileExtension = modelData.file.name.toLowerCase().split('.').pop();
-      let model: THREE.Group | null = null;
+      let model: Group | null = null;
 
       if (fileExtension === 'obj') {
         // Load OBJ file
         const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
         const loader = new OBJLoader();
-        
+
         const text = await fetch(modelData.url).then(res => res.text());
         model = loader.parse(text);
       } else if (fileExtension === 'fbx') {
         // Load FBX file
         const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
         const loader = new FBXLoader();
-        
+
         const result = await loader.loadAsync(modelData.url);
         model = result;
       } else if (fileExtension === 'gltf' || fileExtension === 'glb') {
         // Load GLTF/GLB file
         const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-        const { LoadingManager } = await import('three');
-        
+
         // Create a custom loading manager to handle blob URLs and dependencies
         const manager = new LoadingManager();
-        
+
         // Get related files map if available
         const relatedFiles = modelData.relatedFiles || new Map();
-        
+
         // Custom resolver for external resources
         manager.setURLModifier((url: string) => {
           // If it's already a blob URL or absolute URL, use it as-is
           if (url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) {
             return url;
           }
-          
+
           // Extract filename from path (handle paths like "textures/image.png" or "scene.bin")
           const fileName = url.split('/').pop() || url;
           const normalizedUrl = url.replace(/\\/g, '/'); // Normalize path separators
-          
+
           // Try to find the file in related files map
           // First try exact match with full path
           if (relatedFiles.has(normalizedUrl)) {
             return relatedFiles.get(normalizedUrl)!.url;
           }
-          
+
           // Try exact filename match
           if (relatedFiles.has(fileName)) {
             return relatedFiles.get(fileName)!.url;
           }
-          
+
           // Try to find by filename (case-insensitive, partial match)
           const lowerFileName = fileName.toLowerCase();
           for (const [key, value] of relatedFiles.entries()) {
             const lowerKey = key.toLowerCase();
             // Match if key ends with filename or contains it
-            if (lowerKey === lowerFileName || 
-                lowerKey.endsWith('/' + lowerFileName) ||
-                lowerKey.endsWith('\\' + lowerFileName) ||
-                lowerKey.includes(lowerFileName)) {
+            if (lowerKey === lowerFileName ||
+              lowerKey.endsWith('/' + lowerFileName) ||
+              lowerKey.endsWith('\\' + lowerFileName) ||
+              lowerKey.includes(lowerFileName)) {
               return value.url;
             }
           }
-          
+
           // Try to match by filename without extension or with different case
           const fileNameWithoutExt = fileName.split('.').slice(0, -1).join('.');
           if (fileNameWithoutExt) {
@@ -92,15 +91,15 @@ export function useModel3DLoader() {
               }
             }
           }
-          
+
           // If not found in related files, return original URL
           // The loader will fail, but we'll catch it and show a helpful error
           console.warn('[GLTFLoader] Could not resolve dependency:', url, 'Available files:', Array.from(relatedFiles.keys()));
           return url;
         });
-        
+
         const loader = new GLTFLoader(manager);
-        
+
         // For GLB files (binary), they're self-contained and should work
         if (fileExtension === 'glb') {
           const result = await loader.loadAsync(modelData.url);
@@ -112,10 +111,10 @@ export function useModel3DLoader() {
             model = result.scene;
           } catch (gltfError: any) {
             // If it's a missing dependency error, provide helpful message
-            if (gltfError.message?.includes('Failed to load') || 
-                gltfError.message?.includes('buffer') ||
-                gltfError.message?.includes('texture') ||
-                gltfError.message?.includes('ERR_FILE_NOT_FOUND')) {
+            if (gltfError.message?.includes('Failed to load') ||
+              gltfError.message?.includes('buffer') ||
+              gltfError.message?.includes('texture') ||
+              gltfError.message?.includes('ERR_FILE_NOT_FOUND')) {
               throw new Error(
                 'GLTF file requires external files (.bin, textures). ' +
                 'Please upload all related files together, or use a GLB file (self-contained). ' +
@@ -140,9 +139,9 @@ export function useModel3DLoader() {
       }
 
       // Calculate bounding box to center and scale model
-      const box = new THREE.Box3().setFromObject(model);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
+      const box = new Box3().setFromObject(model);
+      const center = box.getCenter(new Vector3());
+      const size = box.getSize(new Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = 2 / maxDim; // Scale to fit in view
 

@@ -16,12 +16,8 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
     switch (activeSection) {
       case 'profile':
         return 'Profile';
-      case 'canvas':
-        return 'Canvas';
       case 'keyboard':
         return 'Keyboard Shortcuts';
-      case 'notification':
-        return 'Notification';
       default:
         return 'Settings';
     }
@@ -48,10 +44,10 @@ export const SettingsHeader: React.FC<SettingsHeaderProps> = ({ activeSection, o
         transition: 'background-color 0.3s ease, border-color 0.3s ease',
       }}
     >
-      <h3 style={{ 
-        margin: 0, 
-        fontSize: '20px', 
-        color: textColor, 
+      <h3 style={{
+        margin: 0,
+        fontSize: '20px',
+        color: textColor,
         fontWeight: 600,
         transition: 'color 0.3s ease'
       }}>

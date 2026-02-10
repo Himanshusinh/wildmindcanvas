@@ -40,13 +40,13 @@ export const FrameSpinner: React.FC<FrameSpinnerProps> = ({ scale = 1, label = '
       }}
     >
       <img
-        src={isDark ? '/lodinglight.gif' : '/lodingblack.gif'}
+        src={isDark ? '/loader-light.svg' : '/loader-dark.svg'}
         alt="Loading"
+        fetchPriority="high"
         style={{
           width: size,
           height: size,
           marginBottom: 8 * scale,
-          objectFit: 'contain',
         }}
       />
       {label && (

@@ -5,6 +5,7 @@ import { MultiangleCameraPluginModal } from '@/modules/plugins/MultiangleCameraP
 import Konva from 'konva';
 import { Connection, ImageModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useMultiangleCameraModalStates, useMultiangleCameraSelection, useMultiangleCameraStore } from '@/modules/stores';
 
 interface MultiangleCameraModalState {
   id: string;
@@ -15,13 +16,7 @@ interface MultiangleCameraModalState {
 }
 
 interface MultiangleCameraModalOverlaysProps {
-  multiangleCameraModalStates: MultiangleCameraModalState[] | undefined;
-  selectedMultiangleCameraModalId: string | null | undefined;
-  selectedMultiangleCameraModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<MultiangleCameraModalState[]>>;
-  setSelectedMultiangleCameraModalId: (id: string | null) => void;
-  setSelectedMultiangleCameraModalIds: (ids: string[]) => void;
   onPersistMultiangleCameraModalCreate?: (modal: { id: string; x: number; y: number; sourceImageUrl?: string | null }) => void | Promise<void>;
   onPersistMultiangleCameraModalMove?: (id: string, updates: Partial<{ x: number; y: number; sourceImageUrl?: string | null }>) => void | Promise<void>;
   onPersistMultiangleCameraModalDelete?: (id: string) => void | Promise<void>;
@@ -36,16 +31,12 @@ interface MultiangleCameraModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
 export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverlaysProps> = ({
-  multiangleCameraModalStates,
-  selectedMultiangleCameraModalId,
-  selectedMultiangleCameraModalIds,
   clearAllSelections,
-  setMultiangleCameraModalStates,
-  setSelectedMultiangleCameraModalId,
-  setSelectedMultiangleCameraModalIds,
   onPersistMultiangleCameraModalCreate,
   onPersistMultiangleCameraModalMove,
   onPersistMultiangleCameraModalDelete,
@@ -60,7 +51,13 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
+  const multiangleCameraModalStates = useMultiangleCameraModalStates();
+  const { selectedId: selectedMultiangleCameraModalId, selectedIds: selectedMultiangleCameraModalIds, setSelectedId: setSelectedMultiangleCameraModalId, setSelectedIds: setSelectedMultiangleCameraModalIds } = useMultiangleCameraSelection();
+  const { setMultiangleCameraModalStates } = useMultiangleCameraStore();
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   return (
@@ -104,6 +101,20 @@ export const MultiangleCameraModalOverlays: React.FC<MultiangleCameraModalOverla
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedMultiangleCameraModalId === modalState.id || (selectedMultiangleCameraModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedMultiangleCameraModalIds && selectedMultiangleCameraModalIds.includes(modalState.id)) {
+                  return selectedMultiangleCameraModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();

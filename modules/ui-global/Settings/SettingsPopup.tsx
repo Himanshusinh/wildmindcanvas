@@ -5,9 +5,7 @@ import { useProfile } from '../Profile/useProfile';
 import { SettingsSidebar } from './SettingsSidebar';
 import { SettingsHeader } from './SettingsHeader';
 import { ProfileSection } from './ProfileSection';
-import { CanvasSection } from './CanvasSection';
 import { KeyboardShortcutsSection } from './KeyboardShortcutsSection';
-import { NotificationSection } from './NotificationSection';
 import { SettingsPopupProps, ActiveSection, CanvasSettings, CursorType, BackgroundType } from './types';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 
@@ -213,19 +211,14 @@ export const SettingsPopup: React.FC<SettingsPopupProps> = ({ isOpen, onClose, s
                   creditBalance={creditBalance}
                   handleUpgradePlan={handleUpgradePlan}
                   handleAccountSettings={handleAccountSettings}
+                  canvasSettings={canvasSettings}
+                  setCanvasSettings={setCanvasSettings}
                 />
-              )}
-
-              {/* Canvas Section */}
-              {activeSection === 'canvas' && (
-                <CanvasSection canvasSettings={canvasSettings} setCanvasSettings={setCanvasSettings} />
               )}
 
               {/* Keyboard Shortcuts Section */}
               {activeSection === 'keyboard' && <KeyboardShortcutsSection />}
 
-              {/* Notification Section */}
-              {activeSection === 'notification' && <NotificationSection />}
             </div>
           </div>
         </div>

@@ -23,53 +23,76 @@ export const ScaleInput: React.FC<ScaleInputProps> = ({
   const buttonText = isDark ? '#ffffff' : '#1f2937';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: `${4 * scale}px` }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+      borderRadius: `${10 * scale}px`,
+      border: `1px solid ${dropdownBorderColor}`,
+      overflow: 'hidden',
+      padding: `${2 * scale}px`
+    }}>
       <button
+        type="button"
         onClick={() => {
           const newScale = Math.max(1, scaleValue - 1);
           onScaleChange(newScale);
         }}
         style={{
-          width: `${32 * scale}px`,
-          height: `${32 * scale}px`,
-          borderRadius: '50%',
-          border: `1px solid ${dropdownBorderColor}`,
-          backgroundColor: buttonBg,
+          width: `${30 * scale}px`,
+          height: `${30 * scale}px`,
+          borderRadius: `${8 * scale}px`,
+          border: 'none',
+          backgroundColor: 'transparent',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: `${18 * scale}px`,
           color: buttonText,
-          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+          transition: 'background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease',
         }}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
-        −
+        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
       </button>
-      <span style={{ minWidth: `${40 * scale}px`, textAlign: 'center', fontSize: `${14 * scale}px`, color: buttonText, transition: 'color 0.3s ease' }}>
+      <span style={{
+        minWidth: `${28 * scale}px`,
+        textAlign: 'center',
+        fontSize: `${13 * scale}px`,
+        fontWeight: 600,
+        color: buttonText,
+        userSelect: 'none'
+      }}>
         {scaleValue}x
       </span>
       <button
+        type="button"
         onClick={() => {
           const newScale = Math.min(maxScale, scaleValue + 1);
           onScaleChange(newScale);
         }}
         style={{
-          width: `${32 * scale}px`,
-          height: `${32 * scale}px`,
-          borderRadius: '50%',
-          border: `1px solid ${dropdownBorderColor}`,
-          backgroundColor: buttonBg,
+          width: `${30 * scale}px`,
+          height: `${30 * scale}px`,
+          borderRadius: `${8 * scale}px`,
+          border: 'none',
+          backgroundColor: 'transparent',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: `${18 * scale}px`,
           color: buttonText,
-          transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+          transition: 'background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease',
         }}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
       >
-        +
+        <svg width={14 * scale} height={14 * scale} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
       </button>
     </div>
   );

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import '@/modules/ui-global/common/canvasCaptureGuard';
 import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { TextModalTooltip } from './TextModalTooltip';
 import { TextModalFrame } from './TextModalFrame';
-import { TextModalNodes } from './TextModalNodes';
+
 import { TextModalControls } from './TextModalControls';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
+import { SmartToken } from './smartTerms';
+import { useTextStore } from '@/modules/stores';
 
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -24,8 +26,11 @@ interface TextInputProps {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onValueChange?: (value: string) => void;
+  value?: string;
+  onSmartTokensChange?: (tokens: SmartToken[]) => void;
   onSendPrompt?: (text: string) => void;
   stageRef: React.RefObject<any>;
+  smartTokens?: SmartToken[];
   scale: number;
   position: { x: number; y: number };
   isSelected?: boolean;
@@ -65,8 +70,11 @@ export const TextInput: React.FC<TextInputProps> = ({
   isPinned = false,
   onTogglePin,
   onDownload,
+  smartTokens: initialSmartTokens = [],
+  onSmartTokensChange,
+  value: initialText = '',
 }) => {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const [selectedModel, setSelectedModel] = useState('GPT-4');
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -79,6 +87,23 @@ export const TextInput: React.FC<TextInputProps> = ({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceStatus, setEnhanceStatus] = useState('');
+  const [smartTokens, setSmartTokens] = useState<SmartToken[]>(initialSmartTokens);
+
+  // Sync smartTokens state if prop changes (e.g. from backend load)
+  useEffect(() => {
+    if (initialSmartTokens && initialSmartTokens.length > 0) {
+      console.log('[TextInput] Syncing smartTokens from prop:', initialSmartTokens.length);
+      setSmartTokens(initialSmartTokens);
+    }
+  }, [initialSmartTokens]);
+
+  // Sync text state if prop changes (e.g. from backend load)
+  useEffect(() => {
+    if (initialText !== undefined) {
+      console.log('[TextInput] Syncing initialText from prop, len:', initialText.length);
+      setText(initialText);
+    }
+  }, [initialText]);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -174,29 +199,52 @@ export const TextInput: React.FC<TextInputProps> = ({
     lastPositionRef.current = { x, y };
   }, [x, y]);
 
+
+  // Ref to hold latest props/state for drag handlers without triggering re-binds
+  const dragStateRef = useRef({
+    scale,
+    position,
+    onPositionChange,
+    onPositionCommit,
+    dragOffset
+  });
+
+  // Update ref on every render
+  useEffect(() => {
+    dragStateRef.current = {
+      scale,
+      position,
+      onPositionChange,
+      onPositionCommit,
+      dragOffset
+    };
+  }, [scale, position, onPositionChange, onPositionCommit, dragOffset]);
+
   // Handle drag move
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current || !onPositionChange) return;
+      const state = dragStateRef.current;
+      if (!containerRef.current || !state.onPositionChange) return;
 
       // Calculate new screen position
-      const newScreenX = e.clientX - dragOffset.x;
-      const newScreenY = e.clientY - dragOffset.y;
+      const newScreenX = e.clientX - state.dragOffset.x;
+      const newScreenY = e.clientY - state.dragOffset.y;
 
       // Convert screen coordinates back to canvas coordinates
-      const newCanvasX = (newScreenX - position.x) / scale;
-      const newCanvasY = (newScreenY - position.y) / scale;
+      const newCanvasX = (newScreenX - state.position.x) / state.scale;
+      const newCanvasY = (newScreenY - state.position.y) / state.scale;
 
-      onPositionChange(newCanvasX, newCanvasY);
+      state.onPositionChange(newCanvasX, newCanvasY);
       lastPositionRef.current = { x: newCanvasX, y: newCanvasY };
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      if (onPositionCommit) {
-        onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
+      const state = dragStateRef.current;
+      if (state.onPositionCommit) {
+        state.onPositionCommit(lastPositionRef.current.x, lastPositionRef.current.y);
       }
     };
 
@@ -208,7 +256,7 @@ export const TextInput: React.FC<TextInputProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [isDragging, dragOffset, scale, position, onPositionChange, onPositionCommit]);
+  }, [isDragging]);
 
   const handleConfirm = () => {
     if (text.trim()) {
@@ -258,6 +306,10 @@ export const TextInput: React.FC<TextInputProps> = ({
           if (onValueChange) {
             onValueChange(generatedStory);
           }
+          if (result.smart_tokens) {
+            setSmartTokens(result.smart_tokens);
+            if (onSmartTokensChange) onSmartTokensChange(result.smart_tokens);
+          }
 
           // Send the generated story to connected storyboard (as scriptText)
           window.dispatchEvent(new CustomEvent('text-script-generated', {
@@ -306,6 +358,10 @@ export const TextInput: React.FC<TextInputProps> = ({
         if (onValueChange) {
           onValueChange(enhancedText);
         }
+        if (result.smart_tokens) {
+          setSmartTokens(result.smart_tokens);
+          if (onSmartTokensChange) onSmartTokensChange(result.smart_tokens);
+        }
         // Also call onScriptGenerated for backwards compatibility
         if (onScriptGenerated) {
           onScriptGenerated(id, enhancedText);
@@ -347,6 +403,12 @@ export const TextInput: React.FC<TextInputProps> = ({
     }
   };
 
+  const textModalStates = useTextStore(s => s.textModalStates);
+  const updateTextModal = useTextStore(s => s.updateTextModal);
+  const modalState = useMemo(() => textModalStates.find(m => m.id === id), [textModalStates, id]);
+  const storeIsHandleHovered = modalState?.isHandleHovered || false;
+  const effectiveIsHovered = isHovered || storeIsHandleHovered;
+
   const requestHoverState = (next: boolean, force = false) => {
     if (next) {
       if (hoverTimeoutRef.current) {
@@ -354,6 +416,7 @@ export const TextInput: React.FC<TextInputProps> = ({
         hoverTimeoutRef.current = null;
       }
       setIsHovered(true);
+      updateTextModal(id, { isHovered: true });
       return;
     }
 
@@ -365,6 +428,7 @@ export const TextInput: React.FC<TextInputProps> = ({
 
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(false);
+      updateTextModal(id, { isHovered: false });
       hoverTimeoutRef.current = null;
     }, 150);
   };
@@ -387,38 +451,39 @@ export const TextInput: React.FC<TextInputProps> = ({
       onMouseDown={handleMouseDown}
       onMouseEnter={() => requestHoverState(true, true)}
       onMouseLeave={() => requestHoverState(false)}
+      onWheel={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         left: `${screenX}px`,
         top: `${screenY}px`,
-        zIndex: isHovered || isSelected ? 2001 : 2000,
+        zIndex: effectiveIsHovered || isSelected ? 2001 : 2000,
         display: 'flex',
         flexDirection: 'column',
         gap: `${0 * scale}px`, // Removed gap as header is merging
         padding: 0, // Remove padding, let internal components handle spacing
         backgroundColor: isDark ? '#121212' : '#ffffff',
-        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`, // Increased radius slightly
+        borderRadius: (effectiveIsHovered || isPinned)
+          ? '0px'
+          : `${16 * scale}px`,
         borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        transition: 'border 0.3s ease, background-color 0.3s ease',
+        borderBottom: (effectiveIsHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        transition: 'background-color 0.3s ease',
         boxShadow: 'none',
         width: `${400 * scale}px`,
         minWidth: `${400 * scale}px`,
         maxWidth: `${400 * scale}px`,
-        cursor: isDragging ? 'grabbing' : (isHovered || isSelected ? 'grab' : 'pointer'),
+        cursor: isDragging ? 'grabbing' : (effectiveIsHovered || isSelected ? 'grab' : 'pointer'),
         userSelect: 'none',
         overflow: 'visible',
         boxSizing: 'border-box',
       }}
     >
       <TextModalTooltip
-        isHovered={isHovered}
+        isHovered={effectiveIsHovered}
         scale={scale}
       />
-
-
 
       <div style={{ position: 'relative' }}>
         <ModalActionIcons
@@ -445,6 +510,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           text={text}
           isTextFocused={isTextFocused}
           autoFocusInput={autoFocusInput}
+          isEnhancing={isEnhancing}
           onTextChange={(v) => {
             setText(v);
             if (onValueChange) onValueChange(v);
@@ -466,15 +532,14 @@ export const TextInput: React.FC<TextInputProps> = ({
           onHoverChange={requestHoverState}
           onSendPrompt={handleSendPrompt}
           hasConnectedComponents={hasConnectedComponents}
+          smartTokens={smartTokens}
+          onSmartTokensChange={(tokens) => {
+            setSmartTokens(tokens);
+            if (onSmartTokensChange) onSmartTokensChange(tokens);
+          }}
         />
 
-        <TextModalNodes
-          id={id}
-          scale={scale}
-          isHovered={isHovered}
-          isSelected={!!isSelected}
-          globalDragActive={globalDragActive}
-        />
+
       </div>
 
       <TextModalControls

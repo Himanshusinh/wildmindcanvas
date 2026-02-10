@@ -27,13 +27,22 @@ Rules:
 - If user wants to animate an existing image into video -> task = "image_to_video"
 - If user wants a video from scratch (no image) -> task = "text_to_video"
 - If user says remove/delete -> task = "delete_content"
-- If user asks how to use canvas -> task = "explain"
+- If user asks how to use canvas, how to do something, or asks a general question -> task = "explain" or "unknown"
+- If user asks general knowledge questions (what is X, how to make Y, explain Z) -> task = "unknown"
 - needsReferenceImage=true for image_to_video when no reference images are provided.
 - needsScript=true for ads/long videos unless user says they already have a script.
+- For general questions, provide a helpful explanation in the "explanation" field.
 `;
 
-export async function detectIntent(userMessage: string, ctx: { selectedImageCount: number }): Promise<IntentResult> {
-  const payload = `${INTENT_PROMPT}\n\nContext:\n- selectedImageCount=${ctx.selectedImageCount}\n\nUser:\n${userMessage}`;
+export async function detectIntent(userMessage: string, ctx: { selectedImageCount: number; selectedImageIds?: string[] }): Promise<IntentResult> {
+  // Build context with image numbering information
+  const contextParts = [`selectedImageCount=${ctx.selectedImageCount}`];
+  if (ctx.selectedImageIds && ctx.selectedImageIds.length > 0) {
+    const imageNumbering = ctx.selectedImageIds.map((id, index) => `Image ${index + 1}: ${id}`).join(', ');
+    contextParts.push(`selectedImageIds (numbered): ${imageNumbering}`);
+    contextParts.push(`Note: User can reference images by number (e.g., "2nd image", "image 2", "second image").`);
+  }
+  const payload = `${INTENT_PROMPT}\n\nContext:\n- ${contextParts.join('\n- ')}\n\nUser:\n${userMessage}`;
   const raw = await queryCanvasPrompt(payload);
   const text = typeof raw === 'string' ? raw : (raw.response || '');
   const parsed = extractFirstJsonObject<any>(text);

@@ -1,6 +1,6 @@
-import { Dispatch, SetStateAction } from 'react';
 import { generateImageForCanvas } from '@/core/api/api';
-import { GenerationQueueItem } from '@/modules/canvas/GenerationQueue';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
+
 import { CanvasAppSetters } from '@/modules/canvas-app/types';
 import { ImageUpload } from '@/core/types/canvas';
 
@@ -20,32 +20,7 @@ export const handleImageGenerate = async (
   setters: CanvasAppSetters,
   options?: Record<string, any>
 ) => {
-  const { setGenerationQueue, setShowImageGenerationModal, setImageGenerators, onShowStorageWarning } = setters;
-
-  // Storage Validation
-  try {
-    const { getCurrentUser, getStorageInfo } = await import('@/core/api/api');
-    const user = await getCurrentUser();
-    if (user?.uid) {
-        const info = await getStorageInfo(user.uid);
-        const quota = BigInt(info.quotaBytes);
-        const used = BigInt(info.usedBytes);
-
-        if (quota > 0 && used >= quota) {
-            console.warn('[ImageGenerate] Storage limit reached.');
-            if (onShowStorageWarning) {
-                onShowStorageWarning();
-            }
-            throw new Error('Storage limit reached. Please upgrade your plan.');
-        }
-    }
-  } catch (error: any) {
-    if (error.message === 'Storage limit reached. Please upgrade your plan.') {
-        throw error;
-    }
-    console.warn('[ImageGenerate] Storage check failed, proceeding cautiously:', error);
-  }
-
+  const { setShowImageGenerationModal, setImageGenerators } = setters;
 
   try {
     let effectiveSourceImageUrl = sourceImageUrl;
@@ -57,23 +32,7 @@ export const handleImageGenerate = async (
     if (isNaN(parsedImageCount) || parsedImageCount < 1) parsedImageCount = 1;
 
     const queuedCount = parsedImageCount;
-    const baseId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const jobEntries: GenerationQueueItem[] = [];
-    for (let i = 0; i < queuedCount; i++) {
-      jobEntries.push({
-        id: `${baseId}-${i}`,
-        type: 'image',
-        operationName: 'Generating Image',
-        prompt: prompt,
-        model: model,
-        total: queuedCount,
-        index: i + 1,
-        startedAt: Date.now()
-      });
-    }
-
-    setGenerationQueue((prev) => [...prev, ...jobEntries]);
     setShowImageGenerationModal(false);
 
     let genWidth = width;
@@ -109,8 +68,7 @@ export const handleImageGenerate = async (
       );
     }
 
-    const jobIdSet = new Set(jobEntries.map((entry) => entry.id));
-    setGenerationQueue((prev) => prev.filter((job) => !jobIdSet.has(job.id)));
+
 
     // IMPORTANT: Update state if targetFrameId is provided (Canvas Generation Flow)
     if (targetFrameId && result && result.url) {
@@ -138,10 +96,18 @@ export const handleImageGenerate = async (
     return { url: result.url, originalUrl: result.originalUrl, prompt: prompt };
 
   } catch (error: any) {
-    if (error.message !== 'Storage limit reached. Please upgrade your plan.') {
-        console.error('Generation failed:', error);
+    console.error('Generation failed:', error);
+
+    // Show persistent error in UI
+    const errorMessage = error?.message || 'Fine-tuning/Generation failed. Please try again.';
+    useNotificationStore.getState().addToast(errorMessage, 'error', 6000);
+
+    if (targetFrameId) {
+      setters.setImageGenerators(prev => prev.map(img =>
+        img.id === targetFrameId ? { ...img, error: errorMessage } : img
+      ));
     }
-    setGenerationQueue((prev) => prev.filter((job) => !job.model?.includes(model))); // simpler error cleanup
+
     throw error;
   }
 };

@@ -1,7 +1,30 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
+import {
+  Scene,
+  PerspectiveCamera,
+  WebGLRenderer,
+  Color,
+  Raycaster,
+  GridHelper,
+  PlaneGeometry,
+  MeshBasicMaterial,
+  Mesh,
+  TextureLoader,
+  DoubleSide,
+  SRGBColorSpace,
+  Group,
+  BoxGeometry,
+  MeshStandardMaterial,
+  SphereGeometry,
+  Vector2,
+  Vector3,
+  BufferGeometry,
+  LineBasicMaterial,
+  Line,
+  Material
+} from 'three';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 import { RotateCcw, Rocket } from 'lucide-react';
@@ -34,31 +57,31 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
   const isDark = useIsDarkTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<Scene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragType, setDragType] = useState<'rotation' | 'vertical' | 'zoom' | null>(null);
   const [hoveredSphere, setHoveredSphere] = useState<'rotation' | 'vertical' | 'zoom' | null>(null);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   const [statusMessage, setStatusMessage] = useState('');
-  
+
   // Refs to store current values for animation loop
   const horizontalAngleRef = useRef(horizontalAngle);
   const verticalAngleRef = useRef(verticalAngle);
   const zoomRef = useRef(zoom);
-  
+
   // Refs for 3D objects
-  const rotationSphereRef = useRef<THREE.Mesh | null>(null);
-  const verticalSphereRef = useRef<THREE.Mesh | null>(null);
-  const zoomSphereRef = useRef<THREE.Mesh | null>(null);
-  const cameraModelRef = useRef<THREE.Group | null>(null);
-  const imagePlaneRef = useRef<THREE.Mesh | null>(null);
-  const raycasterRef = useRef<THREE.Raycaster | null>(null);
-  const mouseRef = useRef(new THREE.Vector2());
-  
+  const rotationSphereRef = useRef<Mesh | null>(null);
+  const verticalSphereRef = useRef<Mesh | null>(null);
+  const zoomSphereRef = useRef<Mesh | null>(null);
+  const cameraModelRef = useRef<Group | null>(null);
+  const imagePlaneRef = useRef<Mesh | null>(null);
+  const raycasterRef = useRef<Raycaster | null>(null);
+  const mouseRef = useRef(new Vector2());
+
   // Update refs when props change
   useEffect(() => {
     horizontalAngleRef.current = horizontalAngle;
@@ -84,18 +107,18 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     const height = containerRef.current.clientHeight;
 
     // Scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(bgColor);
+    const scene = new Scene();
+    scene.background = new Color(bgColor);
     sceneRef.current = scene;
 
     // Camera (view camera, not the camera model)
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+    const camera = new PerspectiveCamera(50, width / height, 0.1, 1000);
     camera.position.set(0, 0, 8);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ 
+    const renderer = new WebGLRenderer({
       canvas: canvasRef.current,
       antialias: true,
       alpha: true,
@@ -105,11 +128,11 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     rendererRef.current = renderer;
 
     // Raycaster for mouse interaction
-    const raycaster = new THREE.Raycaster();
+    const raycaster = new Raycaster();
     raycasterRef.current = raycaster;
 
     // Grid floor for spatial reference
-    const gridHelper = new THREE.GridHelper(10, 20, gridColor, gridColor);
+    const gridHelper = new GridHelper(10, 20, gridColor, gridColor);
     gridHelper.material.opacity = 0.3;
     gridHelper.material.transparent = true;
     gridHelper.rotation.x = Math.PI / 2; // Lay flat on the ground
@@ -117,11 +140,11 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     scene.add(gridHelper);
 
     // Central image plane (the target being edited)
-    const imagePlaneGeometry = new THREE.PlaneGeometry(3, 3); // Increased image size
-    let imagePlaneMaterial: THREE.MeshBasicMaterial;
-    
+    const imagePlaneGeometry = new PlaneGeometry(3, 3); // Increased image size
+    let imagePlaneMaterial: MeshBasicMaterial;
+
     if (sourceImageUrl) {
-      const textureLoader = new THREE.TextureLoader();
+      const textureLoader = new TextureLoader();
       textureLoader.load(
         sourceImageUrl,
         (texture) => {
@@ -129,11 +152,11 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
           // Three.js TextureLoader defaults to flipY=true which matches PlaneGeometry UVs.
           texture.flipY = true;
           // Slightly improve clarity on angled planes
-          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.colorSpace = SRGBColorSpace;
           texture.needsUpdate = true;
           if (imagePlaneRef.current) {
-            (imagePlaneRef.current.material as THREE.MeshBasicMaterial).map = texture;
-            (imagePlaneRef.current.material as THREE.MeshBasicMaterial).needsUpdate = true;
+            (imagePlaneRef.current.material as MeshBasicMaterial).map = texture;
+            (imagePlaneRef.current.material as MeshBasicMaterial).needsUpdate = true;
           }
         },
         undefined,
@@ -141,19 +164,19 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
           console.error('[Camera3DControl] Failed to load image:', error);
         }
       );
-      imagePlaneMaterial = new THREE.MeshBasicMaterial({ 
+      imagePlaneMaterial = new MeshBasicMaterial({
         color: 0xffffff,
-        side: THREE.DoubleSide,
+        side: DoubleSide,
       });
     } else {
       // Fallback: simple colored plane
-      imagePlaneMaterial = new THREE.MeshBasicMaterial({ 
+      imagePlaneMaterial = new MeshBasicMaterial({
         color: 0x2d2d2d,
-        side: THREE.DoubleSide,
+        side: DoubleSide,
       });
     }
-    
-    const imagePlane = new THREE.Mesh(imagePlaneGeometry, imagePlaneMaterial);
+
+    const imagePlane = new Mesh(imagePlaneGeometry, imagePlaneMaterial);
     imagePlane.position.set(0, 0, 0);
     // Rotate horizontally about 24 degrees from RIGHT side (Y-axis rotation)
     // This matches the reference image where the plane is angled, not perfectly front-on
@@ -163,20 +186,20 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     imagePlaneRef.current = imagePlane;
 
     // Camera model (orbiting camera)
-    const cameraGroup = new THREE.Group();
-    
+    const cameraGroup = new Group();
+
     // Camera body (box)
-    const cameraBody = new THREE.Mesh(
-      new THREE.BoxGeometry(0.4, 0.3, 0.6),
-      new THREE.MeshStandardMaterial({ color: cameraColor })
+    const cameraBody = new Mesh(
+      new BoxGeometry(0.4, 0.3, 0.6),
+      new MeshStandardMaterial({ color: cameraColor })
     );
     cameraBody.position.set(0, 0, 0);
     cameraGroup.add(cameraBody);
 
     // Camera lens (sphere)
-    const lens = new THREE.Mesh(
-      new THREE.SphereGeometry(0.15, 32, 32),
-      new THREE.MeshStandardMaterial({ color: lensColor, emissive: lensColor, emissiveIntensity: 0.5 })
+    const lens = new Mesh(
+      new SphereGeometry(0.15, 32, 32),
+      new MeshStandardMaterial({ color: lensColor, emissive: lensColor, emissiveIntensity: 0.5 })
     );
     lens.position.set(0, 0, 0.35);
     cameraGroup.add(lens);
@@ -187,20 +210,20 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     // Animation loop
     const animate = () => {
       animationFrameRef.current = requestAnimationFrame(animate);
-      
+
       // Get current values from refs
       const currentHorizontalAngle = horizontalAngleRef.current;
       const currentVerticalAngle = verticalAngleRef.current;
       const currentZoom = zoomRef.current;
-      
+
       // Calculate camera position
       // Rotation: 0° to 360° (full circle around Y-axis)
       // Vertical: -30° to +90° (down to up around X-axis)
       // Zoom: 0 to 10 (distance multiplier, higher = closer)
-      
+
       const hRad = (currentHorizontalAngle * Math.PI) / 180; // 0 to 2π
       const vRad = (currentVerticalAngle * Math.PI) / 180; // -30° to +90°
-      
+
       // Base distance from center - increased for larger image view
       const baseDistance = 5.5;
       // Zoom: 0 = far, 10 = close. Map 0-10 to distance multiplier
@@ -209,7 +232,7 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       // Lower zoom value = zoom out = farther = more distance
       const zoomMultiplier = 1.0 - (currentZoom / 10) * 0.9; // 1.0 (far at zoom 0) to 0.1 (close at zoom 10)
       const distance = baseDistance * zoomMultiplier;
-      
+
       // Calculate position using spherical coordinates
       // Horizontal rotation around Y-axis (0° = front, 90° = right, 180° = back, 270° = left)
       // Keep camera orbit direction in sync with the green rotation control.
@@ -217,32 +240,32 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       const x = distance * Math.cos(yawForOrbit) * Math.cos(vRad);
       const y = distance * Math.sin(vRad);
       const z = distance * Math.sin(yawForOrbit) * Math.cos(vRad);
-      
+
       // Update camera model position
       cameraGroup.position.set(x, y, z);
-      
+
       // Make camera look at center (0, 0, 0)
       cameraGroup.lookAt(0, 0, 0);
 
       // Keep the image/card STATIC (user request).
       // Rotation should be represented by the camera orbit + the green rotation control,
       // not by rotating the image plane itself.
-      
+
       // Update line of sight
       if ((scene as any).lineOfSight) {
         scene.remove((scene as any).lineOfSight);
       }
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(x, y, z),
-        new THREE.Vector3(0, 0, 0),
+      const lineGeometry = new BufferGeometry().setFromPoints([
+        new Vector3(x, y, z),
+        new Vector3(0, 0, 0),
       ]);
-      const lineMaterial = new THREE.LineBasicMaterial({ 
-        color: zoomColor, 
+      const lineMaterial = new LineBasicMaterial({
+        color: zoomColor,
         linewidth: 2, // Thin orange line to match reference
         opacity: 0.7,
         transparent: true,
       });
-      const lineOfSight = new THREE.Line(lineGeometry, lineMaterial);
+      const lineOfSight = new Line(lineGeometry, lineMaterial);
       scene.add(lineOfSight);
       (scene as any).lineOfSight = lineOfSight;
 
@@ -251,7 +274,7 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       if ((scene as any).rotationArc) {
         scene.remove((scene as any).rotationArc);
       }
-      const rotationArcPoints: THREE.Vector3[] = [];
+      const rotationArcPoints: Vector3[] = [];
       const rotationArcRadius = 2.5;
       // Create a full 360° circle in 3D space that wraps around the camera
       // Complete circle from 0° to 360°, positioned in front/around the camera
@@ -264,16 +287,16 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
         // Depth variation should go BOTH front and back; using sin(angle * 0.5) kept it always in front
         // which made the knob appear opposite when the camera/light is behind the image.
         const arcZ = Math.sin(angle) * rotationArcRadius * 0.3;
-        rotationArcPoints.push(new THREE.Vector3(arcX, arcY, arcZ));
+        rotationArcPoints.push(new Vector3(arcX, arcY, arcZ));
       }
-      const rotationArcGeometry = new THREE.BufferGeometry().setFromPoints(rotationArcPoints);
-      const rotationArcMaterial = new THREE.LineBasicMaterial({ 
-        color: rotationColor, 
+      const rotationArcGeometry = new BufferGeometry().setFromPoints(rotationArcPoints);
+      const rotationArcMaterial = new LineBasicMaterial({
+        color: rotationColor,
         linewidth: 1, // Thin line
         opacity: 0.8,
         transparent: true,
       });
-      const rotationArc = new THREE.Line(rotationArcGeometry, rotationArcMaterial);
+      const rotationArc = new Line(rotationArcGeometry, rotationArcMaterial);
       scene.add(rotationArc);
       (scene as any).rotationArc = rotationArc;
 
@@ -281,12 +304,12 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       if (rotationSphereRef.current) {
         scene.remove(rotationSphereRef.current);
       }
-      const rotationSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 16, 16), // Small circle
-        new THREE.MeshStandardMaterial({ 
-          color: rotationColor, 
-          emissive: rotationColor, 
-          emissiveIntensity: hoveredSphere === 'rotation' || (isDragging && dragType === 'rotation') ? 1.5 : 1.0 
+      const rotationSphere = new Mesh(
+        new SphereGeometry(0.12, 16, 16), // Small circle
+        new MeshStandardMaterial({
+          color: rotationColor,
+          emissive: rotationColor,
+          emissiveIntensity: hoveredSphere === 'rotation' || (isDragging && dragType === 'rotation') ? 1.5 : 1.0
         })
       );
       // Place the knob on the arc using the current horizontal rotation angle
@@ -306,7 +329,7 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       if ((scene as any).verticalArc) {
         scene.remove((scene as any).verticalArc);
       }
-      const verticalArcPoints: THREE.Vector3[] = [];
+      const verticalArcPoints: Vector3[] = [];
       const verticalArcRadius = 2.8; // tall arc
       const verticalArcX = -1.25; // anchor near camera on the left
       const verticalArcZCenter = 0.15; // small forward offset so it's clearly visible
@@ -321,16 +344,16 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
         // Flip the bow direction so the curve goes OUTSIDE (bulges outward) instead of inside.
         const arcX = verticalArcX - Math.cos(angle) * verticalXBow;
         const arcZ = verticalArcZCenter - Math.cos(angle) * verticalZBow;
-        verticalArcPoints.push(new THREE.Vector3(arcX, arcY, arcZ));
+        verticalArcPoints.push(new Vector3(arcX, arcY, arcZ));
       }
-      const verticalArcGeometry = new THREE.BufferGeometry().setFromPoints(verticalArcPoints);
-      const verticalArcMaterial = new THREE.LineBasicMaterial({ 
-        color: verticalColor, 
+      const verticalArcGeometry = new BufferGeometry().setFromPoints(verticalArcPoints);
+      const verticalArcMaterial = new LineBasicMaterial({
+        color: verticalColor,
         linewidth: 1.5, // Thin line
         opacity: 0.9,
         transparent: true,
       });
-      const verticalArc = new THREE.Line(verticalArcGeometry, verticalArcMaterial);
+      const verticalArc = new Line(verticalArcGeometry, verticalArcMaterial);
       scene.add(verticalArc);
       (scene as any).verticalArc = verticalArc;
 
@@ -338,12 +361,12 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       if (verticalSphereRef.current) {
         scene.remove(verticalSphereRef.current);
       }
-      const verticalSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.14, 16, 16), // Small circle
-        new THREE.MeshStandardMaterial({ 
-          color: verticalColor, 
-          emissive: verticalColor, 
-          emissiveIntensity: hoveredSphere === 'vertical' || (isDragging && dragType === 'vertical') ? 1.5 : 1.0 
+      const verticalSphere = new Mesh(
+        new SphereGeometry(0.14, 16, 16), // Small circle
+        new MeshStandardMaterial({
+          color: verticalColor,
+          emissive: verticalColor,
+          emissiveIntensity: hoveredSphere === 'vertical' || (isDragging && dragType === 'vertical') ? 1.5 : 1.0
         })
       );
       const verticalAngle = vRad;
@@ -359,19 +382,19 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
         scene.remove((scene as any).zoomLine);
       }
       // Draw the zoom line along the current camera -> image (origin) direction so it feels intuitive.
-      const camPos = new THREE.Vector3(x, y, z);
+      const camPos = new Vector3(x, y, z);
       const zoomLinePoints = [
-        new THREE.Vector3(0, 0, 0), // image center
+        new Vector3(0, 0, 0), // image center
         camPos.clone(), // camera position
       ];
-      const zoomLineGeometry = new THREE.BufferGeometry().setFromPoints(zoomLinePoints);
-      const zoomLineMaterial = new THREE.LineBasicMaterial({ 
-        color: zoomColor, 
+      const zoomLineGeometry = new BufferGeometry().setFromPoints(zoomLinePoints);
+      const zoomLineMaterial = new LineBasicMaterial({
+        color: zoomColor,
         linewidth: 1, // Thin line
         opacity: 0.7,
         transparent: true,
       });
-      const zoomLine = new THREE.Line(zoomLineGeometry, zoomLineMaterial);
+      const zoomLine = new Line(zoomLineGeometry, zoomLineMaterial);
       scene.add(zoomLine);
       (scene as any).zoomLine = zoomLine;
 
@@ -379,12 +402,12 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       if (zoomSphereRef.current) {
         scene.remove(zoomSphereRef.current);
       }
-      const zoomSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.10, 16, 16), // Small circle
-        new THREE.MeshStandardMaterial({ 
-          color: zoomColor, 
-          emissive: zoomColor, 
-          emissiveIntensity: hoveredSphere === 'zoom' || (isDragging && dragType === 'zoom') ? 1.2 : 0.8 
+      const zoomSphere = new Mesh(
+        new SphereGeometry(0.10, 16, 16), // Small circle
+        new MeshStandardMaterial({
+          color: zoomColor,
+          emissive: zoomColor,
+          emissiveIntensity: hoveredSphere === 'zoom' || (isDragging && dragType === 'zoom') ? 1.2 : 0.8
         })
       );
       // Move the yellow/orange ball toward the image when zooming in.
@@ -420,16 +443,16 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       }
       // Clean up scene objects
       scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
+        if (object instanceof Mesh) {
           object.geometry.dispose();
           if (Array.isArray(object.material)) {
             object.material.forEach((mat) => mat.dispose());
           } else {
             object.material.dispose();
           }
-        } else if (object instanceof THREE.Line) {
+        } else if (object instanceof Line) {
           object.geometry.dispose();
-          if (object.material instanceof THREE.Material) {
+          if (object.material instanceof Material) {
             object.material.dispose();
           }
         }
@@ -439,17 +462,17 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
   }, [bgColor, gridColor, rotationColor, verticalColor, zoomColor, cameraColor, lensColor, sourceImageUrl, hoveredSphere, isDragging, dragType]);
 
   // Mouse interaction
-  const getMousePosition = (e: React.MouseEvent): THREE.Vector2 => {
-    if (!containerRef.current) return new THREE.Vector2();
+  const getMousePosition = (e: React.MouseEvent): Vector2 => {
+    if (!containerRef.current) return new Vector2();
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    return new THREE.Vector2(x, y);
+    return new Vector2(x, y);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current || !raycasterRef.current || !cameraRef.current || !sceneRef.current) return;
-    
+
     // Always track mouse in LOCAL (container) coordinates so drag deltas are consistent.
     const rect = containerRef.current.getBoundingClientRect();
     const localX = e.clientX - rect.left;
@@ -458,12 +481,12 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
     const mouse = getMousePosition(e);
     mouseRef.current = mouse;
     raycasterRef.current.setFromCamera(mouse, cameraRef.current);
-    
+
     // Increase threshold for easier clicking on spheres
     raycasterRef.current.params.Points = { threshold: 0.25 };
-    
+
     const intersects = raycasterRef.current.intersectObjects(sceneRef.current.children, true);
-    
+
     // Check for sphere intersections first (most specific)
     for (const intersect of intersects) {
       if (intersect.object === rotationSphereRef.current) {
@@ -493,22 +516,22 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
         return;
       }
     }
-    
+
     lastMousePosRef.current = { x: localX, y: localY };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !containerRef.current) return;
-    
+
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const dx = x - lastMousePosRef.current.x;
     const dy = y - lastMousePosRef.current.y;
-    
+
     // Update last position for next frame
     lastMousePosRef.current = { x, y };
-    
+
     if (dragType === 'rotation') {
       // Dragging left/right rotates camera around Y-axis
       // Smooth circular motion: calculate angle from center of viewport
@@ -517,7 +540,7 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       const centerY = rect.top + rect.height / 2;
       const mouseX = e.clientX - centerX;
       const mouseY = e.clientY - centerY;
-      
+
       // Calculate angle from center (atan2 gives -π to +π, 0° = right, 90° = down)
       // IMPORTANT: screen-space Y increases downward, which makes atan2 rotate clockwise.
       // Our 3D orbit + knob placement assume counter-clockwise angles, so flip Y here
@@ -526,10 +549,10 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       // Convert to degrees: -180° to +180°, then normalize to 0° to 360°
       let newAngle = (angle * 180) / Math.PI;
       if (newAngle < 0) newAngle += 360; // Convert -180° to +180° to 0° to 360°
-      
+
       // Clamp to 0° to 360° range
       newAngle = Math.max(0, Math.min(360, newAngle));
-      
+
       onHorizontalAngleChange(newAngle);
       setStatusMessage(`Rotate ${newAngle.toFixed(0)}°`);
     } else if (dragType === 'vertical') {
@@ -558,20 +581,20 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
       const baseDistance = 5.5;
       const zoomMultiplier = 1.0 - (zoom / 10) * 0.9;
       const distance = baseDistance * zoomMultiplier;
-      const camPos = new THREE.Vector3(
+      const camPos = new Vector3(
         distance * Math.cos(hRad) * Math.cos(vRad),
         distance * Math.sin(vRad),
         distance * Math.sin(hRad) * Math.cos(vRad)
       );
 
       // Project origin and camera position to screen pixels
-      const originNdc = new THREE.Vector3(0, 0, 0).project(cam);
+      const originNdc = new Vector3(0, 0, 0).project(cam);
       const camNdc = camPos.clone().project(cam);
-      const originPx = new THREE.Vector2(
+      const originPx = new Vector2(
         (originNdc.x * 0.5 + 0.5) * rect.width,
         (-originNdc.y * 0.5 + 0.5) * rect.height
       );
-      const camPx = new THREE.Vector2(
+      const camPx = new Vector2(
         (camNdc.x * 0.5 + 0.5) * rect.width,
         (-camNdc.y * 0.5 + 0.5) * rect.height
       );
@@ -604,17 +627,17 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
   // Hover detection
   useEffect(() => {
     if (!containerRef.current || !raycasterRef.current || !cameraRef.current || !sceneRef.current) return;
-    
+
     const handleMouseMoveHover = (e: MouseEvent) => {
       if (isDragging) return;
-      
+
       const rect = containerRef.current!.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      
-      raycasterRef.current!.setFromCamera(new THREE.Vector2(x, y), cameraRef.current!);
+
+      raycasterRef.current!.setFromCamera(new Vector2(x, y), cameraRef.current!);
       const intersects = raycasterRef.current!.intersectObjects(sceneRef.current!.children, true);
-      
+
       let newHovered: 'rotation' | 'vertical' | 'zoom' | null = null;
       for (const intersect of intersects) {
         if (intersect.object === rotationSphereRef.current) {
@@ -628,12 +651,12 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
           break;
         }
       }
-      
+
       if (newHovered !== hoveredSphere) {
         setHoveredSphere(newHovered);
       }
     };
-    
+
     containerRef.current.addEventListener('mousemove', handleMouseMoveHover);
     return () => {
       containerRef.current?.removeEventListener('mousemove', handleMouseMoveHover);
@@ -680,7 +703,7 @@ export const Camera3DControl: React.FC<Camera3DControlProps> = ({
         }}
       >
         <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-        
+
         {/* Legend - Positioned at top-left with values */}
         <div
           style={{

@@ -7,9 +7,7 @@ import { ModalActionIcons } from '@/modules/ui-global/common/ModalActionIcons';
 import { VectorizeControls } from './VectorizeControls';
 import { VectorizeImageFrame } from './VectorizeImageFrame';
 import { useCanvasModalDrag } from '../PluginComponents/useCanvasModalDrag';
-import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState } from '../PluginComponents';
-import { PluginNodeShell } from '../PluginComponents';
-import { PluginConnectionNodes } from '../PluginComponents';
+import { useCanvasFrameDim, useConnectedSourceImage, useLatestRef, usePersistedPopupState, PluginNodeShell } from '../PluginComponents';
 import { useIsDarkTheme } from '@/core/hooks/useIsDarkTheme';
 import { SELECTION_COLOR } from '@/core/canvas/canvasHelpers';
 
@@ -40,15 +38,19 @@ interface VectorizePluginModalProps {
   onPersistVectorizeModalCreate?: (modal: { id: string; x: number; y: number; vectorizedImageUrl?: string | null; sourceImageUrl?: string | null; localVectorizedImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isVectorizing?: boolean }) => void | Promise<void>;
   onUpdateModalState?: (modalId: string, updates: { vectorizedImageUrl?: string | null; isVectorizing?: boolean; isExpanded?: boolean }) => void;
   onPersistImageModalCreate?: (modal: { id: string; x: number; y: number; generatedImageUrl?: string | null; frameWidth?: number; frameHeight?: number; model?: string; frame?: string; aspectRatio?: string; prompt?: string; isGenerating?: boolean }) => void | Promise<void>;
-  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean }) => void;
+  onUpdateImageModalState?: (modalId: string, updates: { generatedImageUrl?: string | null; model?: string; frame?: string; aspectRatio?: string; prompt?: string; frameWidth?: number; frameHeight?: number; isGenerating?: boolean; error?: string | null }) => void;
   connections?: Array<{ id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number }>;
   imageModalStates?: Array<{ id: string; x: number; y: number; generatedImageUrl?: string | null }>;
   images?: Array<{ elementId?: string; url?: string; type?: string }>;
   onPersistConnectorCreate?: (connector: { id?: string; from: string; to: string; color: string; fromX?: number; fromY?: number; toX?: number; toY?: number; fromAnchor?: string; toAnchor?: string }) => void | Promise<void>;
   onContextMenu?: (e: React.MouseEvent) => void;
+  isAttachedToChat?: boolean;
+  selectionOrder?: number;
 }
 
-export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
+import { memo } from 'react';
+
+export const VectorizePluginModal = memo<VectorizePluginModalProps>(({
   isOpen,
   isExpanded,
   id,
@@ -81,6 +83,8 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
   images = [],
   onPersistConnectorCreate,
   onContextMenu,
+  isAttachedToChat,
+  selectionOrder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -321,9 +325,8 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       // Update frame to show error state or remove it
       if (onUpdateImageModalState) {
         onUpdateImageModalState(newModalId, {
-          generatedImageUrl: null,
-          model: 'Vectorize',
-          isGenerating: false, // Clear loading state
+
+          error: (error as any)?.message || 'Vectorize failed',
         });
       }
     } finally {
@@ -344,6 +347,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       containerRef={containerRef}
       screenX={screenX}
       screenY={screenY}
+      scale={scale}
       isHovered={isHovered}
       isSelected={Boolean(isSelected)}
       isDimmed={isDimmed}
@@ -352,6 +356,22 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={onContextMenu}
     >
+      {isAttachedToChat && selectionOrder && (
+        <div
+          className="absolute top-0 flex items-center justify-center bg-blue-500 text-white font-bold rounded-full shadow-lg z-[2002] border border-white/20 animate-in fade-in zoom-in duration-300"
+          style={{
+            left: `${-40 * scale}px`,
+            top: `${-8 * scale}px`,
+            width: `${32 * scale}px`,
+            height: `${32 * scale}px`,
+            fontSize: `${20 * scale}px`,
+            minWidth: `${32 * scale}px`,
+            minHeight: `${32 * scale}px`,
+          }}
+        >
+          {selectionOrder}
+        </div>
+      )}
       {/* Action icons removed - functionality still available via onDelete, onDuplicate handlers */}
       {/* ModalActionIcons removed per user request - delete/duplicate functionality preserved */}
 
@@ -428,12 +448,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
             }}
           />
 
-          <PluginConnectionNodes
-            id={id}
-            scale={scale}
-            isHovered={isHovered}
-            isSelected={isSelected || false}
-          />
+
         </div>
 
         {/* Controls shown/hidden on click - overlap beneath circle */}
@@ -470,7 +485,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
                 onModeChange={(newMode) => {
                   setMode(newMode);
                   if (onOptionsChange) {
-                    onOptionsChange({ mode: newMode } as any);
+                    onOptionsChange({ mode: newMode });
                   }
                 }}
                 onVectorize={handleVectorize}
@@ -484,7 +499,7 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
                 isVectorizedImage={isVectorizedImage}
                 isDraggingContainer={isDraggingContainer}
                 isHovered={isHovered}
-                isSelected={isSelected || false}
+                isSelected={Boolean(isSelected)}
                 sourceImageUrl={sourceImageUrl}
                 onMouseDown={handleMouseDown}
                 onSelect={onSelect}
@@ -496,5 +511,6 @@ export const VectorizePluginModal: React.FC<VectorizePluginModalProps> = ({
 
     </PluginNodeShell>
   );
-};
+});
 
+VectorizePluginModal.displayName = 'VectorizePluginModal';

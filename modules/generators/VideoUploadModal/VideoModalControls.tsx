@@ -186,6 +186,7 @@ export const VideoModalControls: React.FC<VideoModalControlsProps> = ({
         borderLeft: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderRight: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
         borderBottom: `${frameBorderWidth * scale}px solid ${controlsFrameBorderColor}`,
+        marginTop: `${-frameBorderWidth * scale}px`, // Pull up to overlap border
         transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
       }}
     >

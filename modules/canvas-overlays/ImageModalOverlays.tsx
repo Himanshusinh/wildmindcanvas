@@ -8,6 +8,8 @@ import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu'
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { ImageUpload } from '@/core/types/canvas';
 import { getReferenceImagesForText } from '@/modules/plugins/StoryboardPluginModal/mentionUtils';
+// Zustand Store - Image State Management
+import { useImageStore, useImageModalStates, useImageSelection } from '@/modules/stores';
 
 /**
  * Calculate aspect ratio string (e.g., "9:16") from width and height
@@ -50,13 +52,15 @@ function calculateAspectRatioFromDimensions(width?: number, height?: number): st
 }
 
 interface ImageModalOverlaysProps {
-  imageModalStates: ImageModalState[];
-  selectedImageModalId: string | null;
-  selectedImageModalIds: string[];
+  // REMOVED: These props are now managed by Zustand store
+  imageModalStates?: ImageModalState[];
+  selectedImageModalId?: string | null;
+  selectedImageModalIds?: string[];
+  // setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
+  // setSelectedImageModalId: (id: string | null) => void;
+  // setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+
   clearAllSelections: () => void;
-  setImageModalStates: React.Dispatch<React.SetStateAction<ImageModalState[]>>;
-  setSelectedImageModalId: (id: string | null) => void;
-  setSelectedImageModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   onImageGenerate?: (
     prompt: string,
     model: string,
@@ -91,17 +95,15 @@ interface ImageModalOverlaysProps {
   isChatOpen?: boolean;
   selectedIds?: string[];
   setSelectionOrder?: (order: string[] | ((prev: string[]) => string[])) => void;
+  // Level-of-detail flags (optional)
+  showFineDetails?: boolean;
+  showLabelsOnly?: boolean;
+  isZoomedOut?: boolean;
 }
 
 
-export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
-  imageModalStates,
-  selectedImageModalId,
-  selectedImageModalIds,
+export const ImageModalOverlays = React.memo<ImageModalOverlaysProps>(({
   clearAllSelections,
-  setImageModalStates,
-  setSelectedImageModalId,
-  setSelectedImageModalIds,
   onImageGenerate,
   onAddImageToCanvas,
   onPersistImageModalCreate,
@@ -122,7 +124,28 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
   isChatOpen,
   selectedIds,
   setSelectionOrder,
+  showFineDetails,
+  showLabelsOnly,
+  isZoomedOut,
+  imageModalStates: propImageModalStates,
+  selectedImageModalId: propSelectedImageModalId,
+  selectedImageModalIds: propSelectedImageModalIds,
 }) => {
+  // Zustand Store - Get image state and actions
+  const storeImageModalStates = useImageModalStates();
+  const { selectedId: storeSelectedImageModalId, selectedIds: storeSelectedImageModalIds } = useImageSelection();
+
+  const imageModalStates = propImageModalStates || storeImageModalStates;
+  const selectedImageModalId = propSelectedImageModalId !== undefined ? propSelectedImageModalId : storeSelectedImageModalId;
+  const selectedImageModalIds = propSelectedImageModalIds !== undefined ? propSelectedImageModalIds : storeSelectedImageModalIds;
+
+  const setImageModalStates = useImageStore(state => state.setImageModalStates);
+  const setSelectedImageModalId = useImageStore(state => state.setSelectedImageModalId);
+  const setSelectedImageModalIds = useImageStore(state => state.setSelectedImageModalIds);
+  const updateImageModal = useImageStore(state => state.updateImageModal);
+  const removeImageModal = useImageStore(state => state.removeImageModal);
+  const addImageModal = useImageStore(state => state.addImageModal);
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; modalId: string } | null>(null);
 
   // Track Shift key locally for robust multi-selection
@@ -205,16 +228,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
           modalState.generatedImageUrl === sourceImageUrlForDisplayCheck &&
           modalState.model !== 'Uploaded Image';
 
-        if (isChatOpen && (selectedImageModalId === modalState.id || selectedImageModalIds.includes(modalState.id))) {
-          console.log('[ImageModalOverlays] Render Debug:', {
-            id: modalState.id,
-            selectedIds: selectedIds || 'undefined',
-            selectedImageModalIds,
-            indexInAll: selectedIds ? selectedIds.indexOf(modalState.id) : -1,
-            indexInLocal: selectedImageModalIds.indexOf(modalState.id),
-            isShiftPressed
-          });
-        }
+        // Removed excessive console.log to prevent performance issues
 
         return (
           <ImageUploadModal
@@ -251,7 +265,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               }
             }}
             onClose={() => {
-              setImageModalStates(prev => prev.filter(m => m.id !== modalState.id));
+              removeImageModal(modalState.id);
               setSelectedImageModalId(null);
               if (onPersistImageModalDelete) {
                 Promise.resolve(onPersistImageModalDelete(modalState.id)).catch(console.error);
@@ -260,14 +274,6 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             refImages={refImages}
             sourceImageUrl={(() => {
               const sourceUrl = modalState.sourceImageUrl;
-              console.log('[ImageModalOverlays] 🚨 CRITICAL: About to render ImageUploadModal:', {
-                modalId: modalState.id,
-                hasSourceImageUrlInModalState: !!sourceUrl,
-                sourceImageUrlValue: sourceUrl || 'UNDEFINED/NULL',
-                sourceImageUrlPreview: sourceUrl ? sourceUrl.substring(0, 100) + '...' : 'UNDEFINED/NULL',
-                modalStateKeys: Object.keys(modalState),
-                fullModalState: modalState,
-              });
               // Belt-and-suspenders: allow only stitched refs; drop legacy comma lists
               if (!sourceUrl) return undefined;
               if (sourceUrl.includes('reference-stitched')) return sourceUrl;
@@ -614,15 +620,14 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                     const rawHeight = ar ? Math.round(frameWidth / ar) : 600;
                     const frameHeight = Math.max(400, rawHeight);
 
-                    setImageModalStates(prev => prev.map(m => m.id === targetFrameId ? {
-                      ...m,
+                    updateImageModal(targetFrameId, {
                       generatedImageUrl: imageUrls[0] || null,
                       generatedImageUrls: imageUrls,
                       isGenerating: false,
                       aspectRatio, // Preserve aspect ratio
                       frameWidth, // Update frame dimensions based on aspect ratio
                       frameHeight, // Update frame dimensions based on aspect ratio
-                    } : m));
+                    });
                     if (onPersistImageModalMove) {
                       Promise.resolve(onPersistImageModalMove(targetFrameId, {
                         generatedImageUrl: imageUrls[0] || null,
@@ -650,15 +655,25 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             generatedImageUrl={modalState.generatedImageUrl}
             generatedImageUrls={modalState.generatedImageUrls}
             isGenerating={modalState.isGenerating}
+            isProcessing={modalState.isProcessing}
             initialModel={modalState.model}
             initialFrame={modalState.frame}
             initialAspectRatio={modalState.aspectRatio || (modalState.frameWidth && modalState.frameHeight ? calculateAspectRatioFromDimensions(modalState.frameWidth, modalState.frameHeight) : undefined)}
             initialPrompt={modalState.prompt}
             frameWidth={modalState.frameWidth}
             frameHeight={modalState.frameHeight}
+            error={modalState.error}
             onOptionsChange={(opts) => {
               // Update local state to keep UI in sync
-              setImageModalStates(prev => prev.map(m => m.id === modalState.id ? { ...m, ...opts, frameWidth: opts.frameWidth ?? m.frameWidth, frameHeight: opts.frameHeight ?? m.frameHeight, model: opts.model ?? m.model, frame: opts.frame ?? m.frame, aspectRatio: opts.aspectRatio ?? m.aspectRatio, prompt: opts.prompt ?? m.prompt } : m));
+              updateImageModal(modalState.id, {
+                ...opts,
+                frameWidth: opts.frameWidth ?? modalState.frameWidth,
+                frameHeight: opts.frameHeight ?? modalState.frameHeight,
+                model: opts.model ?? modalState.model,
+                frame: opts.frame ?? modalState.frame,
+                aspectRatio: opts.aspectRatio ?? modalState.aspectRatio,
+                prompt: opts.prompt ?? modalState.prompt
+              });
               // Persist to parent (which will broadcast + snapshot)
               if (onPersistImageModalMove) {
                 Promise.resolve(onPersistImageModalMove(modalState.id, opts as any)).catch(console.error);
@@ -769,11 +784,17 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               // Create a duplicate of the image modal to the right
               const duplicated = {
                 id: `image-modal-${Date.now()}`,
-                x: modalState.x + 600 + 50, // 600px width + 50px spacing
+                x: modalState.x + (modalState.frameWidth || 600) + 50, // width + 50px spacing
                 y: modalState.y, // Same Y position
                 generatedImageUrl: modalState.generatedImageUrl,
+                frameWidth: modalState.frameWidth || 600,
+                frameHeight: modalState.frameHeight || 600,
+                frame: modalState.frame || 'Square',
+                aspectRatio: modalState.aspectRatio || '1:1',
+                prompt: modalState.prompt || '',
+                model: modalState.model || 'Google Nano Banana',
               };
-              setImageModalStates(prev => [...prev, duplicated]);
+              setImageModalStates((prev) => [...prev, duplicated]);
               if (onPersistImageModalCreate) {
                 Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
               }
@@ -781,9 +802,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             x={modalState.x}
             y={modalState.y}
             onPositionChange={(newX, newY) => {
-              setImageModalStates(prev => prev.map(m =>
-                m.id === modalState.id ? { ...m, x: newX, y: newY } : m
-              ));
+              updateImageModal(modalState.id, { x: newX, y: newY });
             }}
             onPositionCommit={(finalX, finalY) => {
               if (onPersistImageModalMove) {
@@ -796,14 +815,16 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
             onPersistImageModalCreate={onPersistImageModalCreate}
 
             initialCount={modalState.imageCount}
-            onUpdateModalState={(modalId, updates) => {
-              setImageModalStates(prev => prev.map(m => m.id === modalId ? { ...m, ...updates } : m));
-              if (onPersistImageModalMove) {
-                Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
-              }
-            }}
+            // REMOVED: onUpdateModalState prop (now using Zustand store directly in ImageUploadModal)
+            // onUpdateModalState={(modalId, updates) => {
+            //   updateImageModal(modalId, updates);
+            //   if (onPersistImageModalMove) {
+            //     Promise.resolve(onPersistImageModalMove(modalId, updates)).catch(console.error);
+            //   }
+            // }}
             connections={connections}
-            imageModalStates={imageModalStatesForConnections}
+            // REMOVED: imageModalStates prop (now using Zustand store directly in ImageUploadModal)
+            // imageModalStates={imageModalStates}
             images={images}
             textInputStates={textInputStates}
             sceneFrameModalStates={sceneFrameModalStates}
@@ -848,7 +869,7 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
                 frameHeight: modal.frameHeight,
               };
               // Optimistic update
-              setImageModalStates((prev) => [...prev, duplicated]);
+              addImageModal(duplicated);
               Promise.resolve(onPersistImageModalCreate(duplicated)).catch(console.error);
             }
           }}
@@ -860,12 +881,14 @@ export const ImageModalOverlays: React.FC<ImageModalOverlaysProps> = ({
               Promise.resolve(onPersistImageModalDelete(modalId)).catch(console.error);
               // Local state might be updated by parent sync, but we can do optimistic removal if needed
               // Actually existing onDelete handler removed it locally. Let's trust parent sync or update local too to be snappy
-              setImageModalStates(prev => prev.filter(m => m.id !== modalId));
+              removeImageModal(modalId);
             }
           }}
         />
       )}
     </>
   );
-};
+});
+
+ImageModalOverlays.displayName = 'ImageModalOverlays';
 

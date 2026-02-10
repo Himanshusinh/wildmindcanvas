@@ -5,45 +5,71 @@ import { useCanvasState } from './useCanvasState';
 import { useCanvasSelection } from './useCanvasSelection';
 import { calculateGroupBounds } from '../utils/groupUtils';
 import { GroupContainerState } from '@/core/types/groupContainer';
+import { useImageModalStates, useVideoModalStates, useMusicModalStates, useUpscaleModalStates, useMultiangleCameraModalStates, useRemoveBgModalStates, useEraseModalStates, useExpandModalStates, useImageStore, useVideoStore, useMusicStore, useUpscaleStore, useMultiangleCameraStore, useRemoveBgStore, useEraseStore, useExpandStore } from '@/modules/stores';
 
 export function useGroupLogic(
     canvasState: ReturnType<typeof useCanvasState>,
     canvasSelection: ReturnType<typeof useCanvasSelection>,
     props: CanvasProps
 ) {
+    const imageModalStates = useImageModalStates();
+    const videoModalStates = useVideoModalStates();
+    const musicModalStates = useMusicModalStates();
+    const upscaleModalStates = useUpscaleModalStates();
+    const multiangleCameraModalStates = useMultiangleCameraModalStates();
+
+    const { setImageModalStates } = useImageStore();
+    const { setVideoModalStates } = useVideoStore();
+    const { setMusicModalStates } = useMusicStore();
+    const { setUpscaleModalStates } = useUpscaleStore();
+    const { setMultiangleCameraModalStates } = useMultiangleCameraStore();
+    const removeBgModalStates = useRemoveBgModalStates();
+    /* REMOVED DUPLICATE */
+    const { setRemoveBgModalStates } = useRemoveBgStore();
+    const eraseModalStates = useEraseModalStates();
+    const { setEraseModalStates } = useEraseStore();
+    const expandModalStates = useExpandModalStates();
+    const { setExpandModalStates } = useExpandStore();
+
     const {
         images,
-        imageModalStates,
-        videoModalStates,
         textInputStates,
         storyboardModalStates,
         scriptFrameModalStates,
         sceneFrameModalStates,
-        musicModalStates,
-        upscaleModalStates,
-        removeBgModalStates,
-        eraseModalStates,
-        expandModalStates,
+        // REMOVED: musicModalStates (via store)
+        // REMOVED: upscaleModalStates (via store)
+        // REMOVED: upscaleModalStates (via store)
+        // REMOVED: removeBgModalStates (via store)
+        // removeBgModalStates,
+        // REMOVED: eraseModalStates (via store)
+        // eraseModalStates,
+        // REMOVED: expandModalStates (via store)
+        // expandModalStates,
         vectorizeModalStates,
         groupContainerStates = [],
         setGroupContainerStates,
-        setImageModalStates,
-        setVideoModalStates,
+        // REMOVED: setImageModalStates (via store)
+        // REMOVED: setVideoModalStates (via store)
         setTextInputStates,
         setStoryboardModalStates,
         setScriptFrameModalStates,
         setSceneFrameModalStates,
-        setMusicModalStates,
-        setUpscaleModalStates,
-        setRemoveBgModalStates,
-        setEraseModalStates,
-        setExpandModalStates,
+        // REMOVED: setMusicModalStates (via store)
+        // REMOVED: setUpscaleModalStates (via store)
+        // REMOVED: setUpscaleModalStates (via store)
+        // REMOVED: setRemoveBgModalStates (via store)
+        // setRemoveBgModalStates,
+        // REMOVED: setEraseModalStates (via store)
+        // setEraseModalStates,
+        // REMOVED: setExpandModalStates (via store)
+        // setExpandModalStates,
         setVectorizeModalStates,
-        setMultiangleCameraModalStates,
+        // REMOVED: setMultiangleCameraModalStates (via store)
         setNextSceneModalStates,
         setVideoEditorModalStates,
         setCompareModalStates,
-        multiangleCameraModalStates,
+        // REMOVED: multiangleCameraModalStates (via store)
         compareModalStates,
         nextSceneModalStates,
         videoEditorModalStates,
@@ -155,7 +181,7 @@ export function useGroupLogic(
                 height: selectionTightRect.height + pad * 2,
             };
         } else {
-            bounds = calculateGroupBounds(allSelectedIds, currentCanvasData);
+            bounds = calculateGroupBounds(allSelectedIds, currentCanvasData, { removeBgModalStates, eraseModalStates });
         }
 
         if (!bounds) {

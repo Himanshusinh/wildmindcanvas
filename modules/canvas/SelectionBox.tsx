@@ -11,6 +11,7 @@ import { ImageUpload } from '@/core/types/canvas';
 import { ScriptFrameModalState, SceneFrameModalState } from '@/modules/canvas-overlays/types';
 import { getComponentDimensions } from './utils/getComponentDimensions';
 import { CanvasItemsData } from './types';
+import { useRemoveBgModalStates, useRemoveBgStore, useRemoveBgSelection, useEraseModalStates, useEraseStore, useEraseSelection, useExpandModalStates, useExpandStore, useExpandSelection } from '@/modules/stores';
 
 const GRID_GAP = 10; // Minimal gap between components
 const GRID_PADDING = 8; // Minimal equal padding on all sides (left, right, top, bottom)
@@ -78,9 +79,12 @@ interface SelectionBoxProps {
   onImageUpdate?: (index: number, updates: Partial<ImageUpload>) => void;
   selectedUpscaleModalIds: string[];
   selectedMultiangleCameraModalIds: string[];
-  selectedRemoveBgModalIds: string[];
-  selectedEraseModalIds: string[];
-  selectedExpandModalIds: string[];
+  // REMOVED: selectedRemoveBgModalIds (via store)
+  // selectedRemoveBgModalIds: string[];
+  // REMOVED: selectedEraseModalIds (via store)
+  // selectedEraseModalIds: string[];
+  // REMOVED: selectedExpandModalIds (via store)
+  // selectedExpandModalIds: string[];
   selectedVectorizeModalIds: string[];
   selectedNextSceneModalIds: string[];
   selectedCompareModalIds: string[];
@@ -89,9 +93,11 @@ interface SelectionBoxProps {
   selectedSceneFrameModalIds: string[];
   upscaleModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   multiangleCameraModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  removeBgModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  eraseModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
-  expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  // REMOVED: removeBgModalStates (via store)
+  // removeBgModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
+  // REMOVED: eraseModalStates (via store)
+  // REMOVED: expandModalStates (via store)
+  // expandModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   vectorizeModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   nextSceneModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>;
   compareModalStates: Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>;
@@ -100,9 +106,12 @@ interface SelectionBoxProps {
   sceneFrameModalStates: SceneFrameModalState[];
   setUpscaleModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setMultiangleCameraModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
-  setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  // REMOVED: setRemoveBgModalStates (via store)
+  // setRemoveBgModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  // REMOVED: setEraseModalStates (via store)
+  // setEraseModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
+  // REMOVED: setExpandModalStates (via store)
+  // setExpandModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setVectorizeModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setNextSceneModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number }>>>;
   setCompareModalStates: React.Dispatch<React.SetStateAction<Array<{ id: string; x: number; y: number; frameWidth?: number; frameHeight?: number; width?: number; height?: number; scale?: number; isExpanded?: boolean }>>>;
@@ -111,9 +120,12 @@ interface SelectionBoxProps {
   setSceneFrameModalStates: React.Dispatch<React.SetStateAction<SceneFrameModalState[]>>;
   setSelectedUpscaleModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedMultiangleCameraModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
-  setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setSelectedRemoveBgModalIds (via store)
+  // setSelectedRemoveBgModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setSelectedEraseModalIds (via store)
+  // setSelectedEraseModalIds: React.Dispatch<React.SetStateAction<string[]>>;
+  // REMOVED: setSelectedExpandModalIds (via store)
+  // setSelectedExpandModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedVectorizeModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedNextSceneModalIds: React.Dispatch<React.SetStateAction<string[]>>;
   setSelectedCompareModalIds: React.Dispatch<React.SetStateAction<string[]>>;
@@ -195,9 +207,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   onImageUpdate,
   selectedUpscaleModalIds,
   selectedMultiangleCameraModalIds,
-  selectedRemoveBgModalIds,
-  selectedEraseModalIds,
-  selectedExpandModalIds,
+  // REMOVED: selectedRemoveBgModalIds (via store)
+  // selectedRemoveBgModalIds,
+  // REMOVED: selectedEraseModalIds (via store)
+  // selectedEraseModalIds,
+  // REMOVED: selectedExpandModalIds, ... (now using hooks)
+  // selectedExpandModalIds, expandModalStates, setExpandModalStates, setSelectedExpandModalIds,
   selectedVectorizeModalIds,
   selectedNextSceneModalIds = [],
   selectedCompareModalIds = [],
@@ -206,9 +221,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   selectedSceneFrameModalIds,
   upscaleModalStates,
   multiangleCameraModalStates,
-  removeBgModalStates,
-  eraseModalStates,
-  expandModalStates,
+  // REMOVED: removeBgModalStates (via store)
+  // removeBgModalStates,
+  // REMOVED: eraseModalStates (via store)
+  // eraseModalStates,
+  // REMOVED: expandModalStates (via store)
+  // expandModalStates,
   vectorizeModalStates,
   nextSceneModalStates = [],
   compareModalStates = [],
@@ -217,9 +235,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   sceneFrameModalStates,
   setUpscaleModalStates,
   setMultiangleCameraModalStates,
-  setRemoveBgModalStates,
-  setEraseModalStates,
-  setExpandModalStates,
+  // REMOVED: setRemoveBgModalStates (via store)
+  // setRemoveBgModalStates,
+  // REMOVED: setEraseModalStates (via store)
+  // setEraseModalStates,
+  // REMOVED: setExpandModalStates (via store)
+  // setExpandModalStates,
   setVectorizeModalStates,
   setNextSceneModalStates,
   setCompareModalStates,
@@ -228,9 +249,12 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSceneFrameModalStates,
   setSelectedUpscaleModalIds,
   setSelectedMultiangleCameraModalIds,
-  setSelectedRemoveBgModalIds,
-  setSelectedEraseModalIds,
-  setSelectedExpandModalIds,
+  // REMOVED: setSelectedRemoveBgModalIds (via store)
+  // setSelectedRemoveBgModalIds,
+  // REMOVED: setSelectedEraseModalIds (via store)
+  // setSelectedEraseModalIds,
+  // REMOVED: setSelectedExpandModalIds (via store)
+  // setSelectedExpandModalIds,
   setSelectedVectorizeModalIds,
   setSelectedNextSceneModalIds,
   setSelectedCompareModalIds,
@@ -266,7 +290,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   setSelectionTransformerRect,
 }) => {
   // Calculate UI scale based on canvas scale (inverse scaling)
-  const MAX_UI_SCALE = 3;
+  const MAX_UI_SCALE = 1.5; // Reduced from 3 to prevent huge UI elements
   const inverseScale = 1 / Math.max(scale, 0.001);
   const uiScale = Math.min(inverseScale, MAX_UI_SCALE);
   // Remove htmlScale calculation, use uiScale directly for CSS transform to counteract zoom
@@ -299,15 +323,35 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
 
   // Ref for the selection box group (for Transformer)
   const selectionGroupRef = React.useRef<Konva.Group>(null);
+  const smartSelectRectRef = React.useRef<Konva.Rect>(null);
 
   const arrangeStateRef = useRef<{ selectionKey: string; order: string[]; bounds?: { minX: number; minY: number; maxX: number; maxY: number } } | null>(null);
   const arrangeAnimationFrameRef = useRef<number | null>(null);
+  const dragMoveRafRef = useRef<number | null>(null);
+  const pendingDragDeltaRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  // Zustand Hooks
+  const removeBgModalStates = useRemoveBgModalStates();
+  const { setRemoveBgModalStates, setSelectedRemoveBgModalId, setSelectedRemoveBgModalIds } = useRemoveBgStore();
+  const { selectedIds: selectedRemoveBgModalIds } = useRemoveBgSelection();
+
+  const eraseModalStates = useEraseModalStates();
+  const { setEraseModalStates, setSelectedEraseModalId, setSelectedEraseModalIds } = useEraseStore();
+  const { selectedIds: selectedEraseModalIds } = useEraseSelection();
+
+  const expandModalStates = useExpandModalStates();
+  const { setExpandModalStates, setSelectedExpandModalId, setSelectedExpandModalIds } = useExpandStore();
+  const { selectedIds: selectedExpandModalIds } = useExpandSelection();
 
   useEffect(() => {
     return () => {
       if (arrangeAnimationFrameRef.current) {
         cancelAnimationFrame(arrangeAnimationFrameRef.current);
         arrangeAnimationFrameRef.current = null;
+      }
+      if (dragMoveRafRef.current) {
+        cancelAnimationFrame(dragMoveRafRef.current);
+        dragMoveRafRef.current = null;
       }
     };
   }, []);
@@ -1364,6 +1408,31 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   };
 
 
+  // Ensure smart select appears on top of all components - update continuously during drag
+  useEffect(() => {
+    if (!isSelecting || !smartSelectRectRef.current) return;
+
+    let rafId: number;
+    const updateZIndex = () => {
+      if (smartSelectRectRef.current && isSelecting) {
+        smartSelectRectRef.current.moveToTop();
+        const layer = smartSelectRectRef.current.getLayer();
+        if (layer) {
+          layer.batchDraw();
+        }
+      }
+      if (isSelecting) {
+        rafId = requestAnimationFrame(updateZIndex);
+      }
+    };
+
+    rafId = requestAnimationFrame(updateZIndex);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [isSelecting, selectionBox]);
+
   // Show SelectionBox if:
   // 1. There's a selection rect AND it's a drag selection with 2+ components, OR
   // 2. There's a selection rect AND a group is selected (for group dragging and ungroup button)
@@ -1371,22 +1440,6 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
     // After selection completes, show tight rect with toolbar and allow dragging to move all
     return (
       <>
-        {/* Keep the normal marquee visible with subtle styling to indicate parallel selection */}
-        {selectionBox && (
-          <Rect
-            x={Math.min(selectionBox.startX, selectionBox.currentX)}
-            y={Math.min(selectionBox.startY, selectionBox.currentY)}
-            width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
-            height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-            fill={hasRichText ? "transparent" : "rgba(100,149,237,0.08)"}
-            stroke={SELECTION_COLOR}
-            strokeWidth={3}
-            dash={[8, 6]}
-            listening={false}
-            globalCompositeOperation="source-over"
-            cornerRadius={0}
-          />
-        )}
         <Group
           ref={selectionGroupRef}
           x={selectionTightRect.x}
@@ -1785,68 +1838,77 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             const deltaX = newX - origin.x;
             const deltaY = newY - origin.y;
 
-            // Move all selected images by delta in real-time (from original positions)
-            selectedImageIndices.forEach(idx => {
-              const originalPos = originalPositions.images.get(idx);
-              if (originalPos) {
-                handleImageUpdateWithGroup(idx, { x: originalPos.x + deltaX, y: originalPos.y + deltaY });
-              }
-            });
+            // Throttle drag-move updates to at most once per animation frame.
+            // Doing dozens of setState(map()) calls per pointer event makes dragging feel "stuck".
+            pendingDragDeltaRef.current = { dx: deltaX, dy: deltaY };
+            if (dragMoveRafRef.current) return;
 
-            // Move all selected text inputs by delta in real-time (from original positions)
-            selectedTextInputIds.forEach(textId => {
-              const originalPos = originalPositions.textInputs.get(textId);
-              if (originalPos) {
-                setTextInputStates((prev) =>
-                  prev.map((textState) =>
-                    textState.id === textId
-                      ? { ...textState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : textState
-                  )
-                );
-              }
-            });
+            dragMoveRafRef.current = requestAnimationFrame(() => {
+              dragMoveRafRef.current = null;
+              const pending = pendingDragDeltaRef.current;
+              if (!pending) return;
+              pendingDragDeltaRef.current = null;
 
-            // Move all selected rich text nodes by delta in real-time
-            selectedRichTextIds.forEach(textId => {
-              const originalPos = originalPositions.richTexts.get(textId);
-              if (originalPos) {
-                if (setRichTextStates) {
-                  setRichTextStates((prev) =>
-                    prev.map((textState) =>
-                      textState.id === textId
-                        ? { ...textState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                        : textState
-                    )
-                  );
+              const dx = pending.dx;
+              const dy = pending.dy;
+
+              // Move all selected images by delta (from original positions)
+              selectedImageIndices.forEach(idx => {
+                const originalPos = originalPositions.images.get(idx);
+                if (originalPos) {
+                  handleImageUpdateWithGroup(idx, { x: originalPos.x + dx, y: originalPos.y + dy });
                 }
-              }
-            });
+              });
 
-            // Move all selected image modals by delta in real-time (from original positions)
-            selectedImageModalIds.forEach(modalId => {
-              const originalPos = originalPositions.imageModals.get(modalId);
-              if (originalPos) {
-                setImageModalStates((prev) =>
-                  prev.map((modalState) =>
-                    modalState.id === modalId
-                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : modalState
-                  )
+              // Move all selected text inputs by delta (from original positions)
+              if (setTextInputStates) {
+                const ids = new Set(selectedTextInputIds);
+                setTextInputStates((prev) =>
+                  prev.map((textState) => {
+                    if (!ids.has(textState.id)) return textState;
+                    const originalPos = originalPositions.textInputs.get(textState.id);
+                    if (!originalPos) return textState;
+                    return { ...textState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
                 );
               }
-            });
 
-            // Move all selected video modals by delta in real-time (from original positions)
-            selectedVideoModalIds.forEach(modalId => {
-              const originalPos = originalPositions.videoModals.get(modalId);
-              if (originalPos) {
+              // Move all selected rich text nodes by delta
+              if (setRichTextStates) {
+                const ids = new Set(selectedRichTextIds);
+                setRichTextStates((prev) =>
+                  prev.map((textState) => {
+                    if (!ids.has(textState.id)) return textState;
+                    const originalPos = originalPositions.richTexts.get(textState.id);
+                    if (!originalPos) return textState;
+                    return { ...textState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
+                );
+              }
+
+              // Move selected image modals by delta
+              if (setImageModalStates) {
+                const ids = new Set(selectedImageModalIds);
+                setImageModalStates((prev) =>
+                  prev.map((modalState) => {
+                    if (!ids.has(modalState.id)) return modalState;
+                    const originalPos = originalPositions.imageModals.get(modalState.id);
+                    if (!originalPos) return modalState;
+                    return { ...modalState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
+                );
+              }
+
+              // Move selected video modals by delta
+              if (setVideoModalStates) {
+                const ids = new Set(selectedVideoModalIds);
                 setVideoModalStates((prev) =>
-                  prev.map((modalState) =>
-                    modalState.id === modalId
-                      ? { ...modalState, x: originalPos.x + deltaX, y: originalPos.y + deltaY }
-                      : modalState
-                  )
+                  prev.map((modalState) => {
+                    if (!ids.has(modalState.id)) return modalState;
+                    const originalPos = originalPositions.videoModals.get(modalState.id);
+                    if (!originalPos) return modalState;
+                    return { ...modalState, x: originalPos.x + dx, y: originalPos.y + dy };
+                  })
                 );
               }
             });
@@ -2292,6 +2354,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               divProps={{
                 style: {
                   pointerEvents: 'none',
+                  zIndex: 15000,
                 }
               }}
             >
@@ -2302,40 +2365,41 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       position: absolute;
                       display: flex;
                       align-items: center;
-                      gap: 6px;
+                      gap: 4px;
                       background: rgba(26, 26, 26, 0.95);
                       backdrop-filter: blur(10px);
                       -webkit-backdrop-filter: blur(10px);
                       border: 1px solid rgba(255, 255, 255, 0.1);
-                      border-radius: 10px;
-                      padding: 8px 12px;
+                      border-radius: 8px;
+                      padding: 6px 8px;
                       z-index: 1000;
                       box-shadow: 
                           0 4px 6px -1px rgba(0, 0, 0, 0.1),
                           0 2px 4px -1px rgba(0, 0, 0, 0.06);
-                      transform: translate(-50%, -100%) scale(${uiScale});
+                      transform: translate(-50%, -100%) scale(${Math.min(uiScale, 1.2)});
                       transform-origin: bottom center;
                       left: ${selectionTightRect.width / 2}px;
-                      top: -45px;
-                      min-width: max-content;
+                      top: -40px;
+                      max-width: ${Math.min(selectionTightRect.width * 0.9, 300)}px;
                       animation: fadeIn 0.15s ease-out;
                   }
                   @keyframes fadeIn {
-                      from { opacity: 0; transform: translate(-50%, -90%) scale(${uiScale}); }
-                      to { opacity: 1; transform: translate(-50%, -100%) scale(${uiScale}); }
+                      from { opacity: 0; transform: translate(-50%, -90%) scale(${Math.min(uiScale, 1.2)}); }
+                      to { opacity: 1; transform: translate(-50%, -100%) scale(${Math.min(uiScale, 1.2)}); }
                   }
                   .toolbar-btn {
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      width: 36px;
-                      height: 36px;
-                      border-radius: 8px;
+                      width: 28px;
+                      height: 28px;
+                      border-radius: 6px;
                       border: 1px solid transparent;
                       background: transparent;
                       color: #a1a1aa;
                       cursor: pointer;
                       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                      font-size: 12px;
                   }
                   .toolbar-btn:hover {
                       background: rgba(255, 255, 255, 0.1);
@@ -2344,9 +2408,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   }
                   .toolbar-divider {
                       width: 1px;
-                      height: 20px;
+                      height: 16px;
                       background: rgba(255, 255, 255, 0.15);
-                      margin: 0 4px;
+                      margin: 0 2px;
                   }
                   `}
                 </style>
@@ -2359,7 +2423,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       onClick={() => onCreateGroup?.()}
                       title="Group Selection"
                     >
-                      <GroupIcon size={20} />
+                      <GroupIcon size={16} />
                     </button>
                   )}
 
@@ -2377,7 +2441,7 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                       }}
                       title="Arrange Grid"
                     >
-                      <LayoutGrid size={20} />
+                      <LayoutGrid size={16} />
                     </button>
                   )}
                 </div>
@@ -2391,11 +2455,20 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
               divProps={{
                 style: {
                   pointerEvents: 'none',
-                  zIndex: 2000,
+                  zIndex: 15000,
                 }
               }}
             >
-              <div style={{ pointerEvents: 'auto' }}>
+              <div
+                style={{
+                  pointerEvents: 'auto',
+                  position: 'absolute',
+                  left: Math.min(selectionTightRect.width / 2, selectionTightRect.width - 150),
+                  top: Math.max(-60, -selectionTightRect.height - 10) * uiScale,
+                  transform: `scale(${Math.min(uiScale, 1.2)}) translate(-50%, -100%)`,
+                  transformOrigin: 'bottom center',
+                }}
+              >
                 <RichTextToolbar
                   fontFamily={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.fontFamily) ||
                     (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.fontFamily) || 'Inter'}
@@ -2406,27 +2479,36 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
                   align={(richTextStates.find(t => selectedRichTextIds.includes(t.id))?.align) ||
                     (effectiveCanvasTextStates.find(t => selectedCanvasTextIds.includes(t.id))?.textAlign) || 'left'}
                   onChange={handleMultiTextChange}
-                  position={{
-                    x: selectionTightRect.width / 2,
-                    y: -60 // Slightly higher to clear handles
-                  }}
+                  position={{ x: 0, y: 0 }}
                 />
               </div>
             </Html>
           )}
 
-        </Group>
-
-        {(totalSelected > 1) && selectionTransformerRect && (
+          {/* Blue background that moves with the group - matching smart select */}
           <Rect
-            x={selectionTransformerRect.x - 4} // Match Transformer padding
-            y={selectionTransformerRect.y - 4}
-            width={selectionTransformerRect.width + 8}
-            height={selectionTransformerRect.height + 8}
-            fill="rgba(76, 131, 255, 0.12)" // Theme blue with transparency
+            x={0}
+            y={0}
+            width={selectionTightRect.width}
+            height={selectionTightRect.height}
+            fill="rgba(59, 130, 246, 0.1)" // Same color and opacity as smart select
             listening={false}
           />
-        )}
+
+          {/* Selection border - dashed rectangle that moves with the group - matching smart select */}
+          <Rect
+            x={0}
+            y={0}
+            width={selectionTightRect.width}
+            height={selectionTightRect.height}
+            fill="transparent"
+            stroke="rgba(76, 131, 255, 0.6)" // Same color and opacity as smart select
+            strokeWidth={2}
+            dash={[4, 4]}
+            listening={false}
+            globalCompositeOperation="source-over"
+          />
+        </Group>
 
         {(totalSelected > 1) && selectionTransformerRect && (
           <Transformer
@@ -2437,9 +2519,9 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
             boundBoxFunc={(oldBox: { x: number; y: number; width: number; height: number; rotation: number }, newBox: { x: number; y: number; width: number; height: number; rotation: number }) => {
               return oldBox; // Prevent any resizing logic just in case
             }}
-            borderStroke={SELECTION_COLOR}
-            borderStrokeWidth={1}
-            borderDash={[4, 4]} // Keep dashed as per "smart selected" typical look
+            borderStroke="transparent" // Hide Transformer border since we have border in Group
+            borderStrokeWidth={0}
+            borderDash={[]}
             padding={4}
             onTransformEnd={handleTransformEnd}
           />
@@ -2449,15 +2531,16 @@ export const SelectionBox: React.FC<SelectionBoxProps> = ({
   }
 
   if (isSelecting && selectionBox) {
-    // While dragging, show live marquee box
+    // While dragging, show live marquee box (should appear on top of all components)
     return (
       <Rect
+        ref={smartSelectRectRef}
         x={Math.min(selectionBox.startX, selectionBox.currentX)}
         y={Math.min(selectionBox.startY, selectionBox.currentY)}
         width={Math.max(1, Math.abs(selectionBox.currentX - selectionBox.startX))}
         height={Math.max(1, Math.abs(selectionBox.currentY - selectionBox.startY))}
-        fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.2)"}
-        stroke={isOnlyText ? "transparent" : SELECTION_COLOR}
+        fill={isOnlyText ? "transparent" : "rgba(59, 130, 246, 0.1)"}
+        stroke={isOnlyText ? "transparent" : "rgba(76, 131, 255, 0.6)"}
         strokeWidth={2}
         dash={[4, 4]}
         listening={false}

@@ -18,6 +18,7 @@ interface VideoModalFrameProps {
   frameBorderWidth: number;
   onSelect?: () => void;
   getAspectRatio: (ratio: string) => string;
+  error?: string | null;
 }
 
 export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
@@ -35,6 +36,7 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
   frameBorderWidth,
   onSelect,
   getAspectRatio,
+  error,
 }) => {
   const isDark = useIsDarkTheme();
 
@@ -98,11 +100,12 @@ export const VideoModalFrame: React.FC<VideoModalFrameProps> = ({
         aspectRatio: getAspectRatio(selectedAspectRatio),
         minHeight: `${400 * scale}px`,
         backgroundColor: generatedVideoUrl ? 'transparent' : frameBg,
-        borderRadius: (isHovered || isPinned) ? '0px' : `${16 * scale}px`,
-        borderTop: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderLeft: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderRight: `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
-        borderBottom: (isHovered || isPinned) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRadius: ((isHovered || isPinned) && !isUploadedVideo) ? '0px' : `${16 * scale}px`,
+        borderTop: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderLeft: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderRight: (error && isSelected) ? `${2 * scale}px solid #ef4444` : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        borderBottom: (error && isSelected) ? `${2 * scale}px solid #ef4444` : ((isHovered || isPinned) && !isUploadedVideo) ? 'none' : `${frameBorderWidth * scale}px solid ${frameBorderColor}`,
+        boxSizing: 'border-box',
         transition: 'border 0.18s ease, background-color 0.3s ease',
         boxShadow: 'none',
         display: 'flex',

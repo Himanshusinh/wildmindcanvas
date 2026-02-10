@@ -6,15 +6,10 @@ import Konva from 'konva';
 import { UpscaleModalState, Connection, ImageModalState } from './types';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useUpscaleModalStates, useUpscaleSelection, useUpscaleStore } from '@/modules/stores';
 
 interface UpscaleModalOverlaysProps {
-  upscaleModalStates: UpscaleModalState[] | undefined;
-  selectedUpscaleModalId: string | null | undefined;
-  selectedUpscaleModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setUpscaleModalStates: React.Dispatch<React.SetStateAction<UpscaleModalState[]>>;
-  setSelectedUpscaleModalId: (id: string | null) => void;
-  setSelectedUpscaleModalIds: (ids: string[]) => void;
   onUpscale?: (model: string, scale: number, sourceImageUrl?: string, faceEnhance?: boolean, faceEnhanceStrength?: number, topazModel?: string, faceEnhanceCreativity?: number) => Promise<string | null>;
   onPersistUpscaleModalCreate?: (modal: { id: string; x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }) => void | Promise<void>;
   onPersistUpscaleModalMove?: (id: string, updates: Partial<{ x: number; y: number; upscaledImageUrl?: string | null; model?: string; scale?: number; frameWidth?: number; frameHeight?: number; faceEnhance?: boolean; faceEnhanceStrength?: number; topazModel?: string; faceEnhanceCreativity?: number }>) => void | Promise<void>;
@@ -28,16 +23,12 @@ interface UpscaleModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
-export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
-  upscaleModalStates,
-  selectedUpscaleModalId,
-  selectedUpscaleModalIds,
+export const UpscaleModalOverlays = React.memo<UpscaleModalOverlaysProps>(({
   clearAllSelections,
-  setUpscaleModalStates,
-  setSelectedUpscaleModalId,
-  setSelectedUpscaleModalIds,
   onUpscale,
   onPersistUpscaleModalCreate,
   onPersistUpscaleModalMove,
@@ -51,7 +42,17 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
+  // Zustand Store
+  const upscaleModalStates = useUpscaleModalStates();
+  const { selectedId: selectedUpscaleModalId, selectedIds: selectedUpscaleModalIds } = useUpscaleSelection();
+
+  const setUpscaleModalStates = useUpscaleStore(state => state.setUpscaleModalStates);
+  const setSelectedUpscaleModalId = useUpscaleStore(state => state.setSelectedUpscaleModalId);
+  const setSelectedUpscaleModalIds = useUpscaleStore(state => state.setSelectedUpscaleModalIds);
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   return (
@@ -95,6 +96,20 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedUpscaleModalId === modalState.id || (selectedUpscaleModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedUpscaleModalIds && selectedUpscaleModalIds.includes(modalState.id)) {
+                  return selectedUpscaleModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -228,5 +243,7 @@ export const UpscaleModalOverlays: React.FC<UpscaleModalOverlaysProps> = ({
       ))}
     </>
   );
-};
+});
+
+UpscaleModalOverlays.displayName = 'UpscaleModalOverlays';
 

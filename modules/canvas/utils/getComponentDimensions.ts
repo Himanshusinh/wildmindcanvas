@@ -4,7 +4,18 @@ import { CanvasItemsData } from '../types';
 export function getComponentDimensions(
     type: string,
     id: string | number,
-    data: CanvasItemsData
+    data: CanvasItemsData,
+    additionalStates: {
+        removeBgModalStates?: any[];
+        eraseModalStates?: any[];
+        expandModalStates?: any[];
+        vectorizeModalStates?: any[];
+        imageEditorModalStates?: any[];
+        nextSceneModalStates?: any[];
+        storyboardModalStates?: any[];
+        videoEditorModalStates?: any[];
+        compareModalStates?: any[];
+    } = {}
 ): { width: number; height: number } {
     const calculateHeightFromAspectRatio = (width: number, aspectRatio: string | undefined, minHeight: number): number => {
         if (!aspectRatio) return minHeight;
@@ -15,27 +26,39 @@ export function getComponentDimensions(
     };
 
     const {
-        images,
-        canvasTextStates,
-        textInputStates,
-        imageModalStates,
-        videoModalStates,
-        musicModalStates,
-        upscaleModalStates,
-        multiangleCameraModalStates,
-        removeBgModalStates,
-        eraseModalStates,
-        expandModalStates,
-        vectorizeModalStates,
-        nextSceneModalStates,
-        compareModalStates,
-        storyboardModalStates,
-        scriptFrameModalStates,
-        sceneFrameModalStates,
-        videoEditorModalStates,
-        richTextStates,
-        imageEditorModalStates
+        images = [],
+        canvasTextStates = [],
+        textInputStates = [],
+        imageModalStates = [],
+        videoModalStates = [],
+        musicModalStates = [],
+        upscaleModalStates = [],
+        multiangleCameraModalStates = [],
+        // REMOVED: removeBgModalStates
+        // REMOVED: eraseModalStates
+        // REMOVED: expandModalStates
+        // REMOVED: vectorizeModalStates
+        // nextSceneModalStates,
+        // compareModalStates,
+        // storyboardModalStates,
+        scriptFrameModalStates = [],
+        sceneFrameModalStates = [],
+        // videoEditorModalStates,
+        // compareModalStates,
+        richTextStates = [],
+        // The imageEditorModalStates from `data` is no longer destructured here
     } = data;
+
+    const removeBgModalStates = additionalStates.removeBgModalStates || data.removeBgModalStates || [];
+    const eraseModalStates = additionalStates.eraseModalStates || data.eraseModalStates || [];
+    const expandModalStates = additionalStates.expandModalStates || data.expandModalStates || [];
+    const vectorizeModalStates = additionalStates.vectorizeModalStates || data.vectorizeModalStates || [];
+    // Prioritize additionalStates for imageEditorModalStates as per instruction
+    const imageEditorModalStates = additionalStates.imageEditorModalStates || data.imageEditorModalStates || [];
+    const nextSceneModalStates = additionalStates.nextSceneModalStates || data.nextSceneModalStates || [];
+    const storyboardModalStates = additionalStates.storyboardModalStates || data.storyboardModalStates || [];
+    const videoEditorModalStates = additionalStates.videoEditorModalStates || data.videoEditorModalStates || [];
+    const compareModalStates = additionalStates.compareModalStates || data.compareModalStates || [];
 
     switch (type) {
         case 'image': {

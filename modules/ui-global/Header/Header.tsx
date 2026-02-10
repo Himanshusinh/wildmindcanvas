@@ -132,17 +132,27 @@ export const Header: React.FC<HeaderProps> = ({
         </svg>
       </div>
 
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .header-btn { position: relative; overflow: hidden; }
+        .header-btn .hover-overlay { opacity: 0; transition: opacity 0.2s; pointer-events: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .header-btn:hover .hover-overlay { opacity: 1; }
+      `}} />
+
       {/* Project Name */}
       <div
+        className="header-btn"
         style={{
           padding: '6px 10px',
           backgroundColor: bgColor,
           borderRadius: '8px',
           border: `1px solid ${borderColor}`,
           boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.3)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
-          transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+          // Optimization: Removed transition on expensive properties
         }}
       >
+        <div className="hover-overlay" style={{ backgroundColor: hoverBg }} />
+
         {isEditing ? (
           <input
             ref={inputRef}
@@ -162,7 +172,9 @@ export const Header: React.FC<HeaderProps> = ({
               outline: 'none',
               minWidth: '120px',
               backgroundColor: inputBg,
-              transition: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease',
+              transition: 'background-color 0.3s ease, color 0.3s ease', // Removed border-color transition
+              position: 'relative',
+              zIndex: 1,
             }}
           />
         ) : (
@@ -175,14 +187,10 @@ export const Header: React.FC<HeaderProps> = ({
               fontWeight: '500',
               cursor: 'text',
               borderRadius: '4px',
-              transition: 'background-color 0.3s ease, color 0.3s ease',
+              transition: 'color 0.3s ease',
               minWidth: '120px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = hoverBg;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             {initialProjectName || 'Untitled'}
@@ -194,6 +202,7 @@ export const Header: React.FC<HeaderProps> = ({
       {onSwitchProject && (
         <div
           onClick={onSwitchProject}
+          className="header-btn"
           style={{
             width: '28px',
             height: '28px',
@@ -206,19 +215,16 @@ export const Header: React.FC<HeaderProps> = ({
             boxShadow: isDark ? '0 8px 32px 0 rgba(0, 0, 0, 0.3)' : '0 8px 32px 0 rgba(0, 0, 0, 0.1)',
             color: iconColor,
             cursor: 'pointer',
-            transition: 'all 0.3s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = hoverBg;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = bgColor;
+            // Optimization: Removed transition on expensive properties
           }}
           title="Switch Project"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3h18v18H3zM7 12h10M7 12l3-3M7 12l3 3" />
-          </svg>
+          <div className="hover-overlay" style={{ backgroundColor: hoverBg }} />
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3h18v18H3zM7 12h10M7 12l3-3M7 12l3 3" />
+            </svg>
+          </div>
         </div>
       )}
 
@@ -237,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({
             color: textColor,
             fontSize: '14px',
             fontWeight: '500',
-            transition: 'background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+            // Optimization: Removed transition on expensive properties
           }}
           title="Available Credits"
         >

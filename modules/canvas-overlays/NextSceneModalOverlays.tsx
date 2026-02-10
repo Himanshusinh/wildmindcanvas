@@ -6,15 +6,10 @@ import Konva from 'konva';
 import { Connection, ImageModalState, NextSceneModalState } from './types';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
+import { useNextSceneStore, useNextSceneSelection, useNextSceneModalStates } from '@/modules/stores';
 
 interface NextSceneModalOverlaysProps {
-    nextSceneModalStates: NextSceneModalState[] | undefined;
-    selectedNextSceneModalId: string | null | undefined;
-    selectedNextSceneModalIds: string[] | undefined;
     clearAllSelections: () => void;
-    setNextSceneModalStates: React.Dispatch<React.SetStateAction<NextSceneModalState[]>>;
-    setSelectedNextSceneModalId: (id: string | null) => void;
-    setSelectedNextSceneModalIds: (ids: string[]) => void;
     onPersistNextSceneModalCreate?: (modal: { id: string; x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }) => void | Promise<void>;
     onPersistNextSceneModalMove?: (id: string, updates: Partial<{ x: number; y: number; nextSceneImageUrl?: string | null; sourceImageUrl?: string | null; localNextSceneImageUrl?: string | null; mode?: string; frameWidth?: number; frameHeight?: number; isProcessing?: boolean }>) => void | Promise<void>;
     onPersistNextSceneModalDelete?: (id: string) => void | Promise<void>;
@@ -27,16 +22,12 @@ interface NextSceneModalOverlaysProps {
     stageRef: React.RefObject<Konva.Stage | null>;
     scale: number;
     position: { x: number; y: number };
+    isChatOpen?: boolean;
+    selectedIds?: string[];
 }
 
 export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
-    nextSceneModalStates,
-    selectedNextSceneModalId,
-    selectedNextSceneModalIds,
     clearAllSelections,
-    setNextSceneModalStates,
-    setSelectedNextSceneModalId,
-    setSelectedNextSceneModalIds,
     onPersistNextSceneModalCreate,
     onPersistNextSceneModalMove,
     onPersistNextSceneModalDelete,
@@ -49,7 +40,36 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
     stageRef,
     scale,
     position,
+    isChatOpen = false,
+    selectedIds = [],
 }) => {
+    const storeNextSceneModalStates = useNextSceneModalStates();
+    const {
+        selectedId: storeSelectedNextSceneModalId,
+        selectedIds: storeSelectedNextSceneModalIds,
+        setSelectedId: storeSetSelectedNextSceneModalId,
+        setSelectedIds: storeSetSelectedNextSceneModalIds
+    } = useNextSceneSelection();
+    const { setNextSceneModalStates: storeSetNextSceneModalStates } = useNextSceneStore();
+
+    /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
+    const finalNextSceneModalStates = nextSceneModalStates || storeNextSceneModalStates;
+    const finalSelectedNextSceneModalId = selectedNextSceneModalId !== undefined ? selectedNextSceneModalId : storeSelectedNextSceneModalId;
+    const finalSelectedNextSceneModalIds = selectedNextSceneModalIds !== undefined ? selectedNextSceneModalIds : storeSelectedNextSceneModalIds;
+
+    const finalSetNextSceneModalStates = setNextSceneModalStates || storeSetNextSceneModalStates;
+    const finalSetSelectedNextSceneModalId = setSelectedNextSceneModalId || storeSetSelectedNextSceneModalId;
+    const finalSetSelectedNextSceneModalIds = setSelectedNextSceneModalIds || storeSetSelectedNextSceneModalIds;
+    */
+    // Use store directly
+    const finalNextSceneModalStates = storeNextSceneModalStates;
+    const finalSelectedNextSceneModalId = storeSelectedNextSceneModalId;
+    const finalSelectedNextSceneModalIds = storeSelectedNextSceneModalIds;
+
+    const finalSetNextSceneModalStates = storeSetNextSceneModalStates;
+    const finalSetSelectedNextSceneModalId = storeSetSelectedNextSceneModalId;
+    const finalSetSelectedNextSceneModalIds = storeSetSelectedNextSceneModalIds;
+
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
     return (
@@ -60,7 +80,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
                     onDuplicate={() => {
-                        const modalState = nextSceneModalStates?.find(m => m.id === contextMenu.modalId);
+                        const modalState = finalNextSceneModalStates?.find(m => m.id === contextMenu.modalId);
                         if (modalState) {
                             const duplicated = {
                                 ...modalState,
@@ -68,7 +88,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                                 x: modalState.x + 50,
                                 y: modalState.y + 50,
                             };
-                            setNextSceneModalStates(prev => [...prev, duplicated]);
+                            finalSetNextSceneModalStates(prev => [...prev, duplicated]);
                             if (onPersistNextSceneModalCreate) {
                                 Promise.resolve(onPersistNextSceneModalCreate(duplicated)).catch(console.error);
                             }
@@ -77,8 +97,8 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     onDelete={() => {
                         if (onPersistNextSceneModalDelete) {
                             const modalId = contextMenu.modalId;
-                            setSelectedNextSceneModalId(null);
-                            setSelectedNextSceneModalIds([]);
+                            finalSetSelectedNextSceneModalId(null);
+                            finalSetSelectedNextSceneModalIds([]);
                             const result = onPersistNextSceneModalDelete(modalId);
                             if (result && typeof result.then === 'function') {
                                 Promise.resolve(result).catch(console.error);
@@ -87,20 +107,34 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     }}
                 />
             )}
-            {(nextSceneModalStates || []).map((modalState) => (
+            {(finalNextSceneModalStates || []).map((modalState) => (
                 <NextScenePluginModal
                     key={modalState.id}
                     isOpen={true}
                     isExpanded={modalState.isExpanded}
                     id={modalState.id}
+                    isAttachedToChat={isChatOpen && (finalSelectedNextSceneModalId === modalState.id || (finalSelectedNextSceneModalIds || []).includes(modalState.id))}
+                    selectionOrder={
+                        isChatOpen
+                            ? (() => {
+                                if (selectedIds && selectedIds.includes(modalState.id)) {
+                                    return selectedIds.indexOf(modalState.id) + 1;
+                                }
+                                if (finalSelectedNextSceneModalIds && finalSelectedNextSceneModalIds.includes(modalState.id)) {
+                                    return finalSelectedNextSceneModalIds.indexOf(modalState.id) + 1;
+                                }
+                                return undefined;
+                            })()
+                            : undefined
+                    }
                     onContextMenu={(e: React.MouseEvent) => {
                         e.preventDefault();
                         e.stopPropagation();
                         setContextMenu({ x: e.clientX, y: e.clientY, modalId: modalState.id });
                     }}
                     onClose={() => {
-                        setNextSceneModalStates(prev => prev.filter(m => m.id !== modalState.id));
-                        setSelectedNextSceneModalId(null);
+                        finalSetNextSceneModalStates(prev => prev.filter(m => m.id !== modalState.id));
+                        finalSetSelectedNextSceneModalId(null);
                         if (onPersistNextSceneModalDelete) {
                             Promise.resolve(onPersistNextSceneModalDelete(modalState.id)).catch(console.error);
                         }
@@ -109,8 +143,8 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     isProcessing={modalState.isProcessing || false}
                     onSelect={() => {
                         clearAllSelections();
-                        setSelectedNextSceneModalId(modalState.id);
-                        setSelectedNextSceneModalIds([modalState.id]);
+                        finalSetSelectedNextSceneModalId(modalState.id);
+                        finalSetSelectedNextSceneModalIds([modalState.id]);
                     }}
                     onDelete={() => {
                         console.log('[NextSceneModalOverlays] onDelete called', {
@@ -118,8 +152,8 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                             modalId: modalState.id,
                         });
                         // Clear selection immediately
-                        setSelectedNextSceneModalId(null);
-                        setSelectedNextSceneModalIds([]);
+                        finalSetSelectedNextSceneModalId(null);
+                        finalSetSelectedNextSceneModalIds([]);
                         // Call persist delete - it updates parent state (nextSceneGenerators) which flows down as externalNextSceneModals
                         // Canvas will sync nextSceneModalStates with externalNextSceneModals via useEffect
                         if (onPersistNextSceneModalDelete) {
@@ -154,13 +188,13 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                             frameWidth: modalState.frameWidth || 400,
                             frameHeight: modalState.frameHeight || 500,
                             isProcessing: false,
-                        };
-                        setNextSceneModalStates(prev => [...prev, newModal]);
+                        } as any;
+                        finalSetNextSceneModalStates(prev => [...prev, newModal]);
                         if (onPersistNextSceneModalCreate) {
                             Promise.resolve(onPersistNextSceneModalCreate(newModal)).catch(console.error);
                         }
                     }}
-                    isSelected={selectedNextSceneModalId === modalState.id || (selectedNextSceneModalIds || []).includes(modalState.id)}
+                    isSelected={finalSelectedNextSceneModalId === modalState.id || (finalSelectedNextSceneModalIds || []).includes(modalState.id)}
                     stageRef={stageRef}
                     scale={scale}
                     position={position}
@@ -170,7 +204,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     // Log position props to verify they're updating
                     // #endregion
                     onPositionChange={(newX, newY) => {
-                        setNextSceneModalStates(prev =>
+                        finalSetNextSceneModalStates(prev =>
                             prev.map(m => m.id === modalState.id ? { ...m, x: newX, y: newY } : m)
                         );
                     }}
@@ -183,7 +217,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     initialSourceImageUrl={modalState.sourceImageUrl}
                     initialLocalNextSceneImageUrl={modalState.localNextSceneImageUrl}
                     onOptionsChange={(opts) => {
-                        setNextSceneModalStates(prev =>
+                        finalSetNextSceneModalStates(prev =>
                             prev.map(m => m.id === modalState.id ? { ...m, ...opts } : m)
                         );
                         if (onPersistNextSceneModalMove) {
@@ -192,7 +226,7 @@ export const NextSceneModalOverlays: React.FC<NextSceneModalOverlaysProps> = ({
                     }}
                     onPersistNextSceneModalCreate={onPersistNextSceneModalCreate}
                     onUpdateModalState={(modalId, updates) => {
-                        setNextSceneModalStates(prev =>
+                        finalSetNextSceneModalStates(prev =>
                             prev.map(m => m.id === modalId ? { ...m, ...updates } : m)
                         );
                         if (onPersistNextSceneModalMove) {

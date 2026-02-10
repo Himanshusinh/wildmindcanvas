@@ -6,15 +6,10 @@ import Konva from 'konva';
 import { EraseModalState, Connection, ImageModalState } from './types';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useEraseModalStates, useEraseStore, useEraseSelection } from '@/modules/stores';
 
 interface EraseModalOverlaysProps {
-  eraseModalStates: EraseModalState[] | undefined;
-  selectedEraseModalId: string | null | undefined;
-  selectedEraseModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setEraseModalStates: React.Dispatch<React.SetStateAction<EraseModalState[]>>;
-  setSelectedEraseModalId: (id: string | null) => void;
-  setSelectedEraseModalIds: (ids: string[]) => void;
   onErase?: (model: string, sourceImageUrl?: string, mask?: string, prompt?: string) => Promise<string | null>;
   onPersistEraseModalCreate?: (modal: { id: string; x: number; y: number; erasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistEraseModalMove?: (id: string, updates: Partial<{ x: number; y: number; erasedImageUrl?: string | null; sourceImageUrl?: string | null; localErasedImageUrl?: string | null; isErasing?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
@@ -28,16 +23,12 @@ interface EraseModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
-export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
-  eraseModalStates,
-  selectedEraseModalId,
-  selectedEraseModalIds,
+export const EraseModalOverlays = React.memo<EraseModalOverlaysProps>(({
   clearAllSelections,
-  setEraseModalStates,
-  setSelectedEraseModalId,
-  setSelectedEraseModalIds,
   onErase,
   onPersistEraseModalCreate,
   onPersistEraseModalMove,
@@ -51,7 +42,29 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
+  const storeEraseModalStates = useEraseModalStates();
+  const storeSetEraseModalStates = useEraseStore(state => state.setEraseModalStates);
+  const { selectedId: storeSelectedEraseModalId, selectedIds: storeSelectedEraseModalIds, setSelectedId: storeSetSelectedEraseModalId, setSelectedIds: storeSetSelectedEraseModalIds } = useEraseSelection();
+
+  /* Removed: Prop fallback logic. State is now strictly managed by Zustand.
+  const eraseModalStates = propEraseModalStates || storeEraseModalStates;
+  const setEraseModalStates = propSetEraseModalStates || storeSetEraseModalStates;
+  const selectedEraseModalId = propSelectedEraseModalId || storeSelectedEraseModalId;
+  const selectedEraseModalIds = propSelectedEraseModalIds || storeSelectedEraseModalIds;
+  const setSelectedEraseModalId = propSetSelectedEraseModalId || storeSetSelectedEraseModalId;
+  const setSelectedEraseModalIds = propSetSelectedEraseModalIds || storeSetSelectedEraseModalIds;
+  */
+  // Use store directly
+  const eraseModalStates = storeEraseModalStates;
+  const setEraseModalStates = storeSetEraseModalStates;
+  const selectedEraseModalId = storeSelectedEraseModalId;
+  const selectedEraseModalIds = storeSelectedEraseModalIds;
+  const setSelectedEraseModalId = storeSetSelectedEraseModalId;
+  const setSelectedEraseModalIds = storeSetSelectedEraseModalIds;
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   return (
@@ -95,6 +108,20 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedEraseModalId === modalState.id || (selectedEraseModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedEraseModalIds && selectedEraseModalIds.includes(modalState.id)) {
+                  return selectedEraseModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -220,5 +247,7 @@ export const EraseModalOverlays: React.FC<EraseModalOverlaysProps> = ({
       ))}
     </>
   );
-};
+});
+
+EraseModalOverlays.displayName = 'EraseModalOverlays';
 

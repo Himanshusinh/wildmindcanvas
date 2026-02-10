@@ -79,8 +79,8 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
       style={{
         position: 'absolute',
         top: '100%',
-        left: `${-frameBorderWidth * scale}px`,
-        right: `${-frameBorderWidth * scale}px`, // Span full width
+        left: 0,
+        right: 0, // Align exactly with parent width
         padding: `${12 * scale}px`,
         paddingTop: `${8 * scale}px`,
         paddingBottom: `${12 * scale}px`,
@@ -98,10 +98,10 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
         flexDirection: 'column',
         gap: `${10 * scale}px`,
         pointerEvents: (isHovered || isPinned) ? 'auto' : 'none',
+        boxSizing: 'border-box',
         overflow: 'visible',
         zIndex: 1,
-        transition: 'background-color, border-color, opacity, max-height',
-        marginTop: `${-1 * scale}px`, // Pull up to overlap border
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease',
       }}
       onMouseEnter={() => onSetIsHovered(true)}
       onMouseLeave={() => onSetIsHovered(false)}
@@ -164,7 +164,7 @@ export const TextModalControls: React.FC<TextModalControlsProps> = ({
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              {['GPT-4o', 'Gemini Pro'].map((model) => (
+              {['GPT-5', 'Gemini Pro'].map((model) => (
                 <div
                   key={model}
                   onClick={(e) => {

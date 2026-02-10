@@ -6,15 +6,10 @@ import Konva from 'konva';
 import { Connection, ImageModalState, RemoveBgModalState } from './types';
 import { downloadImage, generateDownloadFilename } from '@/core/api/downloadUtils';
 import { PluginContextMenu } from '@/modules/ui-global/common/PluginContextMenu';
+import { useRemoveBgModalStates, useRemoveBgStore, useRemoveBgSelection } from '@/modules/stores';
 
 interface RemoveBgModalOverlaysProps {
-  removeBgModalStates: RemoveBgModalState[] | undefined;
-  selectedRemoveBgModalId: string | null | undefined;
-  selectedRemoveBgModalIds: string[] | undefined;
   clearAllSelections: () => void;
-  setRemoveBgModalStates: React.Dispatch<React.SetStateAction<RemoveBgModalState[]>>;
-  setSelectedRemoveBgModalId: (id: string | null) => void;
-  setSelectedRemoveBgModalIds: (ids: string[]) => void;
   onRemoveBg?: (model: string, backgroundType: string, scaleValue: number, sourceImageUrl?: string) => Promise<string | null>;
   onPersistRemoveBgModalCreate?: (modal: { id: string; x: number; y: number; removedBgImageUrl?: string | null; isRemovingBg?: boolean; frameWidth?: number; frameHeight?: number }) => void | Promise<void>;
   onPersistRemoveBgModalMove?: (id: string, updates: Partial<{ x: number; y: number; removedBgImageUrl?: string | null; sourceImageUrl?: string | null; localRemovedBgImageUrl?: string | null; isRemovingBg?: boolean; frameWidth?: number; frameHeight?: number }>) => void | Promise<void>;
@@ -28,16 +23,12 @@ interface RemoveBgModalOverlaysProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   scale: number;
   position: { x: number; y: number };
+  isChatOpen?: boolean;
+  selectedIds?: string[];
 }
 
-export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
-  removeBgModalStates,
-  selectedRemoveBgModalId,
-  selectedRemoveBgModalIds,
+export const RemoveBgModalOverlays = React.memo<RemoveBgModalOverlaysProps>(({
   clearAllSelections,
-  setRemoveBgModalStates,
-  setSelectedRemoveBgModalId,
-  setSelectedRemoveBgModalIds,
   onRemoveBg,
   onPersistRemoveBgModalCreate,
   onPersistRemoveBgModalMove,
@@ -51,7 +42,19 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
   stageRef,
   scale,
   position,
+  isChatOpen = false,
+  selectedIds = [],
 }) => {
+  const storeRemoveBgModalStates = useRemoveBgModalStates();
+  const storeSetRemoveBgModalStates = useRemoveBgStore(state => state.setRemoveBgModalStates);
+  const { selectedId: storeSelectedRemoveBgModalId, selectedIds: storeSelectedRemoveBgModalIds, setSelectedId: storeSetSelectedRemoveBgModalId, setSelectedIds: storeSetSelectedRemoveBgModalIds } = useRemoveBgSelection();
+
+  const setRemoveBgModalStates = useRemoveBgStore(state => state.setRemoveBgModalStates);
+  const { selectedId: selectedRemoveBgModalId, selectedIds: selectedRemoveBgModalIds, setSelectedId: setSelectedRemoveBgModalId, setSelectedIds: setSelectedRemoveBgModalIds } = useRemoveBgSelection();
+
+  // Removed: Prop fallback logic. State is now strictly managed by Zustand.
+  const removeBgModalStates = storeRemoveBgModalStates || [];
+
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number; modalId: string } | null>(null);
 
   return (
@@ -95,6 +98,20 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
           isOpen={true}
           isExpanded={modalState.isExpanded}
           id={modalState.id}
+          isAttachedToChat={isChatOpen && (selectedRemoveBgModalId === modalState.id || (selectedRemoveBgModalIds || []).includes(modalState.id))}
+          selectionOrder={
+            isChatOpen
+              ? (() => {
+                if (selectedIds && selectedIds.includes(modalState.id)) {
+                  return selectedIds.indexOf(modalState.id) + 1;
+                }
+                if (selectedRemoveBgModalIds && selectedRemoveBgModalIds.includes(modalState.id)) {
+                  return selectedRemoveBgModalIds.indexOf(modalState.id) + 1;
+                }
+                return undefined;
+              })()
+              : undefined
+          }
           onContextMenu={(e: React.MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -222,5 +239,7 @@ export const RemoveBgModalOverlays: React.FC<RemoveBgModalOverlaysProps> = ({
       ))}
     </>
   );
-};
+});
+
+RemoveBgModalOverlays.displayName = 'RemoveBgModalOverlays';
 

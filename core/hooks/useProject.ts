@@ -23,10 +23,8 @@ interface UseProjectReturn {
  */
 export function useProject({ currentUser }: UseProjectOptions): UseProjectReturn {
   const [projectName, setProjectName] = useState(() => {
-    // Load from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('canvas-project-name') || 'Untitled';
-    }
+    // Don't load from localStorage on initial render - it might be stale
+    // The project name will be set when a project is loaded or selected
     return 'Untitled';
   });
   const [projectId, setProjectId] = useState<string | null>(null);

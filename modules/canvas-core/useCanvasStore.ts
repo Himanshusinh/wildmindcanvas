@@ -34,23 +34,47 @@ export function useCanvasStore(projectId: string | null) {
     const historyRef = useRef(new HistoryManager());
     const [historyVersion, setHistoryVersion] = useState(0);
 
-    // Initialization
+    // Initialization - Reset store when projectId changes
     useEffect(() => {
-        if (!projectId) return;
-        const loaded = loadSnapshot();
-        if (loaded) {
+        if (!projectId) {
+            // Clear doc when no projectId
+            setDoc({
+                id: 'default',
+                version: 0,
+                nodes: {},
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            });
+            historyRef.current = new HistoryManager();
+            setHistoryVersion(0);
+            return;
+        }
+
+        // Load project-specific snapshot
+        const loaded = loadSnapshot(projectId);
+        if (loaded && loaded.id === projectId) {
+            // Only use loaded doc if it matches the current projectId
             setDoc(loaded);
         } else {
-            setDoc(prev => ({ ...prev, id: projectId }));
+            // Reset to empty doc for new project
+            setDoc({
+                id: projectId,
+                version: 0,
+                nodes: {},
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            });
+            historyRef.current = new HistoryManager();
+            setHistoryVersion(0);
         }
     }, [projectId]);
 
-    // Persistence Auto-Save
+    // Persistence Auto-Save - Only save if projectId matches doc.id
     useEffect(() => {
-        if (doc.version > 0) {
-            saveSnapshot(doc);
+        if (doc.version > 0 && projectId && doc.id === projectId) {
+            saveSnapshot(doc, projectId);
         }
-    }, [doc]);
+    }, [doc, projectId]);
 
     // Command Executor
     const execute = useCallback((cmd: Command) => {
@@ -103,7 +127,7 @@ export function useCanvasStore(projectId: string | null) {
     const groupContainerStates = useMemo(() => nodesArray.filter(n => n.type === 'group').map(n => itemFromNode<GroupContainerState>(n)), [nodesArray]);
     const connectors = useMemo(() => nodesArray.filter(n => n.type === 'connector').map(n => itemFromNode<Connector>(n)), [nodesArray]);
 
-    const [generationQueue, setGenerationQueue] = useState<any[]>([]);
+
 
     // --- Compatible Setters ---
     // Make createSetter depend on execute (which is stable now)
@@ -160,7 +184,7 @@ export function useCanvasStore(projectId: string | null) {
                     // Check if position changed (x or y) - always update if position changed
                     const positionChanged = (oldItem as any).x !== (item as any).x || (oldItem as any).y !== (item as any).y;
                     const hasPositionUpdate = (item as any).x !== undefined || (item as any).y !== undefined;
-                    
+
                     if (oldItem === item && !positionChanged && !hasPositionUpdate) return; // No change
 
                     let newNode = (type === 'image' || type === 'model3d')
@@ -169,7 +193,7 @@ export function useCanvasStore(projectId: string | null) {
 
                     if (!newNode.width) newNode.width = (oldItem as any).width || 400;
                     if (!newNode.height) newNode.height = (oldItem as any).height || 400;
-                    
+
                     // Ensure position is always set from item - explicitly check for position updates
                     if ((item as any).x !== undefined) {
                         newNode.x = (item as any).x;
@@ -177,7 +201,7 @@ export function useCanvasStore(projectId: string | null) {
                         // If position changed but new item doesn't have x, preserve old x
                         newNode.x = (oldItem as any).x;
                     }
-                    
+
                     if ((item as any).y !== undefined) {
                         newNode.y = (item as any).y;
                     } else if (positionChanged && (oldItem as any).y !== undefined) {
@@ -218,7 +242,7 @@ export function useCanvasStore(projectId: string | null) {
         richTextStates,
         groupContainerStates,
         connectors,
-        generationQueue,
+
         showImageGenerationModal: false,
 
         setImages: createSetter('image', images),
@@ -244,7 +268,7 @@ export function useCanvasStore(projectId: string | null) {
         setGroupContainerStates: createSetter('group', groupContainerStates),
         setConnectors: createSetter('connector', connectors),
 
-        setGenerationQueue,
+
         setShowImageGenerationModal: () => { },
 
         doc,
