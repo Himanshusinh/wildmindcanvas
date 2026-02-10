@@ -16,7 +16,7 @@ const PluginSidebar = dynamic(() => import('@/modules/canvas/PluginSidebar'), { 
 import { ImageUpload } from '@/core/types/canvas';
 import { useMediaUpload } from '@/modules/canvas/hooks/useMediaUpload';
 import { usePasteHandler } from '@/modules/canvas/hooks/usePasteHandler';
-import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem } from '@/core/api/api';
+import { generateImageForCanvas, generateVideoForCanvas, upscaleImageForCanvas, removeBgImageForCanvas, vectorizeImageForCanvas, multiangleImageForCanvas, getCurrentUser, MediaItem, StorageInfo, getStorageInfo } from '@/core/api/api';
 import { createProject, getProject, listProjects, getCurrentSnapshot as apiGetCurrentSnapshot, setCurrentSnapshot as apiSetCurrentSnapshot, updateProject } from '@/core/api/canvasApi';
 import { ProjectSelector } from '@/modules/ui-global/ProjectSelector/ProjectSelector';
 import { CanvasProject, CanvasOp } from '@/core/api/canvasApi';
@@ -96,7 +96,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
       setStorageStats(info);
       setIsStorageModalOpen(true);
     } catch (error) {
-       console.error('Failed to load storage info', error);
+      console.error('Failed to load storage info', error);
     }
   }, [currentUser]);
 
@@ -1421,7 +1421,7 @@ export function CanvasApp({ user }: CanvasAppProps) {
         storageUsed={storageStats ? Number(storageStats.usedBytes) : 0}
         storageQuota={storageStats ? Number(storageStats.quotaBytes) : 0}
       />
-      <GenerationQueue items={generationQueue} />
+      {/* <GenerationQueue items={generationQueue} /> */}
       <LibrarySidebar
         isOpen={isLibraryOpen}
         onClose={() => setIsLibraryOpen(false)}

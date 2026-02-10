@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { ImageUpload } from '@/core/types/canvas';
 import { saveUploadedMedia } from '@/core/api/api';
+import { useNotificationStore } from '@/modules/stores/notificationStore';
 
 interface UseMediaUploadProps {
     projectId: string | null;
@@ -17,6 +18,7 @@ export const useMediaUpload = ({
     setImageGenerators,
     setVideoGenerators,
 }: UseMediaUploadProps) => {
+    const addToast = useNotificationStore(state => state.addToast);
 
     const processMediaFile = useCallback(async (file: File, offsetIndex: number = 0) => {
         const fileType = file.type.toLowerCase();
@@ -67,10 +69,14 @@ export const useMediaUpload = ({
                         setTimeout(() => {
                             window.dispatchEvent(new CustomEvent('library-refresh'));
                         }, 1000);
+                        addToast('Media uploaded successfully', 'success');
+                    } else {
+                        throw new Error(result.error || 'Upload failed');
                     }
                 }
             } catch (err) {
                 console.warn('[processMediaFile] Background upload failed, keeping local blob:', err);
+                addToast('Failed to upload media to server. Your changes are saved locally only.', 'error');
             }
         };
 
